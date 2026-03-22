@@ -1,14 +1,14 @@
 from tusk.schemas.desktop_context import DesktopContext, WindowInfo
 from tusk.schemas.gate_result import GateResult
-from tusk.schemas.semantic_action import CloseWindowAction, LaunchApplicationAction, SemanticAction
+from tusk.schemas.tool_call import ToolCall
+from tusk.schemas.tool_result import ToolResult
 from tusk.schemas.utterance import Utterance
 
 __all__ = [
-    "Utterance",
-    "GateResult",
     "DesktopContext",
+    "GateResult",
+    "ToolCall",
+    "ToolResult",
+    "Utterance",
     "WindowInfo",
-    "SemanticAction",
-    "LaunchApplicationAction",
-    "CloseWindowAction",
 ]

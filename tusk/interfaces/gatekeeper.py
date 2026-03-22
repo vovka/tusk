@@ -8,5 +8,5 @@ __all__ = ["Gatekeeper"]
 
 class Gatekeeper(ABC):
     @abstractmethod
-    def evaluate(self, utterance: Utterance) -> GateResult:
+    def evaluate(self, utterance: Utterance, system_prompt: str) -> GateResult:
         ...

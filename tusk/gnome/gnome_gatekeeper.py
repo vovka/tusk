@@ -7,23 +7,13 @@ from tusk.schemas.utterance import Utterance
 
 __all__ = ["GnomeGatekeeper"]
 
-_SYSTEM_PROMPT = (
-    "You are a gatekeeper for a voice assistant named TUSK. "
-    "Decide if the transcribed speech is a command directed at TUSK. "
-    "It is directed at TUSK if it mentions 'tusk' or 'task' (common mishearing) "
-    "or is a clear imperative desktop command (e.g. 'open firefox', 'close this window'). "
-    'Respond ONLY with valid JSON: {"directed": true, "cleaned_command": "<text>"} '
-    'or {"directed": false, "cleaned_command": ""}. '
-    "For cleaned_command, strip any leading wake word ('tusk', 'task', 'hey tusk', 'hey task') and trim whitespace."
-)
-
 
 class GnomeGatekeeper(Gatekeeper):
     def __init__(self, llm_provider: LLMProvider) -> None:
         self._llm = llm_provider
 
-    def evaluate(self, utterance: Utterance) -> GateResult:
-        raw = self._llm.complete(_SYSTEM_PROMPT, utterance.text)
+    def evaluate(self, utterance: Utterance, system_prompt: str) -> GateResult:
+        raw = self._llm.complete(system_prompt, utterance.text)
         print(f"[LLM:gate] {raw!r}")
         return self._parse_response(raw)
 
@@ -43,11 +33,16 @@ class GnomeGatekeeper(Gatekeeper):
     def _parse_response(self, raw: str) -> GateResult:
         try:
             data = self._unwrap(json.loads(self._extract_json(raw)))
-            return GateResult(
-                is_directed_at_tusk=bool(data["directed"]),
-                cleaned_command=data.get("cleaned_command", ""),
-                confidence=1.0,
-            )
-        except Exception as e:
-            print(f"[GATE] parse error: {e}")
+            return self._build_gate_result(data)
+        except Exception as exc:
+            print(f"[GATE] parse error: {exc}")
             return GateResult(is_directed_at_tusk=False, cleaned_command="", confidence=0.0)
+
+    def _build_gate_result(self, data: dict) -> GateResult:
+        metadata = {k: str(v) for k, v in data.items() if k.startswith("metadata_")}
+        return GateResult(
+            is_directed_at_tusk=bool(data["directed"]),
+            cleaned_command=data.get("cleaned_command", ""),
+            confidence=1.0,
+            metadata=metadata,
+        )
