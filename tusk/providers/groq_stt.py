@@ -11,6 +11,26 @@ __all__ = ["GroqSTT"]
 
 _HALLUCINATION = re.compile(r"^\[.+\]$")  # e.g. [BLANK_AUDIO], [Music], [Applause]
 
+# Common Whisper silence hallucinations (case-insensitive, stripped of punctuation)
+_WHISPER_GHOSTS = {
+    "thank you",
+    "thanks for watching",
+    "thank you for watching",
+    "thank you very much",
+    "thanks",
+    "you",
+    "bye",
+    "bye bye",
+    "okay",
+    "ok",
+    "oh",
+    "uh",
+    "um",
+    "hmm",
+    ".",
+    "!",
+}
+
 
 class GroqSTT(STTEngine):
     def __init__(self, api_key: str, model: str = "whisper-large-v3-turbo") -> None:
@@ -42,4 +62,7 @@ class GroqSTT(STTEngine):
         return buf.getvalue()
 
     def _is_non_speech(self, text: str) -> bool:
-        return not text or bool(_HALLUCINATION.match(text))
+        if not text or bool(_HALLUCINATION.match(text)):
+            return True
+        normalized = text.lower().rstrip(".!?,").strip()
+        return not normalized or normalized in _WHISPER_GHOSTS
