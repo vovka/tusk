@@ -6,6 +6,7 @@ RUN apt-get update && apt-get install -y \
     portaudio19-dev \
     wmctrl \
     xdotool \
+    xclip \
     pulseaudio-utils \
     libpulse-dev \
     libasound2-plugins \
