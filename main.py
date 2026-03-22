@@ -3,6 +3,7 @@ from tusk.core.audio_capture import AudioCapture
 from tusk.core.agent import MainAgent
 from tusk.core.pipeline import Pipeline
 from tusk.core.utterance_detector import UtteranceDetector
+from tusk.gnome.app_catalog import AppCatalog
 from tusk.gnome.gnome_action_executor import GnomeActionExecutor
 from tusk.gnome.gnome_context_provider import GnomeContextProvider
 from tusk.gnome.gnome_gatekeeper import GnomeGatekeeper
@@ -22,7 +23,7 @@ def main() -> None:
     agent_llm = OpenRouterLLM(config.openrouter_api_key, config.main_agent_model)
 
     gatekeeper = GnomeGatekeeper(gatekeeper_llm)
-    context_provider = GnomeContextProvider()
+    context_provider = GnomeContextProvider(AppCatalog())
     main_agent = MainAgent(agent_llm, context_provider)
     action_executor = GnomeActionExecutor()
 

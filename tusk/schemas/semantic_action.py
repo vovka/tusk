@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Literal, Union
 
-__all__ = ["LaunchApplicationAction", "CloseWindowAction", "SemanticAction"]
+__all__ = ["LaunchApplicationAction", "CloseWindowAction", "UnrecognizedAction", "SemanticAction"]
 
 
 @dataclass(frozen=True)
@@ -16,4 +16,10 @@ class CloseWindowAction:
     window_title: str
 
 
-SemanticAction = Union[LaunchApplicationAction, CloseWindowAction]
+@dataclass(frozen=True)
+class UnrecognizedAction:
+    action_type: Literal["unknown"]
+    reason: str = ""
+
+
+SemanticAction = Union[LaunchApplicationAction, CloseWindowAction, UnrecognizedAction]
