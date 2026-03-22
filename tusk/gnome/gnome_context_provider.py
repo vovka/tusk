@@ -23,7 +23,7 @@ class GnomeContextProvider(ContextProvider):
         )
 
     def _list_windows(self) -> list[WindowInfo]:
-        result = subprocess.run(["wmctrl", "-l"], capture_output=True, text=True)
+        result = subprocess.run(["wmctrl", "-l", "-G"], capture_output=True, text=True)
         return [
             self._parse_window_line(line)
             for line in result.stdout.splitlines()
@@ -39,10 +39,20 @@ class GnomeContextProvider(ContextProvider):
         return result.stdout.strip()
 
     def _parse_window_line(self, line: str) -> WindowInfo:
-        parts = line.split(None, 3)
+        # wmctrl -l -G: window_id desktop x y w h host title
+        parts = line.split(None, 8)
         window_id = parts[0] if len(parts) > 0 else ""
-        title = parts[3] if len(parts) > 3 else ""
-        return WindowInfo(window_id=window_id, title=title, application=title, is_active=False)
+        title = parts[8] if len(parts) > 8 else ""
+        return WindowInfo(
+            window_id=window_id,
+            title=title,
+            application=title,
+            is_active=False,
+            x=int(parts[2]) if len(parts) > 2 else 0,
+            y=int(parts[3]) if len(parts) > 3 else 0,
+            width=int(parts[4]) if len(parts) > 4 else 0,
+            height=int(parts[5]) if len(parts) > 5 else 0,
+        )
 
     def _resolve_active_app(self, active_title: str, windows: list[WindowInfo]) -> str:
         for window in windows:
