@@ -11,6 +11,10 @@ class WindowInfo:
     title: str
     application: str
     is_active: bool
+    x: int = 0
+    y: int = 0
+    width: int = 0
+    height: int = 0
 
 
 @dataclass(frozen=True)
