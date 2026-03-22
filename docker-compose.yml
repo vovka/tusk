@@ -1,0 +1,17 @@
+services:
+  tusk:
+    build: .
+    environment:
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      DISPLAY: ${DISPLAY:-:0}
+      PULSE_SERVER: unix:/run/user/1000/pulse/native
+      GATEKEEPER_MODEL: ${GATEKEEPER_MODEL:-anthropic/claude-haiku-4-5}
+      MAIN_AGENT_MODEL: ${MAIN_AGENT_MODEL:-anthropic/claude-sonnet-4-5}
+      WHISPER_MODEL_SIZE: ${WHISPER_MODEL_SIZE:-base}
+      VAD_AGGRESSIVENESS: ${VAD_AGGRESSIVENESS:-2}
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - /run/user/1000/pulse/native:/run/user/1000/pulse/native
+    devices:
+      - /dev/snd:/dev/snd
+    restart: unless-stopped

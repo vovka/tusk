@@ -39,15 +39,38 @@ cd tusk
 xhost +local:docker
 ```
 
-### 3. Build the Docker image
+### 3. Create your `.env` file
 
 ```bash
-docker build -t tusk .
+cp .env.example .env
+# edit .env and set OPENROUTER_API_KEY
+```
+
+### 4. Build the Docker image
+
+```bash
+docker compose build
 ```
 
 > First build takes a few minutes — it downloads Whisper model weights (~140 MB for the default `base` model).
 
 ## Running
+
+### With Docker Compose (recommended)
+
+```bash
+docker compose up
+```
+
+To run in the background:
+
+```bash
+docker compose up -d
+docker compose logs -f   # follow logs
+docker compose down      # stop
+```
+
+### With plain Docker
 
 ```bash
 docker run --rm \
@@ -60,7 +83,7 @@ docker run --rm \
   tusk
 ```
 
-Replace `your_key_here` with your OpenRouter API key. Once running, you should see:
+Once running, you should see:
 
 ```
 TUSK listening...
