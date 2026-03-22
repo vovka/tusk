@@ -29,11 +29,17 @@ class Pipeline:
     def run(self) -> None:
         print("TUSK listening...")
         for utterance in self._detector.stream_utterances():
-            self._process_utterance(utterance)
+            try:
+                self._process_utterance(utterance)
+            except Exception as e:
+                print(f"[ERROR] {e}")
 
     def _process_utterance(self, utterance: Utterance) -> None:
         transcribed = self._stt.transcribe(utterance.audio_frames, self._config.audio_sample_rate)
-        print(f"[STT] {transcribed.text!r}")
+        print(f"[STT] {transcribed.text!r} (confidence={transcribed.confidence:.2f})")
+        if transcribed.confidence < 0.01:
+            print("[STT] low confidence, discarded")
+            return
         gate = self._gatekeeper.evaluate(transcribed)
         if not gate.is_directed_at_tusk:
             print("[GATE] discarded")

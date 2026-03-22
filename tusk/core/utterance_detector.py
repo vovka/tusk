@@ -23,13 +23,18 @@ class UtteranceDetector:
         for frame in self._audio.stream_frames():
             is_speech = self._vad.is_speech(frame, self._sample_rate)
             if is_speech:
+                if not voiced_frames:
+                    print("[VAD] speech started")
                 voiced_frames.append(frame)
                 silence_count = 0
             elif voiced_frames:
                 silence_count += 1
                 if silence_count >= _SILENCE_FRAMES_THRESHOLD:
                     if len(voiced_frames) >= _MIN_VOICED_FRAMES:
+                        print(f"[VAD] utterance complete ({len(voiced_frames)} frames)")
                         yield self._build_utterance(voiced_frames)
+                    else:
+                        print(f"[VAD] too short, discarded ({len(voiced_frames)} frames)")
                     voiced_frames = []
                     silence_count = 0
 
