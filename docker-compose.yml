@@ -5,13 +5,22 @@ services:
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
       DISPLAY: ${DISPLAY:-:0}
       PULSE_SERVER: unix:/run/user/1000/pulse/native
-      GATEKEEPER_MODEL: ${GATEKEEPER_MODEL:-anthropic/claude-haiku-4-5}
-      MAIN_AGENT_MODEL: ${MAIN_AGENT_MODEL:-anthropic/claude-sonnet-4-5}
+      GATEKEEPER_MODEL: ${GATEKEEPER_MODEL:-liquid/lfm-2-24b-a2b}
+      MAIN_AGENT_MODEL: ${MAIN_AGENT_MODEL:-x-ai/grok-4.1-fast}
       WHISPER_MODEL_SIZE: ${WHISPER_MODEL_SIZE:-base}
       VAD_AGGRESSIVENESS: ${VAD_AGGRESSIVENESS:-2}
+      PYTHONUNBUFFERED: "1"
+      DBUS_SESSION_BUS_ADDRESS: unix:path=/run/user/1000/bus
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix
       - /run/user/1000/pulse/native:/run/user/1000/pulse/native
+      - ~/.cache/whisper:/root/.cache/whisper
+      - /run/user/1000/bus:/run/user/1000/bus
+      - /usr/share/applications:/usr/share/applications:ro
+      - ~/.local/share/applications:/home-apps:ro
+      - /var/lib/snapd/desktop/applications:/snap-apps:ro
+      - /tmp/tusk:/tmp/tusk
+      - .:/app
     devices:
       - /dev/snd:/dev/snd
     restart: unless-stopped
