@@ -7,8 +7,10 @@ from tusk.gnome.app_catalog import AppCatalog
 from tusk.gnome.gnome_action_executor import GnomeActionExecutor
 from tusk.gnome.gnome_context_provider import GnomeContextProvider
 from tusk.gnome.gnome_gatekeeper import GnomeGatekeeper
-from tusk.providers.open_router_llm import OpenRouterLLM
+from tusk.interfaces.llm_provider import LLMProvider
+from tusk.providers.groq_llm import GroqLLM
 from tusk.providers.groq_stt import GroqSTT
+from tusk.providers.open_router_llm import OpenRouterLLM
 from tusk.providers.whisper_stt import WhisperSTT
 
 
@@ -20,6 +22,13 @@ def _build_stt(config: Config) -> object:
     return WhisperSTT(config.whisper_model_size)
 
 
+def _build_gatekeeper_llm(config: Config) -> LLMProvider:
+    if config.groq_api_key:
+        print("[GATE] using Groq llama-3.1-8b-instant")
+        return GroqLLM(config.groq_api_key, "llama-3.1-8b-instant")
+    return OpenRouterLLM(config.openrouter_api_key, config.gatekeeper_model)
+
+
 def main() -> None:
     config = Config.from_env()
 
@@ -27,8 +36,7 @@ def main() -> None:
     utterance_detector = UtteranceDetector(audio_capture, config.audio_sample_rate, config.vad_aggressiveness)
 
     stt_engine = _build_stt(config)
-
-    gatekeeper_llm = OpenRouterLLM(config.openrouter_api_key, config.gatekeeper_model)
+    gatekeeper_llm = _build_gatekeeper_llm(config)
     agent_llm = OpenRouterLLM(config.openrouter_api_key, config.main_agent_model)
 
     gatekeeper = GnomeGatekeeper(gatekeeper_llm)

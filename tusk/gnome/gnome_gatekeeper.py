@@ -10,11 +10,11 @@ __all__ = ["GnomeGatekeeper"]
 _SYSTEM_PROMPT = (
     "You are a gatekeeper for a voice assistant named TUSK. "
     "Decide if the transcribed speech is a command directed at TUSK. "
-    "It is directed at TUSK if it mentions 'tusk' or is a clear imperative desktop command "
-    "(e.g. 'open firefox', 'close this window'). "
+    "It is directed at TUSK if it mentions 'tusk' or 'task' (common mishearing) "
+    "or is a clear imperative desktop command (e.g. 'open firefox', 'close this window'). "
     'Respond ONLY with valid JSON: {"directed": true, "cleaned_command": "<text>"} '
     'or {"directed": false, "cleaned_command": ""}. '
-    "For cleaned_command, strip any leading 'tusk' or 'hey tusk' prefix and trim whitespace."
+    "For cleaned_command, strip any leading wake word ('tusk', 'task', 'hey tusk', 'hey task') and trim whitespace."
 )
 
 
