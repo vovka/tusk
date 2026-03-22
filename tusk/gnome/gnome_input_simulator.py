@@ -9,7 +9,20 @@ _BUTTON_MAP = {"left": 1, "right": 3, "middle": 2}
 
 class GnomeInputSimulator(InputSimulator):
     def press_keys(self, keys: str) -> None:
-        subprocess.run(["xdotool", "key", "--delay", "0", keys], check=False)
+        normalized = self._normalize_keys(keys)
+        subprocess.run(
+            ["xdotool", "key", "--clearmodifiers", "--delay", "0", normalized],
+            check=False,
+        )
+
+    def _normalize_keys(self, keys: str) -> str:
+        _ALIASES = {"enter": "Return", "Enter": "Return", "esc": "Escape", "Esc": "Escape"}
+        if keys in _ALIASES:
+            return _ALIASES[keys]
+        parts = keys.split("+")
+        if len(parts) > 1 and len(parts[-1]) == 1:
+            parts[-1] = parts[-1].lower()
+        return "+".join(parts)
 
     def type_text(self, text: str) -> None:
         subprocess.run(["xdotool", "type", "--delay", "0", "--", text], check=False)
