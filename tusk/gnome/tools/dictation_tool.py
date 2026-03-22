@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 from tusk.core.dictation_mode import DictationMode
 from tusk.interfaces.agent_tool import AgentTool
 from tusk.interfaces.llm_provider import LLMProvider
+from tusk.interfaces.log_printer import LogPrinter
 from tusk.interfaces.pipeline_mode import PipelineMode
 from tusk.interfaces.text_paster import TextPaster
 from tusk.schemas.tool_result import ToolResult
@@ -23,11 +24,13 @@ class DictationTool(AgentTool):
         text_paster: TextPaster,
         cleanup_llm: LLMProvider,
         command_mode_factory: Callable[[], PipelineMode],
+        log_printer: LogPrinter,
     ) -> None:
         self._controller = pipeline_controller
         self._text_paster = text_paster
         self._cleanup_llm = cleanup_llm
         self._command_mode_factory = command_mode_factory
+        self._log = log_printer
 
     @property
     def name(self) -> str:
@@ -46,6 +49,7 @@ class DictationTool(AgentTool):
             text_paster=self._text_paster,
             cleanup_llm=self._cleanup_llm,
             command_mode_factory=self._command_mode_factory,
+            log_printer=self._log,
         )
         self._controller.set_mode(mode)
         return ToolResult(success=True, message="dictation mode started")
