@@ -1,5 +1,6 @@
 import subprocess
 
+from tusk.gnome.app_catalog import AppCatalog
 from tusk.interfaces.context_provider import ContextProvider
 from tusk.schemas.desktop_context import DesktopContext, WindowInfo
 
@@ -7,6 +8,9 @@ __all__ = ["GnomeContextProvider"]
 
 
 class GnomeContextProvider(ContextProvider):
+    def __init__(self, app_catalog: AppCatalog) -> None:
+        self._catalog = app_catalog
+
     def get_context(self) -> DesktopContext:
         windows = self._list_windows()
         active_title = self._get_active_window_title()
@@ -15,6 +19,7 @@ class GnomeContextProvider(ContextProvider):
             active_window_title=active_title,
             active_application=active_app,
             open_windows=windows,
+            available_applications=self._catalog.list_apps(),
         )
 
     def _list_windows(self) -> list[WindowInfo]:
