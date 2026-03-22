@@ -3,3 +3,4 @@ sounddevice
 webrtcvad
 numpy
 openai
+groq

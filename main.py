@@ -8,7 +8,16 @@ from tusk.gnome.gnome_action_executor import GnomeActionExecutor
 from tusk.gnome.gnome_context_provider import GnomeContextProvider
 from tusk.gnome.gnome_gatekeeper import GnomeGatekeeper
 from tusk.providers.open_router_llm import OpenRouterLLM
+from tusk.providers.groq_stt import GroqSTT
 from tusk.providers.whisper_stt import WhisperSTT
+
+
+def _build_stt(config: Config) -> object:
+    if config.groq_api_key:
+        print("[STT] using Groq whisper-large-v3-turbo")
+        return GroqSTT(config.groq_api_key)
+    print("[STT] using local Whisper")
+    return WhisperSTT(config.whisper_model_size)
 
 
 def main() -> None:
@@ -17,7 +26,7 @@ def main() -> None:
     audio_capture = AudioCapture(config.audio_sample_rate, config.audio_frame_duration_ms)
     utterance_detector = UtteranceDetector(audio_capture, config.audio_sample_rate, config.vad_aggressiveness)
 
-    stt_engine = WhisperSTT(config.whisper_model_size)
+    stt_engine = _build_stt(config)
 
     gatekeeper_llm = OpenRouterLLM(config.openrouter_api_key, config.gatekeeper_model)
     agent_llm = OpenRouterLLM(config.openrouter_api_key, config.main_agent_model)

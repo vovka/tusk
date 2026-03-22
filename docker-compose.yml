@@ -1,14 +1,11 @@
 services:
   tusk:
     build: .
+    env_file:
+      - .env
     environment:
-      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
       DISPLAY: ${DISPLAY:-:0}
       PULSE_SERVER: unix:/run/user/1000/pulse/native
-      GATEKEEPER_MODEL: ${GATEKEEPER_MODEL:-liquid/lfm-2-24b-a2b}
-      MAIN_AGENT_MODEL: ${MAIN_AGENT_MODEL:-x-ai/grok-4.1-fast}
-      WHISPER_MODEL_SIZE: ${WHISPER_MODEL_SIZE:-base}
-      VAD_AGGRESSIVENESS: ${VAD_AGGRESSIVENESS:-2}
       PYTHONUNBUFFERED: "1"
       DBUS_SESSION_BUS_ADDRESS: unix:path=/run/user/1000/bus
     volumes:
