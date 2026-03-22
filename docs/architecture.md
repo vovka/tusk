@@ -92,11 +92,10 @@ CommandMode.handle_utterance()
     │       GateResult(is_directed_at_tusk, cleaned_command, confidence, metadata)
     │       — dropped if not directed at TUSK
     │
-    ├─► MainAgent.process_command()     LLM + desktop context → ToolCall
-    │       ToolCall(tool_name, parameters)
-    │
-    └─► ToolRegistry.get(tool_name).execute(parameters)
-            ToolResult(success, message)
+    └─► MainAgent.process_command()     agentic loop (up to 10 steps):
+            ├─ LLM call with desktop context + tool history
+            ├─ parse ToolCall → execute via ToolRegistry → append result
+            └─ repeat until {"tool":"done"} or max steps reached
 ```
 
 ### Dictation Mode
@@ -266,16 +265,21 @@ which generates the JSON format descriptions injected into the agent's system pr
 
 ### `MainAgent` — `core/agent.py`
 
-Receives a cleaned command string. Builds a system prompt dynamically from the
-`ToolRegistry`, calls `LLMProvider.complete()` with desktop context, and parses
-the response into a `ToolCall`. The agent has no knowledge of specific tools — it
-only knows the tool interface.
+Receives a cleaned command string and runs a **multi-step agentic loop** (max 10 steps):
+1. Builds a system prompt dynamically from `ToolRegistry`
+2. Calls `LLMProvider.complete_messages()` with desktop context and message history
+3. Parses the response into a `ToolCall` and executes it via `ToolRegistry`
+4. Appends the tool result to message history and calls the LLM again
+5. Stops when the LLM responds with `{"tool":"done"}` or max steps is reached
+
+The agent has no knowledge of specific tools — it only knows the tool interface.
+Multi-step commands ("select all and copy", "open Firefox and gedit") work naturally.
 
 ### `CommandMode` — `core/command_mode.py`
 
 The default pipeline mode. Holds the wake-word detection gatekeeper prompt.
-On each utterance: evaluates gatekeeper, if directed at TUSK sends to agent,
-looks up the returned tool in the registry, and calls `tool.execute()`.
+On each utterance: evaluates gatekeeper, if directed at TUSK delegates fully to
+`MainAgent.process_command()`. All tool lookup and execution is owned by the agent.
 
 ### `DictationMode` — `core/dictation_mode.py`
 
@@ -411,7 +415,7 @@ GroqLLM / OpenRouterLLM → GnomeGatekeeper
 
 ToolRegistry ← LaunchApplicationTool, CloseWindowTool
 MainAgent(agent_llm, context, registry)
-CommandMode(agent, registry) → initial Pipeline mode
+CommandMode(agent) → initial Pipeline mode
 
 Pipeline(detector, stt, gatekeeper, CommandMode, config)
 

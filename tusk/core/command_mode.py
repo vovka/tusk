@@ -3,9 +3,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from tusk.core.agent import MainAgent
-from tusk.core.tool_registry import ToolRegistry
 from tusk.interfaces.pipeline_mode import PipelineMode
 from tusk.schemas.gate_result import GateResult
+from tusk.schemas.utterance import Utterance
 
 if TYPE_CHECKING:
     from tusk.interfaces.pipeline_controller import PipelineController
@@ -25,21 +25,16 @@ _GATEKEEPER_PROMPT = (
 
 
 class CommandMode(PipelineMode):
-    def __init__(self, agent: MainAgent, tool_registry: ToolRegistry) -> None:
+    def __init__(self, agent: MainAgent) -> None:
         self._agent = agent
-        self._registry = tool_registry
 
     @property
     def gatekeeper_prompt(self) -> str:
         return _GATEKEEPER_PROMPT
 
-    def handle_utterance(self, gate_result: GateResult, controller: PipelineController) -> None:
+    def handle_utterance(self, gate_result: GateResult, utterance: Utterance, controller: PipelineController) -> None:
         if not gate_result.is_directed_at_tusk:
             print("[GATE] discarded")
             return
         print(f"[GATE] command: {gate_result.cleaned_command!r}")
-        tool_call = self._agent.process_command(gate_result.cleaned_command)
-        print(f"[AGENT] tool: {tool_call}")
-        tool = self._registry.get(tool_call.tool_name)
-        result = tool.execute(tool_call.parameters)
-        print(f"[TOOL] {result.message}")
+        self._agent.process_command(gate_result.cleaned_command)

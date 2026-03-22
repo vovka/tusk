@@ -50,7 +50,7 @@ def main() -> None:
 
     context = GnomeContextProvider(AppCatalog())
     agent = MainAgent(agent_llm, context, registry)
-    command_mode = CommandMode(agent, registry)
+    command_mode = CommandMode(agent)
 
     pipeline = Pipeline(
         utterance_detector=detector,
@@ -61,7 +61,7 @@ def main() -> None:
     )
 
     text_paster = GnomeTextPaster()
-    factory = lambda: CommandMode(agent, registry)  # noqa: E731
+    factory = lambda: CommandMode(agent)  # noqa: E731
     dictation_tool = DictationTool(pipeline, text_paster, agent_llm, factory)
     registry.register(dictation_tool)
 
