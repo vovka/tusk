@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
 from tusk.schemas.gate_result import GateResult
+from tusk.schemas.utterance import Utterance
 
 if TYPE_CHECKING:
     from tusk.interfaces.pipeline_controller import PipelineController
@@ -21,6 +22,7 @@ class PipelineMode(ABC):
     def handle_utterance(
         self,
         gate_result: GateResult,
+        utterance: Utterance,
         controller: PipelineController,
     ) -> None:
         ...

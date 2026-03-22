@@ -42,7 +42,7 @@ class Pipeline(PipelineController):
             return
         prompt = self._current_mode.gatekeeper_prompt
         gate = self._gatekeeper.evaluate(transcribed, prompt)
-        self._current_mode.handle_utterance(gate, self)
+        self._current_mode.handle_utterance(gate, transcribed, self)
 
     def _transcribe(self, utterance: Utterance) -> Utterance | None:
         result = self._stt.transcribe(utterance.audio_frames, self._config.audio_sample_rate)

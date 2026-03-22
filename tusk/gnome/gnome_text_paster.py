@@ -19,5 +19,7 @@ class GnomeTextPaster(TextPaster):
     def _delete_backward(self, char_count: int) -> None:
         if char_count <= 0:
             return
-        keys = " ".join(["BackSpace"] * char_count)
-        subprocess.run(["xdotool", "key", "--delay", "0", keys], check=False)
+        subprocess.run(
+            ["xdotool", "key", "--delay", "0", "--repeat", str(char_count), "BackSpace"],
+            check=False,
+        )

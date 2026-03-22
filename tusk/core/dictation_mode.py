@@ -7,6 +7,7 @@ from tusk.interfaces.llm_provider import LLMProvider
 from tusk.interfaces.pipeline_mode import PipelineMode
 from tusk.interfaces.text_paster import TextPaster
 from tusk.schemas.gate_result import GateResult
+from tusk.schemas.utterance import Utterance
 
 if TYPE_CHECKING:
     from tusk.interfaces.pipeline_controller import PipelineController
@@ -47,11 +48,11 @@ class DictationMode(PipelineMode):
     def gatekeeper_prompt(self) -> str:
         return _GATEKEEPER_PROMPT
 
-    def handle_utterance(self, gate_result: GateResult, controller: PipelineController) -> None:
+    def handle_utterance(self, gate_result: GateResult, utterance: Utterance, controller: PipelineController) -> None:
         if gate_result.metadata.get("metadata_stop") == "true":
             self._handle_stop(controller)
             return
-        self._handle_dictation(gate_result.cleaned_command)
+        self._handle_dictation(utterance.text)
 
     def _handle_dictation(self, text: str) -> None:
         if not text:
@@ -60,7 +61,6 @@ class DictationMode(PipelineMode):
         self._paster.paste(paste_text)
         self._pasted_char_count += len(paste_text)
         self._raw_buffer.append(text)
-        self._cleanup_and_replace()
 
     def _handle_stop(self, controller: PipelineController) -> None:
         if self._raw_buffer:
