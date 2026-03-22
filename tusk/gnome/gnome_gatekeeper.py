@@ -24,12 +24,30 @@ class GnomeGatekeeper(Gatekeeper):
 
     def evaluate(self, utterance: Utterance) -> GateResult:
         raw = self._llm.complete(_SYSTEM_PROMPT, utterance.text)
+        print(f"[LLM:gate] {raw!r}")
         return self._parse_response(raw)
 
+    def _extract_json(self, raw: str) -> str:
+        text = raw.strip()
+        if "```" in text:
+            text = text.split("```")[1].lstrip("json").strip()
+        return text
+
+    def _unwrap(self, data: dict | list) -> dict:
+        if isinstance(data, list):
+            data = data[0]
+        if "arguments" in data:
+            data = data["arguments"]
+        return data
+
     def _parse_response(self, raw: str) -> GateResult:
-        data = json.loads(raw.strip())
-        return GateResult(
-            is_directed_at_tusk=bool(data["directed"]),
-            cleaned_command=data.get("cleaned_command", ""),
-            confidence=1.0,
-        )
+        try:
+            data = self._unwrap(json.loads(self._extract_json(raw)))
+            return GateResult(
+                is_directed_at_tusk=bool(data["directed"]),
+                cleaned_command=data.get("cleaned_command", ""),
+                confidence=1.0,
+            )
+        except Exception as e:
+            print(f"[GATE] parse error: {e}")
+            return GateResult(is_directed_at_tusk=False, cleaned_command="", confidence=0.0)
