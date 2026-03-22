@@ -3,23 +3,21 @@ from tusk.core.agent import MainAgent
 from tusk.core.audio_capture import AudioCapture
 from tusk.core.command_mode import CommandMode
 from tusk.core.pipeline import Pipeline
-from tusk.core.tool_registry import ToolRegistry
 from tusk.core.utterance_detector import UtteranceDetector
 from tusk.gnome.app_catalog import AppCatalog
+from tusk.gnome.gnome_clipboard_provider import GnomeClipboardProvider
 from tusk.gnome.gnome_context_provider import GnomeContextProvider
 from tusk.gnome.gnome_gatekeeper import GnomeGatekeeper
+from tusk.gnome.gnome_input_simulator import GnomeInputSimulator
 from tusk.gnome.gnome_text_paster import GnomeTextPaster
-from tusk.gnome.tools.close_window_tool import CloseWindowTool
+from tusk.gnome.tool_factory import build_tool_registry
 from tusk.gnome.tools.dictation_tool import DictationTool
-from tusk.gnome.tools.launch_application_tool import LaunchApplicationTool
 from tusk.interfaces.llm_provider import LLMProvider
 from tusk.interfaces.stt_engine import STTEngine
 from tusk.providers.groq_llm import GroqLLM
 from tusk.providers.groq_stt import GroqSTT
 from tusk.providers.open_router_llm import OpenRouterLLM
 from tusk.providers.whisper_stt import WhisperSTT
-
-_SOCKET_PATH = "/tmp/tusk/launch.sock"
 
 
 def _build_stt(config: Config) -> STTEngine:
@@ -37,13 +35,6 @@ def _build_gatekeeper_llm(config: Config) -> LLMProvider:
     return OpenRouterLLM(config.openrouter_api_key, config.gatekeeper_model)
 
 
-def _build_tool_registry() -> ToolRegistry:
-    registry = ToolRegistry()
-    registry.register(LaunchApplicationTool(_SOCKET_PATH))
-    registry.register(CloseWindowTool())
-    return registry
-
-
 def main() -> None:
     config = Config.from_env()
     audio = AudioCapture(config.audio_sample_rate, config.audio_frame_duration_ms)
@@ -53,7 +44,10 @@ def main() -> None:
     gatekeeper = GnomeGatekeeper(_build_gatekeeper_llm(config))
     agent_llm = OpenRouterLLM(config.openrouter_api_key, config.main_agent_model)
 
-    registry = _build_tool_registry()
+    simulator = GnomeInputSimulator()
+    clipboard = GnomeClipboardProvider()
+    registry = build_tool_registry(simulator, clipboard, agent_llm)
+
     context = GnomeContextProvider(AppCatalog())
     agent = MainAgent(agent_llm, context, registry)
     command_mode = CommandMode(agent, registry)
