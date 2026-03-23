@@ -4,6 +4,11 @@ __all__ = ["LLMProvider"]
 
 
 class LLMProvider(ABC):
+    @property
+    @abstractmethod
+    def label(self) -> str:
+        ...
+
     @abstractmethod
     def complete(self, system_prompt: str, user_message: str, max_tokens: int = 256) -> str:
         ...

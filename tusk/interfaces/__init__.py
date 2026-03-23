@@ -7,6 +7,7 @@ from tusk.interfaces.gatekeeper import Gatekeeper
 from tusk.interfaces.input_simulator import InputSimulator
 from tusk.interfaces.interaction_clock import InteractionClock
 from tusk.interfaces.llm_provider import LLMProvider
+from tusk.interfaces.llm_provider_factory import LLMProviderFactory
 from tusk.interfaces.log_printer import LogPrinter
 from tusk.interfaces.pipeline_controller import PipelineController
 from tusk.interfaces.pipeline_mode import PipelineMode
@@ -23,6 +24,7 @@ __all__ = [
     "InputSimulator",
     "InteractionClock",
     "LLMProvider",
+    "LLMProviderFactory",
     "LogPrinter",
     "PipelineController",
     "PipelineMode",

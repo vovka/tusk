@@ -13,6 +13,7 @@ from tusk.gnome.tools.move_resize_window_tool import MoveResizeWindowTool
 from tusk.gnome.tools.open_uri_tool import OpenUriTool
 from tusk.gnome.tools.press_keys_tool import PressKeysTool
 from tusk.gnome.tools.read_clipboard_tool import ReadClipboardTool
+from tusk.gnome.tools.switch_model_tool import SwitchModelTool
 from tusk.gnome.tools.switch_workspace_tool import SwitchWorkspaceTool
 from tusk.gnome.tools.type_text_tool import TypeTextTool
 from tusk.gnome.tools.write_clipboard_tool import WriteClipboardTool
@@ -33,6 +34,7 @@ __all__ = [
     "OpenUriTool",
     "PressKeysTool",
     "ReadClipboardTool",
+    "SwitchModelTool",
     "SwitchWorkspaceTool",
     "TypeTextTool",
     "WriteClipboardTool",

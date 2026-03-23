@@ -1,9 +1,11 @@
 from tusk.config import Config
-from tusk.core.agent import MainAgent
 from tusk.core.audio_capture import AudioCapture
 from tusk.core.color_log_printer import ColorLogPrinter
 from tusk.core.command_mode import CommandMode
 from tusk.core.llm_conversation_summarizer import LLMConversationSummarizer
+from tusk.core.llm_proxy import LLMProxy
+from tusk.core.llm_registry import LLMRegistry
+from tusk.core.agent import MainAgent
 from tusk.core.monotonic_interaction_clock import MonotonicInteractionClock
 from tusk.core.recent_context_formatter import RecentContextFormatter
 from tusk.core.pipeline import Pipeline
@@ -17,66 +19,80 @@ from tusk.gnome.gnome_input_simulator import GnomeInputSimulator
 from tusk.gnome.gnome_text_paster import GnomeTextPaster
 from tusk.gnome.tool_factory import build_tool_registry
 from tusk.gnome.tools.dictation_tool import DictationTool
-from tusk.interfaces.llm_provider import LLMProvider
+from tusk.core.tool_registry import ToolRegistry
+from tusk.interfaces.llm_provider_factory import LLMProviderFactory
 from tusk.interfaces.log_printer import LogPrinter
-from tusk.interfaces.stt_engine import STTEngine
-from tusk.providers.groq_llm import GroqLLM
+from tusk.providers.configurable_llm_factory import ConfigurableLLMFactory
 from tusk.providers.groq_stt import GroqSTT
-from tusk.providers.open_router_llm import OpenRouterLLM
-from tusk.providers.whisper_stt import WhisperSTT
+from tusk.schemas.llm_slot_config import LLMSlotConfig
 
 
-def _build_stt(config: Config, log: LogPrinter) -> STTEngine:
-    if config.groq_api_key:
-        log.log("STT", "using Groq whisper-large-v3-turbo")
-        return GroqSTT(config.groq_api_key)
-    log.log("STT", "using local Whisper")
-    return WhisperSTT(config.whisper_model_size)
+def _build_llm_registry(config: Config) -> LLMRegistry:
+    factory = ConfigurableLLMFactory(config.groq_api_key, config.openrouter_api_key)
+    registry = LLMRegistry(factory)
+    _register_slot(registry, factory, "gatekeeper", config.gatekeeper_llm)
+    _register_slot(registry, factory, "agent", config.agent_llm)
+    _register_slot(registry, factory, "utility", config.utility_llm)
+    return registry
 
 
-def _build_gatekeeper_llm(config: Config, log: LogPrinter) -> LLMProvider:
-    if config.groq_api_key:
-        log.log("GATE", "using Groq llama-3.1-8b-instant")
-        return GroqLLM(config.groq_api_key, "llama-3.1-8b-instant")
-    return OpenRouterLLM(config.openrouter_api_key, config.gatekeeper_model)
+def _register_slot(
+    registry: LLMRegistry,
+    factory: LLMProviderFactory,
+    name: str,
+    slot_config: LLMSlotConfig,
+) -> None:
+    provider = factory.create(slot_config.provider_name, slot_config.model)
+    registry.register_slot(name, LLMProxy(provider))
 
 
-def main() -> None:
-    config = Config.from_env()
-    log: LogPrinter = ColorLogPrinter()
+def _build_pipeline(config: Config, log: LogPrinter) -> Pipeline:
     audio = AudioCapture(config.audio_sample_rate, config.audio_frame_duration_ms)
     detector = UtteranceDetector(audio, config.audio_sample_rate, config.vad_aggressiveness, log)
+    stt = GroqSTT(config.groq_api_key)
+    llm_registry = _build_llm_registry(config)
 
-    stt = _build_stt(config, log)
-    gatekeeper = GnomeGatekeeper(_build_gatekeeper_llm(config, log), log)
-    agent_llm = OpenRouterLLM(config.openrouter_api_key, config.main_agent_model)
-
+    gatekeeper = GnomeGatekeeper(llm_registry.get("gatekeeper"), log)
     simulator = GnomeInputSimulator()
     clipboard = GnomeClipboardProvider()
-    registry = build_tool_registry(simulator, clipboard, agent_llm)
+    tool_registry = build_tool_registry(simulator, clipboard, llm_registry.get("utility"), llm_registry)
 
     context = GnomeContextProvider(AppCatalog())
-    summarizer = LLMConversationSummarizer(agent_llm)
+    summarizer = LLMConversationSummarizer(llm_registry.get("utility"))
     history = SlidingWindowHistory(max_messages=20, summarizer=summarizer)
-    agent = MainAgent(agent_llm, context, registry, history, log)
+    agent = MainAgent(llm_registry.get("agent"), context, tool_registry, history, log)
     clock = MonotonicInteractionClock(config.follow_up_timeout_seconds)
     formatter = RecentContextFormatter(history)
     command_mode = CommandMode(agent, clock, formatter, log)
 
     pipeline = Pipeline(
-        utterance_detector=detector,
-        stt_engine=stt,
-        gatekeeper=gatekeeper,
-        initial_mode=command_mode,
-        config=config,
-        log_printer=log,
+        utterance_detector=detector, stt_engine=stt, gatekeeper=gatekeeper,
+        initial_mode=command_mode, config=config, log_printer=log,
     )
 
+    _register_dictation(tool_registry, pipeline, llm_registry, agent, clock, formatter, log)
+    return pipeline
+
+
+def _register_dictation(
+    tool_registry: ToolRegistry,
+    pipeline: Pipeline,
+    llm_registry: LLMRegistry,
+    agent: MainAgent,
+    clock: MonotonicInteractionClock,
+    formatter: RecentContextFormatter,
+    log: LogPrinter,
+) -> None:
     text_paster = GnomeTextPaster()
     factory = lambda: CommandMode(agent, clock, formatter, log)  # noqa: E731
-    dictation_tool = DictationTool(pipeline, text_paster, agent_llm, factory, log)
-    registry.register(dictation_tool)
+    dictation = DictationTool(pipeline, text_paster, llm_registry.get("utility"), factory, log)
+    tool_registry.register(dictation)
 
+
+def main() -> None:
+    config = Config.from_env()
+    log: LogPrinter = ColorLogPrinter()
+    pipeline = _build_pipeline(config, log)
     pipeline.run()
 
 
