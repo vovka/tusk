@@ -119,7 +119,7 @@ DictationMode.handle_utterance()
 
 ## Interfaces (Abstract Base Classes)
 
-Nine ABCs define the extension points. All swappable components implement one of these.
+Ten ABCs define the extension points. All swappable components implement one of these.
 
 ### `STTEngine` — `interfaces/stt_engine.py`
 
@@ -141,6 +141,19 @@ def evaluate(self, utterance: Utterance, system_prompt: str) -> GateResult
 
 The `system_prompt` is provided by the current pipeline mode, allowing different
 modes to ask different questions (command detection vs. stop detection).
+
+### `InteractionClock` — `interfaces/interaction_clock.py`
+
+```python
+def record_interaction(self) -> None
+def seconds_since_last_interaction(self) -> float
+def is_within_follow_up_window(self) -> bool
+```
+
+Tracks when the last successful command was processed. Used by `CommandMode` to
+determine whether the gatekeeper prompt should include recent conversation context
+for follow-up detection. The follow-up window is configurable via
+`FOLLOW_UP_TIMEOUT_SECONDS` (default 30 seconds).
 
 ### `ContextProvider` — `interfaces/context_provider.py`
 
@@ -277,9 +290,15 @@ Multi-step commands ("select all and copy", "open Firefox and gedit") work natur
 
 ### `CommandMode` — `core/command_mode.py`
 
-The default pipeline mode. Holds the wake-word detection gatekeeper prompt.
+The default pipeline mode. Builds the gatekeeper prompt dynamically based on
+conversation state. When within the follow-up window (configurable, default 30s),
+the prompt includes recent conversation context so the gatekeeper can recognize
+contextual follow-ups without a wake word. Outside the window, the prompt is the
+standard wake-word detection prompt.
+
 On each utterance: evaluates gatekeeper, if directed at TUSK delegates fully to
-`MainAgent.process_command()`. All tool lookup and execution is owned by the agent.
+`MainAgent.process_command()` and records the interaction on the `InteractionClock`.
+All tool lookup and execution is owned by the agent.
 
 ### `DictationMode` — `core/dictation_mode.py`
 
@@ -294,6 +313,18 @@ Active when the user requests dictation. On each utterance:
 
 Text appears in the active field within ~1 second of each pause, then is silently
 refined in place.
+
+### `MonotonicInteractionClock` — `core/monotonic_interaction_clock.py`
+
+Implements `InteractionClock` using `time.monotonic()`. Tracks the timestamp of the
+last successful command execution and determines whether the conversation is within
+the follow-up window.
+
+### `RecentContextFormatter` — `core/recent_context_formatter.py`
+
+Extracts the last N messages (default 6) from `ConversationHistory` and formats them
+as compact text for injection into the gatekeeper prompt. Each message is truncated
+to 150 characters. No LLM call — pure string formatting (< 1 ms).
 
 ### `Pipeline` — `core/pipeline.py`
 
@@ -414,8 +445,10 @@ AppCatalog → GnomeContextProvider
 GroqLLM / OpenRouterLLM → GnomeGatekeeper
 
 ToolRegistry ← LaunchApplicationTool, CloseWindowTool
-MainAgent(agent_llm, context, registry)
-CommandMode(agent) → initial Pipeline mode
+MainAgent(agent_llm, context, registry, history)
+MonotonicInteractionClock(config.follow_up_timeout_seconds)
+RecentContextFormatter(history)
+CommandMode(agent, clock, formatter) → initial Pipeline mode
 
 Pipeline(detector, stt, gatekeeper, CommandMode, config)
 
@@ -443,14 +476,18 @@ through `__init__`.
 | `AUDIO_SAMPLE_RATE` | `16000` | Microphone sample rate in Hz |
 | `AUDIO_FRAME_DURATION_MS` | `30` | VAD frame size in milliseconds |
 | `VAD_AGGRESSIVENESS` | `2` | WebRTC VAD aggressiveness: 0 (least) – 3 (most) |
+| `FOLLOW_UP_TIMEOUT_SECONDS` | `30` | Seconds after last command before follow-up window expires |
 
 ---
 
 ## Two-Tier LLM Design
 
 **Tier 1 — Gatekeeper (cheap, fast):** Processes every transcribed utterance.
-Its prompt is supplied by the current pipeline mode. In command mode it asks
-"Is this for TUSK?" In dictation mode it asks "Is this a stop command?"
+Its prompt is supplied by the current pipeline mode. In command mode the prompt is
+built dynamically: it asks "Is this for TUSK?" and, when within the follow-up window
+(default 30 seconds since last command), also includes recent conversation context so
+the gatekeeper can recognize contextual follow-ups without a wake word.
+In dictation mode it asks "Is this a stop command?"
 
 **Tier 2 — Main Agent (capable):** Only receives utterances the gatekeeper confirmed.
 Reasons with full desktop context to produce a `ToolCall`. Invoked far less

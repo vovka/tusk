@@ -4,6 +4,8 @@ from tusk.core.audio_capture import AudioCapture
 from tusk.core.color_log_printer import ColorLogPrinter
 from tusk.core.command_mode import CommandMode
 from tusk.core.llm_conversation_summarizer import LLMConversationSummarizer
+from tusk.core.monotonic_interaction_clock import MonotonicInteractionClock
+from tusk.core.recent_context_formatter import RecentContextFormatter
 from tusk.core.pipeline import Pipeline
 from tusk.core.sliding_window_history import SlidingWindowHistory
 from tusk.core.utterance_detector import UtteranceDetector
@@ -57,7 +59,9 @@ def main() -> None:
     summarizer = LLMConversationSummarizer(agent_llm)
     history = SlidingWindowHistory(max_messages=20, summarizer=summarizer)
     agent = MainAgent(agent_llm, context, registry, history, log)
-    command_mode = CommandMode(agent, log)
+    clock = MonotonicInteractionClock(config.follow_up_timeout_seconds)
+    formatter = RecentContextFormatter(history)
+    command_mode = CommandMode(agent, clock, formatter, log)
 
     pipeline = Pipeline(
         utterance_detector=detector,
@@ -69,7 +73,7 @@ def main() -> None:
     )
 
     text_paster = GnomeTextPaster()
-    factory = lambda: CommandMode(agent, log)  # noqa: E731
+    factory = lambda: CommandMode(agent, clock, formatter, log)  # noqa: E731
     dictation_tool = DictationTool(pipeline, text_paster, agent_llm, factory, log)
     registry.register(dictation_tool)
 
