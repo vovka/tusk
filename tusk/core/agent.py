@@ -73,8 +73,7 @@ class MainAgent:
 
     def _log_finish(self, step: int, tool_call: ToolCall) -> None:
         if tool_call.tool_name == "unknown":
-            reason = tool_call.parameters.get("reason", "?")
-            self._log.log("AGENT", f"cannot handle: {reason}")
+            self._log.log("AGENT", f"cannot handle: {tool_call.parameters.get('reason', '?')}")
             return
         self._log.log("AGENT", f"done ({step} steps)")
 
