@@ -5,6 +5,7 @@ from tusk.interfaces.conversation_history import ConversationHistory
 from tusk.interfaces.conversation_summarizer import ConversationSummarizer
 from tusk.interfaces.gatekeeper import Gatekeeper
 from tusk.interfaces.input_simulator import InputSimulator
+from tusk.interfaces.interaction_clock import InteractionClock
 from tusk.interfaces.llm_provider import LLMProvider
 from tusk.interfaces.llm_provider_factory import LLMProviderFactory
 from tusk.interfaces.log_printer import LogPrinter
@@ -21,6 +22,7 @@ __all__ = [
     "ConversationSummarizer",
     "Gatekeeper",
     "InputSimulator",
+    "InteractionClock",
     "LLMProvider",
     "LLMProviderFactory",
     "LogPrinter",

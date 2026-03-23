@@ -6,6 +6,8 @@ from tusk.core.llm_conversation_summarizer import LLMConversationSummarizer
 from tusk.core.llm_proxy import LLMProxy
 from tusk.core.llm_registry import LLMRegistry
 from tusk.core.agent import MainAgent
+from tusk.core.monotonic_interaction_clock import MonotonicInteractionClock
+from tusk.core.recent_context_formatter import RecentContextFormatter
 from tusk.core.pipeline import Pipeline
 from tusk.core.sliding_window_history import SlidingWindowHistory
 from tusk.core.utterance_detector import UtteranceDetector
@@ -59,14 +61,16 @@ def _build_pipeline(config: Config, log: LogPrinter) -> Pipeline:
     summarizer = LLMConversationSummarizer(llm_registry.get("utility"))
     history = SlidingWindowHistory(max_messages=20, summarizer=summarizer)
     agent = MainAgent(llm_registry.get("agent"), context, tool_registry, history, log)
-    command_mode = CommandMode(agent, log)
+    clock = MonotonicInteractionClock(config.follow_up_timeout_seconds)
+    formatter = RecentContextFormatter(history)
+    command_mode = CommandMode(agent, clock, formatter, log)
 
     pipeline = Pipeline(
         utterance_detector=detector, stt_engine=stt, gatekeeper=gatekeeper,
         initial_mode=command_mode, config=config, log_printer=log,
     )
 
-    _register_dictation(tool_registry, pipeline, llm_registry, agent, log)
+    _register_dictation(tool_registry, pipeline, llm_registry, agent, clock, formatter, log)
     return pipeline
 
 
@@ -75,10 +79,12 @@ def _register_dictation(
     pipeline: Pipeline,
     llm_registry: LLMRegistry,
     agent: MainAgent,
+    clock: MonotonicInteractionClock,
+    formatter: RecentContextFormatter,
     log: LogPrinter,
 ) -> None:
     text_paster = GnomeTextPaster()
-    factory = lambda: CommandMode(agent, log)  # noqa: E731
+    factory = lambda: CommandMode(agent, clock, formatter, log)  # noqa: E731
     dictation = DictationTool(pipeline, text_paster, llm_registry.get("utility"), factory, log)
     tool_registry.register(dictation)
 

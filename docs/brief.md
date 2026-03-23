@@ -122,9 +122,10 @@ The **gatekeeper model (Tier 1)** performs hybrid intent detection:
 
 - **Name trigger (primary):** Looks for "Tusk" (or configured aliases) in the transcribed text to identify directed commands.
 - **Implicit command detection:** Obvious imperative commands (e.g., "open Firefox", "close this window") are caught even without the name trigger, based on phrasing and context.
+- **Conversational follow-up detection:** When the user has recently interacted with TUSK (within a configurable timeout, default 30 seconds), the gatekeeper receives recent conversation context and can recognize contextual follow-ups (e.g., "now close it", "do the same for the other one") as directed at TUSK even without a wake word. The follow-up window expires after the timeout to prevent false positives from ambient speech.
 - **Ambient speech is discarded.** Conversation, background noise, and non-command speech are classified as "not for me" and dropped — they never reach the main agent.
 
-This means: no wake-word button, no "Hey Tusk" ritual. You talk, and if you're talking to TUSK, the gatekeeper catches it and passes it up.
+This means: no wake-word button, no "Hey Tusk" ritual. You talk, and if you're talking to TUSK, the gatekeeper catches it and passes it up. And if you're in an active conversation with TUSK, you can keep talking naturally without repeating the wake word.
 
 ### 3.5 AI Agent Architecture
 
@@ -282,13 +283,13 @@ These are unresolved decisions to revisit as development progresses:
 
 1. **License choice** — MIT, Apache 2.0, GPL, or other.
 2. **LLM cost management** — the two-tier architecture dramatically reduces main agent invocations, but the gatekeeper still processes every transcribed utterance. At what usage level does a local gatekeeper model become necessary?
-3. **Gatekeeper design** — should the gatekeeper return a simple yes/no, or also extract a preliminary intent category to speed up the main agent? How do we measure and tune its false-positive vs. false-negative rate?
+3. **Gatekeeper design** — should the gatekeeper return a simple yes/no, or also extract a preliminary intent category to speed up the main agent? How do we measure and tune its false-positive vs. false-negative rate? *Partially resolved: the gatekeeper now receives recent conversation context within a follow-up window to recognize contextual follow-ups without a wake word.*
 4. **Unified context schema design** — what fields belong in the context schema? How frequently should context providers push updates (continuous polling, event-driven, on-demand before each agent invocation)? How do we keep the context payload compact enough to not bloat LLM token usage?
 5. **Sub-agent lifecycle** — how long do sub-agents live? Per-task? Per-session? What are the resource limits?
 6. **Extension API design** — bidirectionality is decided (context providers + action executors), but: how are extensions discovered, loaded, and sandboxed? What's the registration protocol? Can extensions declare capabilities and required context fields?
 7. **Dangerous action list** — what specific operations belong in the dangerous action registry? How granular should it be?
 8. **Metrics and telemetry** — what to measure and how (recognition accuracy, gatekeeper precision/recall, command latency breakdown per tier, context freshness, agent response time).
-9. **Conversation context** — should the main agent maintain conversational memory within a session? Across sessions?
+9. **Conversation context** — *Partially resolved: the main agent maintains a sliding-window conversation history within a session (max 20 messages, with LLM-based summarization on compaction). The gatekeeper also receives recent context within a follow-up window. Cross-session memory remains an open question.*
 
 ---
 

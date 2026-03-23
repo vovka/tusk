@@ -43,6 +43,7 @@ immutable (`frozen=True`) for the lifetime of the process.
 | `AUDIO_SAMPLE_RATE` | `int` | `16000` | Positive integer (Hz) |
 | `AUDIO_FRAME_DURATION_MS` | `int` | `30` | `10`, `20`, or `30` (WebRTC VAD constraint) |
 | `VAD_AGGRESSIVENESS` | `int` | `2` | `0`, `1`, `2`, or `3` |
+| `FOLLOW_UP_TIMEOUT_SECONDS` | `float` | `30` | Positive float (seconds) |
 
 ### 2.3 Provider Selection Logic (main.py)
 
@@ -163,6 +164,28 @@ to serve different purposes in different modes without being modified.
 The `metadata` field is used by `DictationMode` to detect stop commands via
 `metadata["metadata_stop"] == "true"`.
 
+### 6.3 Conversation-Aware Gatekeeper Prompt
+
+In command mode, the gatekeeper prompt is built dynamically by `CommandMode`.
+
+**When outside the follow-up window** (no recent interaction or timeout expired):
+The gatekeeper receives the standard static prompt — wake-word or imperative command
+detection only. Behavior is identical to a stateless gatekeeper.
+
+**When within the follow-up window** (within `FOLLOW_UP_TIMEOUT_SECONDS` of last command):
+The gatekeeper prompt is extended with recent conversation context (last 6 messages,
+each truncated to 150 characters). The addendum instructs the gatekeeper to treat
+contextual follow-ups as directed at TUSK even without a wake word.
+
+**Time decay:** The follow-up window starts when `CommandMode` records a successful
+interaction via `InteractionClock.record_interaction()`. It expires after the
+configured timeout (default 30 seconds). This prevents stale conversation context
+from causing false positives on ambient speech.
+
+**Latency impact:** No additional LLM calls. Context is formatted via string
+operations (< 1 ms). The gatekeeper prompt grows by ~200-400 tokens when context
+is included, adding ~10-30 ms to inference on a fast model.
+
 ---
 
 ## 7. Agent Tool Specification
@@ -274,15 +297,19 @@ trigger mode transitions without holding a reference to the pipeline directly.
 
 ### 9.2 CommandMode — `tusk/core/command_mode.py`
 
-**Gatekeeper prompt:** Instructs LLM to decide if utterance is directed at TUSK
-(by wake word "tusk"/"task" or by imperative phrasing). Expected LLM response:
-`{"directed": bool, "cleaned_command": str}`.
+**Dependencies:** `MainAgent`, `InteractionClock`, `RecentContextFormatter`, `LogPrinter`
+
+**Gatekeeper prompt (dynamic):** Built by the `gatekeeper_prompt` property:
+- Outside follow-up window: standard prompt (wake word or imperative detection)
+- Within follow-up window: standard prompt + follow-up addendum with recent context
+
+Expected LLM response: `{"directed": bool, "cleaned_command": str}`.
 
 **handle_utterance:**
 
 1. If `gate_result.is_directed_at_tusk` is False: return (discard utterance)
-2. Call `agent.process_command(gate_result.cleaned_command)` → `ToolCall`
-3. Call `registry.get(tool_call.tool_name).execute(tool_call.parameters)`
+2. Call `agent.process_command(gate_result.cleaned_command)`
+3. Call `interaction_clock.record_interaction()` to mark the interaction time
 
 ### 9.3 DictationMode — `tusk/core/dictation_mode.py`
 
@@ -473,6 +500,7 @@ The target end-to-end latency from end of speech to action start is ≤ 1 second
 | Main agent LLM call | OpenRouterLLM | ~300–800 ms |
 | Desktop context query | wmctrl + xdotool | ~20–50 ms |
 | Tool execution | socket / wmctrl / xdotool | ~10–30 ms |
+| Context formatting | RecentContextFormatter | < 1 ms (string ops) |
 
 **Dictation mode additional latency:**
 - Raw text paste: ~10–30 ms (xdotool type)
