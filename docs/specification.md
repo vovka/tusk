@@ -11,7 +11,7 @@ TUSK runs as a Python process (optionally inside Docker). It interacts with:
 
 - **Microphone** — via `sounddevice` (reads from default input device)
 - **LLM APIs** — via HTTPS to OpenRouter and/or Groq
-- **Desktop environment** — via `wmctrl` and `xdotool` subprocesses
+- **Desktop environment** — via `wmctrl`, `xdotool`, `xclip`, and `xdg-open` subprocesses
 - **Host launcher daemon** — via a Unix domain socket at `/tmp/tusk/launch.sock`
 
 The host launcher daemon (`launcher/tusk_host_launcher.py`) is a separate process that
@@ -30,33 +30,37 @@ immutable (`frozen=True`) for the lifetime of the process.
 
 | Env Var | Type | Description |
 |---|---|---|
-| `OPENROUTER_API_KEY` | `str` | API key for OpenRouter |
+| `GROQ_API_KEY` | `str` | API key for Groq (STT + LLM) |
 
 ### 2.2 Optional Fields with Defaults
 
 | Env Var | Python Type | Default | Valid Values |
 |---|---|---|---|
-| `GROQ_API_KEY` | `str` | `""` | Any Groq API key string |
-| `GATEKEEPER_MODEL` | `str` | `"liquid/lfm-2-24b-a2b"` | Any OpenRouter model ID |
-| `MAIN_AGENT_MODEL` | `str` | `"x-ai/grok-4.1-fast"` | Any OpenRouter model ID |
+| `OPENROUTER_API_KEY` | `str` | `""` | Any OpenRouter API key string |
+| `GATEKEEPER_LLM` | `str` | `"groq/llama-3.1-8b-instant"` | `provider/model` format |
+| `AGENT_LLM` | `str` | `"groq/openai/gpt-oss-120b"` | `provider/model` format |
+| `UTILITY_LLM` | `str` | `"groq/llama-3.3-70b-versatile"` | `provider/model` format |
 | `WHISPER_MODEL_SIZE` | `str` | `"base"` | `tiny`, `base`, `small`, `medium` |
 | `AUDIO_SAMPLE_RATE` | `int` | `16000` | Positive integer (Hz) |
 | `AUDIO_FRAME_DURATION_MS` | `int` | `30` | `10`, `20`, or `30` (WebRTC VAD constraint) |
 | `VAD_AGGRESSIVENESS` | `int` | `2` | `0`, `1`, `2`, or `3` |
 | `FOLLOW_UP_TIMEOUT_SECONDS` | `float` | `30` | Positive float (seconds) |
 
+LLM slot values use `provider/model` format. The first path segment is the provider
+name (`groq` or `openrouter`); the remainder is the model ID. Parsed by
+`LLMSlotConfig.parse()`.
+
 ### 2.3 Provider Selection Logic (main.py)
 
 ```
-if GROQ_API_KEY is set (non-empty):
-    STT engine   → GroqSTT (cloud Whisper-large-v3-turbo)
-    Gatekeeper   → GnomeGatekeeper(GroqLLM(model="llama-3.1-8b-instant"))
-else:
-    STT engine   → WhisperSTT(model_size=config.whisper_model_size)
-    Gatekeeper   → GnomeGatekeeper(OpenRouterLLM(model=config.gatekeeper_model))
+STT engine → GroqSTT (cloud Whisper-large-v3-turbo)
 
-Main agent and dictation cleanup always use:
-    OpenRouterLLM(model=config.main_agent_model)
+LLM slots (via LLMRegistry, each wrapped in LLMProxy for runtime swapping):
+    "gatekeeper" → ConfigurableLLMFactory.create(GATEKEEPER_LLM)
+    "agent"      → ConfigurableLLMFactory.create(AGENT_LLM)
+    "utility"    → ConfigurableLLMFactory.create(UTILITY_LLM)
+
+Supported providers: "groq" (GroqLLM), "openrouter" (OpenRouterLLM)
 ```
 
 ---
@@ -213,28 +217,61 @@ def execute(self, parameters: dict[str, str]) -> ToolResult
 {"tool": "start_dictation"}
 ```
 
-### 7.2 LaunchApplicationTool — `tusk/gnome/tools/launch_application_tool.py`
+### 7.2 Tool Factory — `tusk/gnome/tool_factory.py`
 
-- **name:** `launch_application`
-- **parameters_schema:** `{"application_name": "<exec_cmd>"}`
-- **execute:**
-  1. Connect to Unix socket at `socket_path` (injected via `__init__`)
-  2. Send `application_name` as UTF-8
-  3. Read response (up to 256 bytes)
-  4. Return `ToolResult(success=True)` if response starts with `"ok"`
+`build_tool_registry()` creates a `ToolRegistry` and registers all 19 tools,
+injecting dependencies (InputSimulator, ClipboardProvider, utility LLM, LLMRegistry).
 
-### 7.3 CloseWindowTool — `tusk/gnome/tools/close_window_tool.py`
+### 7.3 Tool Catalog (19 tools)
 
-- **name:** `close_window`
-- **parameters_schema:** `{"window_title": "<title>"}`
-- **execute:** runs `wmctrl -c <window_title>` as subprocess
+**Application & Window Management:**
 
-### 7.4 DictationTool — `tusk/gnome/tools/dictation_tool.py`
+| Tool | Name | Parameters | Execution |
+|---|---|---|---|
+| `LaunchApplicationTool` | `launch_application` | `application_name` | Unix socket to host launcher |
+| `CloseWindowTool` | `close_window` | `window_title` | `wmctrl -c` |
+| `FocusWindowTool` | `focus_window` | `window_title` | `wmctrl -a` |
+| `MaximizeWindowTool` | `maximize_window` | `window_title` | `wmctrl` add maximized |
+| `MinimizeWindowTool` | `minimize_window` | `window_title` | `xdotool` minimize |
+| `MoveResizeWindowTool` | `move_resize_window` | `window_title`, `geometry` | `wmctrl -e` |
+| `SwitchWorkspaceTool` | `switch_workspace` | `workspace_number` | `wmctrl -s` |
 
-- **name:** `start_dictation`
-- **parameters_schema:** `{}` (no parameters)
-- **execute:** constructs a new `DictationMode` and calls
-  `pipeline_controller.set_mode(dictation_mode)`
+**Input Simulation:**
+
+| Tool | Name | Parameters | Execution |
+|---|---|---|---|
+| `PressKeysTool` | `press_keys` | `keys` | `InputSimulator.press_keys()` |
+| `TypeTextTool` | `type_text` | `text` | `InputSimulator.type_text()` |
+
+**Mouse Control:**
+
+| Tool | Name | Parameters | Execution |
+|---|---|---|---|
+| `MouseClickTool` | `mouse_click` | `x`, `y`, `button`, `clicks` | `InputSimulator.mouse_click()` |
+| `MouseMoveTool` | `mouse_move` | `x`, `y` | `InputSimulator.mouse_move()` |
+| `MouseDragTool` | `mouse_drag` | `from_x`, `from_y`, `to_x`, `to_y` | `InputSimulator.mouse_drag()` |
+| `MouseScrollTool` | `mouse_scroll` | `direction`, `clicks` | `InputSimulator.mouse_scroll()` |
+
+**Clipboard:**
+
+| Tool | Name | Parameters | Execution |
+|---|---|---|---|
+| `ReadClipboardTool` | `read_clipboard` | *(none)* | `ClipboardProvider.read()` |
+| `WriteClipboardTool` | `write_clipboard` | `text` | `ClipboardProvider.write()` |
+
+**Desktop Navigation:**
+
+| Tool | Name | Parameters | Execution |
+|---|---|---|---|
+| `OpenUriTool` | `open_uri` | `uri` | `xdg-open` |
+
+**Special Modes & System:**
+
+| Tool | Name | Parameters | Execution |
+|---|---|---|---|
+| `DictationTool` | `start_dictation` | *(none)* | Switches pipeline to `DictationMode` |
+| `AiTransformTool` | `ai_transform` | `instruction` | Copy selection → LLM transform → replace |
+| `SwitchModelTool` | `switch_model` | `slot`, `provider`, `model` | `LLMRegistry.swap()` |
 
 ---
 
@@ -243,7 +280,7 @@ def execute(self, parameters: dict[str, str]) -> ToolResult
 **Source:** `tusk/core/agent.py`
 
 ```python
-def process_command(self, command: str) -> ToolCall
+def process_command(self, command: str) -> None
 ```
 
 ### 8.1 System Prompt
@@ -252,10 +289,13 @@ Built dynamically at call time from `ToolRegistry.build_schema_text()`:
 
 ```
 You are TUSK, a desktop voice assistant. Given a user command and desktop context,
-output ONLY valid JSON matching one of the available tools:
+call tools one at a time to complete it. Available tools:
 <tool schema lines>
-Use {"tool":"unknown","reason":"<why>"} if the command is too garbled or cannot be
-mapped to a known tool. Respond with JSON only, no explanation.
+Respond with JSON matching one tool schema per message. On your first response you
+may include an optional "reply" field with a brief acknowledgment.
+Use {"tool":"done","reply":"<confirmation>"} when the task is fully complete.
+Use {"tool":"unknown","reason":"<why>"} only if the command cannot be mapped.
+Respond with JSON only.
 ```
 
 ### 8.2 User Message Construction
@@ -263,17 +303,27 @@ mapped to a known tool. Respond with JSON only, no explanation.
 ```
 Command: <cleaned_command>
 Active window: <active_window_title>
-Open windows: <comma-separated window titles>
+Open windows:
+  <title> [<w>x<h> at <x>,<y>]
 Available apps (name → exec_cmd):
 <name → exec_cmd per line>
 ```
 
-### 8.3 Response Parsing
+### 8.3 Multi-Step Agentic Loop
 
-Parses LLM response as JSON. Extracts `"tool"` field as `tool_name`. Remaining
-fields become `parameters`. Returns `ToolCall(tool_name, parameters)`.
+The agent runs a loop (max 10 steps):
 
-On JSON parse failure: raises `json.JSONDecodeError` (caught by Pipeline).
+1. Calls `LLMProvider.complete_messages()` with system prompt and full
+   `ConversationHistory` (including tool results from prior steps)
+2. Parses response JSON — extracts `"tool"` as `tool_name`, remaining fields as
+   `parameters`. Optionally pops a `"reply"` field for user acknowledgment.
+3. If tool is `"done"` or `"unknown"` — stops the loop
+4. Otherwise executes the tool via `ToolRegistry`, appends the `ToolResult` to
+   history as a user message (`"Tool result: <message>"`), and loops
+5. On JSON parse failure: returns `ToolCall("done", {})` (graceful fallback)
+
+All messages (user commands, LLM responses, tool results) are persisted in
+`ConversationHistory` for cross-command context.
 
 ---
 
@@ -283,7 +333,7 @@ On JSON parse failure: raises `json.JSONDecodeError` (caught by Pipeline).
 
 ```python
 @property def gatekeeper_prompt(self) -> str
-def handle_utterance(self, gate_result: GateResult, controller: PipelineController) -> None
+def handle_utterance(self, gate_result: GateResult, utterance: Utterance, controller: PipelineController) -> None
 ```
 
 ### 9.1 PipelineController — `tusk/interfaces/pipeline_controller.py`
@@ -409,12 +459,29 @@ Takes effect immediately on the next utterance.
 **Interface:** `tusk/interfaces/llm_provider.py`
 
 ```python
-def complete(self, system_prompt: str, user_message: str) -> str
+@property def label(self) -> str
+def complete(self, system_prompt: str, user_message: str, max_tokens: int = 256) -> str
+def complete_messages(self, system_prompt: str, messages: list[dict]) -> str
 ```
 
-Both providers format the call as:
+`label` returns a human-readable identifier (e.g. `"groq/llama-3.1-8b-instant"`).
+`complete_messages` supports multi-turn conversation for the agent loop.
+
+Both providers format single-turn calls as:
 `[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_message}]`
-with `max_tokens=256`.
+with default `max_tokens=256`.
+
+**Factory:** `tusk/interfaces/llm_provider_factory.py`
+
+```python
+def create(self, provider_name: str, model: str) -> LLMProvider
+```
+
+Implemented by `ConfigurableLLMFactory` which supports `"groq"` and `"openrouter"`.
+
+**Runtime swapping:** `LLMProxy` wraps any `LLMProvider` and exposes a `swap()`
+method. `LLMRegistry` manages three named slots, each holding an `LLMProxy`.
+`SwitchModelTool` calls `LLMRegistry.swap()` to hot-swap models by voice.
 
 ### 12.1 OpenRouterLLM — `tusk/providers/open_router_llm.py`
 
@@ -478,8 +545,8 @@ The launcher runs on the host so spawned apps appear in the desktop.
 | `GroqSTT` | Any | Propagates to Pipeline; utterance dropped |
 | `GnomeGatekeeper` | JSON parse error | Returns `GateResult(is_directed_at_tusk=False)` |
 | `GnomeGatekeeper` | LLM error | Propagates to Pipeline; utterance dropped |
-| `MainAgent` | JSON parse error | Propagates to Pipeline; utterance dropped |
-| `MainAgent` | Unknown tool name | `KeyError` propagates to Pipeline; utterance dropped |
+| `MainAgent` | JSON parse error | Falls back to `ToolCall("done", {})` |
+| `MainAgent` | Unknown tool name | Returns `ToolResult(success=False)`, loop continues |
 | `LaunchApplicationTool` | Socket error | Returns `ToolResult(success=False)` |
 | `CloseWindowTool` | Subprocess error | `subprocess.CalledProcessError` propagates |
 | `Pipeline` | Any from above | Caught, printed, loop continues |
