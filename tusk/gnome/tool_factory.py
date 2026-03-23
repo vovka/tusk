@@ -1,3 +1,4 @@
+from tusk.core.llm_registry import LLMRegistry
 from tusk.core.tool_registry import ToolRegistry
 from tusk.gnome.tools.ai_transform_tool import AiTransformTool
 from tusk.gnome.tools.close_window_tool import CloseWindowTool
@@ -13,6 +14,7 @@ from tusk.gnome.tools.move_resize_window_tool import MoveResizeWindowTool
 from tusk.gnome.tools.open_uri_tool import OpenUriTool
 from tusk.gnome.tools.press_keys_tool import PressKeysTool
 from tusk.gnome.tools.read_clipboard_tool import ReadClipboardTool
+from tusk.gnome.tools.switch_model_tool import SwitchModelTool
 from tusk.gnome.tools.switch_workspace_tool import SwitchWorkspaceTool
 from tusk.gnome.tools.type_text_tool import TypeTextTool
 from tusk.gnome.tools.write_clipboard_tool import WriteClipboardTool
@@ -28,7 +30,8 @@ _SOCKET_PATH = "/tmp/tusk/launch.sock"
 def build_tool_registry(
     simulator: InputSimulator,
     clipboard: ClipboardProvider,
-    agent_llm: LLMProvider,
+    utility_llm: LLMProvider,
+    llm_registry: LLMRegistry,
 ) -> ToolRegistry:
     registry = ToolRegistry()
     registry.register(LaunchApplicationTool(_SOCKET_PATH))
@@ -38,7 +41,8 @@ def build_tool_registry(
     _register_mouse_tools(registry, simulator)
     _register_clipboard_tools(registry, clipboard)
     _register_desktop_tools(registry)
-    registry.register(AiTransformTool(simulator, clipboard, agent_llm))
+    registry.register(AiTransformTool(simulator, clipboard, utility_llm))
+    registry.register(SwitchModelTool(llm_registry))
     return registry
 
 
