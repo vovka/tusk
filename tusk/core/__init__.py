@@ -3,7 +3,9 @@ from tusk.core.audio_capture import AudioCapture
 from tusk.core.color_log_printer import ColorLogPrinter
 from tusk.core.command_mode import CommandMode
 from tusk.core.dictation_mode import DictationMode
+from tusk.core.llm_conversation_summarizer import LLMConversationSummarizer
 from tusk.core.pipeline import Pipeline
+from tusk.core.sliding_window_history import SlidingWindowHistory
 from tusk.core.tool_registry import ToolRegistry
 from tusk.core.utterance_detector import UtteranceDetector
 
@@ -12,8 +14,10 @@ __all__ = [
     "ColorLogPrinter",
     "CommandMode",
     "DictationMode",
+    "LLMConversationSummarizer",
     "MainAgent",
     "Pipeline",
+    "SlidingWindowHistory",
     "ToolRegistry",
     "UtteranceDetector",
 ]

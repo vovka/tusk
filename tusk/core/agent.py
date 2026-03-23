@@ -2,8 +2,10 @@ import json
 
 from tusk.core.tool_registry import ToolRegistry
 from tusk.interfaces.context_provider import ContextProvider
+from tusk.interfaces.conversation_history import ConversationHistory
 from tusk.interfaces.llm_provider import LLMProvider
 from tusk.interfaces.log_printer import LogPrinter
+from tusk.schemas.chat_message import ChatMessage
 from tusk.schemas.desktop_context import DesktopContext
 from tusk.schemas.tool_call import ToolCall
 from tusk.schemas.tool_result import ToolResult
@@ -20,9 +22,11 @@ _SYSTEM_PROMPT_PREFIX = (
 
 _SYSTEM_PROMPT_SUFFIX = (
     '\nRespond with JSON matching one tool schema per message. '
-    'Use {"tool":"done"} when the task is fully complete or needs no action. '
+    'On your first response you may include an optional "reply" field with a brief natural-language '
+    'acknowledgment of what you are about to do (e.g. {"tool":"press_keys","reply":"Sure, selecting all text.","keys":"ctrl+a"}). '
+    'Use {"tool":"done","reply":"<confirmation>"} when the task is fully complete or needs no action. '
     'Use {"tool":"unknown","reason":"<why>"} only if the command cannot be mapped to any tool. '
-    "Respond with JSON only, no explanation."
+    "Respond with JSON only."
 )
 
 
@@ -32,29 +36,39 @@ class MainAgent:
         llm_provider: LLMProvider,
         context_provider: ContextProvider,
         tool_registry: ToolRegistry,
+        history: ConversationHistory,
         log_printer: LogPrinter,
     ) -> None:
         self._llm = llm_provider
         self._context = context_provider
         self._registry = tool_registry
+        self._history = history
         self._log = log_printer
 
     def process_command(self, command: str) -> None:
         context = self._context.get_context()
-        messages = [{"role": "user", "content": self._build_message(command, context)}]
+        user_msg = ChatMessage("user", self._build_message(command, context))
+        self._history.append(user_msg)
         prompt = self._build_system_prompt()
         self._log.log("LLM", f"→ {command!r}")
+        self._run_tool_loop(prompt)
+
+    def _run_tool_loop(self, prompt: str) -> None:
         for step in range(1, _MAX_STEPS + 1):
+            messages = [m.to_dict() for m in self._history.get_messages()]
             raw = self._llm.complete_messages(prompt, messages)
-            messages.append({"role": "assistant", "content": raw})
+            self._history.append(ChatMessage("assistant", raw))
             tool_call = self._parse_tool_call(raw)
+            reply = tool_call.parameters.pop("reply", None)
+            if reply:
+                self._log.log("TUSK", reply)
             self._log_step(step, tool_call)
             if tool_call.tool_name in ("done", "unknown"):
                 self._log_finish(step, tool_call)
                 break
             result = self._execute(tool_call)
             self._log.log("TOOL", result.message)
-            messages.append({"role": "user", "content": f"Tool result: {result.message}"})
+            self._history.append(ChatMessage("user", f"Tool result: {result.message}"))
         else:
             self._log.log("AGENT", f"max steps reached ({_MAX_STEPS})")
 
@@ -64,8 +78,7 @@ class MainAgent:
 
     def _log_finish(self, step: int, tool_call: ToolCall) -> None:
         if tool_call.tool_name == "unknown":
-            reason = tool_call.parameters.get("reason", "?")
-            self._log.log("AGENT", f"cannot handle: {reason}")
+            self._log.log("AGENT", f"cannot handle: {tool_call.parameters.get('reason', '?')}")
             return
         self._log.log("AGENT", f"done ({step} steps)")
 

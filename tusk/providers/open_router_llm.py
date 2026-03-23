@@ -13,7 +13,7 @@ _APP_HEADERS = {
 
 class OpenRouterLLM(LLMProvider):
     def __init__(self, api_key: str, model: str) -> None:
-        self._client = OpenAI(api_key=api_key, base_url=_BASE_URL, default_headers=_APP_HEADERS)
+        self._client = OpenAI(api_key=api_key, base_url=_BASE_URL, default_headers=_APP_HEADERS, timeout=15.0)
         self._model = model
 
     def complete(self, system_prompt: str, user_message: str, max_tokens: int = 256) -> str:

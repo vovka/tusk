@@ -18,8 +18,8 @@ _GATEKEEPER_PROMPT = (
     "Decide if the transcribed speech is a command directed at TUSK. "
     "It is directed at TUSK if it mentions 'tusk' or 'task' (common mishearing) "
     "or is a clear imperative desktop command (e.g. 'open firefox', 'close this window'). "
-    'Respond ONLY with valid JSON: {"directed": true, "cleaned_command": "<text>"} '
-    'or {"directed": false, "cleaned_command": ""}. '
+    'Respond ONLY with valid JSON: {"directed": true, "cleaned_command": "<text>", "reason": "<brief explanation>"} '
+    'or {"directed": false, "cleaned_command": "", "reason": "<brief explanation>"}. '
     "For cleaned_command, strip any leading wake word ('tusk', 'task', 'hey tusk', 'hey task') "
     "and trim whitespace."
 )
