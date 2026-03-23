@@ -16,7 +16,7 @@ class GnomeGatekeeper(Gatekeeper):
 
     def evaluate(self, utterance: Utterance, system_prompt: str) -> GateResult:
         raw = self._llm.complete(system_prompt, utterance.text)
-        self._log.log("LLM", f"gate → {raw!r}")
+        self._log.log("LLM", f"[{self._llm.label}] gate → {raw!r}")
         return self._parse_response(raw)
 
     def _extract_json(self, raw: str) -> str:

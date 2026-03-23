@@ -7,8 +7,12 @@ __all__ = ["GroqLLM"]
 
 class GroqLLM(LLMProvider):
     def __init__(self, api_key: str, model: str) -> None:
-        self._client = Groq(api_key=api_key, timeout=10.0)
+        self._client = Groq(api_key=api_key, timeout=30.0)
         self._model = model
+
+    @property
+    def label(self) -> str:
+        return f"groq/{self._model}"
 
     def complete(self, system_prompt: str, user_message: str, max_tokens: int = 256) -> str:
         return self.complete_messages(system_prompt, [{"role": "user", "content": user_message}])
