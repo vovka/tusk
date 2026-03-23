@@ -3,6 +3,7 @@ import json
 from tusk.core.tool_registry import ToolRegistry
 from tusk.interfaces.context_provider import ContextProvider
 from tusk.interfaces.llm_provider import LLMProvider
+from tusk.interfaces.log_printer import LogPrinter
 from tusk.schemas.desktop_context import DesktopContext
 from tusk.schemas.tool_call import ToolCall
 from tusk.schemas.tool_result import ToolResult
@@ -31,29 +32,42 @@ class MainAgent:
         llm_provider: LLMProvider,
         context_provider: ContextProvider,
         tool_registry: ToolRegistry,
+        log_printer: LogPrinter,
     ) -> None:
         self._llm = llm_provider
         self._context = context_provider
         self._registry = tool_registry
+        self._log = log_printer
 
     def process_command(self, command: str) -> None:
         context = self._context.get_context()
         messages = [{"role": "user", "content": self._build_message(command, context)}]
         prompt = self._build_system_prompt()
-        for _ in range(_MAX_STEPS):
+        self._log.log("LLM", f"→ {command!r}")
+        for step in range(1, _MAX_STEPS + 1):
             raw = self._llm.complete_messages(prompt, messages)
-            print(f"[LLM:agent] {raw!r}")
             messages.append({"role": "assistant", "content": raw})
             tool_call = self._parse_tool_call(raw)
+            self._log_step(step, tool_call)
             if tool_call.tool_name in ("done", "unknown"):
-                if tool_call.tool_name == "unknown":
-                    print(f"[AGENT] cannot handle: {tool_call.parameters.get('reason', '?')}")
+                self._log_finish(step, tool_call)
                 break
             result = self._execute(tool_call)
-            print(f"[TOOL] {result.message}")
+            self._log.log("TOOL", result.message)
             messages.append({"role": "user", "content": f"Tool result: {result.message}"})
         else:
-            print("[AGENT] max steps reached")
+            self._log.log("AGENT", f"max steps reached ({_MAX_STEPS})")
+
+    def _log_step(self, step: int, tool_call: ToolCall) -> None:
+        params = ", ".join(f"{k}={v!r}" for k, v in tool_call.parameters.items())
+        self._log.log("AGENT", f"step {step}: {tool_call.tool_name}({params})")
+
+    def _log_finish(self, step: int, tool_call: ToolCall) -> None:
+        if tool_call.tool_name == "unknown":
+            reason = tool_call.parameters.get("reason", "?")
+            self._log.log("AGENT", f"cannot handle: {reason}")
+            return
+        self._log.log("AGENT", f"done ({step} steps)")
 
     def _execute(self, tool_call: ToolCall) -> ToolResult:
         try:

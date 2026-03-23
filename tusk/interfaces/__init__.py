@@ -4,6 +4,7 @@ from tusk.interfaces.context_provider import ContextProvider
 from tusk.interfaces.gatekeeper import Gatekeeper
 from tusk.interfaces.input_simulator import InputSimulator
 from tusk.interfaces.llm_provider import LLMProvider
+from tusk.interfaces.log_printer import LogPrinter
 from tusk.interfaces.pipeline_controller import PipelineController
 from tusk.interfaces.pipeline_mode import PipelineMode
 from tusk.interfaces.stt_engine import STTEngine
@@ -16,6 +17,7 @@ __all__ = [
     "Gatekeeper",
     "InputSimulator",
     "LLMProvider",
+    "LogPrinter",
     "PipelineController",
     "PipelineMode",
     "STTEngine",

@@ -4,6 +4,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from tusk.interfaces.llm_provider import LLMProvider
+from tusk.interfaces.log_printer import LogPrinter
 from tusk.interfaces.pipeline_mode import PipelineMode
 from tusk.interfaces.text_paster import TextPaster
 from tusk.schemas.gate_result import GateResult
@@ -37,10 +38,12 @@ class DictationMode(PipelineMode):
         text_paster: TextPaster,
         cleanup_llm: LLMProvider,
         command_mode_factory: Callable[[], PipelineMode],
+        log_printer: LogPrinter,
     ) -> None:
         self._paster = text_paster
         self._cleanup_llm = cleanup_llm
         self._command_mode_factory = command_mode_factory
+        self._log = log_printer
         self._raw_buffer: list[str] = []
         self._pasted_char_count: int = 0
 
@@ -65,7 +68,7 @@ class DictationMode(PipelineMode):
     def _handle_stop(self, controller: PipelineController) -> None:
         if self._raw_buffer:
             self._cleanup_and_replace()
-        print("[DICTATION] stopped")
+        self._log.log("DICTATION", "stopped")
         controller.set_mode(self._command_mode_factory())
 
     def _cleanup_and_replace(self) -> None:
