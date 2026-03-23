@@ -22,9 +22,11 @@ _SYSTEM_PROMPT_PREFIX = (
 
 _SYSTEM_PROMPT_SUFFIX = (
     '\nRespond with JSON matching one tool schema per message. '
-    'Use {"tool":"done"} when the task is fully complete or needs no action. '
+    'On your first response you may include an optional "reply" field with a brief natural-language '
+    'acknowledgment of what you are about to do (e.g. {"tool":"press_keys","reply":"Sure, selecting all text.","keys":"ctrl+a"}). '
+    'Use {"tool":"done","reply":"<confirmation>"} when the task is fully complete or needs no action. '
     'Use {"tool":"unknown","reason":"<why>"} only if the command cannot be mapped to any tool. '
-    "Respond with JSON only, no explanation."
+    "Respond with JSON only."
 )
 
 
@@ -57,6 +59,9 @@ class MainAgent:
             raw = self._llm.complete_messages(prompt, messages)
             self._history.append(ChatMessage("assistant", raw))
             tool_call = self._parse_tool_call(raw)
+            reply = tool_call.parameters.pop("reply", None)
+            if reply:
+                self._log.log("TUSK", reply)
             self._log_step(step, tool_call)
             if tool_call.tool_name in ("done", "unknown"):
                 self._log_finish(step, tool_call)

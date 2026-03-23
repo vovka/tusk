@@ -41,6 +41,9 @@ class GnomeGatekeeper(Gatekeeper):
             return GateResult(is_directed_at_tusk=False, cleaned_command="", confidence=0.0)
 
     def _build_gate_result(self, data: dict) -> GateResult:
+        reason = data.get("reason", "")
+        if reason:
+            self._log.log("GATE", reason)
         metadata = {k: str(v) for k, v in data.items() if k.startswith("metadata_")}
         return GateResult(
             is_directed_at_tusk=bool(data["directed"]),
