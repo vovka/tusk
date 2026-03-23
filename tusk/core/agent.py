@@ -2,7 +2,9 @@ import json
 
 from tusk.core.tool_registry import ToolRegistry
 from tusk.interfaces.context_provider import ContextProvider
+from tusk.interfaces.conversation_history import ConversationHistory
 from tusk.interfaces.llm_provider import LLMProvider
+from tusk.schemas.chat_message import ChatMessage
 from tusk.schemas.desktop_context import DesktopContext
 from tusk.schemas.tool_call import ToolCall
 from tusk.schemas.tool_result import ToolResult
@@ -31,29 +33,45 @@ class MainAgent:
         llm_provider: LLMProvider,
         context_provider: ContextProvider,
         tool_registry: ToolRegistry,
+        history: ConversationHistory,
     ) -> None:
         self._llm = llm_provider
         self._context = context_provider
         self._registry = tool_registry
+        self._history = history
 
     def process_command(self, command: str) -> None:
         context = self._context.get_context()
-        messages = [{"role": "user", "content": self._build_message(command, context)}]
+        user_msg = ChatMessage("user", self._build_message(command, context))
+        self._history.append(user_msg)
         prompt = self._build_system_prompt()
+        self._run_tool_loop(prompt)
+
+    def _run_tool_loop(self, prompt: str) -> None:
         for _ in range(_MAX_STEPS):
+            messages = [m.to_dict() for m in self._history.get_messages()]
             raw = self._llm.complete_messages(prompt, messages)
             print(f"[LLM:agent] {raw!r}")
-            messages.append({"role": "assistant", "content": raw})
-            tool_call = self._parse_tool_call(raw)
-            if tool_call.tool_name in ("done", "unknown"):
-                if tool_call.tool_name == "unknown":
-                    print(f"[AGENT] cannot handle: {tool_call.parameters.get('reason', '?')}")
+            self._history.append(ChatMessage("assistant", raw))
+            if self._handle_tool_call(raw):
                 break
-            result = self._execute(tool_call)
-            print(f"[TOOL] {result.message}")
-            messages.append({"role": "user", "content": f"Tool result: {result.message}"})
         else:
             print("[AGENT] max steps reached")
+
+    def _handle_tool_call(self, raw: str) -> bool:
+        tool_call = self._parse_tool_call(raw)
+        if tool_call.tool_name in ("done", "unknown"):
+            self._log_terminal(tool_call)
+            return True
+        result = self._execute(tool_call)
+        print(f"[TOOL] {result.message}")
+        self._history.append(ChatMessage("user", f"Tool result: {result.message}"))
+        return False
+
+    def _log_terminal(self, tool_call: ToolCall) -> None:
+        if tool_call.tool_name == "unknown":
+            reason = tool_call.parameters.get("reason", "?")
+            print(f"[AGENT] cannot handle: {reason}")
 
     def _execute(self, tool_call: ToolCall) -> ToolResult:
         try:

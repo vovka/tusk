@@ -2,7 +2,9 @@ from tusk.config import Config
 from tusk.core.agent import MainAgent
 from tusk.core.audio_capture import AudioCapture
 from tusk.core.command_mode import CommandMode
+from tusk.core.llm_conversation_summarizer import LLMConversationSummarizer
 from tusk.core.pipeline import Pipeline
+from tusk.core.sliding_window_history import SlidingWindowHistory
 from tusk.core.utterance_detector import UtteranceDetector
 from tusk.gnome.app_catalog import AppCatalog
 from tusk.gnome.gnome_clipboard_provider import GnomeClipboardProvider
@@ -49,7 +51,9 @@ def main() -> None:
     registry = build_tool_registry(simulator, clipboard, agent_llm)
 
     context = GnomeContextProvider(AppCatalog())
-    agent = MainAgent(agent_llm, context, registry)
+    summarizer = LLMConversationSummarizer(agent_llm)
+    history = SlidingWindowHistory(max_messages=20, summarizer=summarizer)
+    agent = MainAgent(agent_llm, context, registry, history)
     command_mode = CommandMode(agent)
 
     pipeline = Pipeline(
