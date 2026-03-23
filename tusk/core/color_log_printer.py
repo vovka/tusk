@@ -12,7 +12,7 @@ _TAG_COLORS: dict[str, str] = {
     "AGENT": "\033[90m",
     "TOOL": "\033[35m",
     "PIPELINE": "\033[37m",
-    "DICTATION": "\033[36m",
+    "DICTATION": "\033[96m",
     "ERROR": "\033[31m",
 }
 
