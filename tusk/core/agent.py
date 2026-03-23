@@ -50,7 +50,7 @@ class MainAgent:
         user_msg = ChatMessage("user", self._build_message(command, context))
         self._history.append(user_msg)
         prompt = self._build_system_prompt()
-        self._log.log("LLM", f"→ {command!r}")
+        self._log.log("LLM", f"[{self._llm.label}] → {command!r}")
         self._run_tool_loop(prompt)
 
     def _run_tool_loop(self, prompt: str) -> None:

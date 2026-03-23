@@ -7,6 +7,10 @@ class LLMProxy(LLMProvider):
     def __init__(self, initial_provider: LLMProvider) -> None:
         self._inner = initial_provider
 
+    @property
+    def label(self) -> str:
+        return self._inner.label
+
     def complete(self, system_prompt: str, user_message: str, max_tokens: int = 256) -> str:
         return self._inner.complete(system_prompt, user_message, max_tokens)
 

@@ -16,6 +16,10 @@ class OpenRouterLLM(LLMProvider):
         self._client = OpenAI(api_key=api_key, base_url=_BASE_URL, default_headers=_APP_HEADERS, timeout=15.0)
         self._model = model
 
+    @property
+    def label(self) -> str:
+        return f"openrouter/{self._model}"
+
     def complete(self, system_prompt: str, user_message: str, max_tokens: int = 256) -> str:
         return self.complete_messages(system_prompt, [{"role": "user", "content": user_message}])
 
