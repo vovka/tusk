@@ -30,7 +30,7 @@ def test_main_entry(monkeypatch) -> None:
 
 def test_build_pipeline_wires_components(monkeypatch) -> None:
     cfg = types.SimpleNamespace(groq_api_key="k", openrouter_api_key="o", gatekeeper_llm=types.SimpleNamespace(provider_name="groq", model="m"), agent_llm=types.SimpleNamespace(provider_name="groq", model="m"), utility_llm=types.SimpleNamespace(provider_name="groq", model="m"), audio_sample_rate=1, audio_frame_duration_ms=1, vad_aggressiveness=1, follow_up_timeout_seconds=1)
-    monkeypatch.setattr(main, "_build_llm_registry", lambda c: types.SimpleNamespace(get=lambda n: types.SimpleNamespace(), slot_names=[]))
+    monkeypatch.setattr(main, "_build_llm_registry", lambda c, l=None: types.SimpleNamespace(get=lambda n: types.SimpleNamespace(), slot_names=[]))
     monkeypatch.setattr(main, "build_tool_registry", lambda *a: types.SimpleNamespace(register=lambda t: None))
     monkeypatch.setattr(main, "Pipeline", lambda **k: types.SimpleNamespace())
     pipe = main._build_pipeline(cfg, types.SimpleNamespace(log=lambda *a: None))
