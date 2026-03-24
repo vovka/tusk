@@ -27,12 +27,12 @@ from tusk.providers.groq_stt import GroqSTT
 from tusk.schemas.llm_slot_config import LLMSlotConfig
 
 
-def _build_llm_registry(config: Config) -> LLMRegistry:
+def _build_llm_registry(config: Config, log: LogPrinter) -> LLMRegistry:
     factory = ConfigurableLLMFactory(config.groq_api_key, config.openrouter_api_key)
     registry = LLMRegistry(factory)
-    _register_slot(registry, factory, "gatekeeper", config.gatekeeper_llm)
-    _register_slot(registry, factory, "agent", config.agent_llm)
-    _register_slot(registry, factory, "utility", config.utility_llm)
+    _register_slot(registry, factory, "gatekeeper", config.gatekeeper_llm, log)
+    _register_slot(registry, factory, "agent", config.agent_llm, log)
+    _register_slot(registry, factory, "utility", config.utility_llm, log)
     return registry
 
 
@@ -41,16 +41,17 @@ def _register_slot(
     factory: LLMProviderFactory,
     name: str,
     slot_config: LLMSlotConfig,
+    log: LogPrinter,
 ) -> None:
     provider = factory.create(slot_config.provider_name, slot_config.model)
-    registry.register_slot(name, LLMProxy(provider))
+    registry.register_slot(name, LLMProxy(provider, log))
 
 
 def _build_pipeline(config: Config, log: LogPrinter) -> Pipeline:
     audio = AudioCapture(config.audio_sample_rate, config.audio_frame_duration_ms)
     detector = UtteranceDetector(audio, config.audio_sample_rate, config.vad_aggressiveness, log)
     stt = GroqSTT(config.groq_api_key)
-    llm_registry = _build_llm_registry(config)
+    llm_registry = _build_llm_registry(config, log)
 
     gatekeeper = GnomeGatekeeper(llm_registry.get("gatekeeper"), log)
     simulator = GnomeInputSimulator()
