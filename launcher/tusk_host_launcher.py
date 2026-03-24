@@ -33,8 +33,18 @@ def _serve(sock: socket.socket) -> None:
         _handle(conn)
 
 
+def _prepare_socket_dir() -> None:
+    dir_path = os.path.dirname(_SOCKET_PATH)
+    os.makedirs(dir_path, exist_ok=True)
+    if not os.access(dir_path, os.W_OK):
+        raise PermissionError(
+            f"Cannot write to {dir_path!r}: directory is owned by another user. "
+            f"Fix with: sudo rm -rf {dir_path}"
+        )
+
+
 def main() -> None:
-    os.makedirs(os.path.dirname(_SOCKET_PATH), exist_ok=True)
+    _prepare_socket_dir()
     if os.path.exists(_SOCKET_PATH):
         os.unlink(_SOCKET_PATH)
     with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
