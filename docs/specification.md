@@ -291,8 +291,8 @@ Built dynamically at call time from `ToolRegistry.build_schema_text()`:
 You are TUSK, a desktop voice assistant. Given a user command and desktop context,
 call tools one at a time to complete it. Available tools:
 <tool schema lines>
-Respond with JSON matching one tool schema per message. On your first response you
-may include an optional "reply" field with a brief acknowledgment.
+Respond with JSON matching one tool schema per message. On every response include a
+"reply" field with a brief explanation of what you are about to do.
 Use {"tool":"done","reply":"<confirmation>"} when the task is fully complete.
 Use {"tool":"unknown","reason":"<why>"} only if the command cannot be mapped.
 Respond with JSON only.
@@ -316,7 +316,8 @@ The agent runs a loop (max 10 steps):
 1. Calls `LLMProvider.complete_messages()` with system prompt and full
    `ConversationHistory` (including tool results from prior steps)
 2. Parses response JSON — extracts `"tool"` as `tool_name`, remaining fields as
-   `parameters`. Optionally pops a `"reply"` field for user acknowledgment.
+   `parameters`. Pops the `"reply"` field (expected on every step) for user-facing
+   explanation of the upcoming action.
 3. If tool is `"done"` or `"unknown"` — stops the loop
 4. Otherwise executes the tool via `ToolRegistry`, appends the `ToolResult` to
    history as a user message (`"Tool result: <message>"`), and loops
@@ -480,8 +481,11 @@ def create(self, provider_name: str, model: str) -> LLMProvider
 Implemented by `ConfigurableLLMFactory` which supports `"groq"` and `"openrouter"`.
 
 **Runtime swapping:** `LLMProxy` wraps any `LLMProvider` and exposes a `swap()`
-method. `LLMRegistry` manages three named slots, each holding an `LLMProxy`.
-`SwitchModelTool` calls `LLMRegistry.swap()` to hot-swap models by voice.
+method. It also accepts a `LogPrinter` and calls `show_wait(label)` /
+`clear_wait()` around every LLM call, providing a terminal indicator while
+waiting for a response. `LLMRegistry` manages three named slots, each holding
+an `LLMProxy`. `SwitchModelTool` calls `LLMRegistry.swap()` to hot-swap models
+by voice.
 
 ### 12.1 OpenRouterLLM — `tusk/providers/open_router_llm.py`
 
