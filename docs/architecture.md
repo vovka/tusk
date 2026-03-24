@@ -299,9 +299,13 @@ when the history exceeds its capacity.
 
 ```python
 def log(self, tag: str, message: str) -> None
+def show_wait(self, label: str) -> None
+def clear_wait(self) -> None
 ```
 
-Tagged log output. Implemented by `ColorLogPrinter` for colored terminal display.
+Tagged log output with transient waiting indicators. `show_wait` appends a
+"waiting for {label}..." suffix to the last log line. `clear_wait` removes it.
+Implemented by `ColorLogPrinter` for colored terminal display.
 
 ---
 
@@ -415,8 +419,10 @@ Receives a cleaned command string and runs a **multi-step agentic loop** (max 10
 1. Builds a system prompt dynamically from `ToolRegistry`
 2. Calls `LLMProvider.complete_messages()` with desktop context and message history
 3. Parses the response into a `ToolCall` and executes it via `ToolRegistry`
-4. Appends the tool result to message history and calls the LLM again
-5. Stops when the LLM responds with `{"tool":"done"}` or max steps is reached
+4. Extracts the `"reply"` field (required on every step) and logs it — the agent
+   explains each action before execution
+5. Appends the tool result to message history and calls the LLM again
+6. Stops when the LLM responds with `{"tool":"done"}` or max steps is reached
 
 The agent has no knowledge of specific tools — it only knows the tool interface.
 Multi-step commands ("select all and copy", "open Firefox and gedit") work naturally.
@@ -461,9 +467,11 @@ to 150 characters. No LLM call — pure string formatting (< 1 ms).
 
 ### `LLMProxy` — `core/llm_proxy.py`
 
-Wraps an `LLMProvider` and delegates all calls to it. Exposes a `swap(provider)`
-method that replaces the inner provider at runtime. All consumers hold a reference
-to the proxy, so swapping is transparent. Used by `LLMRegistry` for hot-swapping.
+Wraps an `LLMProvider` and delegates all calls to it. Accepts a `LogPrinter` to
+display a transient "waiting for {label}..." indicator on every LLM call via
+`show_wait`/`clear_wait`. Exposes a `swap(provider)` method that replaces the
+inner provider at runtime. All consumers hold a reference to the proxy, so
+swapping is transparent. Used by `LLMRegistry` for hot-swapping.
 
 ### `LLMRegistry` — `core/llm_registry.py`
 
@@ -486,6 +494,10 @@ calls the utility LLM to produce a one-paragraph summary.
 ### `ColorLogPrinter` — `core/color_log_printer.py`
 
 Implements `LogPrinter`. Outputs tagged, colored log lines to the terminal.
+Supports transient waiting indicators: `show_wait` appends a dim
+"waiting for {label}..." suffix inline; `clear_wait` erases it using
+backspace characters and ANSI erase-to-end-of-line, compatible with
+Docker Compose log prefixes.
 
 ### `Pipeline` — `core/pipeline.py`
 

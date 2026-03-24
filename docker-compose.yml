@@ -20,4 +20,5 @@ services:
       - .:/app
     devices:
       - /dev/snd:/dev/snd
+    tty: true
     restart: unless-stopped
