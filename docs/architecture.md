@@ -494,9 +494,10 @@ calls the utility LLM to produce a one-paragraph summary.
 ### `ColorLogPrinter` — `core/color_log_printer.py`
 
 Implements `LogPrinter`. Outputs tagged, colored log lines to the terminal.
-Supports transient waiting indicators: `show_wait` reprints the last log line
-with a dim "waiting for {label}..." suffix; `clear_wait` overwrites the suffix
-with spaces. Uses ANSI cursor-up and carriage-return for in-place updates.
+Supports transient waiting indicators: `show_wait` appends a dim
+"waiting for {label}..." suffix inline; `clear_wait` erases it using
+backspace characters and ANSI erase-to-end-of-line, compatible with
+Docker Compose log prefixes.
 
 ### `Pipeline` — `core/pipeline.py`
 

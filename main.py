@@ -27,7 +27,7 @@ from tusk.providers.groq_stt import GroqSTT
 from tusk.schemas.llm_slot_config import LLMSlotConfig
 
 
-def _build_llm_registry(config: Config, log: LogPrinter) -> LLMRegistry:
+def _build_llm_registry(config: Config, log: LogPrinter | None = None) -> LLMRegistry:
     factory = ConfigurableLLMFactory(config.groq_api_key, config.openrouter_api_key)
     registry = LLMRegistry(factory)
     _register_slot(registry, factory, "gatekeeper", config.gatekeeper_llm, log)
@@ -41,7 +41,7 @@ def _register_slot(
     factory: LLMProviderFactory,
     name: str,
     slot_config: LLMSlotConfig,
-    log: LogPrinter,
+    log: LogPrinter | None = None,
 ) -> None:
     provider = factory.create(slot_config.provider_name, slot_config.model)
     registry.register_slot(name, LLMProxy(provider, log))

@@ -16,30 +16,36 @@ _TAG_COLORS: dict[str, str] = {
     "ERROR": "\033[31m",
 }
 
-
 _DIM = "\033[2m"
-_CURSOR_UP = "\033[A"
+_ERASE_TO_END = "\033[K"
 
 
 class ColorLogPrinter(LogPrinter):
     def __init__(self) -> None:
-        self._last_line: str = ""
-        self._wait_text: str = ""
+        self._wait_len: int = 0
+        self._has_content: bool = False
 
     def log(self, tag: str, message: str) -> None:
-        self.clear_wait()
+        self._finish_line()
         color = _TAG_COLORS.get(tag, _RESET)
-        self._last_line = f"{color}[{tag}] {message}{_RESET}"
-        print(self._last_line)
+        line = f"{color}[{tag}] {message}{_RESET}"
+        print(line, end="", flush=True)
+        self._has_content = True
 
     def show_wait(self, label: str) -> None:
-        self._wait_text = f" waiting for {label}..."
-        suffix = f"{_DIM}{self._wait_text}{_RESET}"
-        print(f"{_CURSOR_UP}\r{self._last_line}{suffix}")
+        self.clear_wait()
+        wait = f" waiting for {label}..."
+        self._wait_len = len(wait)
+        print(f"{_DIM}{wait}{_RESET}", end="", flush=True)
 
     def clear_wait(self) -> None:
-        if not self._wait_text:
+        if self._wait_len == 0:
             return
-        padding = " " * len(self._wait_text)
-        print(f"{_CURSOR_UP}\r{self._last_line}{padding}")
-        self._wait_text = ""
+        print("\b" * self._wait_len + _ERASE_TO_END, end="", flush=True)
+        self._wait_len = 0
+
+    def _finish_line(self) -> None:
+        self.clear_wait()
+        if self._has_content:
+            print(flush=True)
+            self._has_content = False
