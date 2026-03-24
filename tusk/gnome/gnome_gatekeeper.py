@@ -44,10 +44,17 @@ class GnomeGatekeeper(Gatekeeper):
         reason = data.get("reason", "")
         if reason:
             self._log.log("GATE", reason)
-        metadata = {k: str(v) for k, v in data.items() if k.startswith("metadata_")}
+        metadata = _extract_metadata(data)
+        classification = data.get("classification", "ambient")
+        metadata["classification"] = classification
+        cleaned = data.get("cleaned_text", data.get("cleaned_command", ""))
         return GateResult(
-            is_directed_at_tusk=bool(data["directed"]),
-            cleaned_command=data.get("cleaned_command", ""),
+            is_directed_at_tusk=classification in ("command", "conversation"),
+            cleaned_command=cleaned,
             confidence=1.0,
             metadata=metadata,
         )
+
+
+def _extract_metadata(data: dict) -> dict[str, str]:
+    return {k: str(v) for k, v in data.items() if k.startswith("metadata_")}

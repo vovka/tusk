@@ -41,7 +41,8 @@ def test_pipeline_process_and_low_confidence() -> None:
     stt = SimpleNamespace(transcribe=lambda *a: Utterance("x", b"", 0.1, confidence=0.0))
     gate = SimpleNamespace(evaluate=lambda *a: GateResult(True, "x", 1.0))
     mode = SimpleNamespace(gatekeeper_prompt="g", handle_utterance=lambda *a: setattr(mode, "called", True))
-    pipe = Pipeline(detector, stt, gate, mode, SimpleNamespace(audio_sample_rate=16000), SimpleNamespace(log=lambda *a: None))
+    ufilter = SimpleNamespace(is_valid=lambda *a: True)
+    pipe = Pipeline(detector, stt, gate, ufilter, mode, SimpleNamespace(audio_sample_rate=16000), SimpleNamespace(log=lambda *a: None))
     pipe.run()
     assert not hasattr(mode, "called")
 

@@ -24,7 +24,8 @@ class RecentContextFormatter:
         return self._render(recent)
 
     def _render(self, messages: list[ChatMessage]) -> str:
-        lines = [self._format_message(m) for m in messages]
+        user_only = [m for m in messages if m.role == "user"]
+        lines = [self._format_message(m) for m in user_only[-self._max:]]
         return "\n".join(lines)
 
     def _format_message(self, message: ChatMessage) -> str:
