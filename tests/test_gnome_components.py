@@ -24,7 +24,7 @@ def test_gnome_context_provider(monkeypatch) -> None:
 
 
 def test_gatekeeper_parsing() -> None:
-    llm = types.SimpleNamespace(label="x", complete=lambda *a: '{"directed":true,"cleaned_command":"open"}')
+    llm = types.SimpleNamespace(label="x", complete=lambda *a: '{"classification":"command","cleaned_text":"open","reason":"wake word"}')
     gate = GnomeGatekeeper(llm, types.SimpleNamespace(log=lambda *a: None))
     result = gate.evaluate(Utterance("hi", b"", 0.1), "p")
     assert result.is_directed_at_tusk and result.cleaned_command == "open"

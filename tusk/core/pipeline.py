@@ -5,6 +5,7 @@ from tusk.interfaces.log_printer import LogPrinter
 from tusk.interfaces.pipeline_controller import PipelineController
 from tusk.interfaces.pipeline_mode import PipelineMode
 from tusk.interfaces.stt_engine import STTEngine
+from tusk.interfaces.utterance_filter import UtteranceFilter
 from tusk.schemas.utterance import Utterance
 
 __all__ = ["Pipeline"]
@@ -16,6 +17,7 @@ class Pipeline(PipelineController):
         utterance_detector: UtteranceDetector,
         stt_engine: STTEngine,
         gatekeeper: Gatekeeper,
+        utterance_filter: UtteranceFilter,
         initial_mode: PipelineMode,
         config: Config,
         log_printer: LogPrinter,
@@ -23,6 +25,7 @@ class Pipeline(PipelineController):
         self._detector = utterance_detector
         self._stt = stt_engine
         self._gatekeeper = gatekeeper
+        self._utterance_filter = utterance_filter
         self._current_mode = initial_mode
         self._config = config
         self._log = log_printer
@@ -42,6 +45,9 @@ class Pipeline(PipelineController):
     def _process_utterance(self, utterance: Utterance) -> None:
         transcribed = self._transcribe(utterance)
         if transcribed is None:
+            return
+        if not self._utterance_filter.is_valid(transcribed):
+            self._log.log("FILTER", f"rejected: {transcribed.text!r}")
             return
         prompt = self._current_mode.gatekeeper_prompt
         gate = self._gatekeeper.evaluate(transcribed, prompt)

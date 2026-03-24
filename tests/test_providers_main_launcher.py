@@ -34,5 +34,5 @@ def test_launcher_handle_and_main_helpers(monkeypatch) -> None:
     monkeypatch.setattr("subprocess.Popen", lambda *a, **k: None)
     launcher._handle(conn)
     assert conn.out == b"ok\n"
-    cfg = types.SimpleNamespace(groq_api_key="k", openrouter_api_key="", gatekeeper_llm=types.SimpleNamespace(provider_name="groq", model="m"), agent_llm=types.SimpleNamespace(provider_name="groq", model="m"), utility_llm=types.SimpleNamespace(provider_name="groq", model="m"), audio_sample_rate=1, audio_frame_duration_ms=1, vad_aggressiveness=1, follow_up_timeout_seconds=1)
+    cfg = types.SimpleNamespace(groq_api_key="k", openrouter_api_key="", gatekeeper_llm=types.SimpleNamespace(provider_name="groq", model="m"), agent_llm=types.SimpleNamespace(provider_name="groq", model="m"), utility_llm=types.SimpleNamespace(provider_name="groq", model="m"), audio_sample_rate=1, audio_frame_duration_ms=1, vad_aggressiveness=1, follow_up_timeout_seconds=1, max_follow_up_timeout_seconds=120, conversation_log_directory="/tmp/tusk/conversations")
     assert main._build_llm_registry(cfg).slot_names == ["gatekeeper", "agent", "utility"]

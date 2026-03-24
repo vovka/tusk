@@ -17,21 +17,21 @@ __all__ = ["CommandMode"]
 
 _GATEKEEPER_PROMPT = (
     "You are a gatekeeper for a voice assistant named TUSK. "
-    "Decide if the transcribed speech is a command directed at TUSK. "
-    "It is directed at TUSK if it mentions 'tusk' or 'task' (common mishearing) "
-    "or is a clear imperative desktop command (e.g. 'open firefox', 'close this window'). "
-    'Respond ONLY with valid JSON: {"directed": true, "cleaned_command": "<text>", "reason": "<brief explanation>"} '
-    'or {"directed": false, "cleaned_command": "", "reason": "<brief explanation>"}. '
-    "For cleaned_command, strip any leading wake word ('tusk', 'task', 'hey tusk', 'hey task') "
-    "and trim whitespace."
+    "Classify transcribed speech into exactly one category:\n"
+    "- command: a desktop action or tool invocation (e.g. 'open Firefox', 'close this window')\n"
+    "- conversation: user talking TO TUSK but not a desktop action (e.g. 'what do you think?', 'explain how that works')\n"
+    "- ambient: background noise, TV, other people, hallucination remnants\n"
+    "Require wake word ('tusk'/'task') or obvious imperative/question for command or conversation. "
+    'Respond ONLY with JSON: {"classification":"command"|"conversation"|"ambient",'
+    '"cleaned_text":"<text without wake word>","reason":"<brief>"}.'
 )
 
 _FOLLOW_UP_ADDENDUM = (
     "\n\nIMPORTANT: The user recently interacted with TUSK. "
     "Recent conversation:\n{context}\n"
-    "If this new utterance is a contextual follow-up to the above conversation "
-    "(e.g. 'and also...', 'now do...', 'what about...', 'close the other one', "
-    "'do the same for...'), treat it as directed at TUSK even without a wake word. "
+    "Contextual follow-ups (commands or conversational) should be classified "
+    "as command or conversation, not ambient, even without a wake word. "
+    "Only clearly unrelated ambient speech should be ambient. "
     "Still respond with the same JSON format."
 )
 
