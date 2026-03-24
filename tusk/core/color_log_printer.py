@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from tusk.interfaces.log_printer import LogPrinter
 
 __all__ = ["ColorLogPrinter"]
@@ -28,7 +30,8 @@ class ColorLogPrinter(LogPrinter):
     def log(self, tag: str, message: str) -> None:
         self._finish_line()
         color = _TAG_COLORS.get(tag, _RESET)
-        line = f"{color}[{tag}] {message}{_RESET}"
+        ts = datetime.now().strftime("%H:%M:%S")
+        line = f"{_DIM}{ts}{_RESET} {color}[{tag}] {message}{_RESET}"
         print(line, end="", flush=True)
         self._has_content = True
 

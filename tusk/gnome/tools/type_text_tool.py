@@ -24,4 +24,4 @@ class TypeTextTool(AgentTool):
     def execute(self, parameters: dict[str, str]) -> ToolResult:
         text = parameters["text"]
         self._simulator.type_text(text)
-        return ToolResult(success=True, message=f"typed: {text[:50]}")
+        return ToolResult(success=True, message=f"typed: {text}")

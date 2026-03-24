@@ -1,6 +1,7 @@
 import types
 
 from tusk.core.llm_registry import LLMRegistry
+from tusk.gnome.tools.type_text_tool import TypeTextTool
 from tusk.core.tool_registry import ToolRegistry
 from tusk.gnome.tool_factory import build_tool_registry
 from tusk.gnome.tools.ai_transform_tool import AiTransformTool
@@ -60,3 +61,12 @@ def test_remaining_tools_execute(monkeypatch) -> None:
     reg = LLMRegistry(types.SimpleNamespace(create=lambda *a: llm))
     for slot in ["utility", "gatekeeper", "agent"]: reg.register_slot(slot, types.SimpleNamespace())
     assert build_tool_registry(sim, clip, llm, reg).all_tools()
+
+
+def test_type_text_tool_returns_full_text() -> None:
+    typed: list[str] = []
+    sim = types.SimpleNamespace(type_text=lambda t: typed.append(t))
+    long_text = "Hello " * 20
+    result = TypeTextTool(sim).execute({"text": long_text})
+    assert result.success
+    assert long_text in result.message
