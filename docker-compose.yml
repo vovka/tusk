@@ -1,0 +1,24 @@
+services:
+  tusk:
+    build: .
+    env_file:
+      - .env
+    environment:
+      DISPLAY: ${DISPLAY:-:0}
+      PULSE_SERVER: unix:/run/user/1000/pulse/native
+      PYTHONUNBUFFERED: "1"
+      DBUS_SESSION_BUS_ADDRESS: unix:path=/run/user/1000/bus
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - /run/user/1000/pulse/native:/run/user/1000/pulse/native
+      - ~/.cache/whisper:/root/.cache/whisper
+      - /run/user/1000/bus:/run/user/1000/bus
+      - /usr/share/applications:/usr/share/applications:ro
+      - ~/.local/share/applications:/home-apps:ro
+      - /var/lib/snapd/desktop/applications:/snap-apps:ro
+      - /tmp/tusk:/tmp/tusk
+      - .:/app
+    devices:
+      - /dev/snd:/dev/snd
+    tty: true
+    restart: unless-stopped

@@ -1,0 +1,6 @@
+openai-whisper
+sounddevice
+webrtcvad
+numpy
+openai
+groq
