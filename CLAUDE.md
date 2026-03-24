@@ -55,3 +55,15 @@ These rules apply to all code in this repository. Claude must follow them withou
 - Do not add docstrings or comments to code that was not changed.
 - Do not create utility helpers "for future use."
 - Do not add backwards-compatibility shims for removed code.
+
+## Coding Railguide (TDD Required)
+
+- **Tests first, always.** Before writing or changing production code, add or update unit tests that fail for the intended behavior.
+- **Red → Green → Refactor.**
+  1. Write a failing test (Red).
+  2. Implement the smallest change to pass (Green).
+  3. Refactor while keeping tests green.
+- **No untested changes.** Every production code change must be covered by unit tests in the same PR.
+- **Regression tests required.** Any bug fix must include a unit test that reproduces the bug before the fix.
+- **Keep tests focused.** One behavior per test where practical; avoid broad integration-style assertions in unit test files.
+
