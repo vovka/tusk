@@ -18,8 +18,10 @@ class Config:
     audio_frame_duration_ms: int
     vad_aggressiveness: int
     follow_up_timeout_seconds: float
+    max_follow_up_timeout_seconds: float
     shells: list[str]
     adapter_env_cache_dir: str
+    conversation_log_dir: str
 
     @staticmethod
     def from_env() -> "Config":
@@ -35,6 +37,8 @@ class Config:
             audio_frame_duration_ms=int(os.environ.get("AUDIO_FRAME_DURATION_MS", "30")),
             vad_aggressiveness=int(os.environ.get("VAD_AGGRESSIVENESS", "2")),
             follow_up_timeout_seconds=float(os.environ.get("FOLLOW_UP_TIMEOUT_SECONDS", "30")),
+            max_follow_up_timeout_seconds=float(os.environ.get("MAX_FOLLOW_UP_TIMEOUT_SECONDS", "120")),
             shells=[item.strip() for item in shells.split(",") if item.strip()],
             adapter_env_cache_dir=os.environ.get("TUSK_ADAPTER_ENV_CACHE_DIR", ".tusk_runtime/adapters"),
+            conversation_log_dir=os.environ.get("TUSK_CONVERSATION_LOG_DIR", ".tusk_runtime/conversations"),
         )

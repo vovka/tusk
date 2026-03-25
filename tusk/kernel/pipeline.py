@@ -9,6 +9,7 @@ class Pipeline:
     def __init__(
         self,
         stt_engine: object,
+        utterance_filter: object,
         gatekeeper: object,
         command_mode: CommandMode,
         dictation_router: object,
@@ -16,6 +17,7 @@ class Pipeline:
         log_printer: object,
     ) -> None:
         self._stt = stt_engine
+        self._filter = utterance_filter
         self._gatekeeper = gatekeeper
         self._command_mode = command_mode
         self._dictation_router = dictation_router
@@ -33,6 +35,9 @@ class Pipeline:
         utterance = self._stt.transcribe(audio, sample_rate)
         self._log.log("STT", f"{utterance.text!r} (confidence={utterance.confidence:.2f})")
         if utterance.confidence < 0.01:
+            return KernelResponse(False, "")
+        if not self._filter.is_valid(utterance):
+            self._log.log("PIPELINE", "filtered utterance", "pipeline")
             return KernelResponse(False, "")
         if self._dictation_mode is not None:
             return self._dictation_mode.process_text(utterance.text)

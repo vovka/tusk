@@ -17,7 +17,7 @@ class RecentContextFormatter:
         self._max = max_messages
 
     def format_recent_context(self) -> str:
-        messages = [message for message in self._history.get_messages() if not message.is_summary]
+        messages = [message for message in self._history.get_messages() if message.role == "user" and not message.is_summary]
         recent = messages[-self._max:]
         if not recent:
             return ""

@@ -1,22 +1,26 @@
 import importlib.util
 import json
+import sys
 import threading
 from pathlib import Path
 
 from tusk.kernel import (
+    AdaptiveInteractionClock,
     ColorLogPrinter,
     CommandMode,
     Config,
+    DailyFileLogger,
+    HallucinationFilter,
     KernelAPI,
     LLMConversationSummarizer,
     LLMGatekeeper,
     LLMProxy,
     LLMRegistry,
     MainAgent,
-    MonotonicInteractionClock,
     Pipeline,
     RecentContextFormatter,
     SlidingWindowHistory,
+    StartupOptions,
     ToolRegistry,
 )
 from tusk.kernel.adapter_manager import AdapterManager
@@ -25,16 +29,16 @@ from tusk.kernel.providers.configurable_llm_factory import ConfigurableLLMFactor
 from tusk.kernel.providers.groq_stt import GroqSTT
 
 
-def _build_log() -> ColorLogPrinter:
-    return ColorLogPrinter()
+def _build_log(options: StartupOptions) -> ColorLogPrinter:
+    return ColorLogPrinter(options.log_groups)
 
 
 def _build_llm_registry(config: Config, log: ColorLogPrinter) -> LLMRegistry:
     factory = ConfigurableLLMFactory(config.groq_api_key, config.openrouter_api_key)
     registry = LLMRegistry(factory)
-    registry.register_slot("gatekeeper", LLMProxy(factory.create(config.gatekeeper_llm.provider_name, config.gatekeeper_llm.model), log))
-    registry.register_slot("agent", LLMProxy(factory.create(config.agent_llm.provider_name, config.agent_llm.model), log))
-    registry.register_slot("utility", LLMProxy(factory.create(config.utility_llm.provider_name, config.utility_llm.model), log))
+    registry.register_slot("gatekeeper", LLMProxy(factory.create(config.gatekeeper_llm.provider_name, config.gatekeeper_llm.model), log, "gatekeeper"))
+    registry.register_slot("agent", LLMProxy(factory.create(config.agent_llm.provider_name, config.agent_llm.model), log, "agent"))
+    registry.register_slot("utility", LLMProxy(factory.create(config.utility_llm.provider_name, config.utility_llm.model), log, "utility"))
     return registry
 
 
@@ -45,12 +49,14 @@ def _build_kernel(config: Config, log: ColorLogPrinter) -> KernelAPI:
     adapter_manager.run_async(adapter_manager.start_all())
     adapter_manager.start_watcher()
     history = SlidingWindowHistory(20, LLMConversationSummarizer(llm_registry.get("utility")))
-    agent = MainAgent(llm_registry.get("agent"), tool_registry, history, adapter_manager, log)
-    clock = MonotonicInteractionClock(config.follow_up_timeout_seconds)
+    logger = DailyFileLogger(config.conversation_log_dir)
+    agent = MainAgent(llm_registry.get("agent"), tool_registry, history, adapter_manager, log, logger)
+    clock = AdaptiveInteractionClock(config.follow_up_timeout_seconds, config.max_follow_up_timeout_seconds)
     formatter = RecentContextFormatter(history)
     command_mode = CommandMode(agent, clock, formatter, log)
     pipeline = Pipeline(
         stt_engine=GroqSTT(config.groq_api_key),
+        utterance_filter=HallucinationFilter(),
         gatekeeper=LLMGatekeeper(llm_registry.get("gatekeeper"), log),
         command_mode=command_mode,
         dictation_router=None,
@@ -86,8 +92,9 @@ def _load_module(path: Path, dotted_name: str) -> object:
 
 
 def main() -> None:
+    options = StartupOptions.from_sources(sys.argv[1:])
     config = Config.from_env()
-    log = _build_log()
+    log = _build_log(options)
     kernel_api = _build_kernel(config, log)
     shells = _load_shells(config, kernel_api)
     for shell in shells[:-1]:
