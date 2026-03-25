@@ -1,12 +1,11 @@
 import types
 
 from tusk.kernel.agent import MainAgent
+from tusk.kernel.execution_agent import ExecutionAgent
 from tusk.kernel.schemas.tool_result import ToolResult
 from tusk.kernel.tool_registry import ToolRegistry
-from tusk.kernel.tool_usage_recorder import ToolUsageRecorder
-from tusk.kernel.tool_usage_store import ToolUsageStore
 
-__all__ = ["HistoryRecorder", "make_agent", "make_registry_tool"]
+__all__ = ["HistoryRecorder", "make_agent", "make_executor", "make_registry_tool"]
 
 
 class HistoryRecorder:
@@ -29,23 +28,27 @@ def make_agent(
     history = history or types.SimpleNamespace(append=lambda message: None, get_messages=lambda: [])
     log = log or types.SimpleNamespace(log=lambda *args: None)
     registry = registry or ToolRegistry()
-    usage = ToolUsageRecorder(registry, ToolUsageStore("/tmp/tusk-test-usage.json", lambda: 1.0))
-    return MainAgent(llm, registry, history, log, usage)
+    return MainAgent(llm, registry, history, log)
+
+
+def make_executor(llm: object, registry: ToolRegistry | None = None, log: object | None = None) -> ExecutionAgent:
+    log = log or types.SimpleNamespace(log=lambda *args: None)
+    registry = registry or ToolRegistry()
+    return ExecutionAgent(llm, registry, log)
 
 
 def make_registry_tool(
     name: str,
     message: str,
     *,
-    broker: bool = False,
-    prompt_visible: bool = False,
+    planner_visible: bool = True,
+    input_schema: dict | None = None,
 ) -> object:
     return types.SimpleNamespace(
         name=name,
         description=message,
-        input_schema={"type": "object", "properties": {"text": {"type": "string"}}},
+        input_schema=input_schema or {"type": "object", "properties": {"text": {"type": "string"}}},
         execute=lambda _: ToolResult(True, message),
         source="gnome",
-        broker=broker,
-        prompt_visible=prompt_visible,
+        planner_visible=planner_visible,
     )

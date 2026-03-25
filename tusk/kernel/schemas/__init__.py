@@ -6,6 +6,8 @@ from tusk.kernel.schemas.kernel_response import KernelResponse
 from tusk.kernel.schemas.llm_slot_config import LLMSlotConfig
 from tusk.kernel.schemas.mcp_tool_result import MCPToolResult
 from tusk.kernel.schemas.mcp_tool_schema import MCPToolSchema
+from tusk.kernel.schemas.task_execution_result import TaskExecutionResult
+from tusk.kernel.schemas.task_plan import TaskPlan
 from tusk.kernel.schemas.tool_call import ToolCall
 from tusk.kernel.schemas.tool_result import ToolResult
 from tusk.kernel.schemas.utterance import Utterance
@@ -20,6 +22,8 @@ __all__ = [
     "LLMSlotConfig",
     "MCPToolResult",
     "MCPToolSchema",
+    "TaskExecutionResult",
+    "TaskPlan",
     "ToolCall",
     "ToolResult",
     "Utterance",

@@ -10,6 +10,7 @@ class Config:
     groq_api_key: str
     openrouter_api_key: str
     gatekeeper_llm: LLMSlotConfig
+    planner_llm: LLMSlotConfig
     agent_llm: LLMSlotConfig
     utility_llm: LLMSlotConfig
     whisper_model_size: str
@@ -21,7 +22,6 @@ class Config:
     shells: list[str]
     adapter_env_cache_dir: str
     conversation_log_dir: str
-    tool_usage_file: str
 
     @staticmethod
     def from_env() -> "Config":

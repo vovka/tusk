@@ -13,3 +13,4 @@ class RegisteredTool:
     input_schema: dict
     execute: Callable[[dict], ToolResult]
     source: str
+    planner_visible: bool = True

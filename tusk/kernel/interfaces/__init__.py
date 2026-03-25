@@ -11,6 +11,8 @@ from tusk.kernel.interfaces.pipeline_controller import PipelineController
 from tusk.kernel.interfaces.pipeline_mode import PipelineMode
 from tusk.kernel.interfaces.shell import Shell
 from tusk.kernel.interfaces.stt_engine import STTEngine
+from tusk.kernel.interfaces.task_executor import TaskExecutor
+from tusk.kernel.interfaces.task_planner import TaskPlanner
 from tusk.kernel.interfaces.utterance_filter import UtteranceFilter
 
 __all__ = [
@@ -27,5 +29,7 @@ __all__ = [
     "PipelineMode",
     "Shell",
     "STTEngine",
+    "TaskExecutor",
+    "TaskPlanner",
     "UtteranceFilter",
 ]

@@ -11,12 +11,15 @@ cli shell   → direct command path   → dictation/desktop adapters
 ```
 
 1. Shells collect user input (`voice` for always-on audio, `cli` for direct text input)
-2. The kernel handles STT, gatekeeping, tool selection, conversation history, and model switching
+2. The kernel handles STT, gatekeeping, conversation history, planning, execution, and model switching
 3. Desktop control and dictation refinement run through hot-pluggable MCP adapters in `adapters/`
 
-The agent request is intentionally compact. TUSK does not pre-send a full desktop snapshot or every tool schema on
-each request. Instead, the kernel sends native tool definitions for the broker tools (`find_tools`, `describe_tool`,
-`run_tool`) plus the top 3 most-used real tools learned from previous successful executions.
+The agent request is intentionally compact. TUSK does not pre-send a desktop snapshot or every tool schema on each
+request. Instead, the runtime uses:
+
+- a conversation agent with only one operational tool: `execute_task`
+- a one-shot planner request over a compact full tool catalog (`name + description`)
+- an execution agent that receives only the selected native tool schemas for the current task
 
 **Supported actions:**
 
@@ -127,6 +130,7 @@ All settings are configured via environment variables:
 | `GROQ_API_KEY` | *(required)* | Your Groq API key |
 | `OPENROUTER_API_KEY` | `""` | Your OpenRouter API key (optional) |
 | `GATEKEEPER_LLM` | `groq/llama-3.1-8b-instant` | Fast model for intent filtering (`provider/model`) |
+| `PLANNER_LLM` | `groq/openai/gpt-oss-20b` | Strict-schema planner model for one-shot tool subset selection (`provider/model`) |
 | `AGENT_LLM` | `groq/openai/gpt-oss-120b` | Capable model for the main agent (`provider/model`) |
 | `UTILITY_LLM` | `groq/llama-3.3-70b-versatile` | Model for summaries and text cleanup (`provider/model`) |
 | `WHISPER_MODEL_SIZE` | `base` | Whisper model: `tiny`, `base`, `small`, `medium` |
@@ -136,7 +140,6 @@ All settings are configured via environment variables:
 | `FOLLOW_UP_TIMEOUT_SECONDS` | `30` | Seconds before follow-up window expires |
 | `TUSK_SHELLS` | `voice` | Comma-separated shells to start (`voice`, `cli`) |
 | `TUSK_ADAPTER_ENV_CACHE_DIR` | `.tusk_runtime/adapters` | Cache for managed adapter environments |
-| `TUSK_TOOL_USAGE_FILE` | `.tusk_runtime/tool_usage.json` | Persistent usage stats used to inject the top 3 direct tools into the agent prompt |
 | `DICTATION_LLM` | `groq/llama-3.1-8b-instant` | Model used by the dictation adapter |
 
 ### Example: use a smaller/faster Whisper model
@@ -198,15 +201,16 @@ tusk/
 └── main.py         # Startup wiring
 ```
 
-See `docs/brief.md` for the full project vision and `docs/architecture.md` for the
-detailed architecture specification.
+See `docs/brief.md` for the project vision, `docs/architecture.md` for the current runtime
+architecture, and `docs/specification.md` for the concrete technical contract.
 
-The current runtime uses a brokered native-tool surface:
+The current runtime uses a planner/executor split:
 
 - No automatic desktop snapshot is injected into the agent conversation
-- Every agent request includes native tool definitions for `find_tools`, `describe_tool`, and `run_tool`
-- Every agent request also includes native tool definitions for the top 3 most-used real tools from `TUSK_TOOL_USAGE_FILE`
-- Less common tools remain available through brokered lookup and execution
+- The conversation agent sees only `execute_task` plus terminal tools
+- The planner sees the full tool catalog as compact text only
+- The execution agent sees only the selected native tool schemas for the current task
+- If execution lacks capability, it returns `need_tools` and the kernel replans with the missing capability
 
 ## Not Yet Implemented
 

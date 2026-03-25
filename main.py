@@ -9,7 +9,6 @@ from tusk.kernel import (
     ColorLogPrinter,
     CommandMode,
     Config,
-    DailyFileLogger,
     HallucinationFilter,
     KernelAPI,
     LLMConversationSummarizer,
@@ -37,6 +36,7 @@ def _build_llm_registry(config: Config, log: ColorLogPrinter) -> LLMRegistry:
     factory = ConfigurableLLMFactory(config.groq_api_key, config.openrouter_api_key)
     registry = LLMRegistry(factory)
     registry.register_slot("gatekeeper", _slot_proxy(factory, config.gatekeeper_llm, log, "gatekeeper"))
+    registry.register_slot("planner", _slot_proxy(factory, config.planner_llm, log, "planner"))
     registry.register_slot("agent", _slot_proxy(factory, config.agent_llm, log, "agent"))
     registry.register_slot("utility", _slot_proxy(factory, config.utility_llm, log, "utility"))
     return registry
@@ -47,9 +47,8 @@ def _build_kernel(config: Config, log: ColorLogPrinter) -> KernelAPI:
     tool_registry = ToolRegistry()
     adapter_manager = _build_adapter_manager(config, log, tool_registry)
     history = SlidingWindowHistory(20, LLMConversationSummarizer(llm_registry.get("utility")))
-    logger = DailyFileLogger(config.conversation_log_dir)
-    tools = ToolRuntime(config, tool_registry, llm_registry, adapter_manager, log)
-    agent = MainAgent(llm_registry.get("agent"), tool_registry, history, log, tools.usage_recorder, logger)
+    tools = ToolRuntime(tool_registry, llm_registry, adapter_manager, log)
+    agent = MainAgent(llm_registry.get("agent"), tool_registry, history, log)
     pipeline = _build_pipeline(config, log, llm_registry, history, agent)
     tools.register_tools(pipeline)
     return KernelAPI(pipeline, llm_registry, log)

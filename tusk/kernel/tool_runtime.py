@@ -1,43 +1,32 @@
-from tusk.kernel.describe_tool_tool import DescribeToolTool
-from tusk.kernel.find_tools_tool import FindToolsTool
+from tusk.kernel.execute_task_tool import ExecuteTaskTool
+from tusk.kernel.execution_agent import ExecutionAgent
+from tusk.kernel.fallback_task_planner import FallbackTaskPlanner
 from tusk.kernel.internal_tools import DictationRouter, StartDictationTool, SwitchModelTool
-from tusk.kernel.run_tool_tool import RunToolTool
-from tusk.kernel.tool_usage_recorder import ToolUsageRecorder
-from tusk.kernel.tool_usage_store import ToolUsageStore
+from tusk.kernel.llm_task_planner import LLMTaskPlanner
+from tusk.kernel.task_execution_service import TaskExecutionService
 
 __all__ = ["ToolRuntime"]
 
 
 class ToolRuntime:
-    def __init__(
-        self,
-        config: object,
-        tool_registry: object,
-        llm_registry: object,
-        adapter_manager: object,
-        log: object,
-    ) -> None:
-        self._config = config
+    def __init__(self, tool_registry: object, llm_registry: object, adapter_manager: object, log: object) -> None:
         self._registry = tool_registry
         self._llms = llm_registry
         self._manager = adapter_manager
-        self._usage_store = ToolUsageStore(config.tool_usage_file, log=log)
-        self._usage = ToolUsageRecorder(tool_registry, self._usage_store)
-
-    @property
-    def usage_recorder(self) -> ToolUsageRecorder:
-        return self._usage
+        self._log = log
 
     def register_tools(self, pipeline: object) -> None:
         pipeline._dictation_router = DictationRouter(self._registry, pipeline)
-        self._register_real_tools(pipeline)
-        self._register_broker_tools()
-
-    def _register_real_tools(self, pipeline: object) -> None:
         self._registry.register(SwitchModelTool(self._llms))
         self._registry.register(StartDictationTool(self._registry, pipeline, self._manager))
+        self._registry.register(ExecuteTaskTool(self._service()))
 
-    def _register_broker_tools(self) -> None:
-        self._registry.register(FindToolsTool(self._registry))
-        self._registry.register(DescribeToolTool(self._registry))
-        self._registry.register(RunToolTool(self._registry, self._usage))
+    def _service(self) -> TaskExecutionService:
+        planner = self._planner()
+        executor = ExecutionAgent(self._llms.get("agent"), self._registry, self._log)
+        return TaskExecutionService(planner, executor, self._registry, self._log)
+
+    def _planner(self) -> object:
+        primary = LLMTaskPlanner(self._llms.get("planner"), self._log)
+        secondary = LLMTaskPlanner(self._llms.get("utility"), self._log)
+        return FallbackTaskPlanner(primary, secondary, self._log)
