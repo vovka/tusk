@@ -5,6 +5,7 @@ except ImportError:  # pragma: no cover
 
 from tusk.kernel.interfaces.llm_provider import LLMProvider
 from tusk.kernel.schemas.tool_call import ToolCall
+from tusk.kernel.tool_use_failed_recovery import ToolUseFailedRecovery
 
 __all__ = ["OpenRouterLLM"]
 
@@ -21,6 +22,7 @@ class OpenRouterLLM(LLMProvider):
             raise RuntimeError("openai package is not installed")
         self._client = OpenAI(api_key=api_key, base_url=_BASE_URL, default_headers=_APP_HEADERS, timeout=15.0)
         self._model = model
+        self._recovery = ToolUseFailedRecovery()
 
     @property
     def label(self) -> str:
@@ -46,6 +48,9 @@ class OpenRouterLLM(LLMProvider):
         try:
             response = self._create_tool_response(payload, tools, "required")
         except Exception as exc:
+            recovered = self._recovery.recover(exc)
+            if recovered is not None:
+                return recovered
             response = self._fallback_response(exc, payload, tools)
         return _tool_or_done(response)
 

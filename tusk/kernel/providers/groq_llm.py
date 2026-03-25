@@ -5,6 +5,7 @@ except ImportError:  # pragma: no cover
 
 from tusk.kernel.interfaces.llm_provider import LLMProvider
 from tusk.kernel.schemas.tool_call import ToolCall
+from tusk.kernel.tool_use_failed_recovery import ToolUseFailedRecovery
 
 __all__ = ["GroqLLM"]
 
@@ -17,6 +18,7 @@ class GroqLLM(LLMProvider):
             raise RuntimeError("groq package is not installed")
         self._client = Groq(api_key=api_key, timeout=30.0)
         self._model = model
+        self._recovery = ToolUseFailedRecovery()
 
     @property
     def label(self) -> str:
@@ -39,6 +41,9 @@ class GroqLLM(LLMProvider):
         try:
             response = self._create_tool_response(payload, tools, "required")
         except Exception as exc:
+            recovered = self._recovery.recover(exc)
+            if recovered is not None:
+                return recovered
             response = self._fallback_response(exc, payload, tools)
         return _tool_or_done(response)
 
@@ -76,13 +81,16 @@ class GroqLLM(LLMProvider):
         return self._client.chat.completions.create(**{**payload, "tools": tools, "tool_choice": choice})
 
     def _fallback_response(self, exc: Exception, payload: dict[str, object], tools: list[dict[str, object]]) -> object:
-        if not _needs_tool_fallback(exc):
-            raise exc
+        if not _needs_tool_fallback(exc): raise exc
         return self._create_tool_response(payload, tools, "auto")
 
 
 def _chat_payload(model: str, system_prompt: str, messages: list[dict], max_tokens: int) -> dict[str, object]:
-    return {"model": model, "max_tokens": max_tokens, "messages": [{"role": "system", "content": system_prompt}, *messages]}
+    return {
+        "model": model,
+        "max_tokens": max_tokens,
+        "messages": [{"role": "system", "content": system_prompt}, *messages],
+    }
 
 
 def _response_format(model: str, schema_name: str, schema: dict) -> dict:
@@ -93,9 +101,9 @@ def _response_format(model: str, schema_name: str, schema: dict) -> dict:
 
 def _message_content(response: object) -> str:
     content = response.choices[0].message.content
-    if isinstance(content, str) and content.strip():
-        return content
-    raise RuntimeError("empty completion from groq provider")
+    if not isinstance(content, str) or not content.strip():
+        raise RuntimeError("empty completion from groq provider")
+    return content
 
 
 def _first_tool_call(response: object) -> ToolCall:
@@ -112,11 +120,8 @@ def _tool_or_done(response: object) -> ToolCall:
 
 
 def _needs_tool_fallback(exc: Exception) -> bool:
-    text = str(exc)
-    return "Tool choice is required" in text and "did not call a tool" in text
+    return "Tool choice is required" in str(exc) and "did not call a tool" in str(exc)
 
 
 def _arguments(call: object) -> dict[str, object]:
-    import json
-
-    return json.loads(call.function.arguments or "{}")
+    return __import__("json").loads(call.function.arguments or "{}")
