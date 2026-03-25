@@ -53,11 +53,7 @@ class LLMProxy(LLMProvider):
     ) -> str:
         if self._log:
             self._log.show_wait(self.label, "wait")
-            self._log_payload(
-                system_prompt,
-                [{"role": "user", "content": user_message}],
-                {"type": "json_schema", "name": schema_name},
-            )
+            self._log_payload(system_prompt, self._structured_messages(user_message), self._response_format(schema_name))
         try:
             return self._inner.complete_structured(system_prompt, user_message, schema_name, schema, max_tokens)
         finally:
@@ -77,3 +73,9 @@ class LLMProxy(LLMProvider):
             payload["response_format"] = response_format
         text = json.dumps(payload, ensure_ascii=False, indent=2)
         self._log.log("LLM", f"[{self._slot}] payload\n{text}", "llm-with-payload")
+
+    def _structured_messages(self, user_message: str) -> list[dict[str, str]]:
+        return [{"role": "user", "content": user_message}]
+
+    def _response_format(self, schema_name: str) -> dict[str, str]:
+        return {"type": "json_schema", "name": schema_name}

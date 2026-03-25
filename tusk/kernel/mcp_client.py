@@ -3,7 +3,8 @@ import shlex
 import subprocess
 import sys
 
-from tusk.kernel.schemas.mcp_tool_schema import MCPToolResult, MCPToolSchema
+from tusk.kernel.schemas.mcp_tool_result import MCPToolResult
+from tusk.kernel.schemas.mcp_tool_schema import MCPToolSchema
 
 __all__ = ["MCPClient"]
 
@@ -55,15 +56,10 @@ class MCPClient:
     def _request(self, method: str, params: dict) -> dict:
         self._next_id += 1
         message = {"jsonrpc": "2.0", "id": self._next_id, "method": method, "params": params}
-        assert self._process is not None and self._process.stdin is not None and self._process.stdout is not None
-        self._process.stdin.write(json.dumps(message) + "\n")
-        self._process.stdin.flush()
-        line = self._process.stdout.readline()
+        self._write(message)
+        line = self._read_line(method)
         if not line:
-            stderr = ""
-            if self._process.stderr is not None:
-                stderr = self._process.stderr.read().strip()
-            raise RuntimeError(stderr or f"MCP server exited during {method}")
+            raise RuntimeError(self._stderr() or f"MCP server exited during {method}")
         response = json.loads(line)
         return response.get("result", {})
 
@@ -73,3 +69,17 @@ class MCPClient:
         if command[0] == "python":
             return [sys.executable, *command[1:]]
         return command
+
+    def _write(self, message: dict) -> None:
+        assert self._process is not None and self._process.stdin is not None
+        self._process.stdin.write(json.dumps(message) + "\n")
+        self._process.stdin.flush()
+
+    def _read_line(self, method: str) -> str:
+        assert self._process is not None and self._process.stdout is not None
+        return self._process.stdout.readline()
+
+    def _stderr(self) -> str:
+        if self._process is None or self._process.stderr is None:
+            return ""
+        return self._process.stderr.read().strip()

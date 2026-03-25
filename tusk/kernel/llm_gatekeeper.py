@@ -42,8 +42,7 @@ class LLMGatekeeper(Gatekeeper):
             return GateResult(False, "", 0.0)
         self._log.log("LLM", f"[{self._llm.label}] gate → {raw!r}")
         try:
-            data = _unwrap(json.loads(_extract_json(raw)))
-            return _build_gate_result(data, self._log)
+            return self._parse(raw)
         except Exception as exc:
             self._log.log("GATE", f"parse error: {exc}")
             return GateResult(False, "", 0.0)
@@ -64,6 +63,10 @@ class LLMGatekeeper(Gatekeeper):
         except Exception as exc:
             self._log.log("GATE", f"fallback completion failed: {exc}")
             return ""
+
+    def _parse(self, raw: str) -> GateResult:
+        data = _unwrap(json.loads(_extract_json(raw)))
+        return _build_gate_result(data, self._log)
 
 
 def _extract_json(raw: str) -> str:

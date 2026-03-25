@@ -40,16 +40,29 @@ class GroqLLM(LLMProvider):
         schema: dict,
         max_tokens: int = 256,
     ) -> str:
-        response = self._client.chat.completions.create(
-            model=self._model,
-            max_tokens=max_tokens,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_message},
-            ],
-            response_format=_response_format(self._model, schema_name, schema),
-        )
+        response = self._client.chat.completions.create(**self._structured_payload(
+            system_prompt,
+            user_message,
+            schema_name,
+            schema,
+            max_tokens,
+        ))
         return _message_content(response)
+
+    def _structured_payload(
+        self,
+        system_prompt: str,
+        user_message: str,
+        schema_name: str,
+        schema: dict,
+        max_tokens: int,
+    ) -> dict:
+        return {
+            "model": self._model,
+            "max_tokens": max_tokens,
+            "messages": [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_message}],
+            "response_format": _response_format(self._model, schema_name, schema),
+        }
 
 
 def _response_format(model: str, schema_name: str, schema: dict) -> dict:

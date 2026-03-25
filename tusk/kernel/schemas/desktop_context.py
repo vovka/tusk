@@ -1,20 +1,9 @@
 from dataclasses import dataclass, field
 
 from tusk.kernel.schemas.app_entry import AppEntry
+from tusk.kernel.schemas.window_info import WindowInfo
 
-__all__ = ["WindowInfo", "DesktopContext"]
-
-
-@dataclass(frozen=True)
-class WindowInfo:
-    window_id: str
-    title: str
-    application: str
-    is_active: bool
-    x: int = 0
-    y: int = 0
-    width: int = 0
-    height: int = 0
+__all__ = ["DesktopContext"]
 
 
 @dataclass(frozen=True)

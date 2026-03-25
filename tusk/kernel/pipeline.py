@@ -33,7 +33,7 @@ class Pipeline:
 
     def process_audio(self, audio: bytes, sample_rate: int) -> KernelResponse:
         utterance = self._stt.transcribe(audio, sample_rate)
-        self._log.log("STT", f"{utterance.text!r} (confidence={utterance.confidence:.2f})")
+        self._log_utterance(utterance)
         if utterance.confidence < 0.01:
             return KernelResponse(False, "")
         if not self._filter.is_valid(utterance):
@@ -41,8 +41,7 @@ class Pipeline:
             return KernelResponse(False, "")
         if self._dictation_mode is not None:
             return self._dictation_mode.process_text(utterance.text)
-        gate = self._gatekeeper.evaluate(utterance, self._command_mode.gatekeeper_prompt)
-        return self._command_mode.handle_gate_result(gate)
+        return self._process_command_utterance(utterance)
 
     def start_dictation(self, state: object) -> KernelResponse:
         from tusk.kernel.dictation_mode import AdapterDictationMode
@@ -52,3 +51,10 @@ class Pipeline:
 
     def stop_dictation(self) -> None:
         self._dictation_mode = None
+
+    def _log_utterance(self, utterance: Utterance) -> None:
+        self._log.log("STT", f"{utterance.text!r} (confidence={utterance.confidence:.2f})")
+
+    def _process_command_utterance(self, utterance: Utterance) -> KernelResponse:
+        gate = self._gatekeeper.evaluate(utterance, self._command_mode.gatekeeper_prompt)
+        return self._command_mode.handle_gate_result(gate)

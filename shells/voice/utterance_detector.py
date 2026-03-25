@@ -36,22 +36,33 @@ class UtteranceDetector:
         for frame in self._audio.stream_frames():
             is_speech = self._vad.is_speech(frame, self._sample_rate)
             if is_speech:
-                if not voiced_frames:
-                    self._log.log("VAD", "speech started")
-                voiced_frames.append(frame)
-                silence_count = 0
+                voiced_frames, silence_count = self._on_speech(voiced_frames, frame)
             elif voiced_frames:
-                silence_count += 1
-                if silence_count >= _SILENCE_FRAMES_THRESHOLD:
-                    if len(voiced_frames) >= _MIN_VOICED_FRAMES:
-                        self._log.log("VAD", f"utterance complete ({len(voiced_frames)} frames)")
-                        yield self._build_utterance(voiced_frames)
-                    else:
-                        self._log.log("VAD", f"too short, discarded ({len(voiced_frames)} frames)")
-                    voiced_frames = []
-                    silence_count = 0
+                voiced_frames, silence_count, utterance = self._on_silence(voiced_frames, silence_count)
+                if utterance is not None:
+                    yield utterance
 
     def _build_utterance(self, frames: list[bytes]) -> Utterance:
         raw = b"".join(frames)
         duration = len(frames) * 0.030
         return Utterance(text="", audio_frames=raw, duration_seconds=duration)
+
+    def _on_speech(self, voiced_frames: list[bytes], frame: bytes) -> tuple[list[bytes], int]:
+        if not voiced_frames:
+            self._log.log("VAD", "speech started")
+        voiced_frames.append(frame)
+        return voiced_frames, 0
+
+    def _on_silence(self, voiced_frames: list[bytes], silence_count: int) -> tuple[list[bytes], int, Utterance | None]:
+        silence_count += 1
+        if silence_count < _SILENCE_FRAMES_THRESHOLD:
+            return voiced_frames, silence_count, None
+        utterance = self._completed_utterance(voiced_frames)
+        return [], 0, utterance
+
+    def _completed_utterance(self, voiced_frames: list[bytes]) -> Utterance | None:
+        if len(voiced_frames) < _MIN_VOICED_FRAMES:
+            self._log.log("VAD", f"too short, discarded ({len(voiced_frames)} frames)")
+            return None
+        self._log.log("VAD", f"utterance complete ({len(voiced_frames)} frames)")
+        return self._build_utterance(voiced_frames)

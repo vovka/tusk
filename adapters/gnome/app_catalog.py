@@ -2,7 +2,12 @@ import configparser
 import glob
 import os
 import re
-from dataclasses import asdict, dataclass
+from dataclasses import asdict
+
+try:
+    from app_entry import AppEntry
+except ImportError:  # pragma: no cover
+    from adapters.gnome.app_entry import AppEntry
 
 __all__ = ["AppCatalog"]
 
@@ -10,12 +15,6 @@ _PLACEHOLDER = re.compile(r"\s*%\w")
 
 
 _DEFAULT_DIRS = ["/usr/share/applications", "/usr/local/share/applications", "/home-apps", "/snap-apps"]
-
-
-@dataclass(frozen=True)
-class AppEntry:
-    name: str
-    exec_cmd: str
 
 
 class AppCatalog:
@@ -37,12 +36,8 @@ class AppCatalog:
 
     def _parse(self, path: str) -> AppEntry | None:
         config = self._read_config(path)
-        if not config.has_section("Desktop Entry"):
-            return None
-        section = config["Desktop Entry"]
-        if section.get("nodisplay", "false").lower() == "true":
-            return None
-        if section.get("type", "") != "Application":
+        section = self._section(config)
+        if section is None:
             return None
         name = section.get("name", "")
         exec_str = section.get("exec", "")
@@ -54,6 +49,14 @@ class AppCatalog:
         config = configparser.RawConfigParser(strict=False)
         config.read(path, encoding="utf-8")
         return config
+
+    def _section(self, config: configparser.RawConfigParser) -> configparser.SectionProxy | None:
+        if not config.has_section("Desktop Entry"):
+            return None
+        section = config["Desktop Entry"]
+        if section.get("nodisplay", "false").lower() == "true":
+            return None
+        return section if section.get("type", "") == "Application" else None
 
     def _clean_exec(self, exec_str: str) -> str:
         cleaned = _PLACEHOLDER.sub("", exec_str).strip()
@@ -68,14 +71,18 @@ def _ranked(app: AppEntry, query: str) -> tuple[tuple[int, str, str], AppEntry] 
 
 
 def _score(name: str, command: str, query: str) -> int | None:
-    if name == query:
-        return 0
-    if command == query:
-        return 1
-    if name.startswith(query):
-        return 2
-    if command.startswith(query):
-        return 3
-    if query in name:
-        return 4
-    return 5 if query in command else None
+    for score, match in enumerate(_matches(name, command, query)):
+        if match:
+            return score
+    return None
+
+
+def _matches(name: str, command: str, query: str) -> tuple[bool, ...]:
+    return (
+        name == query,
+        command == query,
+        name.startswith(query),
+        command.startswith(query),
+        query in name,
+        query in command,
+    )

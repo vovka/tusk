@@ -37,14 +37,7 @@ class CommandMode:
         if not self._clock.is_within_follow_up_window():
             return _BASE_PROMPT
         context = self._formatter.format_recent_context()
-        if not context:
-            return _BASE_PROMPT
-        return "\n".join([
-            _BASE_PROMPT,
-            "The user recently interacted with TUSK. Follow-up utterances may omit the wake word.",
-            "Recent context:",
-            context,
-        ])
+        return self._follow_up_prompt(context) if context else _BASE_PROMPT
 
     def handle_gate_result(self, gate_result: GateResult) -> KernelResponse:
         if not gate_result.is_directed_at_tusk:
@@ -57,3 +50,11 @@ class CommandMode:
         reply = self._agent.process_command(command)
         self._clock.record_interaction()
         return KernelResponse(True, reply)
+
+    def _follow_up_prompt(self, context: str) -> str:
+        return "\n".join([
+            _BASE_PROMPT,
+            "The user recently interacted with TUSK. Follow-up utterances may omit the wake word.",
+            "Recent context:",
+            context,
+        ])

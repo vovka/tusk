@@ -45,27 +45,12 @@ def _build_llm_registry(config: Config, log: ColorLogPrinter) -> LLMRegistry:
 def _build_kernel(config: Config, log: ColorLogPrinter) -> KernelAPI:
     llm_registry = _build_llm_registry(config, log)
     tool_registry = ToolRegistry()
-    adapter_manager = AdapterManager("adapters", tool_registry, log, config.adapter_env_cache_dir)
-    adapter_manager.run_async(adapter_manager.start_all())
-    adapter_manager.start_watcher()
+    adapter_manager = _build_adapter_manager(config, log, tool_registry)
     history = SlidingWindowHistory(20, LLMConversationSummarizer(llm_registry.get("utility")))
     logger = DailyFileLogger(config.conversation_log_dir)
     agent = MainAgent(llm_registry.get("agent"), tool_registry, history, adapter_manager, log, logger)
-    clock = AdaptiveInteractionClock(config.follow_up_timeout_seconds, config.max_follow_up_timeout_seconds)
-    formatter = RecentContextFormatter(history)
-    command_mode = CommandMode(agent, clock, formatter, log)
-    pipeline = Pipeline(
-        stt_engine=GroqSTT(config.groq_api_key),
-        utterance_filter=HallucinationFilter(),
-        gatekeeper=LLMGatekeeper(llm_registry.get("gatekeeper"), log),
-        command_mode=command_mode,
-        dictation_router=None,
-        config=config,
-        log_printer=log,
-    )
-    pipeline._dictation_router = DictationRouter(tool_registry, pipeline)
-    tool_registry.register(SwitchModelTool(llm_registry))
-    tool_registry.register(StartDictationTool(tool_registry, pipeline, adapter_manager))
+    pipeline = _build_pipeline(config, log, llm_registry, history, agent)
+    _register_internal_tools(llm_registry, tool_registry, pipeline, adapter_manager)
     return KernelAPI(pipeline, llm_registry, log)
 
 
@@ -73,13 +58,7 @@ def _load_shells(config: Config, api: KernelAPI) -> list[object]:
     shells_dir = Path("shells")
     loaded = []
     for name in config.shells:
-        manifest = json.loads((shells_dir / name / "shell.json").read_text())
-        module = _load_module(shells_dir / name / f"{manifest['entry_module']}.py", f"shells.{name}.{manifest['entry_module']}")
-        cls = getattr(module, manifest["entry_class"])
-        if name == "voice":
-            loaded.append(cls(config, api._log))
-        else:
-            loaded.append(cls())
+        loaded.append(_load_shell(name, shells_dir, config, api))
     return loaded
 
 
@@ -89,6 +68,34 @@ def _load_module(path: Path, dotted_name: str) -> object:
     assert spec.loader is not None
     spec.loader.exec_module(module)
     return module
+
+
+def _build_adapter_manager(config: Config, log: ColorLogPrinter, tool_registry: ToolRegistry) -> AdapterManager:
+    manager = AdapterManager("adapters", tool_registry, log, config.adapter_env_cache_dir)
+    manager.run_async(manager.start_all())
+    manager.start_watcher()
+    return manager
+
+
+def _build_pipeline(config: Config, log: ColorLogPrinter, llm_registry: LLMRegistry, history: SlidingWindowHistory, agent: MainAgent) -> Pipeline:
+    clock = AdaptiveInteractionClock(config.follow_up_timeout_seconds, config.max_follow_up_timeout_seconds)
+    formatter = RecentContextFormatter(history)
+    command_mode = CommandMode(agent, clock, formatter, log)
+    return Pipeline(GroqSTT(config.groq_api_key), HallucinationFilter(), LLMGatekeeper(llm_registry.get("gatekeeper"), log), command_mode, None, config, log)
+
+
+def _register_internal_tools(llm_registry: LLMRegistry, tool_registry: ToolRegistry, pipeline: Pipeline, adapter_manager: AdapterManager) -> None:
+    pipeline._dictation_router = DictationRouter(tool_registry, pipeline)
+    tool_registry.register(SwitchModelTool(llm_registry))
+    tool_registry.register(StartDictationTool(tool_registry, pipeline, adapter_manager))
+
+
+def _load_shell(name: str, shells_dir: Path, config: Config, api: KernelAPI) -> object:
+    manifest = json.loads((shells_dir / name / "shell.json").read_text())
+    module_name = manifest["entry_module"]
+    module = _load_module(shells_dir / name / f"{module_name}.py", f"shells.{name}.{module_name}")
+    shell_class = getattr(module, manifest["entry_class"])
+    return shell_class(config, api._log) if name == "voice" else shell_class()
 
 
 def main() -> None:

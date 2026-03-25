@@ -1,32 +1,16 @@
 import subprocess
-from dataclasses import asdict, dataclass
+from dataclasses import asdict
 
 try:
     from app_catalog import AppCatalog
+    from desktop_context import DesktopContext
+    from window_info import WindowInfo
 except ImportError:  # pragma: no cover
     from adapters.gnome.app_catalog import AppCatalog
+    from adapters.gnome.desktop_context import DesktopContext
+    from adapters.gnome.window_info import WindowInfo
 
 __all__ = ["GnomeContextProvider"]
-
-
-@dataclass(frozen=True)
-class WindowInfo:
-    window_id: str
-    title: str
-    application: str
-    is_active: bool
-    x: int = 0
-    y: int = 0
-    width: int = 0
-    height: int = 0
-
-
-@dataclass(frozen=True)
-class DesktopContext:
-    active_window_title: str
-    active_application: str
-    open_windows: list[WindowInfo]
-    available_applications: list[object]
 
 
 class GnomeContextProvider:
@@ -64,23 +48,26 @@ class GnomeContextProvider:
         return result.stdout.strip()
 
     def _parse_window_line(self, line: str) -> WindowInfo:
-        # wmctrl -l -G: window_id desktop x y w h host title
         parts = line.split(None, 8)
-        window_id = parts[0] if len(parts) > 0 else ""
-        title = parts[8] if len(parts) > 8 else ""
-        return WindowInfo(
-            window_id=window_id,
-            title=title,
-            application=title,
-            is_active=False,
-            x=int(parts[2]) if len(parts) > 2 else 0,
-            y=int(parts[3]) if len(parts) > 3 else 0,
-            width=int(parts[4]) if len(parts) > 4 else 0,
-            height=int(parts[5]) if len(parts) > 5 else 0,
-        )
+        return WindowInfo(*self._window_values(parts))
 
     def _resolve_active_app(self, active_title: str, windows: list[WindowInfo]) -> str:
         for window in windows:
             if window.title == active_title:
                 return window.application
         return active_title
+
+    def _geometry(self, parts: list[str]) -> tuple[int, int, int, int]:
+        values = [self._part(parts, index) for index in range(2, 6)]
+        return values[0], values[1], values[2], values[3]
+
+    def _part(self, parts: list[str], index: int) -> int:
+        return int(parts[index]) if len(parts) > index else 0
+
+    def _title(self, parts: list[str]) -> str:
+        return parts[8] if len(parts) > 8 else ""
+
+    def _window_values(self, parts: list[str]) -> tuple[object, ...]:
+        geometry = self._geometry(parts)
+        title = self._title(parts)
+        return parts[0] if parts else "", title, title, False, *geometry

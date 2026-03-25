@@ -1,21 +1,18 @@
 import asyncio
 import json
-import os
 import shlex
-import subprocess
-import sys
 from pathlib import Path
 
+from tusk.kernel.adapter_context_builder import AdapterContextBuilder
+from tusk.kernel.adapter_env_builder import AdapterEnvironmentBuilder
+from tusk.kernel.adapter_watcher import AdapterWatcher
 from tusk.kernel.mcp_client import MCPClient
-from tusk.kernel.schemas.app_entry import AppEntry
-from tusk.kernel.schemas.desktop_context import DesktopContext, WindowInfo
-from tusk.kernel.schemas.tool_result import ToolResult
+from tusk.kernel.mcp_tool_proxy import MCPToolProxy
+from tusk.kernel.schemas.desktop_context import DesktopContext
 
 try:
-    from watchdog.events import FileSystemEventHandler
     from watchdog.observers import Observer
 except ImportError:  # pragma: no cover
-    FileSystemEventHandler = object
     Observer = None
 
 __all__ = ["AdapterManager"]
@@ -26,11 +23,12 @@ class AdapterManager:
         self.adapters_dir = Path(adapters_dir)
         self.tool_registry = tool_registry
         self._log = log
-        self._cache_dir = Path(cache_dir)
         self._clients: dict[str, MCPClient] = {}
         self._manifests: dict[str, dict] = {}
         self._context_adapter: str | None = None
         self._observer = None
+        self._context_builder = AdapterContextBuilder()
+        self._env_builder = AdapterEnvironmentBuilder(cache_dir)
 
     async def start_all(self) -> None:
         if not self.adapters_dir.exists():
@@ -41,21 +39,14 @@ class AdapterManager:
 
     async def start_adapter(self, adapter_dir: str) -> None:
         path = Path(adapter_dir)
-        manifest_path = path / "adapter.json"
-        if not manifest_path.exists():
+        manifest = self._manifest(path)
+        if manifest is None:
             return
-        manifest = json.loads(manifest_path.read_text())
         name = manifest["name"]
         if manifest.get("transport") != "stdio":
             return
         client = await self._connect_stdio(path, manifest)
-        tools = await client.list_tools()
-        self._clients[name] = client
-        self._manifests[name] = manifest
-        for tool in tools:
-            self.tool_registry.register(_MCPToolProxy(name, tool, client, self.run_async))
-        if manifest.get("provides_context") and self._context_adapter is None:
-            self._context_adapter = name
+        self._register(name, client, manifest, await client.list_tools())
 
     async def stop_adapter(self, name: str) -> None:
         client = self._clients.pop(name, None)
@@ -73,9 +64,8 @@ class AdapterManager:
         if Observer is None:
             self._log.log("PIPELINE", "watchdog not installed; adapter hot-plug disabled")
             return
-        handler = _AdapterWatcher(self)
         self._observer = Observer()
-        self._observer.schedule(handler, str(self.adapters_dir), recursive=False)
+        self._observer.schedule(AdapterWatcher(self), str(self.adapters_dir), recursive=False)
         self._observer.daemon = True
         self._observer.start()
 
@@ -84,16 +74,8 @@ class AdapterManager:
 
     def get_context(self) -> DesktopContext:
         if self._context_adapter is None:
-            return DesktopContext("", "")
-        result = self.tool_registry.get(f"{self._context_adapter}.get_desktop_context").execute({})
-        if not result.success or result.data is None:
-            return DesktopContext("", "")
-        return DesktopContext(
-            active_window_title=result.data.get("active_window_title", ""),
-            active_application=result.data.get("active_application", ""),
-            open_windows=[WindowInfo(**item) for item in result.data.get("open_windows", [])],
-            available_applications=[AppEntry(**item) for item in result.data.get("available_applications", [])],
-        )
+            return self._context_builder.build(None)
+        return self._context_builder.build(self._context_result())
 
     def primary_desktop_source(self) -> str:
         return self._context_adapter or "gnome"
@@ -105,46 +87,23 @@ class AdapterManager:
             await client.connect_stdio(command, str(path))
             return client
         except Exception:
-            env = self._build_fallback_env(path, manifest)
+            env = self._env_builder.build(path, manifest)
             await client.connect_stdio(command, str(path), env=env)
             return client
 
-    def _build_fallback_env(self, path: Path, manifest: dict) -> dict:
-        env = os.environ.copy()
-        requirements = path / "requirements.txt"
-        if not requirements.exists():
-            return env
-        cache = self._cache_dir / manifest["name"] / manifest["version"]
-        python_bin = cache / "bin" / "python"
-        if not python_bin.exists():
-            cache.parent.mkdir(parents=True, exist_ok=True)
-            subprocess.run([sys.executable, "-m", "venv", str(cache)], check=True)
-            subprocess.run([str(python_bin), "-m", "pip", "install", "-r", str(requirements)], check=True)
-        env["PATH"] = f"{cache / 'bin'}:{env.get('PATH', '')}"
-        env["VIRTUAL_ENV"] = str(cache)
-        return env
+    def _manifest(self, path: Path) -> dict | None:
+        manifest_path = path / "adapter.json"
+        return json.loads(manifest_path.read_text()) if manifest_path.exists() else None
 
+    def _register(self, name: str, client: MCPClient, manifest: dict, tools: list[object]) -> None:
+        self._clients[name] = client
+        self._manifests[name] = manifest
+        for tool in tools:
+            self.tool_registry.register(MCPToolProxy(name, tool, client, self.run_async))
+        if manifest.get("provides_context") and self._context_adapter is None:
+            self._context_adapter = name
 
-class _MCPToolProxy:
-    def __init__(self, source: str, schema: object, client: MCPClient, runner: object) -> None:
-        self.name = f"{source}.{schema.name}"
-        self.description = schema.description
-        self.input_schema = schema.input_schema
-        self.source = source
-        self._tool_name = schema.name
-        self._client = client
-        self._runner = runner
-
-    def execute(self, parameters: dict) -> ToolResult:
-        result = self._runner(self._client.call_tool(self._tool_name, parameters))
-        return ToolResult(not result.is_error, result.content, result.data)
-
-
-class _AdapterWatcher(FileSystemEventHandler):
-    def __init__(self, manager: AdapterManager) -> None:
-        self._manager = manager
-
-    def on_created(self, event) -> None:
-        if not event.is_directory:
-            return
-        self._manager.run_async(self._manager.start_adapter(event.src_path))
+    def _context_result(self) -> dict | None:
+        name = f"{self._context_adapter}.get_desktop_context"
+        result = self.tool_registry.get(name).execute({})
+        return result.data if result.success else None

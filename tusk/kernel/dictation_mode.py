@@ -1,16 +1,8 @@
-from dataclasses import dataclass
-
+from tusk.kernel.dictation_state import DictationState
 from tusk.kernel.interfaces.log_printer import LogPrinter
 from tusk.kernel.schemas.kernel_response import KernelResponse
 
-__all__ = ["AdapterDictationMode", "DictationState"]
-
-
-@dataclass
-class DictationState:
-    adapter_name: str
-    session_id: str
-    desktop_source: str
+__all__ = ["AdapterDictationMode"]
 
 
 class AdapterDictationMode:

@@ -1,23 +1,17 @@
-import json
-
+from tusk.kernel.agent_tool_loop import AgentToolLoop
+from tusk.kernel.desktop_context_message_builder import DesktopContextMessageBuilder
 from tusk.kernel.interfaces.agent import Agent
 from tusk.kernel.interfaces.conversation_logger import ConversationLogger
 from tusk.kernel.interfaces.conversation_history import ConversationHistory
 from tusk.kernel.interfaces.llm_provider import LLMProvider
 from tusk.kernel.interfaces.log_printer import LogPrinter
 from tusk.kernel.schemas.chat_message import ChatMessage
-from tusk.kernel.schemas.desktop_context import DesktopContext
-from tusk.kernel.schemas.tool_call import ToolCall
-from tusk.kernel.schemas.tool_result import ToolResult
 from tusk.kernel.tool_registry import ToolRegistry
+from tusk.kernel.tool_call_parser import ToolCallParser
+from tusk.kernel.model_failure_reply_builder import ModelFailureReplyBuilder
 
 __all__ = ["MainAgent"]
 
-_MAX_STEPS = 10
-_MAX_WINDOWS = 12
-_MAX_APPS = 40
-_MAX_APP_NAME_LENGTH = 40
-_TERMINAL_TOOLS = frozenset({"done", "unknown", "clarify"})
 _SYSTEM_PROMPT = "\n".join([
     "You are TUSK, a desktop assistant.",
     "Use exactly one tool per response.",
@@ -41,57 +35,22 @@ class MainAgent(Agent):
         log_printer: LogPrinter,
         conversation_logger: ConversationLogger | None = None,
     ) -> None:
-        self._llm = llm_provider
         self._registry = tool_registry
         self._history = history
         self._context = context_provider
-        self._log = log_printer
         self._logger = conversation_logger
+        self._loop = self._build_loop(llm_provider, tool_registry, log_printer, conversation_logger)
+        self._context_builder = DesktopContextMessageBuilder()
 
     def process_command(self, command: str) -> str:
         context = self._context.get_context()
         prompt = self._build_system_prompt()
-        reply = self._run_tool_loop(
+        reply = self._loop.run(
             prompt,
-            self._build_context_message(context),
+            self._context_builder.build(context),
             self._build_command_history(command),
         )
         self._remember_exchange(command, reply)
-        return reply
-
-    def _run_tool_loop(
-        self,
-        prompt: str,
-        context_message: str,
-        command_history: list[dict[str, str]],
-    ) -> str:
-        reply = ""
-        messages = [ChatMessage("user", context_message).to_dict(), *command_history]
-        for step in range(1, _MAX_STEPS + 1):
-            try:
-                raw = self._llm.complete_messages(prompt, messages)
-            except Exception as exc:
-                self._log.log("AGENT", f"llm failure: {exc}")
-                return _model_failure_reply(exc)
-            self._log.log("LLM", f"[{self._llm.label}] agent → {raw!r}")
-            self._log_message(ChatMessage("assistant", raw))
-            messages.append(ChatMessage("assistant", raw).to_dict())
-            tool_call = self._parse_tool_call(raw)
-            reply = tool_call.parameters.pop("reply", reply)
-            if reply:
-                self._log.log("TUSK", reply)
-            if tool_call.tool_name in _TERMINAL_TOOLS:
-                if tool_call.tool_name == "unknown":
-                    reason = tool_call.parameters.get("reason", "unknown reason")
-                    self._log.log("AGENT", f"unknown: {reason}")
-                return reply
-            result = self._execute(tool_call)
-            self._log.log("TOOL", result.message)
-            feedback = ChatMessage("user", self._build_tool_feedback(tool_call.tool_name, result))
-            self._log_message(feedback)
-            messages.append(feedback.to_dict())
-            self._log.log("AGENT", f"step {step}: {tool_call.tool_name}")
-        self._log.log("AGENT", "max steps reached")
         return reply
 
     def _build_command_history(self, command: str) -> list[dict[str, str]]:
@@ -107,62 +66,25 @@ class MainAgent(Agent):
             self._log_message(assistant)
             self._history.append(assistant)
 
-    def _execute(self, tool_call: ToolCall) -> ToolResult:
-        try:
-            return self._registry.get(tool_call.tool_name).execute(tool_call.parameters)
-        except KeyError:
-            return ToolResult(False, f"unknown tool: {tool_call.tool_name}")
-
-    def _parse_tool_call(self, raw: str) -> ToolCall:
-        try:
-            data = json.loads(raw.strip())
-            return ToolCall(tool_name=data.pop("tool"), parameters=data)
-        except Exception as exc:
-            self._log.log("AGENT", f"invalid JSON from model: {exc}")
-            return ToolCall(
-                "unknown",
-                {
-                    "reply": "I could not interpret the model response.",
-                    "reason": "model did not return valid tool JSON",
-                },
-            )
-
     def _build_system_prompt(self) -> str:
         return "\n".join([_SYSTEM_PROMPT, self._registry.build_schema_text()])
-
-    def _build_context_message(self, ctx: DesktopContext) -> str:
-        windows = "\n".join(
-            f"  {item.title[:80]} [{item.width}x{item.height} at {item.x},{item.y}]"
-            for item in ctx.open_windows[:_MAX_WINDOWS]
-        )
-        apps = "\n".join(
-            f"  {item.name[:_MAX_APP_NAME_LENGTH]}"
-            for item in ctx.available_applications[:_MAX_APPS]
-        )
-        more_windows = max(0, len(ctx.open_windows) - _MAX_WINDOWS)
-        more_apps = max(0, len(ctx.available_applications) - _MAX_APPS)
-        window_tail = f"\n  ... and {more_windows} more" if more_windows else ""
-        app_tail = f"\n  ... and {more_apps} more" if more_apps else ""
-        return "\n".join([
-            "Desktop context:",
-            f"Active window: {ctx.active_window_title}",
-            f"Open windows:\n{windows or '  none'}{window_tail}",
-            f"Available apps:\n{apps or '  none'}{app_tail}",
-        ])
-
-    def _build_tool_feedback(self, tool_name: str, result: ToolResult) -> str:
-        status = "success" if result.success else "failure"
-        return f"Tool {tool_name} returned {status}: {result.message}"
 
     def _log_message(self, message: ChatMessage) -> None:
         if self._logger:
             self._logger.log_message(message)
 
-
-def _model_failure_reply(exc: Exception) -> str:
-    text = str(exc).lower()
-    if "rate limit" in text or "429" in text:
-        return "The model is currently rate limited. Please try again in a few minutes."
-    if "empty completion" in text:
-        return "The model returned an empty response. Please try again."
-    return "The model is temporarily unavailable. Please try again."
+    def _build_loop(
+        self,
+        llm_provider: LLMProvider,
+        tool_registry: ToolRegistry,
+        log_printer: LogPrinter,
+        conversation_logger: ConversationLogger | None,
+    ) -> AgentToolLoop:
+        return AgentToolLoop(
+            llm_provider,
+            tool_registry,
+            log_printer,
+            conversation_logger,
+            ToolCallParser(log_printer),
+            ModelFailureReplyBuilder(),
+        )

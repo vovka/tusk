@@ -1,18 +1,8 @@
 import json
-from dataclasses import dataclass
 
-from tusk.kernel.schemas.tool_result import ToolResult
+from tusk.kernel.registered_tool import RegisteredTool
 
-__all__ = ["RegisteredTool", "ToolRegistry"]
-
-
-@dataclass(frozen=True)
-class RegisteredTool:
-    name: str
-    description: str
-    input_schema: dict
-    execute: object
-    source: str
+__all__ = ["ToolRegistry"]
 
 
 class ToolRegistry:
