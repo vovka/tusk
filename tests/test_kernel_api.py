@@ -58,6 +58,24 @@ def test_main_agent_invalid_json_returns_visible_failure() -> None:
     assert any(tag == "AGENT" and "invalid JSON" in message for tag, message in logs)
 
 
+def test_main_agent_handles_rate_limit_without_crashing() -> None:
+    llm = types.SimpleNamespace(
+        label="agent",
+        complete_messages=lambda *args: (_ for _ in ()).throw(RuntimeError("Rate limit reached for model")),
+    )
+    logs: list[tuple[str, str]] = []
+    agent = MainAgent(
+        llm,
+        ToolRegistry(),
+        types.SimpleNamespace(append=lambda message: None, get_messages=lambda: []),
+        types.SimpleNamespace(get_context=lambda: DesktopContext("", "")),
+        types.SimpleNamespace(log=lambda tag, message, *rest: logs.append((tag, message))),
+    )
+    reply = agent.process_command("tell me a joke")
+    assert "rate limited" in reply.lower()
+    assert any(tag == "AGENT" and "llm failure" in message for tag, message in logs)
+
+
 def test_main_agent_sends_context_as_transient_payload() -> None:
     capture = {}
 

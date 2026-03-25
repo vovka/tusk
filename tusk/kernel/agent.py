@@ -1,6 +1,7 @@
 import json
 
 from tusk.kernel.interfaces.agent import Agent
+from tusk.kernel.interfaces.conversation_logger import ConversationLogger
 from tusk.kernel.interfaces.conversation_history import ConversationHistory
 from tusk.kernel.interfaces.llm_provider import LLMProvider
 from tusk.kernel.interfaces.log_printer import LogPrinter
@@ -16,12 +17,14 @@ _MAX_STEPS = 10
 _MAX_WINDOWS = 12
 _MAX_APPS = 40
 _MAX_APP_NAME_LENGTH = 40
+_TERMINAL_TOOLS = frozenset({"done", "unknown", "clarify"})
 _SYSTEM_PROMPT = "\n".join([
     "You are TUSK, a desktop assistant.",
     "Use exactly one tool per response.",
     'Respond with JSON only.',
     'Every response must include "tool" and "reply".',
     'Use {"tool":"done","reply":"<final response>"} when no tool is needed.',
+    'Use {"tool":"clarify","reply":"<question>"} if the request is ambiguous and you need a short follow-up question.',
     'Use {"tool":"unknown","reply":"<brief response>","reason":"<why>"} only when the request cannot be handled.',
     'When calling a tool, return a flat JSON object like {"tool":"gnome.launch_application","reply":"Opening gedit.","application_name":"gedit"}.',
     "Available tools:",
@@ -36,12 +39,14 @@ class MainAgent(Agent):
         history: ConversationHistory,
         context_provider: object,
         log_printer: LogPrinter,
+        conversation_logger: ConversationLogger | None = None,
     ) -> None:
         self._llm = llm_provider
         self._registry = tool_registry
         self._history = history
         self._context = context_provider
         self._log = log_printer
+        self._logger = conversation_logger
 
     def process_command(self, command: str) -> str:
         context = self._context.get_context()
@@ -63,21 +68,28 @@ class MainAgent(Agent):
         reply = ""
         messages = [ChatMessage("user", context_message).to_dict(), *command_history]
         for step in range(1, _MAX_STEPS + 1):
-            raw = self._llm.complete_messages(prompt, messages)
+            try:
+                raw = self._llm.complete_messages(prompt, messages)
+            except Exception as exc:
+                self._log.log("AGENT", f"llm failure: {exc}")
+                return _model_failure_reply(exc)
             self._log.log("LLM", f"[{self._llm.label}] agent → {raw!r}")
+            self._log_message(ChatMessage("assistant", raw))
             messages.append(ChatMessage("assistant", raw).to_dict())
             tool_call = self._parse_tool_call(raw)
             reply = tool_call.parameters.pop("reply", reply)
             if reply:
                 self._log.log("TUSK", reply)
-            if tool_call.tool_name in ("done", "unknown"):
+            if tool_call.tool_name in _TERMINAL_TOOLS:
                 if tool_call.tool_name == "unknown":
                     reason = tool_call.parameters.get("reason", "unknown reason")
                     self._log.log("AGENT", f"unknown: {reason}")
                 return reply
             result = self._execute(tool_call)
             self._log.log("TOOL", result.message)
-            messages.append(ChatMessage("user", self._build_tool_feedback(tool_call.tool_name, result)).to_dict())
+            feedback = ChatMessage("user", self._build_tool_feedback(tool_call.tool_name, result))
+            self._log_message(feedback)
+            messages.append(feedback.to_dict())
             self._log.log("AGENT", f"step {step}: {tool_call.tool_name}")
         self._log.log("AGENT", "max steps reached")
         return reply
@@ -87,9 +99,13 @@ class MainAgent(Agent):
         return [*prior, ChatMessage("user", f"Command: {command}").to_dict()]
 
     def _remember_exchange(self, command: str, reply: str) -> None:
-        self._history.append(ChatMessage("user", f"Command: {command}"))
+        user = ChatMessage("user", f"Command: {command}")
+        self._log_message(user)
+        self._history.append(user)
         if reply:
-            self._history.append(ChatMessage("assistant", reply))
+            assistant = ChatMessage("assistant", reply)
+            self._log_message(assistant)
+            self._history.append(assistant)
 
     def _execute(self, tool_call: ToolCall) -> ToolResult:
         try:
@@ -137,3 +153,16 @@ class MainAgent(Agent):
     def _build_tool_feedback(self, tool_name: str, result: ToolResult) -> str:
         status = "success" if result.success else "failure"
         return f"Tool {tool_name} returned {status}: {result.message}"
+
+    def _log_message(self, message: ChatMessage) -> None:
+        if self._logger:
+            self._logger.log_message(message)
+
+
+def _model_failure_reply(exc: Exception) -> str:
+    text = str(exc).lower()
+    if "rate limit" in text or "429" in text:
+        return "The model is currently rate limited. Please try again in a few minutes."
+    if "empty completion" in text:
+        return "The model returned an empty response. Please try again."
+    return "The model is temporarily unavailable. Please try again."

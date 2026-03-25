@@ -34,4 +34,17 @@ class OpenRouterLLM(LLMProvider):
             max_tokens=1024,
             messages=[{"role": "system", "content": system_prompt}, *messages],
         )
-        return response.choices[0].message.content
+        content = response.choices[0].message.content
+        if isinstance(content, str) and content.strip():
+            return content
+        raise RuntimeError("empty completion from openrouter provider")
+
+    def complete_structured(
+        self,
+        system_prompt: str,
+        user_message: str,
+        schema_name: str,
+        schema: dict,
+        max_tokens: int = 256,
+    ) -> str:
+        return self.complete(system_prompt, user_message, max_tokens)

@@ -9,12 +9,13 @@ __all__ = ["CommandMode"]
 
 _BASE_PROMPT = "\n".join([
     "You are the gatekeeper for a voice assistant named TUSK.",
-    "Determine whether the utterance is directed at TUSK.",
-    "Treat direct wake-word requests as directed.",
-    "Treat obvious desktop commands as directed even without a wake word.",
-    "If the utterance is conversational but explicitly addresses TUSK, still mark it directed.",
-    "Return strict JSON only: {\"directed\": true|false, \"cleaned_command\": \"...\"}.",
-    "For directed commands, remove wake words like 'tusk', 'task', 'hey tusk', or 'hey task'.",
+    "Classify each utterance as command, conversation, or ambient.",
+    "Treat direct wake-word requests as command.",
+    "Treat obvious desktop commands as command even without a wake word.",
+    "If the utterance is conversational but explicitly addresses TUSK, classify it as conversation.",
+    "Treat background speech, filler, and unrelated chatter as ambient.",
+    "Return strict JSON only: {\"classification\":\"command|conversation|ambient\",\"cleaned_text\":\"...\",\"reason\":\"...\"}.",
+    "For command or conversation, remove wake words like 'tusk', 'task', 'hey tusk', or 'hey task'.",
 ])
 
 
