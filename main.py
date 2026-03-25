@@ -1,100 +1,99 @@
-from tusk.config import Config
-from tusk.core.audio_capture import AudioCapture
-from tusk.core.color_log_printer import ColorLogPrinter
-from tusk.core.command_mode import CommandMode
-from tusk.core.llm_conversation_summarizer import LLMConversationSummarizer
-from tusk.core.llm_proxy import LLMProxy
-from tusk.core.llm_registry import LLMRegistry
-from tusk.core.agent import MainAgent
-from tusk.core.monotonic_interaction_clock import MonotonicInteractionClock
-from tusk.core.recent_context_formatter import RecentContextFormatter
-from tusk.core.pipeline import Pipeline
-from tusk.core.sliding_window_history import SlidingWindowHistory
-from tusk.core.utterance_detector import UtteranceDetector
-from tusk.gnome.app_catalog import AppCatalog
-from tusk.gnome.gnome_clipboard_provider import GnomeClipboardProvider
-from tusk.gnome.gnome_context_provider import GnomeContextProvider
-from tusk.gnome.gnome_gatekeeper import GnomeGatekeeper
-from tusk.gnome.gnome_input_simulator import GnomeInputSimulator
-from tusk.gnome.gnome_text_paster import GnomeTextPaster
-from tusk.gnome.tool_factory import build_tool_registry
-from tusk.gnome.tools.dictation_tool import DictationTool
-from tusk.core.tool_registry import ToolRegistry
-from tusk.interfaces.llm_provider_factory import LLMProviderFactory
-from tusk.interfaces.log_printer import LogPrinter
-from tusk.providers.configurable_llm_factory import ConfigurableLLMFactory
-from tusk.providers.groq_stt import GroqSTT
-from tusk.schemas.llm_slot_config import LLMSlotConfig
+import importlib.util
+import json
+import threading
+from pathlib import Path
+
+from tusk.kernel import (
+    ColorLogPrinter,
+    CommandMode,
+    Config,
+    KernelAPI,
+    LLMConversationSummarizer,
+    LLMGatekeeper,
+    LLMProxy,
+    LLMRegistry,
+    MainAgent,
+    MonotonicInteractionClock,
+    Pipeline,
+    RecentContextFormatter,
+    SlidingWindowHistory,
+    ToolRegistry,
+)
+from tusk.kernel.adapter_manager import AdapterManager
+from tusk.kernel.internal_tools import DictationRouter, StartDictationTool, SwitchModelTool
+from tusk.kernel.providers.configurable_llm_factory import ConfigurableLLMFactory
+from tusk.kernel.providers.groq_stt import GroqSTT
 
 
-def _build_llm_registry(config: Config, log: LogPrinter | None = None) -> LLMRegistry:
+def _build_log() -> ColorLogPrinter:
+    return ColorLogPrinter()
+
+
+def _build_llm_registry(config: Config, log: ColorLogPrinter) -> LLMRegistry:
     factory = ConfigurableLLMFactory(config.groq_api_key, config.openrouter_api_key)
     registry = LLMRegistry(factory)
-    _register_slot(registry, factory, "gatekeeper", config.gatekeeper_llm, log)
-    _register_slot(registry, factory, "agent", config.agent_llm, log)
-    _register_slot(registry, factory, "utility", config.utility_llm, log)
+    registry.register_slot("gatekeeper", LLMProxy(factory.create(config.gatekeeper_llm.provider_name, config.gatekeeper_llm.model), log))
+    registry.register_slot("agent", LLMProxy(factory.create(config.agent_llm.provider_name, config.agent_llm.model), log))
+    registry.register_slot("utility", LLMProxy(factory.create(config.utility_llm.provider_name, config.utility_llm.model), log))
     return registry
 
 
-def _register_slot(
-    registry: LLMRegistry,
-    factory: LLMProviderFactory,
-    name: str,
-    slot_config: LLMSlotConfig,
-    log: LogPrinter | None = None,
-) -> None:
-    provider = factory.create(slot_config.provider_name, slot_config.model)
-    registry.register_slot(name, LLMProxy(provider, log))
-
-
-def _build_pipeline(config: Config, log: LogPrinter) -> Pipeline:
-    audio = AudioCapture(config.audio_sample_rate, config.audio_frame_duration_ms)
-    detector = UtteranceDetector(audio, config.audio_sample_rate, config.vad_aggressiveness, log)
-    stt = GroqSTT(config.groq_api_key)
+def _build_kernel(config: Config, log: ColorLogPrinter) -> KernelAPI:
     llm_registry = _build_llm_registry(config, log)
-
-    gatekeeper = GnomeGatekeeper(llm_registry.get("gatekeeper"), log)
-    simulator = GnomeInputSimulator()
-    clipboard = GnomeClipboardProvider()
-    tool_registry = build_tool_registry(simulator, clipboard, llm_registry.get("utility"), llm_registry)
-
-    context = GnomeContextProvider(AppCatalog())
-    summarizer = LLMConversationSummarizer(llm_registry.get("utility"))
-    history = SlidingWindowHistory(max_messages=20, summarizer=summarizer)
-    agent = MainAgent(llm_registry.get("agent"), context, tool_registry, history, log)
+    tool_registry = ToolRegistry()
+    adapter_manager = AdapterManager("adapters", tool_registry, log, config.adapter_env_cache_dir)
+    adapter_manager.run_async(adapter_manager.start_all())
+    adapter_manager.start_watcher()
+    history = SlidingWindowHistory(20, LLMConversationSummarizer(llm_registry.get("utility")))
+    agent = MainAgent(llm_registry.get("agent"), tool_registry, history, adapter_manager, log)
     clock = MonotonicInteractionClock(config.follow_up_timeout_seconds)
     formatter = RecentContextFormatter(history)
     command_mode = CommandMode(agent, clock, formatter, log)
-
     pipeline = Pipeline(
-        utterance_detector=detector, stt_engine=stt, gatekeeper=gatekeeper,
-        initial_mode=command_mode, config=config, log_printer=log,
+        stt_engine=GroqSTT(config.groq_api_key),
+        gatekeeper=LLMGatekeeper(llm_registry.get("gatekeeper"), log),
+        command_mode=command_mode,
+        dictation_router=None,
+        config=config,
+        log_printer=log,
     )
+    pipeline._dictation_router = DictationRouter(tool_registry, pipeline)
+    tool_registry.register(SwitchModelTool(llm_registry))
+    tool_registry.register(StartDictationTool(tool_registry, pipeline, adapter_manager))
+    return KernelAPI(pipeline, llm_registry, log)
 
-    _register_dictation(tool_registry, pipeline, llm_registry, agent, clock, formatter, log)
-    return pipeline
+
+def _load_shells(config: Config, api: KernelAPI) -> list[object]:
+    shells_dir = Path("shells")
+    loaded = []
+    for name in config.shells:
+        manifest = json.loads((shells_dir / name / "shell.json").read_text())
+        module = _load_module(shells_dir / name / f"{manifest['entry_module']}.py", f"shells.{name}.{manifest['entry_module']}")
+        cls = getattr(module, manifest["entry_class"])
+        if name == "voice":
+            loaded.append(cls(config, api._log))
+        else:
+            loaded.append(cls())
+    return loaded
 
 
-def _register_dictation(
-    tool_registry: ToolRegistry,
-    pipeline: Pipeline,
-    llm_registry: LLMRegistry,
-    agent: MainAgent,
-    clock: MonotonicInteractionClock,
-    formatter: RecentContextFormatter,
-    log: LogPrinter,
-) -> None:
-    text_paster = GnomeTextPaster()
-    factory = lambda: CommandMode(agent, clock, formatter, log)  # noqa: E731
-    dictation = DictationTool(pipeline, text_paster, llm_registry.get("utility"), factory, log)
-    tool_registry.register(dictation)
+def _load_module(path: Path, dotted_name: str) -> object:
+    spec = importlib.util.spec_from_file_location(dotted_name, path)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
 
 
 def main() -> None:
     config = Config.from_env()
-    log: LogPrinter = ColorLogPrinter()
-    pipeline = _build_pipeline(config, log)
-    pipeline.run()
+    log = _build_log()
+    kernel_api = _build_kernel(config, log)
+    shells = _load_shells(config, kernel_api)
+    for shell in shells[:-1]:
+        threading.Thread(target=shell.start, args=(kernel_api,), daemon=True).start()
+    if shells:
+        shells[-1].start(kernel_api)
 
 
 if __name__ == "__main__":

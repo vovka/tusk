@@ -4,3 +4,5 @@ webrtcvad
 numpy
 openai
 groq
+watchdog
+mcp

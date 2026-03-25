@@ -1,0 +1,8 @@
+{
+  "name": "dictation",
+  "version": "1.0.0",
+  "description": "Dictation cleanup and refinement adapter",
+  "transport": "stdio",
+  "entry": "python server.py",
+  "provides_context": false
+}

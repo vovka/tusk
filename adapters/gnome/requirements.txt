@@ -1,0 +1,1 @@
+# No extra Python packages required for the GNOME adapter.

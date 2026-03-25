@@ -1,0 +1,6 @@
+{
+  "name": "voice",
+  "description": "Voice shell",
+  "entry_module": "voice_shell",
+  "entry_class": "VoiceShell"
+}
