@@ -1,5 +1,6 @@
 import configparser
 import glob
+import os
 import re
 from dataclasses import asdict, dataclass
 
@@ -29,6 +30,11 @@ class AppCatalog:
     def list_dicts(self) -> list[dict]:
         return [asdict(item) for item in self.list_apps()]
 
+    def search(self, query: str, limit: int = 10) -> list[AppEntry]:
+        ranked = [_ranked(item, query.casefold()) for item in self.list_apps()]
+        matches = [item for item in ranked if item]
+        return [app for _, app in sorted(matches, key=lambda item: item[0])[:limit]]
+
     def _parse(self, path: str) -> AppEntry | None:
         config = self._read_config(path)
         if not config.has_section("Desktop Entry"):
@@ -52,3 +58,24 @@ class AppCatalog:
     def _clean_exec(self, exec_str: str) -> str:
         cleaned = _PLACEHOLDER.sub("", exec_str).strip()
         return cleaned.split()[0] if cleaned else ""
+
+
+def _ranked(app: AppEntry, query: str) -> tuple[tuple[int, str, str], AppEntry] | None:
+    name = app.name.casefold()
+    command = os.path.basename(app.exec_cmd).casefold()
+    score = _score(name, command, query)
+    return ((score, name, command), app) if score is not None else None
+
+
+def _score(name: str, command: str, query: str) -> int | None:
+    if name == query:
+        return 0
+    if command == query:
+        return 1
+    if name.startswith(query):
+        return 2
+    if command.startswith(query):
+        return 3
+    if query in name:
+        return 4
+    return 5 if query in command else None

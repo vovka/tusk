@@ -63,6 +63,9 @@ class GnomeServer:
             ("write_clipboard", "Write clipboard", {"text": "string"}),
             ("open_uri", "Open URI", {"uri": "string"}),
             ("get_desktop_context", "Get desktop context", {}),
+            ("get_active_window", "Get the active window title, app name, and geometry", {}),
+            ("list_windows", "List the currently open windows with app names and geometry", {}),
+            ("search_applications", "Search installed desktop applications by name or exec command", {"query": "string"}),
         ]
         return {
             name: {
@@ -168,6 +171,31 @@ class GnomeServer:
     def _tool_get_desktop_context(self, arguments: dict) -> dict:
         return {"success": True, "message": "context", "data": self._context.get_context_dict()}
 
+    def _tool_get_active_window(self, arguments: dict) -> dict:
+        context = self._context.get_context()
+        for window in context.open_windows:
+            if window.title == context.active_window_title:
+                message = f"active window: {window.title} -> {window.application} [{window.width}x{window.height} at {window.x},{window.y}]"
+                return {"success": True, "message": message}
+        return {"success": True, "message": f"active window: {context.active_window_title} -> {context.active_application}"}
+
+    def _tool_list_windows(self, arguments: dict) -> dict:
+        windows = self._context.get_context().open_windows
+        if not windows:
+            return {"success": True, "message": "open windows:\n  none"}
+        lines = "\n".join(f"  {item.title} -> {item.application} [{item.width}x{item.height} at {item.x},{item.y}]" for item in windows)
+        return {"success": True, "message": f"open windows:\n{lines}"}
+
+    def _tool_search_applications(self, arguments: dict) -> dict:
+        query = arguments["query"].strip()
+        if not query:
+            return {"success": False, "message": "search_applications requires a non-empty query"}
+        matches = self._apps.search(query) if hasattr(self._apps, "search") else _search_apps(self._apps.list_apps(), query)
+        if not matches:
+            return {"success": False, "message": f"no applications found for: {query}"}
+        lines = "\n".join(f"{item.name} -> {item.exec_cmd}" for item in matches)
+        return {"success": True, "message": f"application matches for {query!r}:\n{lines}"}
+
     def _write(self, request_id: int, payload: dict) -> None:
         response = {"jsonrpc": "2.0", "id": request_id, "result": payload}
         sys.stdout.write(json.dumps(response) + "\n")
@@ -176,6 +204,17 @@ class GnomeServer:
 
 def main() -> None:
     GnomeServer().serve()
+
+
+def _search_apps(apps: list[object], query: str) -> list[object]:
+    ranked = []
+    for item in apps:
+        name = item.name.casefold()
+        command = item.exec_cmd.casefold().split("/")[-1]
+        score = 0 if name == query.casefold() else 1 if command == query.casefold() else 2 if name.startswith(query.casefold()) else 3 if command.startswith(query.casefold()) else 4 if query.casefold() in name else 5 if query.casefold() in command else None
+        if score is not None:
+            ranked.append(((score, name, command), item))
+    return [item for _, item in sorted(ranked, key=lambda pair: pair[0])[:10]]
 
 
 if __name__ == "__main__":
