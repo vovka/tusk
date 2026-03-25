@@ -35,6 +35,12 @@ class GnomeServer:
         return self._router.call(name, arguments)
 
     def _payload(self, request: dict) -> dict:
+        try:
+            return self._safe_payload(request)
+        except Exception as exc:
+            return {"content": [{"type": "text", "text": f"adapter error: {exc}"}], "isError": True}
+
+    def _safe_payload(self, request: dict) -> dict:
         method = request.get("method")
         params = request.get("params", {})
         if method == "initialize":

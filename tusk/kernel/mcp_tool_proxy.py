@@ -14,5 +14,8 @@ class MCPToolProxy:
         self._runner = runner
 
     def execute(self, parameters: dict) -> ToolResult:
-        result = self._runner(self._client.call_tool(self._tool_name, parameters))
+        try:
+            result = self._runner(self._client.call_tool(self._tool_name, parameters))
+        except Exception as exc:
+            return ToolResult(False, f"tool execution failed: {exc}")
         return ToolResult(not result.is_error, result.content, result.data)

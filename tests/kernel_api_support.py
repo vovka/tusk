@@ -1,11 +1,12 @@
 import types
 
 from tusk.kernel.agent import MainAgent
-from tusk.kernel.schemas.desktop_context import DesktopContext
 from tusk.kernel.schemas.tool_result import ToolResult
 from tusk.kernel.tool_registry import ToolRegistry
+from tusk.kernel.tool_usage_recorder import ToolUsageRecorder
+from tusk.kernel.tool_usage_store import ToolUsageStore
 
-__all__ = ["HistoryRecorder", "make_agent", "make_context", "make_registry_tool"]
+__all__ = ["HistoryRecorder", "make_agent", "make_registry_tool"]
 
 
 class HistoryRecorder:
@@ -19,23 +20,32 @@ class HistoryRecorder:
         return []
 
 
-def make_agent(llm: object, history: object | None = None, context: object | None = None, log: object | None = None) -> MainAgent:
+def make_agent(
+    llm: object,
+    history: object | None = None,
+    registry: ToolRegistry | None = None,
+    log: object | None = None,
+) -> MainAgent:
     history = history or types.SimpleNamespace(append=lambda message: None, get_messages=lambda: [])
-    context = context or types.SimpleNamespace(get_context=lambda: DesktopContext("", ""))
     log = log or types.SimpleNamespace(log=lambda *args: None)
-    return MainAgent(llm, ToolRegistry(), history, context, log)
+    registry = registry or ToolRegistry()
+    usage = ToolUsageRecorder(registry, ToolUsageStore("/tmp/tusk-test-usage.json", lambda: 1.0))
+    return MainAgent(llm, registry, history, log, usage)
 
 
-def make_context(title: str = "", app_count: int = 0) -> DesktopContext:
-    apps = [types.SimpleNamespace(name=f"app-{index}") for index in range(app_count)]
-    return DesktopContext(title, "", available_applications=apps)
-
-
-def make_registry_tool(name: str, message: str) -> object:
+def make_registry_tool(
+    name: str,
+    message: str,
+    *,
+    broker: bool = False,
+    prompt_visible: bool = False,
+) -> object:
     return types.SimpleNamespace(
         name=name,
-        description="tool",
-        input_schema={"type": "object"},
+        description=message,
+        input_schema={"type": "object", "properties": {"text": {"type": "string"}}},
         execute=lambda _: ToolResult(True, message),
         source="gnome",
+        broker=broker,
+        prompt_visible=prompt_visible,
     )

@@ -21,6 +21,7 @@ class Config:
     shells: list[str]
     adapter_env_cache_dir: str
     conversation_log_dir: str
+    tool_usage_file: str
 
     @staticmethod
     def from_env() -> "Config":

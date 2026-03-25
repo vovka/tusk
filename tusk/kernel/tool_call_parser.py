@@ -1,3 +1,6 @@
+# Legacy note: this file is not used by the current runtime.
+# The agent now uses provider-native tool calling instead of parsing JSON tool text.
+
 import json
 
 from tusk.kernel.interfaces.log_printer import LogPrinter

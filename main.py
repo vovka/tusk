@@ -24,9 +24,9 @@ from tusk.kernel import (
     ToolRegistry,
 )
 from tusk.kernel.adapter_manager import AdapterManager
-from tusk.kernel.internal_tools import DictationRouter, StartDictationTool, SwitchModelTool
 from tusk.kernel.providers.configurable_llm_factory import ConfigurableLLMFactory
 from tusk.kernel.providers.groq_stt import GroqSTT
+from tusk.kernel.tool_runtime import ToolRuntime
 
 
 def _build_log(options: StartupOptions) -> ColorLogPrinter:
@@ -36,9 +36,9 @@ def _build_log(options: StartupOptions) -> ColorLogPrinter:
 def _build_llm_registry(config: Config, log: ColorLogPrinter) -> LLMRegistry:
     factory = ConfigurableLLMFactory(config.groq_api_key, config.openrouter_api_key)
     registry = LLMRegistry(factory)
-    registry.register_slot("gatekeeper", LLMProxy(factory.create(config.gatekeeper_llm.provider_name, config.gatekeeper_llm.model), log, "gatekeeper"))
-    registry.register_slot("agent", LLMProxy(factory.create(config.agent_llm.provider_name, config.agent_llm.model), log, "agent"))
-    registry.register_slot("utility", LLMProxy(factory.create(config.utility_llm.provider_name, config.utility_llm.model), log, "utility"))
+    registry.register_slot("gatekeeper", _slot_proxy(factory, config.gatekeeper_llm, log, "gatekeeper"))
+    registry.register_slot("agent", _slot_proxy(factory, config.agent_llm, log, "agent"))
+    registry.register_slot("utility", _slot_proxy(factory, config.utility_llm, log, "utility"))
     return registry
 
 
@@ -48,9 +48,10 @@ def _build_kernel(config: Config, log: ColorLogPrinter) -> KernelAPI:
     adapter_manager = _build_adapter_manager(config, log, tool_registry)
     history = SlidingWindowHistory(20, LLMConversationSummarizer(llm_registry.get("utility")))
     logger = DailyFileLogger(config.conversation_log_dir)
-    agent = MainAgent(llm_registry.get("agent"), tool_registry, history, adapter_manager, log, logger)
+    tools = ToolRuntime(config, tool_registry, llm_registry, adapter_manager, log)
+    agent = MainAgent(llm_registry.get("agent"), tool_registry, history, log, tools.usage_recorder, logger)
     pipeline = _build_pipeline(config, log, llm_registry, history, agent)
-    _register_internal_tools(llm_registry, tool_registry, pipeline, adapter_manager)
+    tools.register_tools(pipeline)
     return KernelAPI(pipeline, llm_registry, log)
 
 
@@ -77,17 +78,24 @@ def _build_adapter_manager(config: Config, log: ColorLogPrinter, tool_registry: 
     return manager
 
 
-def _build_pipeline(config: Config, log: ColorLogPrinter, llm_registry: LLMRegistry, history: SlidingWindowHistory, agent: MainAgent) -> Pipeline:
+def _build_pipeline(
+    config: Config,
+    log: ColorLogPrinter,
+    llm_registry: LLMRegistry,
+    history: SlidingWindowHistory,
+    agent: MainAgent,
+) -> Pipeline:
     clock = AdaptiveInteractionClock(config.follow_up_timeout_seconds, config.max_follow_up_timeout_seconds)
     formatter = RecentContextFormatter(history)
     command_mode = CommandMode(agent, clock, formatter, log)
-    return Pipeline(GroqSTT(config.groq_api_key), HallucinationFilter(), LLMGatekeeper(llm_registry.get("gatekeeper"), log), command_mode, None, config, log)
+    gatekeeper = LLMGatekeeper(llm_registry.get("gatekeeper"), log)
+    return Pipeline(GroqSTT(config.groq_api_key), HallucinationFilter(), gatekeeper, command_mode, None, config, log)
 
 
-def _register_internal_tools(llm_registry: LLMRegistry, tool_registry: ToolRegistry, pipeline: Pipeline, adapter_manager: AdapterManager) -> None:
-    pipeline._dictation_router = DictationRouter(tool_registry, pipeline)
-    tool_registry.register(SwitchModelTool(llm_registry))
-    tool_registry.register(StartDictationTool(tool_registry, pipeline, adapter_manager))
+def _slot_proxy(factory: ConfigurableLLMFactory, slot: object, log: ColorLogPrinter, name: str) -> LLMProxy:
+    provider = factory.create(slot.provider_name, slot.model)
+    return LLMProxy(provider, log, name)
+
 
 
 def _load_shell(name: str, shells_dir: Path, config: Config, api: KernelAPI) -> object:

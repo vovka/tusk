@@ -54,4 +54,5 @@ class ConfigFactory:
             "shells": self._shells(shells),
             "adapter_env_cache_dir": os.environ.get("TUSK_ADAPTER_ENV_CACHE_DIR", ".tusk_runtime/adapters"),
             "conversation_log_dir": os.environ.get("TUSK_CONVERSATION_LOG_DIR", ".tusk_runtime/conversations"),
+            "tool_usage_file": os.environ.get("TUSK_TOOL_USAGE_FILE", ".tusk_runtime/tool_usage.json"),
         }

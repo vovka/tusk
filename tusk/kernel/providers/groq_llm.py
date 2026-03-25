@@ -4,6 +4,7 @@ except ImportError:  # pragma: no cover
     Groq = None
 
 from tusk.kernel.interfaces.llm_provider import LLMProvider
+from tusk.kernel.schemas.tool_call import ToolCall
 
 __all__ = ["GroqLLM"]
 
@@ -25,12 +26,21 @@ class GroqLLM(LLMProvider):
         return self.complete_messages(system_prompt, [{"role": "user", "content": user_message}])
 
     def complete_messages(self, system_prompt: str, messages: list[dict]) -> str:
-        response = self._client.chat.completions.create(
-            model=self._model,
-            max_tokens=1024,
-            messages=[{"role": "system", "content": system_prompt}, *messages],
-        )
+        response = self._client.chat.completions.create(**_chat_payload(self._model, system_prompt, messages, 1024))
         return _message_content(response)
+
+    def complete_tool_call(
+        self,
+        system_prompt: str,
+        messages: list[dict],
+        tools: list[dict[str, object]],
+    ) -> ToolCall:
+        payload = _chat_payload(self._model, system_prompt, messages, 1024)
+        try:
+            response = self._create_tool_response(payload, tools, "required")
+        except Exception as exc:
+            response = self._fallback_response(exc, payload, tools)
+        return _tool_or_done(response)
 
     def complete_structured(
         self,
@@ -58,11 +68,21 @@ class GroqLLM(LLMProvider):
         max_tokens: int,
     ) -> dict:
         return {
-            "model": self._model,
-            "max_tokens": max_tokens,
-            "messages": [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_message}],
+            **_chat_payload(self._model, system_prompt, [{"role": "user", "content": user_message}], max_tokens),
             "response_format": _response_format(self._model, schema_name, schema),
         }
+
+    def _create_tool_response(self, payload: dict[str, object], tools: list[dict[str, object]], choice: str) -> object:
+        return self._client.chat.completions.create(**{**payload, "tools": tools, "tool_choice": choice})
+
+    def _fallback_response(self, exc: Exception, payload: dict[str, object], tools: list[dict[str, object]]) -> object:
+        if not _needs_tool_fallback(exc):
+            raise exc
+        return self._create_tool_response(payload, tools, "auto")
+
+
+def _chat_payload(model: str, system_prompt: str, messages: list[dict], max_tokens: int) -> dict[str, object]:
+    return {"model": model, "max_tokens": max_tokens, "messages": [{"role": "system", "content": system_prompt}, *messages]}
 
 
 def _response_format(model: str, schema_name: str, schema: dict) -> dict:
@@ -76,3 +96,27 @@ def _message_content(response: object) -> str:
     if isinstance(content, str) and content.strip():
         return content
     raise RuntimeError("empty completion from groq provider")
+
+
+def _first_tool_call(response: object) -> ToolCall:
+    tool_calls = response.choices[0].message.tool_calls or []
+    if not tool_calls:
+        raise RuntimeError("missing tool call from groq provider")
+    call = tool_calls[0]
+    return ToolCall(call.function.name, _arguments(call), call.id or "")
+
+
+def _tool_or_done(response: object) -> ToolCall:
+    tool_calls = response.choices[0].message.tool_calls or []
+    return _first_tool_call(response) if tool_calls else ToolCall("done", {"reply": _message_content(response)}, "")
+
+
+def _needs_tool_fallback(exc: Exception) -> bool:
+    text = str(exc)
+    return "Tool choice is required" in text and "did not call a tool" in text
+
+
+def _arguments(call: object) -> dict[str, object]:
+    import json
+
+    return json.loads(call.function.arguments or "{}")

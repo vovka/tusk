@@ -31,7 +31,7 @@ class GnomeToolSchemaCatalog:
 
     def _schema(self, name: str, description: str, fields: dict[str, str]) -> dict:
         properties = {key: {"type": value} for key, value in fields.items()}
-        return {"name": name, "description": description, "inputSchema": {"type": "object", "properties": properties}}
+        return {"name": name, "description": description, "inputSchema": {"type": "object", "properties": properties, "required": list(fields.keys())}}
 
     def _definitions(self) -> list[tuple[str, str, dict[str, str]]]:
         return _DEFINITIONS

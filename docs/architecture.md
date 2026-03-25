@@ -11,6 +11,16 @@ TUSK is split into three layers:
 3. `adapters/`
    MCP servers discovered from `adapters/*/adapter.json`. `adapters/gnome` provides desktop context and desktop-control tools. `adapters/dictation` owns dictation cleanup/refinement sessions.
 
+## Agent Prompt Strategy
+
+- The main agent no longer receives an automatic desktop-context message.
+- The system prompt no longer contains the full tool registry or full JSON schemas for every tool.
+- The agent uses provider-native tool calling instead of prompt-encoded JSON tool instructions.
+- Every agent request exposes three broker tools as native tool definitions: `find_tools`, `describe_tool`, and `run_tool`.
+- On startup, the kernel reads `.tusk_runtime/tool_usage.json` and injects the top 3 currently available real tools as direct-call tools for the session.
+- Tool usage ranking is success-based and recency-weighted, so the direct-call set adapts over time without growing the prompt.
+- All other tools stay hidden from the prompt and are reachable only through `run_tool`.
+
 ## Runtime Flow
 
 ### Voice shell
@@ -23,6 +33,16 @@ stdin -> `KernelAPI.submit_text()` -> main agent -> tool call -> MCP adapter
 
 `submit_text()` bypasses STT and gatekeeping. It is treated as a direct command path.
 
+When the agent needs a hidden tool, the runtime flow is:
+
+`command` -> `find_tools` -> optional `describe_tool` -> `run_tool` -> real tool
+
+When the agent uses a real tool, the loop continues through native tool-call messages:
+
+`assistant tool_call` -> `tool result` -> next native tool_call or `done`
+
+When a real tool succeeds, the kernel updates the persistent usage file. Broker-tool calls themselves are never counted.
+
 ## Adapter Model
 
 - Adapters are started from `adapter.json`.
@@ -30,6 +50,7 @@ stdin -> `KernelAPI.submit_text()` -> main agent -> tool call -> MCP adapter
 - The kernel uses stdio JSON-RPC for v1.
 - `AdapterManager` can watch `adapters/` for hot-plug and tries shared-env startup first, then a managed env under `.tusk_runtime/adapters/` if needed.
 - Exactly one context-providing desktop adapter is used at a time.
+- Desktop inspection tools still exist in the GNOME adapter, but they are fetched on demand rather than injected automatically into the agent prompt.
 
 ## Dictation
 

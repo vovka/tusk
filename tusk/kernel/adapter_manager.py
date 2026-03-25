@@ -3,12 +3,10 @@ import json
 import shlex
 from pathlib import Path
 
-from tusk.kernel.adapter_context_builder import AdapterContextBuilder
 from tusk.kernel.adapter_env_builder import AdapterEnvironmentBuilder
 from tusk.kernel.adapter_watcher import AdapterWatcher
 from tusk.kernel.mcp_client import MCPClient
 from tusk.kernel.mcp_tool_proxy import MCPToolProxy
-from tusk.kernel.schemas.desktop_context import DesktopContext
 
 try:
     from watchdog.observers import Observer
@@ -27,7 +25,6 @@ class AdapterManager:
         self._manifests: dict[str, dict] = {}
         self._context_adapter: str | None = None
         self._observer = None
-        self._context_builder = AdapterContextBuilder()
         self._env_builder = AdapterEnvironmentBuilder(cache_dir)
 
     async def start_all(self) -> None:
@@ -72,11 +69,6 @@ class AdapterManager:
     def run_async(self, coro: object) -> object:
         return asyncio.run(coro)
 
-    def get_context(self) -> DesktopContext:
-        if self._context_adapter is None:
-            return self._context_builder.build(None)
-        return self._context_builder.build(self._context_result())
-
     def primary_desktop_source(self) -> str:
         return self._context_adapter or "gnome"
 
@@ -102,8 +94,3 @@ class AdapterManager:
             self.tool_registry.register(MCPToolProxy(name, tool, client, self.run_async))
         if manifest.get("provides_context") and self._context_adapter is None:
             self._context_adapter = name
-
-    def _context_result(self) -> dict | None:
-        name = f"{self._context_adapter}.get_desktop_context"
-        result = self.tool_registry.get(name).execute({})
-        return result.data if result.success else None

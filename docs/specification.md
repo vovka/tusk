@@ -45,12 +45,25 @@ immutable (`frozen=True`) for the lifetime of the process.
 | `AUDIO_FRAME_DURATION_MS` | `int` | `30` | `10`, `20`, or `30` (WebRTC VAD constraint) |
 | `VAD_AGGRESSIVENESS` | `int` | `2` | `0`, `1`, `2`, or `3` |
 | `FOLLOW_UP_TIMEOUT_SECONDS` | `float` | `30` | Positive float (seconds) |
+| `TUSK_TOOL_USAGE_FILE` | `str` | `".tusk_runtime/tool_usage.json"` | Writable file path for learned tool-usage stats |
 
 LLM slot values use `provider/model` format. The first path segment is the provider
 name (`groq` or `openrouter`); the remainder is the model ID. Parsed by
 `LLMSlotConfig.parse()`.
 
-### 2.3 Provider Selection Logic (main.py)
+### 2.3 Tool Usage Persistence
+
+The kernel stores successful real-tool executions in `TUSK_TOOL_USAGE_FILE`.
+
+- **Tracked:** successful executions of real tools, including hidden tools invoked through `run_tool`
+- **Not tracked:** `find_tools`, `describe_tool`, `run_tool`, `done`, `clarify`, `unknown`
+- **Ranking model:** recency-weighted score with exponential decay over time
+- **Refresh policy:** top 3 direct tools are chosen once at startup and remain fixed for that process
+
+If the usage file is missing, startup begins with no learned direct tools. If the file
+is malformed, it is ignored and rebuilt from future successful executions.
+
+### 2.4 Provider Selection Logic (main.py)
 
 ```
 STT engine → GroqSTT (cloud Whisper-large-v3-turbo)
@@ -194,7 +207,59 @@ is included, adding ~10-30 ms to inference on a fast model.
 
 ## 7. Agent Tool Specification
 
-**Interface:** `tusk/interfaces/agent_tool.py`
+### 7.1 Prompt Visibility Model
+
+The main agent does not receive the full tool registry or any automatic desktop snapshot.
+
+The system prompt contains only behavioral instructions. The actual tool surface is sent
+through provider-native tool definitions on each agent request.
+
+The native tool surface contains only:
+
+- terminal pseudo-tools: `done`, `clarify`, `unknown`
+- broker tools: `find_tools`, `describe_tool`, `run_tool`
+- the top 3 learned real tools selected at startup from `TUSK_TOOL_USAGE_FILE`
+
+All other real tools are hidden from the prompt. If the model emits a hidden real tool
+directly, the runtime rejects it and feeds back a failure telling the model to use the
+broker tools instead.
+
+### 7.2 Broker Tools
+
+The broker surface is implemented inside the kernel, not as a separate MCP adapter.
+
+| Tool | Purpose |
+|---|---|
+| `find_tools` | Search the full registered tool set by intent text and return compact candidate matches |
+| `describe_tool` | Return the exact schema for one named tool |
+| `run_tool` | Execute a named real tool with explicit arguments |
+
+Execution policy:
+
+- `run_tool` may invoke hidden adapter-backed and internal real tools
+- `run_tool` rejects broker-tool targets
+- argument names are checked against the target tool schema before execution
+
+### 7.3 Learned Top-Tool Injection
+
+At startup, the kernel:
+
+1. registers all real tools
+2. loads the usage file
+3. filters to currently available real tools
+4. injects the top 3 ranked names into the prompt-visible tool catalog
+5. registers broker tools
+
+This keeps the request small while preserving fast direct calls for the tools the user
+actually uses most often.
+
+### 7.4 Historical Note
+
+Older versions of TUSK described a flat full-tool prompt catalog and automatic desktop
+context injection. The current implementation no longer does that; tool discovery is
+brokered and desktop state is fetched only on demand.
+
+**Historical interface retained here only for comparison:** `tusk/interfaces/agent_tool.py`
 
 ```python
 @property def name(self) -> str
@@ -203,7 +268,7 @@ is included, adding ~10-30 ms to inference on a fast model.
 def execute(self, parameters: dict[str, str]) -> ToolResult
 ```
 
-### 7.1 ToolRegistry — `tusk/core/tool_registry.py`
+### 7.5 ToolRegistry — historical flat-catalog model
 
 - `register(tool)` — stores tool by `tool.name`
 - `get(name)` — retrieves tool by name
@@ -217,12 +282,12 @@ def execute(self, parameters: dict[str, str]) -> ToolResult
 {"tool": "start_dictation"}
 ```
 
-### 7.2 Tool Factory — `tusk/gnome/tool_factory.py`
+### 7.6 Tool Factory — historical GNOME tool-factory model
 
 `build_tool_registry()` creates a `ToolRegistry` and registers all 19 tools,
 injecting dependencies (InputSimulator, ClipboardProvider, utility LLM, LLMRegistry).
 
-### 7.3 Tool Catalog (19 tools)
+### 7.7 Historical Tool Catalog (19 tools)
 
 **Application & Window Management:**
 
@@ -285,46 +350,40 @@ def process_command(self, command: str) -> None
 
 ### 8.1 System Prompt
 
-Built dynamically at call time from `ToolRegistry.build_schema_text()`:
+The system prompt is a short behavior-only instruction block. It tells the model:
 
-```
-You are TUSK, a desktop voice assistant. Given a user command and desktop context,
-call tools one at a time to complete it. Available tools:
-<tool schema lines>
-Respond with JSON matching one tool schema per message. On every response include a
-"reply" field with a brief explanation of what you are about to do.
-Use {"tool":"done","reply":"<confirmation>"} when the task is fully complete.
-Use {"tool":"unknown","reason":"<why>"} only if the command cannot be mapped.
-Respond with JSON only.
-```
+- call exactly one native tool per turn
+- use `done` when no further action is needed
+- use `clarify` for one short follow-up question
+- use `unknown` only when the request cannot be handled
+- use broker tools for hidden actions
 
 ### 8.2 User Message Construction
 
+The first user message is just the cleaned command:
+
 ```
 Command: <cleaned_command>
-Active window: <active_window_title>
-Open windows:
-  <title> [<w>x<h> at <x>,<y>]
-Available apps (name → exec_cmd):
-<name → exec_cmd per line>
 ```
+
+Desktop state is not injected automatically. If the model needs it, it must call
+desktop inspection tools through the broker path or through directly visible top tools.
 
 ### 8.3 Multi-Step Agentic Loop
 
 The agent runs a loop (max 10 steps):
 
-1. Calls `LLMProvider.complete_messages()` with system prompt and full
-   `ConversationHistory` (including tool results from prior steps)
-2. Parses response JSON — extracts `"tool"` as `tool_name`, remaining fields as
-   `parameters`. Pops the `"reply"` field (expected on every step) for user-facing
-   explanation of the upcoming action.
-3. If tool is `"done"` or `"unknown"` — stops the loop
-4. Otherwise executes the tool via `ToolRegistry`, appends the `ToolResult` to
-   history as a user message (`"Tool result: <message>"`), and loops
-5. On JSON parse failure: returns `ToolCall("done", {})` (graceful fallback)
+1. Calls `LLMProvider.complete_tool_call()` with system prompt, history, and native tool definitions
+2. Receives one native tool call (`tool_name`, `parameters`, provider `call_id`)
+3. If tool is `done`, `clarify`, or `unknown` — stops the loop
+4. Otherwise executes the tool via `ToolRegistry`
+5. Appends an assistant tool-call message plus a `role="tool"` result message and loops
 
-All messages (user commands, LLM responses, tool results) are persisted in
-`ConversationHistory` for cross-command context.
+Only the compact command/final-reply exchange is persisted in `ConversationHistory`
+for cross-command context. Tool-loop scratch messages are local to the current request.
+
+The legacy JSON parser helper at `tusk/kernel/tool_call_parser.py` is still present in
+the repository, but it is not used by the current runtime.
 
 ---
 

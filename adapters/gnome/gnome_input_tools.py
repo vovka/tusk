@@ -11,8 +11,11 @@ class GnomeInputTools:
         return {"success": True, "message": f"pressed: {arguments['keys']}"}
 
     def type_text(self, arguments: dict) -> dict:
-        self._input.type_text(arguments["text"])
-        return {"success": True, "message": "typed"}
+        text = arguments["text"]
+        if self._has_control_chars(text):
+            return {"success": False, "message": self._type_text_error()}
+        self._input.type_text(text)
+        return {"success": True, "message": f"typed literal text ({len(text)} chars)"}
 
     def replace_recent_text(self, arguments: dict) -> dict:
         self._paster.replace(int(arguments["replace_chars"]), arguments["text"])
@@ -36,3 +39,9 @@ class GnomeInputTools:
 
     def _int(self, arguments: dict, key: str, default: str | None = None) -> int:
         return int(arguments.get(key, default)) if default is not None else int(arguments[key])
+
+    def _has_control_chars(self, text: str) -> bool:
+        return any(ord(char) < 32 and char not in "\n\t" for char in text)
+
+    def _type_text_error(self) -> str:
+        return "type_text only accepts literal printable text; use press_keys for Enter, Delete, shortcuts, or control keys."

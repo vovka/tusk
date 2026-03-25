@@ -5,15 +5,23 @@ __all__ = ["GnomeWindowTools"]
 
 class GnomeWindowTools:
     def close_window(self, arguments: dict) -> dict:
-        subprocess.run(["wmctrl", "-c", arguments["window_title"]], check=False)
-        return {"success": True, "message": f"closed: {arguments['window_title']}"}
+        title = self._title(arguments)
+        if isinstance(title, dict):
+            return title
+        subprocess.run(["wmctrl", "-c", title], check=False)
+        return {"success": True, "message": f"closed: {title}"}
 
     def focus_window(self, arguments: dict) -> dict:
-        subprocess.run(["wmctrl", "-a", arguments["window_title"]], check=False)
-        return {"success": True, "message": f"focused: {arguments['window_title']}"}
+        title = self._title(arguments)
+        if isinstance(title, dict):
+            return title
+        subprocess.run(["wmctrl", "-a", title], check=False)
+        return {"success": True, "message": f"focused: {title}"}
 
     def maximize_window(self, arguments: dict) -> dict:
-        title = arguments["window_title"]
+        title = self._title(arguments)
+        if isinstance(title, dict):
+            return title
         subprocess.run(["wmctrl", "-r", title, "-b", "add,maximized_vert,maximized_horz"], check=False)
         return {"success": True, "message": f"maximized: {title}"}
 
@@ -36,3 +44,7 @@ class GnomeWindowTools:
     def _window_ids(self, window_title: str) -> list[str]:
         result = subprocess.run(["xdotool", "search", "--name", window_title], capture_output=True, text=True, check=False)
         return result.stdout.strip().splitlines()
+
+    def _title(self, arguments: dict) -> str | dict:
+        title = str(arguments.get("window_title", "")).strip()
+        return title or {"success": False, "message": "missing argument: window_title"}

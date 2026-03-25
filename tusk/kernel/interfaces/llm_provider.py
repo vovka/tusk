@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from tusk.kernel.schemas.tool_call import ToolCall
 
 __all__ = ["LLMProvider"]
 
@@ -15,6 +16,15 @@ class LLMProvider(ABC):
 
     @abstractmethod
     def complete_messages(self, system_prompt: str, messages: list[dict]) -> str:
+        ...
+
+    @abstractmethod
+    def complete_tool_call(
+        self,
+        system_prompt: str,
+        messages: list[dict],
+        tools: list[dict[str, object]],
+    ) -> ToolCall:
         ...
 
     @abstractmethod

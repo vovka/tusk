@@ -14,6 +14,10 @@ cli shell   → direct command path   → dictation/desktop adapters
 2. The kernel handles STT, gatekeeping, tool selection, conversation history, and model switching
 3. Desktop control and dictation refinement run through hot-pluggable MCP adapters in `adapters/`
 
+The agent request is intentionally compact. TUSK does not pre-send a full desktop snapshot or every tool schema on
+each request. Instead, the kernel sends native tool definitions for the broker tools (`find_tools`, `describe_tool`,
+`run_tool`) plus the top 3 most-used real tools learned from previous successful executions.
+
 **Supported actions:**
 
 - **Window management** — launch, close, focus, maximize, minimize, move/resize windows
@@ -132,6 +136,7 @@ All settings are configured via environment variables:
 | `FOLLOW_UP_TIMEOUT_SECONDS` | `30` | Seconds before follow-up window expires |
 | `TUSK_SHELLS` | `voice` | Comma-separated shells to start (`voice`, `cli`) |
 | `TUSK_ADAPTER_ENV_CACHE_DIR` | `.tusk_runtime/adapters` | Cache for managed adapter environments |
+| `TUSK_TOOL_USAGE_FILE` | `.tusk_runtime/tool_usage.json` | Persistent usage stats used to inject the top 3 direct tools into the agent prompt |
 | `DICTATION_LLM` | `groq/llama-3.1-8b-instant` | Model used by the dictation adapter |
 
 ### Example: use a smaller/faster Whisper model
@@ -195,6 +200,13 @@ tusk/
 
 See `docs/brief.md` for the full project vision and `docs/architecture.md` for the
 detailed architecture specification.
+
+The current runtime uses a brokered native-tool surface:
+
+- No automatic desktop snapshot is injected into the agent conversation
+- Every agent request includes native tool definitions for `find_tools`, `describe_tool`, and `run_tool`
+- Every agent request also includes native tool definitions for the top 3 most-used real tools from `TUSK_TOOL_USAGE_FILE`
+- Less common tools remain available through brokered lookup and execution
 
 ## Not Yet Implemented
 
