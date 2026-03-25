@@ -2,6 +2,17 @@
 
 ## Project Brief v0.5
 
+## Current Status Note
+
+The current codebase now uses a kernel/shell/adapter split instead of the earlier core/extensions layout. The current implementation ships:
+
+- `tusk/kernel` as the in-process agent runtime
+- `shells/voice` and `shells/cli`
+- `adapters/gnome` for desktop control and context
+- `adapters/dictation` for dictation cleanup/refinement
+
+The rest of this brief remains the broader product vision rather than a line-by-line mirror of the current code.
+
 ---
 
 ## 1. Vision
