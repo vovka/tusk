@@ -1,6 +1,6 @@
 from tusk.kernel.interfaces.agent import Agent
 from tusk.kernel.interfaces.interaction_clock import InteractionClock
-from tusk.kernel.interfaces.log_printer import LogPrinter
+from tusk.lib.logging.interfaces.log_printer import LogPrinter
 from tusk.kernel.recent_context_formatter import RecentContextFormatter
 from tusk.kernel.schemas.gate_result import GateResult
 from tusk.kernel.schemas.kernel_response import KernelResponse

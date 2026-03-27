@@ -1,4 +1,4 @@
-from tusk.kernel.interfaces.log_printer import LogPrinter
+from tusk.lib.logging.interfaces.log_printer import LogPrinter
 from tusk.kernel.schemas.tool_call import ToolCall
 from tusk.kernel.schemas.tool_result import ToolResult
 from tusk.kernel.tool_loop_message_builder import ToolLoopMessageBuilder

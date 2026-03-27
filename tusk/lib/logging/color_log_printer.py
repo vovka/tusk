@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from tusk.kernel.interfaces.log_printer import LogPrinter
+from tusk.lib.logging.interfaces.log_printer import LogPrinter
 
 __all__ = ["ColorLogPrinter"]
 

@@ -1,5 +1,5 @@
 from tusk.kernel.model_failure_reply_builder import ModelFailureReplyBuilder
-from tusk.kernel.interfaces.log_printer import LogPrinter
+from tusk.lib.logging.interfaces.log_printer import LogPrinter
 from tusk.kernel.schemas.task_execution_result import TaskExecutionResult
 from tusk.kernel.schemas.task_plan import TaskPlan
 from tusk.kernel.task_plan_validator import TaskPlanValidator

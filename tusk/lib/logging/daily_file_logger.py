@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 import sys
 
-from tusk.kernel.interfaces.conversation_logger import ConversationLogger
+from tusk.lib.logging.interfaces.conversation_logger import ConversationLogger
 from tusk.kernel.schemas.chat_message import ChatMessage
 
 __all__ = ["DailyFileLogger"]

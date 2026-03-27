@@ -1,4 +1,4 @@
-from tusk.kernel.interfaces.log_printer import LogPrinter
+from tusk.lib.logging.interfaces.log_printer import LogPrinter
 from tusk.kernel.interfaces.task_planner import TaskPlanner
 from tusk.kernel.schemas.task_plan import TaskPlan
 

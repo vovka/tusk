@@ -3,7 +3,7 @@
 
 import json
 
-from tusk.kernel.interfaces.log_printer import LogPrinter
+from tusk.lib.logging.interfaces.log_printer import LogPrinter
 from tusk.kernel.schemas.tool_call import ToolCall
 
 __all__ = ["ToolCallParser"]
