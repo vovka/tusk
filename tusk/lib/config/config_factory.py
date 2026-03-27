@@ -1,6 +1,6 @@
 import os
 
-from tusk.kernel.config import Config
+from tusk.lib.config.config import Config
 from tusk.kernel.schemas.llm_slot_config import LLMSlotConfig
 
 __all__ = ["ConfigFactory"]

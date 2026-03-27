@@ -25,6 +25,6 @@ class Config:
 
     @staticmethod
     def from_env() -> "Config":
-        from tusk.kernel.config_factory import ConfigFactory
+        from tusk.lib.config.config_factory import ConfigFactory
 
         return ConfigFactory().build()

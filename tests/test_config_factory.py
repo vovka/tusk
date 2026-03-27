@@ -1,4 +1,4 @@
-from tusk.kernel.config_factory import ConfigFactory
+from tusk.lib.config import ConfigFactory
 
 
 def test_config_factory_uses_strict_schema_default_planner_model(monkeypatch) -> None:
