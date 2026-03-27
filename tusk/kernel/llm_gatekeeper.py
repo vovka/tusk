@@ -1,8 +1,8 @@
 import json
 
+from tusk.lib.llm.interfaces.llm_provider import LLMProvider
+from tusk.lib.logging.interfaces.log_printer import LogPrinter
 from tusk.kernel.interfaces.gatekeeper import Gatekeeper
-from tusk.kernel.interfaces.llm_provider import LLMProvider
-from tusk.kernel.interfaces.log_printer import LogPrinter
 from tusk.kernel.schemas.gate_result import GateResult
 from tusk.kernel.schemas.utterance import Utterance
 

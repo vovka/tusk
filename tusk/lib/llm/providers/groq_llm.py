@@ -3,9 +3,9 @@ try:
 except ImportError:  # pragma: no cover
     Groq = None
 
-from tusk.kernel.interfaces.llm_provider import LLMProvider
+from tusk.lib.llm.interfaces.llm_provider import LLMProvider
 from tusk.kernel.schemas.tool_call import ToolCall
-from tusk.kernel.tool_use_failed_recovery import ToolUseFailedRecovery
+from tusk.lib.llm.tool_use_failed_recovery import ToolUseFailedRecovery
 
 __all__ = ["GroqLLM"]
 

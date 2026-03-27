@@ -1,7 +1,7 @@
-from tusk.kernel.interfaces.llm_provider import LLMProvider
-from tusk.kernel.interfaces.log_printer import LogPrinter
-from tusk.kernel.llm_payload_logger import LLMPayloadLogger
-from tusk.kernel.llm_retry_runner import LLMRetryRunner
+from tusk.lib.llm.interfaces.llm_provider import LLMProvider
+from tusk.lib.logging.interfaces.log_printer import LogPrinter
+from tusk.lib.llm.llm_payload_logger import LLMPayloadLogger
+from tusk.lib.llm.llm_retry_runner import LLMRetryRunner
 from tusk.kernel.schemas.tool_call import ToolCall
 
 __all__ = ["LLMProxy"]

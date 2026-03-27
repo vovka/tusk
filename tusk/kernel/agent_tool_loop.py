@@ -1,5 +1,5 @@
-from tusk.kernel.interfaces.llm_provider import LLMProvider
-from tusk.kernel.interfaces.log_printer import LogPrinter
+from tusk.lib.llm.interfaces.llm_provider import LLMProvider
+from tusk.lib.logging.interfaces.log_printer import LogPrinter
 from tusk.kernel.model_failure_reply_builder import ModelFailureReplyBuilder
 from tusk.kernel.repeated_tool_call_guard import RepeatedToolCallGuard
 from tusk.kernel.schemas.task_execution_result import TaskExecutionResult

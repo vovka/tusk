@@ -1,7 +1,7 @@
-from tusk.kernel.interfaces.llm_provider import LLMProvider
-from tusk.kernel.interfaces.llm_provider_factory import LLMProviderFactory
-from tusk.kernel.providers.groq_llm import GroqLLM
-from tusk.kernel.providers.open_router_llm import OpenRouterLLM
+from tusk.lib.llm.interfaces.llm_provider import LLMProvider
+from tusk.lib.llm.interfaces.llm_provider_factory import LLMProviderFactory
+from tusk.lib.llm.providers.groq_llm import GroqLLM
+from tusk.lib.llm.providers.open_router_llm import OpenRouterLLM
 
 __all__ = ["ConfigurableLLMFactory"]
 

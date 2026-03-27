@@ -1,7 +1,6 @@
 import types
 
-from tusk.kernel.llm_proxy import LLMProxy
-from tusk.kernel.llm_retry_runner import LLMRetryRunner
+from tusk.lib.llm import LLMProxy, LLMRetryRunner
 from tusk.kernel.schemas.tool_call import ToolCall
 
 

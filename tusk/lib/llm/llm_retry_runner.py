@@ -1,6 +1,6 @@
 import time
 
-from tusk.kernel.llm_retry_policy import LLMRetryPolicy
+from tusk.lib.llm.llm_retry_policy import LLMRetryPolicy
 
 __all__ = ["LLMRetryRunner"]
 

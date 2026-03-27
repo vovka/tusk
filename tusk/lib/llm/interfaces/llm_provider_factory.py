@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from tusk.kernel.interfaces.llm_provider import LLMProvider
+from tusk.lib.llm.interfaces.llm_provider import LLMProvider
 
 __all__ = ["LLMProviderFactory"]
 
