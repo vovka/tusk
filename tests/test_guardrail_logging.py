@@ -2,10 +2,10 @@ import tempfile
 import types
 from unittest.mock import patch
 
-from tusk.kernel.color_log_printer import ColorLogPrinter
-from tusk.kernel.daily_file_logger import DailyFileLogger
-from tusk.kernel.llm_proxy import LLMProxy
-from tusk.kernel.startup_options import StartupOptions, build_parser
+from tusk.lib.config import StartupOptions
+from tusk.lib.config.startup_options import build_parser
+from tusk.lib.llm import LLMProxy
+from tusk.lib.logging import ColorLogPrinter, DailyFileLogger
 from tusk.kernel.schemas.chat_message import ChatMessage
 
 

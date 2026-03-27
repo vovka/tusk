@@ -2,13 +2,15 @@
 
 ## Layers
 
-TUSK is split into three layers:
+TUSK is split into four layers:
 
-1. `tusk/kernel/`
-   Owns STT, gatekeeping, conversation state, planner/executor orchestration, tool registry, and adapter lifecycle.
-2. `shells/`
+1. `tusk/lib/`
+   Owns infrastructure and swappable implementations: logging, runtime config, LLM providers and retry plumbing, STT providers, and MCP client/tool plumbing.
+2. `tusk/kernel/`
+   Owns business logic: gatekeeping, conversation state, planner/executor orchestration, tool registry, pipeline flow, and adapter management.
+3. `shells/`
    User-facing entrypoints. `shells/voice` owns microphone capture and VAD. `shells/cli` is a direct text shell.
-3. `adapters/`
+4. `adapters/`
    MCP servers discovered from `adapters/*/adapter.json`. `adapters/gnome` provides desktop-control tools. `adapters/dictation` owns dictation refinement sessions.
 
 ## Agent Structure
@@ -70,6 +72,12 @@ The execution agent uses native tool calling with only:
 - `need_tools`
 
 If execution lacks capability, it calls `need_tools`. The kernel reruns planning with the prior plan and the requested capability. Replanning is capped to avoid runaway loops.
+
+## Infrastructure Boundary
+
+- `tusk.lib` may import `tusk.kernel.schemas.*` for shared typed payloads.
+- `tusk.kernel` imports infrastructure through `tusk.lib.*` interfaces and implementations.
+- `main.py` composes the runtime from both packages: infrastructure comes from `tusk.lib`, orchestration from `tusk.kernel`.
 
 ## Tool Model
 

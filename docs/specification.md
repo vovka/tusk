@@ -4,7 +4,7 @@ This document describes the implemented system as it exists in code after the pl
 
 ## 1. Configuration
 
-All runtime configuration is read through `tusk/kernel/config.py` and `tusk/kernel/config_factory.py`.
+All runtime configuration is read through `tusk/lib/config/config.py` and `tusk/lib/config/config_factory.py`.
 
 Required:
 
@@ -34,7 +34,7 @@ Other runtime settings:
 
 ## 2. LLM Slots
 
-`main.py` builds `LLMRegistry` with four swappable slots:
+`main.py` builds `tusk.lib.llm.LLMRegistry` with four swappable slots:
 
 - `gatekeeper`
 - `planner`
@@ -187,7 +187,19 @@ Special case:
 
 This keeps it callable by the conversation agent without leaking it into planner selection.
 
-## 9. Adapters
+## 9. Infrastructure Packages
+
+Infrastructure now lives under `tusk.lib`:
+
+- `tusk.lib.logging`: `ColorLogPrinter`, `DailyFileLogger`, and logging interfaces
+- `tusk.lib.config`: `Config`, `ConfigFactory`, and `StartupOptions`
+- `tusk.lib.llm`: proxy, registry, retry, payload logging, tool-recovery, and provider abstractions
+- `tusk.lib.stt`: STT interface and provider implementations
+- `tusk.lib.mcp`: MCP client, tool proxy, adapter env builder, and adapter watcher
+
+Shared schemas still live in `tusk.kernel.schemas`.
+
+## 10. Adapters
 
 Adapters remain MCP servers loaded by `AdapterManager`.
 
@@ -195,9 +207,9 @@ Adapters remain MCP servers loaded by `AdapterManager`.
 - execution calls them through `MCPToolProxy`
 - adapter errors are converted into failed `ToolResult`s instead of crashing the kernel path
 
-The active runtime still uses stdio MCP transport.
+The active runtime still uses stdio MCP transport through `tusk.lib.mcp`.
 
-## 10. Dictation
+## 11. Dictation
 
 Dictation remains a real tool path, not a planner special case.
 
@@ -205,7 +217,7 @@ Dictation remains a real tool path, not a planner special case.
 - the planner may choose it
 - dictation state is routed through `DictationRouter` and `AdapterDictationMode`
 
-## 11. Removed Runtime Behavior
+## 12. Removed Runtime Behavior
 
 The active runtime no longer uses:
 

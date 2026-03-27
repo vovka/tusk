@@ -8,7 +8,7 @@ try:
 except ImportError:  # pragma: no cover
     whisper = None
 
-from tusk.kernel.interfaces.stt_engine import STTEngine
+from tusk.lib.stt.interfaces.stt_engine import STTEngine
 from tusk.kernel.schemas.utterance import Utterance
 
 __all__ = ["WhisperSTT"]

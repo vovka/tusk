@@ -1,6 +1,6 @@
 import types
 
-from tusk.kernel.mcp_tool_proxy import MCPToolProxy
+from tusk.lib.mcp import MCPToolProxy
 
 
 def test_mcp_tool_proxy_converts_adapter_exception_to_failure() -> None:

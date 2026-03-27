@@ -1,3 +1,3 @@
-from tusk import kernel
+from tusk import kernel, lib
 
-__all__ = ["kernel"]
+__all__ = ["kernel", "lib"]
