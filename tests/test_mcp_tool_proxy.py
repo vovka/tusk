@@ -1,6 +1,7 @@
 import types
 
 from tusk.lib.mcp import MCPToolProxy
+from tusk.kernel.tool_registry import ToolRegistry
 
 
 def test_mcp_tool_proxy_converts_adapter_exception_to_failure() -> None:
@@ -10,9 +11,22 @@ def test_mcp_tool_proxy_converts_adapter_exception_to_failure() -> None:
     assert "tool execution failed" in result.message
 
 
-def _schema() -> object:
+def test_dictation_lifecycle_tools_are_hidden_from_planner() -> None:
+    registry = ToolRegistry()
+    registry.register(MCPToolProxy("dictation", _schema("start_dictation"), _client(), lambda coro: None))
+    registry.register(MCPToolProxy("dictation", _schema("stop_dictation"), _client(), lambda coro: None))
+    registry.register(MCPToolProxy("dictation", _schema("process_segment"), _client(), lambda coro: None))
+    assert registry.planner_tool_names() == {"dictation.process_segment"}
+
+
+def test_non_lifecycle_adapter_tools_remain_planner_visible() -> None:
+    proxy = MCPToolProxy("gnome", _schema("type_text"), _client(), lambda coro: None)
+    assert proxy.planner_visible is True
+
+
+def _schema(name: str = "close_window") -> object:
     return types.SimpleNamespace(
-        name="close_window",
+        name=name,
         description="close",
         input_schema={"type": "object", "properties": {"window_title": {"type": "string"}}},
     )

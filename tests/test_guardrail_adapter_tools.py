@@ -1,5 +1,6 @@
 import types
 
+from adapters.gnome.gnome_application_tools import GnomeApplicationTools
 from adapters.gnome.server import GnomeServer
 from tusk.kernel.schemas.desktop_context import DesktopContext, WindowInfo
 
@@ -20,6 +21,14 @@ def test_list_windows_and_active_window_tools() -> None:
     assert "active window: Editor -> gedit [800x600 at 10,20]" == active["message"]
 
 
+def test_launch_application_resolves_display_name_to_exec() -> None:
+    calls: list[str] = []
+    tools = _application_tools(calls)
+    result = tools.launch_application({"application_name": "Firefox"})
+    assert calls == ["firefox"]
+    assert result == {"success": True, "message": "launched: Firefox"}
+
+
 def _search_result() -> dict:
     return {"success": True, "message": "application matches for 'firefox':\nFirefox -> firefox"}
 
@@ -31,6 +40,18 @@ def _search_handler(server: GnomeServer) -> object:
         search_applications=lambda arguments: _search_result(),
     )
     return server._router._application_handlers(tools)["search_applications"]
+
+
+def _application_tools(calls: list[str]) -> GnomeApplicationTools:
+    apps = types.SimpleNamespace(search=lambda query, limit=10: [types.SimpleNamespace(name="Firefox", exec_cmd="firefox")])
+    tools = GnomeApplicationTools(apps)
+    tools._launch = lambda application_name: _launch_result(calls, application_name)["message"]  # type: ignore[method-assign]
+    return tools
+
+
+def _launch_result(calls: list[str], application_name: str) -> dict:
+    calls.append(application_name)
+    return {"success": True, "message": f"launched: {application_name}"}
 
 
 def _context_handlers() -> dict[str, object]:
