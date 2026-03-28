@@ -15,6 +15,85 @@ and an execution agent that runs only the selected tools.
 
 ---
 
+## System Block Diagram
+
+```mermaid
+flowchart TD
+    subgraph SHELLS["Shells (user input)"]
+        MIC["Microphone\n(AudioCapture)"]
+        VAD["Voice Activity\nDetector"]
+        CLI["CLI Shell\n(typed input)"]
+    end
+
+    subgraph KERNEL["Kernel (tusk/kernel)"]
+        FILTER["Hallucination\nFilter"]
+        GATE["Gatekeeper\n(3-way classify)"]
+        CLOCK["Adaptive\nInteraction Clock"]
+        HISTORY["Sliding Window\nHistory (max 20)"]
+
+        subgraph AGENT_PIPE["Conversation Agent Pipeline"]
+            CONV["Conversation\nAgent\n(execute_task only)"]
+            PLANNER["Task Planner\n(one-shot, compact catalog)"]
+            EXEC["Execution Agent\n(selected tools only)"]
+            TOOLREG["Tool Registry\n(RegisteredTool + planner_visible flag)"]
+        end
+
+        DICTATION["Dictation\nRouter"]
+        SWITCHMODEL["Switch Model\nTool"]
+    end
+
+    subgraph LIB["Infrastructure (tusk/lib)"]
+        LLMPROXY["LLM Proxy\n(retry · wait · hot-swap)"]
+        LLMREG["LLM Registry\n(gatekeeper · planner · agent · utility)"]
+        STT["STT Engine\n(Whisper / Groq)"]
+        MCPCLIENT["MCP Client\n(stdio JSON-RPC 2.0)"]
+        CONFIG["Config\n(env vars)"]
+    end
+
+    subgraph ADAPTERS["MCP Adapters (out-of-process)"]
+        GNOME["GNOME Adapter\n21 tools\n(windows · input · mouse · clipboard)"]
+        DICTADAPTER["Dictation Adapter\n3 tools\n(start · segment · stop)"]
+    end
+
+    MIC --> VAD
+    VAD -->|"speech segment (PCM)"| STT
+    STT -->|"Utterance (text + confidence)"| FILTER
+    CLI -->|"text command"| GATE
+    FILTER -->|"filtered Utterance"| GATE
+    GATE -->|"command / conversation"| CONV
+    GATE -->|"ambient → discard"| GATE
+    CLOCK <-->|"activity timestamps"| GATE
+    HISTORY <-->|"recent messages"| CONV
+    HISTORY <-->|"last 6 msgs for prompt"| GATE
+
+    CONV -->|"execute_task(description)"| PLANNER
+    PLANNER -->|"TaskPlan (tool names)"| TOOLREG
+    TOOLREG -->|"selected tool schemas"| EXEC
+    EXEC -->|"tool calls"| TOOLREG
+    TOOLREG -->|"dispatch"| MCPCLIENT
+    EXEC -->|"need_tools → replan"| PLANNER
+
+    CONV --> DICTATION
+    CONV --> SWITCHMODEL
+    SWITCHMODEL --> LLMREG
+
+    LLMPROXY <--> LLMREG
+    GATE <--> LLMPROXY
+    PLANNER <--> LLMPROXY
+    CONV <--> LLMPROXY
+    EXEC <--> LLMPROXY
+
+    STT <--> LIB
+    MCPCLIENT <-->|"stdio JSON-RPC"| GNOME
+    MCPCLIENT <-->|"stdio JSON-RPC"| DICTADAPTER
+    DICTATION -->|"segment / stop"| MCPCLIENT
+
+    CONFIG --> LLMREG
+    CONFIG --> STT
+```
+
+---
+
 ## Directory Structure
 
 ```
