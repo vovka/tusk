@@ -45,13 +45,13 @@ def _search_handler(server: GnomeServer) -> object:
 def _application_tools(calls: list[str]) -> GnomeApplicationTools:
     apps = types.SimpleNamespace(search=lambda query, limit=10: [types.SimpleNamespace(name="Firefox", exec_cmd="firefox")])
     tools = GnomeApplicationTools(apps)
-    tools._launch = lambda application_name: _launch_result(calls, application_name)["message"]  # type: ignore[method-assign]
+    tools._launch = lambda application_name: _launch_response(calls, application_name)  # type: ignore[method-assign]
     return tools
 
 
-def _launch_result(calls: list[str], application_name: str) -> dict:
+def _launch_response(calls: list[str], application_name: str) -> str:
     calls.append(application_name)
-    return {"success": True, "message": f"launched: {application_name}"}
+    return "ok\n"
 
 
 def _context_handlers() -> dict[str, object]:

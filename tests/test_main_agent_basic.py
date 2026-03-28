@@ -84,11 +84,4 @@ def _execute_task(calls: list[dict[str, str]]) -> object:
         calls.append(arguments)
         return types.SimpleNamespace(message="dictation started")
 
-    return types.SimpleNamespace(
-        name="execute_task",
-        description="task finished",
-        input_schema=_task_schema(),
-        execute=execute,
-        source="kernel",
-        planner_visible=False,
-    )
+    return types.SimpleNamespace(name="execute_task", description="task finished", input_schema=_task_schema(), execute=execute, source="kernel", planner_visible=False)

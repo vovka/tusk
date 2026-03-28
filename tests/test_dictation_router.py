@@ -11,11 +11,7 @@ def test_dictation_router_logs_segment_and_apply() -> None:
     result = router.process(_state(), "hello world")
     assert result.handled is True
     assert calls[-1] == ("gnome.type_text", {"text": "hello world"})
-    assert logs == [
-        ("DICTATION", "segment='hello world'"),
-        ("DICTATION", "active window: Editor -> gedit"),
-        ("DICTATION", "apply insert via gnome"),
-    ]
+    assert logs == _expected_logs()
 
 
 def test_dictation_router_reports_desktop_apply_failure() -> None:
@@ -69,3 +65,11 @@ def _state() -> object:
 
 def _log(logs: list[tuple[str, str]]) -> object:
     return types.SimpleNamespace(log=lambda group, message, source=None: logs.append((group, message)))
+
+
+def _expected_logs() -> list[tuple[str, str]]:
+    return [
+        ("DICTATION", "segment='hello world'"),
+        ("DICTATION", "active window: Editor -> gedit"),
+        ("DICTATION", "apply insert via gnome"),
+    ]
