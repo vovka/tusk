@@ -20,22 +20,30 @@ and an execution agent that runs only the selected tools.
 ```mermaid
 flowchart TD
     subgraph SHELLS["Shells (user input)"]
+        direction LR
         MIC["Microphone\n(AudioCapture)"]
         VAD["Voice Activity\nDetector"]
         CLI["CLI Shell\n(typed input)"]
     end
 
     subgraph KERNEL["Kernel (tusk/kernel)"]
-        FILTER["Hallucination\nFilter"]
-        GATE["Gatekeeper\n(3-way classify)"]
-        CLOCK["Adaptive\nInteraction Clock"]
-        HISTORY["Sliding Window\nHistory (max 20)"]
+        direction TB
+
+        subgraph ROUTING["Input Routing + Context"]
+            direction LR
+            HISTORY["Sliding Window\nHistory (max 20)"]
+            CLOCK["Adaptive\nInteraction Clock"]
+            FILTER["Hallucination\nFilter"]
+            GATE["Gatekeeper\n(3-way classify)"]
+            DROP["Ambient\nDiscard"]
+        end
 
         subgraph AGENT_PIPE["Conversation Agent Pipeline"]
+            direction LR
             CONV["Conversation\nAgent\n(execute_task only)"]
             PLANNER["Task Planner\n(one-shot, compact catalog)"]
-            EXEC["Execution Agent\n(selected tools only)"]
             TOOLREG["Tool Registry\n(RegisteredTool + planner_visible flag)"]
+            EXEC["Execution Agent\n(selected tools only)"]
         end
 
         DICTATION["Dictation\nRouter"]
@@ -43,53 +51,73 @@ flowchart TD
     end
 
     subgraph LIB["Infrastructure (tusk/lib)"]
+        direction TB
+        CONFIG["Config\n(env vars)"]
+        STT["STT Engine\n(Whisper / Groq)"]
+
+        subgraph PROXY_LANES[" "]
+            direction LR
+            PG(( ))
+            PC(( ))
+            PP(( ))
+            PE(( ))
+        end
+
         LLMPROXY["LLM Proxy\n(retry · wait · hot-swap)"]
         LLMREG["LLM Registry\n(gatekeeper · planner · agent · utility)"]
-        STT["STT Engine\n(Whisper / Groq)"]
         MCPCLIENT["MCP Client\n(stdio JSON-RPC 2.0)"]
-        CONFIG["Config\n(env vars)"]
     end
 
     subgraph ADAPTERS["MCP Adapters (out-of-process)"]
+        direction LR
         GNOME["GNOME Adapter\n21 tools\n(windows · input · mouse · clipboard)"]
         DICTADAPTER["Dictation Adapter\n3 tools\n(start · segment · stop)"]
     end
 
     MIC --> VAD
     VAD -->|"speech segment (PCM)"| STT
-    STT -->|"Utterance (text + confidence)"| FILTER
+    STT -->|"Utterance\n(text + confidence)"| FILTER
     CLI -->|"text command"| GATE
-    FILTER -->|"filtered Utterance"| GATE
+    FILTER -->|"filtered utterance"| GATE
     GATE -->|"command / conversation"| CONV
-    GATE -->|"ambient → discard"| GATE
+    GATE -->|"ambient"| DROP
     CLOCK <-->|"activity timestamps"| GATE
     HISTORY <-->|"recent messages"| CONV
-    HISTORY <-->|"last 6 msgs for prompt"| GATE
+    HISTORY <-->|"last 6 msgs\nfor prompt"| GATE
 
     CONV -->|"execute_task(description)"| PLANNER
-    PLANNER -->|"TaskPlan (tool names)"| TOOLREG
+    PLANNER -->|"TaskPlan\n(tool names)"| TOOLREG
     TOOLREG -->|"selected tool schemas"| EXEC
     EXEC -->|"tool calls"| TOOLREG
-    TOOLREG -->|"dispatch"| MCPCLIENT
     EXEC -->|"need_tools → replan"| PLANNER
+    TOOLREG -->|"dispatch"| MCPCLIENT
 
     CONV --> DICTATION
     CONV --> SWITCHMODEL
+    DICTATION -->|"segment / stop"| MCPCLIENT
     SWITCHMODEL --> LLMREG
 
+    GATE <--> PG
+    CONV <--> PC
+    PLANNER <--> PP
+    EXEC <--> PE
+    PG --- LLMPROXY
+    PC --- LLMPROXY
+    PP --- LLMPROXY
+    PE --- LLMPROXY
     LLMPROXY <--> LLMREG
-    GATE <--> LLMPROXY
-    PLANNER <--> LLMPROXY
-    CONV <--> LLMPROXY
-    EXEC <--> LLMPROXY
 
-    STT <--> LIB
     MCPCLIENT <-->|"stdio JSON-RPC"| GNOME
     MCPCLIENT <-->|"stdio JSON-RPC"| DICTADAPTER
-    DICTATION -->|"segment / stop"| MCPCLIENT
 
     CONFIG --> LLMREG
     CONFIG --> STT
+
+    style PG fill:transparent,stroke:transparent
+    style PC fill:transparent,stroke:transparent
+    style PP fill:transparent,stroke:transparent
+    style PE fill:transparent,stroke:transparent
+    style PROXY_LANES fill:transparent,stroke:transparent
 ```
 
 ---
