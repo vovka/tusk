@@ -51,6 +51,16 @@ def test_main_agent_executes_task_tool() -> None:
     assert reply == "task finished"
 
 
+def test_main_agent_routes_start_dictation_through_execute_task() -> None:
+    calls: list[dict[str, str]] = []
+    registry = ToolRegistry()
+    registry.register(_execute_task(calls))
+    llm = types.SimpleNamespace(label="agent", complete_tool_call=lambda *args: ToolCall("execute_task", {}, "call-1"))
+    reply = make_agent(llm, registry=registry).process_command("start dictation mode")
+    assert reply == "dictation started"
+    assert calls == [{"task": "start dictation mode"}]
+
+
 def test_main_agent_blocks_direct_desktop_tool_calls() -> None:
     registry = ToolRegistry()
     registry.register(make_registry_tool("execute_task", "task finished", planner_visible=False, input_schema=_task_schema()))
@@ -67,3 +77,18 @@ def _task_schema() -> dict[str, object]:
         "required": ["task"],
         "additionalProperties": False,
     }
+
+
+def _execute_task(calls: list[dict[str, str]]) -> object:
+    def execute(arguments: dict[str, str]) -> object:
+        calls.append(arguments)
+        return types.SimpleNamespace(message="dictation started")
+
+    return types.SimpleNamespace(
+        name="execute_task",
+        description="task finished",
+        input_schema=_task_schema(),
+        execute=execute,
+        source="kernel",
+        planner_visible=False,
+    )

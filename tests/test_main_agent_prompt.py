@@ -30,10 +30,23 @@ def test_main_agent_prompt_explains_execute_task_routing() -> None:
     make_agent(llm).process_command("press enter")
     prompt = str(capture["prompt"])
     assert "Use execute_task for requests that require actions" in prompt
+    assert "start or stop dictation" in prompt
     assert "Use done for conversational replies" in prompt
     assert "execute_task" in prompt
     assert "describe_tool" not in prompt
     assert "Available tool names" not in prompt
+
+
+def test_main_agent_prompt_keeps_dictation_requests_on_execute_task_path() -> None:
+    capture: dict[str, object] = {}
+    registry = ToolRegistry()
+    registry.register(make_registry_tool("execute_task", "execute", planner_visible=False, input_schema=_task_schema()))
+    llm = types.SimpleNamespace(label="agent", complete_tool_call=_capture_prompt(capture))
+    make_agent(llm, registry=registry).process_command("start dictation mode")
+    prompt = str(capture["prompt"])
+    names = [item["function"]["name"] for item in capture["tools"]]
+    assert "start or stop dictation" in prompt
+    assert names == ["done", "clarify", "unknown", "execute_task"]
 
 
 def _capture_completion(capture: dict[str, object]) -> object:
