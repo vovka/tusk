@@ -94,6 +94,102 @@ flowchart TD
 
 ---
 
+## Agent Workflow Diagram
+
+A sequence diagram of a single agent turn — from classified utterance to final reply — showing all LLM calls, history management, planning, and the execution tool loop.
+
+```mermaid
+sequenceDiagram
+    participant GK as Pipeline / Gatekeeper
+    participant MA as MainAgent
+    participant HX as SlidingWindowHistory
+    participant LLM_A as LLM (agent slot)
+    participant LLM_U as LLM (utility slot)
+    participant ET as ExecuteTaskTool
+    participant TES as TaskExecutionService
+    participant FP as FallbackTaskPlanner
+    participant LLM_P as LLM (planner slot)
+    participant TR as ToolRegistry
+    participant EA as ExecutionAgent
+    participant MCP as MCP Adapter
+
+    GK->>MA: process_command(text)
+    MA->>HX: append user message
+    MA->>HX: get_messages()
+    HX-->>MA: last up to 20 messages
+
+    alt history overflow (gt 20 messages)
+        HX->>LLM_U: summarise(oldest messages)
+        LLM_U-->>HX: summary text
+        HX->>HX: replace oldest entries with summary ChatMessage
+    end
+
+    MA->>LLM_A: complete_tool_call(history, tools=[execute_task])
+
+    alt LLM replies directly
+        LLM_A-->>MA: assistant text
+        MA->>HX: append assistant message
+    else LLM calls execute_task
+        LLM_A-->>MA: tool_call: execute_task(task_description)
+        MA->>HX: append assistant message (tool call)
+        MA->>ET: dispatch(task_description)
+        ET->>TES: execute(task_description)
+
+        TES->>TR: catalog_text() [planner_visible=True tools only]
+        TR-->>TES: compact text "name: description" per line
+
+        TES->>FP: plan(task, catalog)
+        FP->>LLM_P: complete(planner_prompt, strict JSON schema)
+        Note right of LLM_P: One-shot structured output.<br/>Returns list of required tool names.
+        LLM_P-->>FP: TaskPlan {tool_names[]}
+
+        alt planner LLM fails
+            FP->>LLM_U: complete(same prompt, utility slot fallback)
+            LLM_U-->>FP: TaskPlan {tool_names[]}
+        end
+
+        FP-->>TES: TaskPlan
+        TES->>TR: get_schemas(tool_names)
+        TR-->>TES: native tool definition dicts (selected only)
+
+        TES->>EA: execute(task, selected_schemas)
+
+        loop AgentToolLoop — max 16 steps
+            EA->>LLM_A: complete_tool_call(exec_history, selected_schemas)
+            LLM_A-->>EA: tool_call(name, args)
+            Note over EA: RepeatedToolCallGuard:<br/>abort if identical call seen before
+            EA->>TR: call_tool(name, args)
+            TR->>MCP: JSON-RPC tools/call
+            MCP-->>TR: MCPToolResult
+            TR-->>EA: ToolResult
+            EA->>EA: append tool call + result to exec_history
+        end
+
+        alt execution returns need_tools and replans lt 2
+            EA-->>TES: TaskExecutionResult(need_tools, missing=[...])
+            TES->>FP: replan(task, catalog, missing_hint)
+            FP->>LLM_P: complete(updated planner prompt)
+            LLM_P-->>FP: new TaskPlan
+            FP-->>TES: new TaskPlan
+            TES->>TR: get_schemas(new_tool_names)
+            TR-->>TES: updated tool schemas
+            Note over TES,EA: restart execution loop with new schemas
+        else execution complete
+            EA-->>TES: TaskExecutionResult(success, reply)
+        end
+
+        TES-->>ET: TaskExecutionResult
+        ET-->>MA: ToolResult(message)
+        MA->>LLM_A: continue(history + tool_result)
+        LLM_A-->>MA: assistant text
+        MA->>HX: append tool result + assistant messages
+    end
+
+    MA-->>GK: KernelResponse(handled=true, reply)
+```
+
+---
+
 ## Directory Structure
 
 ```
