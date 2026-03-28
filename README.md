@@ -1,25 +1,19 @@
 # TUSK — Task Unified Speech Kernel
 
-An always-listening desktop AI assistant with a three-layer architecture: kernel, shells, and MCP adapters.
+An always-listening desktop AI voice assistant for Linux/GNOME.
 
 ## How it works
 
-```
-Shell → Kernel → MCP Adapter
-voice shell → STT/gatekeeper/agent → gnome adapter
-cli shell   → direct command path   → dictation/desktop adapters
-```
+1. The **voice shell** captures microphone audio, runs VAD, and feeds speech segments to the kernel. The **CLI shell** accepts typed text directly.
+2. The **hallucination filter** rejects STT artifacts (ghost phrases, sub-400 ms segments, punctuation-only output).
+3. The **gatekeeper** classifies the utterance as `command`, `conversation`, or `ambient` (discarded) using a fast LLM with structured output.
+4. The **conversation agent** maintains dialogue history and calls `execute_task` when a desktop action or dictation is needed.
+5. The **planner** receives a compact `name: description` catalog of all registered tools and returns a JSON list of tool names required for the task.
+6. The **execution agent** receives only the selected tool schemas and drives an MCP tool-call loop against the desktop adapter.
+7. **MCP adapters** (`adapters/gnome`, `adapters/dictation`) run as out-of-process stdio servers, hot-plugged at startup via `adapter.json` manifests.
 
-1. Shells collect user input (`voice` for always-on audio, `cli` for direct text input)
-2. The kernel handles STT, gatekeeping, conversation history, planning, execution, and model switching
-3. Desktop control and dictation refinement run through hot-pluggable MCP adapters in `adapters/`
-
-The agent request is intentionally compact. TUSK does not pre-send a desktop snapshot or every tool schema on each
-request. Instead, the runtime uses:
-
-- a conversation agent with only one operational tool: `execute_task`
-- a one-shot planner request over a compact full tool catalog (`name + description`)
-- an execution agent that receives only the selected native tool schemas for the current task
+The agent request is intentionally compact — no full desktop snapshot or complete tool schema set is sent on each
+request. The planner selects only the tools needed per task, keeping each LLM call focused and low-latency.
 
 **Supported actions:**
 
@@ -137,10 +131,10 @@ All settings are configured via environment variables:
 | `AUDIO_SAMPLE_RATE` | `16000` | Microphone sample rate (Hz) |
 | `AUDIO_FRAME_DURATION_MS` | `30` | VAD frame size in ms (`10`, `20`, or `30`) |
 | `VAD_AGGRESSIVENESS` | `2` | VAD sensitivity: `0` (least) to `3` (most aggressive) |
-| `FOLLOW_UP_TIMEOUT_SECONDS` | `30` | Seconds before follow-up window expires |
+| `FOLLOW_UP_TIMEOUT_SECONDS` | `30` | Base seconds for the adaptive follow-up window |
+| `MAX_FOLLOW_UP_TIMEOUT_SECONDS` | `120` | Maximum seconds for the adaptive follow-up window |
 | `TUSK_SHELLS` | `voice` | Comma-separated shells to start (`voice`, `cli`) |
 | `TUSK_ADAPTER_ENV_CACHE_DIR` | `.tusk_runtime/adapters` | Cache for managed adapter environments |
-| `DICTATION_LLM` | `groq/llama-3.1-8b-instant` | Model used by the dictation adapter |
 
 ### Example: use a smaller/faster Whisper model
 
@@ -195,10 +189,20 @@ This should list your open windows.
 
 ```
 tusk/
-├── tusk/kernel/    # Pure agent/kernel runtime
-├── shells/         # Startup-loaded user interfaces
-├── adapters/       # MCP servers (gnome, dictation)
-└── main.py         # Startup wiring
+├── tusk/
+│   ├── kernel/         # Business logic: pipeline, agents, gatekeeper, planner, tool registry
+│   └── lib/            # Infrastructure: LLM providers, STT providers, MCP client, config
+│       ├── llm/        # LLMProxy, LLMRegistry, retry, provider implementations
+│       ├── stt/        # STT ABC, GroqSTT, WhisperSTT
+│       ├── mcp/        # MCPClient (stdio JSON-RPC 2.0)
+│       └── config/     # Config dataclass, ConfigFactory (env vars)
+├── shells/
+│   ├── voice/          # AudioCapture, UtteranceDetector (VAD), VoiceShell
+│   └── cli/            # CliShell (REPL)
+├── adapters/
+│   ├── gnome/          # GNOME desktop MCP server (21 tools: windows, input, mouse, clipboard)
+│   └── dictation/      # Dictation refinement MCP server
+└── main.py             # Startup wiring: build kernel, attach shells, run adapters
 ```
 
 See `docs/brief.md` for the project vision, `docs/architecture.md` for the current runtime
@@ -221,3 +225,7 @@ yet implemented:
 - **Dangerous action registry / confirmation prompts** — no safety confirmation before destructive actions
 - **Configurable master prompt / personality** — the agent system prompt is hardcoded
 - **Cross-session memory** — conversation history is in-memory only, lost on restart
+
+The following items from the original vision have been resolved:
+
+- **Extension API / runtime discovery** — resolved via MCP adapter model (`adapter.json` manifests, stdio JSON-RPC, hot-plug at startup)
