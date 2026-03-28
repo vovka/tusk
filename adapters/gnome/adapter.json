@@ -1,0 +1,8 @@
+{
+  "name": "gnome",
+  "version": "1.0.0",
+  "description": "GNOME desktop control adapter",
+  "transport": "stdio",
+  "entry": "python server.py",
+  "provides_context": true
+}

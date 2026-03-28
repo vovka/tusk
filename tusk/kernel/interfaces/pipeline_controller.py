@@ -1,0 +1,15 @@
+from __future__ import annotations
+
+from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from tusk.kernel.interfaces.pipeline_mode import PipelineMode
+
+__all__ = ["PipelineController"]
+
+
+class PipelineController(ABC):
+    @abstractmethod
+    def set_mode(self, mode: PipelineMode) -> None:
+        ...

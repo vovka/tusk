@@ -13,17 +13,15 @@ _BACKLOG = 5
 
 def _handle(conn: socket.socket) -> None:
     with conn:
-        data = conn.recv(4096).decode("utf-8").strip()
+        data = _read(conn)
         if not data:
             return
         print(f"[launcher] exec: {data!r}")
         try:
-            subprocess.Popen(shlex.split(data))
-            conn.sendall(b"ok\n")
-        except Exception as e:
-            msg = f"error: {e}\n"
-            print(f"[launcher] {msg.strip()}")
-            conn.sendall(msg.encode("utf-8"))
+            _launch(data)
+            _send(conn, "ok\n")
+        except Exception as exc:
+            _send_error(conn, exc)
 
 
 def _serve(sock: socket.socket) -> None:
@@ -31,6 +29,24 @@ def _serve(sock: socket.socket) -> None:
     while True:
         conn, _ = sock.accept()
         _handle(conn)
+
+
+def _read(conn: socket.socket) -> str:
+    return conn.recv(4096).decode("utf-8").strip()
+
+
+def _launch(data: str) -> None:
+    subprocess.Popen(shlex.split(data))
+
+
+def _send(conn: socket.socket, message: str) -> None:
+    conn.sendall(message.encode("utf-8"))
+
+
+def _send_error(conn: socket.socket, exc: Exception) -> None:
+    msg = f"error: {exc}\n"
+    print(f"[launcher] {msg.strip()}")
+    _send(conn, msg)
 
 
 def _prepare_socket_dir() -> None:

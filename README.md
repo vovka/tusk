@@ -4,16 +4,16 @@ An always-listening desktop AI voice assistant for Linux/GNOME.
 
 ## How it works
 
-```
-Microphone → Whisper STT → Gatekeeper LLM → Main Agent LLM → Desktop Action
-```
+1. The **voice shell** captures microphone audio, runs VAD, and feeds speech segments to the kernel. The **CLI shell** accepts typed text directly.
+2. The **hallucination filter** rejects STT artifacts (ghost phrases, sub-400 ms segments, punctuation-only output).
+3. The **gatekeeper** classifies the utterance as `command`, `conversation`, or `ambient` (discarded) using a fast LLM with structured output.
+4. The **conversation agent** maintains dialogue history and calls `execute_task` when a desktop action or dictation is needed.
+5. The **planner** receives a compact `name: description` catalog of all registered tools and returns a JSON list of tool names required for the task.
+6. The **execution agent** receives only the selected tool schemas and drives an MCP tool-call loop against the desktop adapter.
+7. **MCP adapters** (`adapters/gnome`, `adapters/dictation`) run as out-of-process stdio servers, hot-plugged at startup via `adapter.json` manifests.
 
-1. Captures microphone audio continuously
-2. Detects speech utterances via voice activity detection (VAD)
-3. Transcribes each utterance with Whisper (via Groq cloud)
-4. A fast gatekeeper LLM filters out ambient speech (only passes commands directed at TUSK)
-5. A capable main agent LLM runs a multi-step agentic loop with desktop context and tool calling
-6. Actions are executed on your GNOME desktop
+The agent request is intentionally compact — no full desktop snapshot or complete tool schema set is sent on each
+request. The planner selects only the tools needed per task, keeping each LLM call focused and low-latency.
 
 **Supported actions:**
 
@@ -22,8 +22,7 @@ Microphone → Whisper STT → Gatekeeper LLM → Main Agent LLM → Desktop Act
 - **Mouse control** — click, move, drag, scroll
 - **Clipboard** — read and write clipboard contents
 - **Desktop navigation** — open URLs/files, switch workspaces
-- **Dictation mode** — real-time speech-to-text pasting with LLM cleanup
-- **AI text transform** — transform selected text (summarize, translate, rewrite)
+- **Dictation mode** — adapter-driven speech cleanup/refinement applied back through the desktop adapter
 - **LLM hot-swap** — switch models at runtime by voice
 
 ## Prerequisites
@@ -125,13 +124,17 @@ All settings are configured via environment variables:
 | `GROQ_API_KEY` | *(required)* | Your Groq API key |
 | `OPENROUTER_API_KEY` | `""` | Your OpenRouter API key (optional) |
 | `GATEKEEPER_LLM` | `groq/llama-3.1-8b-instant` | Fast model for intent filtering (`provider/model`) |
+| `PLANNER_LLM` | `groq/openai/gpt-oss-20b` | Strict-schema planner model for one-shot tool subset selection (`provider/model`) |
 | `AGENT_LLM` | `groq/openai/gpt-oss-120b` | Capable model for the main agent (`provider/model`) |
 | `UTILITY_LLM` | `groq/llama-3.3-70b-versatile` | Model for summaries and text cleanup (`provider/model`) |
 | `WHISPER_MODEL_SIZE` | `base` | Whisper model: `tiny`, `base`, `small`, `medium` |
 | `AUDIO_SAMPLE_RATE` | `16000` | Microphone sample rate (Hz) |
 | `AUDIO_FRAME_DURATION_MS` | `30` | VAD frame size in ms (`10`, `20`, or `30`) |
 | `VAD_AGGRESSIVENESS` | `2` | VAD sensitivity: `0` (least) to `3` (most aggressive) |
-| `FOLLOW_UP_TIMEOUT_SECONDS` | `30` | Seconds before follow-up window expires |
+| `FOLLOW_UP_TIMEOUT_SECONDS` | `30` | Base seconds for the adaptive follow-up window |
+| `MAX_FOLLOW_UP_TIMEOUT_SECONDS` | `120` | Maximum seconds for the adaptive follow-up window |
+| `TUSK_SHELLS` | `voice` | Comma-separated shells to start (`voice`, `cli`) |
+| `TUSK_ADAPTER_ENV_CACHE_DIR` | `.tusk_runtime/adapters` | Cache for managed adapter environments |
 
 ### Example: use a smaller/faster Whisper model
 
@@ -186,16 +189,32 @@ This should list your open windows.
 
 ```
 tusk/
-├── interfaces/     # Abstract base classes (15 ABCs — extension points)
-├── schemas/        # Typed dataclasses (Utterance, ToolCall, ChatMessage, etc.)
-├── core/           # Pipeline orchestration, audio, agent, conversation history
-├── providers/      # Whisper/Groq STT + Groq/OpenRouter LLM implementations
-└── gnome/          # GNOME-specific context, input simulator, clipboard, 19 tools
-main.py             # Entry point — wires all components together
+├── tusk/
+│   ├── kernel/         # Business logic: pipeline, agents, gatekeeper, planner, tool registry
+│   └── lib/            # Infrastructure: LLM providers, STT providers, MCP client, config
+│       ├── llm/        # LLMProxy, LLMRegistry, retry, provider implementations
+│       ├── stt/        # STT ABC, GroqSTT, WhisperSTT
+│       ├── mcp/        # MCPClient (stdio JSON-RPC 2.0)
+│       └── config/     # Config dataclass, ConfigFactory (env vars)
+├── shells/
+│   ├── voice/          # AudioCapture, UtteranceDetector (VAD), VoiceShell
+│   └── cli/            # CliShell (REPL)
+├── adapters/
+│   ├── gnome/          # GNOME desktop MCP server (21 tools: windows, input, mouse, clipboard)
+│   └── dictation/      # Dictation refinement MCP server
+└── main.py             # Startup wiring: build kernel, attach shells, run adapters
 ```
 
-See `docs/brief.md` for the full project vision and `docs/architecture.md` for the
-detailed architecture specification.
+See `docs/brief.md` for the project vision, `docs/architecture.md` for the current runtime
+architecture, and `docs/specification.md` for the concrete technical contract.
+
+The current runtime uses a planner/executor split:
+
+- No automatic desktop snapshot is injected into the agent conversation
+- The conversation agent sees only `execute_task` plus terminal tools
+- The planner sees the full tool catalog as compact text only
+- The execution agent sees only the selected native tool schemas for the current task
+- If execution lacks capability, it returns `need_tools` and the kernel replans with the missing capability
 
 ## Not Yet Implemented
 
@@ -203,9 +222,10 @@ The following features are described in the project vision (`docs/brief.md`) but
 yet implemented:
 
 - **Sub-agents subsystem** — the main agent cannot spawn sub-agents for complex or parallel tasks
-- **Extension API / runtime discovery** — extensions are hardwired in `main.py`, not discovered or loaded at runtime
 - **Dangerous action registry / confirmation prompts** — no safety confirmation before destructive actions
 - **Configurable master prompt / personality** — the agent system prompt is hardcoded
-- **Screen geometry in desktop context** — not captured by the context provider
-- **Workspace layout in desktop context** — not captured by the context provider
 - **Cross-session memory** — conversation history is in-memory only, lost on restart
+
+The following items from the original vision have been resolved:
+
+- **Extension API / runtime discovery** — resolved via MCP adapter model (`adapter.json` manifests, stdio JSON-RPC, hot-plug at startup)

@@ -8,6 +8,7 @@ services:
       PULSE_SERVER: unix:/run/user/1000/pulse/native
       PYTHONUNBUFFERED: "1"
       DBUS_SESSION_BUS_ADDRESS: unix:path=/run/user/1000/bus
+      SHOW_LOGS: ${SHOW_LOGS:-}
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix
       - /run/user/1000/pulse/native:/run/user/1000/pulse/native
