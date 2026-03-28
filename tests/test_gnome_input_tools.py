@@ -27,6 +27,14 @@ def test_type_text_splits_large_text_into_chunks() -> None:
     assert calls == ["ab", "cd"]
 
 
+def test_type_text_reports_input_failure() -> None:
+    failing = types.SimpleNamespace(type_text=lambda text: (_ for _ in ()).throw(RuntimeError("typing failed")))
+    tools = GnomeInputTools(failing, _paster(), _chunker())
+    result = tools.type_text({"text": "abcd"})
+    assert result["success"] is False
+    assert result["message"] == "typing failed"
+
+
 def _input() -> object:
     return types.SimpleNamespace(type_text=lambda text: (_ for _ in ()).throw(AssertionError("should not be called")))
 

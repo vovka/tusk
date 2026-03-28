@@ -1,4 +1,5 @@
 from tusk.kernel.command_mode import CommandMode
+from tusk.kernel.dictation_gate_prompt import DICTATION_GATE_PROMPT
 from tusk.kernel.schemas.kernel_response import KernelResponse
 from tusk.kernel.schemas.utterance import Utterance
 
@@ -36,11 +37,11 @@ class Pipeline:
         self._log_utterance(utterance)
         if utterance.confidence < 0.01:
             return KernelResponse(False, "")
+        if self._dictation_mode is not None:
+            return self._process_dictation_utterance(utterance)
         if not self._filter.is_valid(utterance):
             self._log.log("PIPELINE", "filtered utterance", "pipeline")
             return KernelResponse(False, "")
-        if self._dictation_mode is not None:
-            return self._dictation_mode.process_text(utterance.text)
         return self._process_command_utterance(utterance)
 
     def start_dictation(self, state: object) -> KernelResponse:
@@ -58,3 +59,12 @@ class Pipeline:
     def _process_command_utterance(self, utterance: Utterance) -> KernelResponse:
         gate = self._gatekeeper.evaluate(utterance, self._command_mode.gatekeeper_prompt)
         return self._command_mode.handle_gate_result(gate)
+
+    def _process_dictation_utterance(self, utterance: Utterance) -> KernelResponse:
+        gate = self._gatekeeper.evaluate(utterance, DICTATION_GATE_PROMPT)
+        if gate.metadata.get("metadata_stop") not in (None, "", "None"):
+            return self._dictation_mode.stop()
+        if not self._filter.is_valid(utterance):
+            self._log.log("PIPELINE", "filtered utterance", "pipeline")
+            return KernelResponse(False, "")
+        return self._dictation_mode.process_text(utterance.text)

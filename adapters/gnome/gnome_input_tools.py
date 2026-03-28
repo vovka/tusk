@@ -18,7 +18,10 @@ class GnomeInputTools:
         text = arguments["text"]
         if self._has_control_chars(text):
             return {"success": False, "message": self._type_text_error()}
-        self._type_chunks(text)
+        try:
+            self._type_chunks(text)
+        except RuntimeError as exc:
+            return {"success": False, "message": str(exc)}
         return {"success": True, "message": f"typed literal text ({len(text)} chars)"}
 
     def replace_recent_text(self, arguments: dict) -> dict:

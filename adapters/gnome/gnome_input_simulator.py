@@ -39,7 +39,14 @@ class GnomeInputSimulator:
             raise RuntimeError(f"failed to press keys: {keys}")
 
     def type_text(self, text: str) -> None:
-        subprocess.run(["xdotool", "type", "--delay", "0", "--", text], check=False)
+        result = subprocess.run(
+            ["xdotool", "type", "--delay", "0", "--", text],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(self._type_text_error(result))
 
     def mouse_click(self, x: int, y: int, button: int, clicks: int) -> None:
         self.mouse_move(x, y)
@@ -63,3 +70,8 @@ class GnomeInputSimulator:
             ["xdotool", "click", "--repeat", str(clicks), str(button)],
             check=False,
         )
+
+    def _type_text_error(self, result: object) -> str:
+        stderr = getattr(result, "stderr", "").strip()
+        suffix = f": {stderr}" if stderr else ""
+        return f"failed to type text (exit={result.returncode}){suffix}"

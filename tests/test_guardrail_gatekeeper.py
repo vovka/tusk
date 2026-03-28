@@ -35,6 +35,13 @@ def test_gatekeeper_falls_back_when_structured_call_fails() -> None:
     assert result.cleaned_command == "tell me a joke"
 
 
+def test_gatekeeper_uses_dictation_schema_when_prompt_requests_metadata_stop() -> None:
+    calls = []
+    prompt = "Return metadata_stop for stop intent."
+    _gatekeeper(calls=calls).evaluate(_utterance("stop dictation"), prompt)
+    assert calls and calls[0][2] == "dictation_gatekeeper"
+
+
 def _gatekeeper(calls: list[tuple]) -> LLMGatekeeper:
     llm = types.SimpleNamespace(label="gate", complete_structured=lambda *args: calls.append(args) or _command("open Firefox"))
     return LLMGatekeeper(llm, _log())

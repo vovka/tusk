@@ -19,3 +19,8 @@ class AdapterDictationMode:
         result = self._router.process(self._state, text)
         self._log.log("DICTATION", result.reply or "updated")
         return result
+
+    def stop(self) -> KernelResponse:
+        result = self._router.stop(self._state)
+        self._log.log("DICTATION", result.reply or "stopped")
+        return result

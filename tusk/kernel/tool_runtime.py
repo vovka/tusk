@@ -16,7 +16,7 @@ class ToolRuntime:
         self._log = log
 
     def register_tools(self, pipeline: object) -> None:
-        pipeline._dictation_router = DictationRouter(self._registry, pipeline)
+        pipeline._dictation_router = DictationRouter(self._registry, pipeline, self._log)
         self._registry.register(SwitchModelTool(self._llms))
         self._registry.register(StartDictationTool(self._registry, pipeline, self._manager))
         self._registry.register(ExecuteTaskTool(self._service()))
