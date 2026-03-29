@@ -1,27 +1,13 @@
 from tusk.lib.config import ConfigFactory
 
 
-def test_config_factory_uses_default_profile_fallbacks(monkeypatch) -> None:
+def test_config_factory_uses_strict_schema_default_planner_model(monkeypatch) -> None:
     monkeypatch.setenv("GROQ_API_KEY", "test-key")
-    monkeypatch.delenv("CONVERSATION_AGENT_LLM", raising=False)
-    monkeypatch.delenv("PLANNER_AGENT_LLM", raising=False)
-    monkeypatch.delenv("EXECUTOR_AGENT_LLM", raising=False)
-    monkeypatch.delenv("DEFAULT_AGENT_LLM", raising=False)
-    config = ConfigFactory().build()
-    assert config.conversation_agent_llm.model == "openai/gpt-oss-120b"
-    assert config.planner_agent_llm.model == "openai/gpt-oss-20b"
-    assert config.executor_agent_llm.model == "openai/gpt-oss-120b"
-    assert config.default_agent_llm.model == "openai/gpt-oss-120b"
+    monkeypatch.delenv("PLANNER_LLM", raising=False)
+    assert ConfigFactory().build().planner_llm.model == "openai/gpt-oss-20b"
 
 
-def test_config_factory_reads_profile_specific_slots(monkeypatch) -> None:
+def test_config_factory_reads_planner_slot(monkeypatch) -> None:
     monkeypatch.setenv("GROQ_API_KEY", "test-key")
-    monkeypatch.setenv("CONVERSATION_AGENT_LLM", "groq/openai/gpt-oss-120b")
-    monkeypatch.setenv("PLANNER_AGENT_LLM", "groq/openai/gpt-oss-20b")
-    monkeypatch.setenv("EXECUTOR_AGENT_LLM", "groq/llama-3.3-70b-versatile")
-    monkeypatch.setenv("DEFAULT_AGENT_LLM", "groq/llama-3.1-8b-instant")
-    config = ConfigFactory().build()
-    assert config.conversation_agent_llm.model == "openai/gpt-oss-120b"
-    assert config.planner_agent_llm.model == "openai/gpt-oss-20b"
-    assert config.executor_agent_llm.model == "llama-3.3-70b-versatile"
-    assert config.default_agent_llm.model == "llama-3.1-8b-instant"
+    monkeypatch.setenv("PLANNER_LLM", "groq/openai/gpt-oss-20b")
+    assert ConfigFactory().build().planner_llm.model == "openai/gpt-oss-20b"
