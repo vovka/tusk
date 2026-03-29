@@ -6,8 +6,6 @@ from tusk.kernel.interfaces.interaction_clock import InteractionClock
 from tusk.kernel.interfaces.pipeline_controller import PipelineController
 from tusk.kernel.interfaces.pipeline_mode import PipelineMode
 from tusk.kernel.interfaces.shell import Shell
-from tusk.kernel.interfaces.task_executor import TaskExecutor
-from tusk.kernel.interfaces.task_planner import TaskPlanner
 from tusk.kernel.interfaces.utterance_filter import UtteranceFilter
 
 __all__ = [
@@ -19,7 +17,5 @@ __all__ = [
     "PipelineController",
     "PipelineMode",
     "Shell",
-    "TaskExecutor",
-    "TaskPlanner",
     "UtteranceFilter",
 ]

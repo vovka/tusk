@@ -28,12 +28,23 @@ class ConfigFactory:
         return {**self._llm_values(), **self._runtime_values(shells)}
 
     def _llm_values(self) -> dict:
+        return {**self._api_keys(), **self._agent_llm_slots()}
+
+    def _api_keys(self) -> dict:
         return {
             "groq_api_key": os.environ["GROQ_API_KEY"],
             "openrouter_api_key": os.environ.get("OPENROUTER_API_KEY", ""),
+        }
+
+    def _agent_llm_slots(self) -> dict:
+        agent = os.environ.get("AGENT_LLM", "groq/openai/gpt-oss-120b")
+        planner = os.environ.get("PLANNER_LLM", "groq/openai/gpt-oss-20b")
+        return {
             "gatekeeper_llm": self._slot("GATEKEEPER_LLM", "groq/llama-3.1-8b-instant"),
-            "planner_llm": self._slot("PLANNER_LLM", "groq/openai/gpt-oss-20b"),
-            "agent_llm": self._slot("AGENT_LLM", "groq/openai/gpt-oss-120b"),
+            "conversation_agent_llm": self._slot("CONVERSATION_AGENT_LLM", agent),
+            "planner_agent_llm": self._slot("PLANNER_AGENT_LLM", planner),
+            "executor_agent_llm": self._slot("EXECUTOR_AGENT_LLM", agent),
+            "default_agent_llm": self._slot("DEFAULT_AGENT_LLM", agent),
             "utility_llm": self._slot("UTILITY_LLM", "groq/llama-3.3-70b-versatile"),
         }
 
@@ -55,4 +66,5 @@ class ConfigFactory:
             "shells": self._shells(shells),
             "adapter_env_cache_dir": os.environ.get("TUSK_ADAPTER_ENV_CACHE_DIR", ".tusk_runtime/adapters"),
             "conversation_log_dir": os.environ.get("TUSK_CONVERSATION_LOG_DIR", ".tusk_runtime/conversations"),
+            "agent_session_log_dir": os.environ.get("TUSK_AGENT_SESSION_LOG_DIR", ".tusk_runtime/agent_sessions"),
         }

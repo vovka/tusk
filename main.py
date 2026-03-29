@@ -5,6 +5,7 @@ import threading
 from pathlib import Path
 
 from tusk.lib.config import Config, StartupOptions
+from tusk.lib import AgentOrchestrator, FileAgentSessionStore
 from tusk.lib.llm import LLMProxy, LLMRegistry
 from tusk.lib.llm.providers import ConfigurableLLMFactory
 from tusk.lib.logging import ColorLogPrinter
@@ -23,6 +24,7 @@ from tusk.kernel import (
     ToolRegistry,
 )
 from tusk.kernel.adapter_manager import AdapterManager
+from tusk.kernel.agent_profiles import build_agent_profiles
 from tusk.kernel.tool_runtime import ToolRuntime
 
 
@@ -33,11 +35,17 @@ def _build_log(options: StartupOptions) -> ColorLogPrinter:
 def _build_llm_registry(config: Config, log: ColorLogPrinter) -> LLMRegistry:
     factory = ConfigurableLLMFactory(config.groq_api_key, config.openrouter_api_key)
     registry = LLMRegistry(factory)
-    registry.register_slot("gatekeeper", _slot_proxy(factory, config.gatekeeper_llm, log, "gatekeeper"))
-    registry.register_slot("planner", _slot_proxy(factory, config.planner_llm, log, "planner"))
-    registry.register_slot("agent", _slot_proxy(factory, config.agent_llm, log, "agent"))
-    registry.register_slot("utility", _slot_proxy(factory, config.utility_llm, log, "utility"))
+    _register_slots(factory, config, log, registry)
     return registry
+
+
+def _register_slots(factory: ConfigurableLLMFactory, config: Config, log: ColorLogPrinter, registry: LLMRegistry) -> None:
+    registry.register_slot("gatekeeper", _slot_proxy(factory, config.gatekeeper_llm, log, "gatekeeper"))
+    registry.register_slot("conversation_agent", _slot_proxy(factory, config.conversation_agent_llm, log, "conversation_agent"))
+    registry.register_slot("planner_agent", _slot_proxy(factory, config.planner_agent_llm, log, "planner_agent"))
+    registry.register_slot("executor_agent", _slot_proxy(factory, config.executor_agent_llm, log, "executor_agent"))
+    registry.register_slot("default_agent", _slot_proxy(factory, config.default_agent_llm, log, "default_agent"))
+    registry.register_slot("utility", _slot_proxy(factory, config.utility_llm, log, "utility"))
 
 
 def _build_kernel(config: Config, log: ColorLogPrinter) -> KernelAPI:
@@ -46,18 +54,22 @@ def _build_kernel(config: Config, log: ColorLogPrinter) -> KernelAPI:
     adapter_manager = _build_adapter_manager(config, log, tool_registry)
     history = SlidingWindowHistory(20, LLMConversationSummarizer(llm_registry.get("utility")))
     tools = ToolRuntime(tool_registry, llm_registry, adapter_manager, log)
-    agent = MainAgent(llm_registry.get("agent"), tool_registry, history, log)
+    agent = _build_agent(config, log, llm_registry, tool_registry, history)
     pipeline = _build_pipeline(config, log, llm_registry, history, agent)
     tools.register_tools(pipeline)
     return KernelAPI(pipeline, llm_registry, log)
 
 
+def _build_agent(config: Config, log: ColorLogPrinter, llm_registry: LLMRegistry, tool_registry: ToolRegistry, history: object) -> MainAgent:
+    store = FileAgentSessionStore(config.agent_session_log_dir)
+    profiles = build_agent_profiles(llm_registry)
+    orchestrator = AgentOrchestrator(profiles, tool_registry, store, log)
+    return MainAgent(orchestrator, history)
+
+
 def _load_shells(config: Config, api: KernelAPI) -> list[object]:
     shells_dir = Path("shells")
-    loaded = []
-    for name in config.shells:
-        loaded.append(_load_shell(name, shells_dir, config, api))
-    return loaded
+    return [_load_shell(name, shells_dir, config, api) for name in config.shells]
 
 
 def _load_module(path: Path, dotted_name: str) -> object:
@@ -75,13 +87,7 @@ def _build_adapter_manager(config: Config, log: ColorLogPrinter, tool_registry: 
     return manager
 
 
-def _build_pipeline(
-    config: Config,
-    log: ColorLogPrinter,
-    llm_registry: LLMRegistry,
-    history: SlidingWindowHistory,
-    agent: MainAgent,
-) -> Pipeline:
+def _build_pipeline(config: Config, log: ColorLogPrinter, llm_registry: LLMRegistry, history: object, agent: MainAgent) -> Pipeline:
     clock = AdaptiveInteractionClock(config.follow_up_timeout_seconds, config.max_follow_up_timeout_seconds)
     formatter = RecentContextFormatter(history)
     command_mode = CommandMode(agent, clock, formatter, log)
@@ -92,7 +98,6 @@ def _build_pipeline(
 def _slot_proxy(factory: ConfigurableLLMFactory, slot: object, log: ColorLogPrinter, name: str) -> LLMProxy:
     provider = factory.create(slot.provider_name, slot.model)
     return LLMProxy(provider, log, name)
-
 
 
 def _load_shell(name: str, shells_dir: Path, config: Config, api: KernelAPI) -> object:

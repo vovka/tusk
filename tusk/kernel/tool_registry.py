@@ -1,6 +1,4 @@
 from tusk.kernel.registered_tool import RegisteredTool
-from tusk.kernel.tool_prompt_builder import ToolPromptBuilder
-from tusk.kernel.visible_tool_definition_builder import VisibleToolDefinitionBuilder
 
 __all__ = ["ToolRegistry"]
 
@@ -8,8 +6,6 @@ __all__ = ["ToolRegistry"]
 class ToolRegistry:
     def __init__(self) -> None:
         self._tools: dict[str, RegisteredTool] = {}
-        self._prompt_builder = ToolPromptBuilder()
-        self._definition_builder = VisibleToolDefinitionBuilder()
 
     def register(self, tool: object) -> None:
         entry = self._entry(tool)
@@ -35,15 +31,15 @@ class ToolRegistry:
     def planner_tool_names(self) -> set[str]:
         return {tool.name for tool in self.planner_tools()}
 
-    def build_planner_catalog_text(self) -> str:
-        return self._prompt_builder.build(self.planner_tools())
+    def planner_tools(self) -> list[RegisteredTool]:
+        return [tool for tool in self.real_tools() if tool.planner_visible]
 
     def definitions_for(self, names: set[str]) -> list[dict[str, object]]:
         tools = [self._tools[name] for name in sorted(names) if name in self._tools]
-        return self._definition_builder.build(tools)
+        return [self._definition(tool) for tool in tools]
 
-    def planner_tools(self) -> list[RegisteredTool]:
-        return [tool for tool in self.real_tools() if tool.planner_visible]
+    def _definition(self, tool: RegisteredTool) -> dict[str, object]:
+        return {"type": "function", "function": {"name": tool.name, "description": tool.description, "parameters": tool.input_schema}}
 
     def _entry(self, tool: object) -> RegisteredTool:
         return RegisteredTool(

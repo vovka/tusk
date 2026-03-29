@@ -2,6 +2,7 @@ import tusk
 import tusk.kernel as kernel
 import tusk.kernel.interfaces as interfaces
 import tusk.kernel.schemas as schemas
+import tusk.lib as lib
 import tusk.lib.config as config
 import tusk.lib.llm as llm
 import tusk.lib.llm.interfaces as llm_interfaces
@@ -9,17 +10,19 @@ import tusk.lib.llm.providers as llm_providers
 import tusk.lib.logging as logging
 import tusk.lib.logging.interfaces as logging_interfaces
 import tusk.lib.mcp as mcp
-import tusk.lib.stt.interfaces as stt_interfaces
-import tusk.lib.stt.providers as stt_providers
 
 
 def test_root_and_kernel_exports_present() -> None:
     assert "lib" in tusk.__all__
     assert "MainAgent" in kernel.__all__
-    assert "LLMTaskPlanner" in kernel.__all__
     assert "Shell" in interfaces.__all__
-    assert "TaskPlanner" in interfaces.__all__
-    assert "TaskPlan" in schemas.__all__
+    assert "ToolCall" in schemas.__all__
+
+
+def test_lib_agent_exports_present() -> None:
+    assert "AgentOrchestrator" in lib.__all__
+    assert "AgentRunRequest" in lib.__all__
+    assert "FileAgentSessionStore" in lib.__all__
 
 
 def test_lib_exports_present() -> None:
@@ -29,8 +32,6 @@ def test_lib_exports_present() -> None:
     assert "LLMProxy" in llm.__all__
     assert "LLMProvider" in llm_interfaces.__all__
     assert "ConfigurableLLMFactory" in llm_providers.__all__
-    assert "STTEngine" in stt_interfaces.__all__
-    assert "GroqSTT" in stt_providers.__all__
     assert "MCPClient" in mcp.__all__
 
 
