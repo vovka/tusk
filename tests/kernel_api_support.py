@@ -1,9 +1,12 @@
+import tempfile
 import types
 
 from tusk.kernel.agent import MainAgent
+from tusk.kernel.agent_profiles import build_agent_profiles
 from tusk.kernel.execution_agent import ExecutionAgent
 from tusk.kernel.schemas.tool_result import ToolResult
 from tusk.kernel.tool_registry import ToolRegistry
+from tusk.lib.agent import AgentOrchestrator, FileAgentSessionStore
 
 __all__ = ["HistoryRecorder", "make_agent", "make_executor", "make_registry_tool"]
 
@@ -24,11 +27,22 @@ def make_agent(
     history: object | None = None,
     registry: ToolRegistry | None = None,
     log: object | None = None,
+    planner_llm: object | None = None,
+    executor_llm: object | None = None,
+    default_llm: object | None = None,
 ) -> MainAgent:
     history = history or types.SimpleNamespace(append=lambda message: None, get_messages=lambda: [])
     log = log or types.SimpleNamespace(log=lambda *args: None)
     registry = registry or ToolRegistry()
-    return MainAgent(llm, registry, history, log)
+    store = FileAgentSessionStore(tempfile.mkdtemp(prefix="tusk-agent-tests-"))
+    llms = {
+        "conversation_agent": llm,
+        "planner_agent": planner_llm or llm,
+        "executor_agent": executor_llm or llm,
+        "default_agent": default_llm or llm,
+    }
+    profiles = build_agent_profiles(types.SimpleNamespace(get=lambda name: llms[name]))
+    return MainAgent(AgentOrchestrator(profiles, registry, store, log), history)
 
 
 def make_executor(llm: object, registry: ToolRegistry | None = None, log: object | None = None) -> ExecutionAgent:

@@ -5,6 +5,7 @@ import threading
 from pathlib import Path
 
 from tusk.lib.config import Config, StartupOptions
+from tusk.lib import AgentOrchestrator, FileAgentSessionStore
 from tusk.lib.llm import LLMProxy, LLMRegistry
 from tusk.lib.llm.providers import ConfigurableLLMFactory
 from tusk.lib.logging import ColorLogPrinter
@@ -23,6 +24,7 @@ from tusk.kernel import (
     ToolRegistry,
 )
 from tusk.kernel.adapter_manager import AdapterManager
+from tusk.kernel.agent_profiles import build_agent_profiles
 from tusk.kernel.tool_runtime import ToolRuntime
 
 
@@ -34,8 +36,10 @@ def _build_llm_registry(config: Config, log: ColorLogPrinter) -> LLMRegistry:
     factory = ConfigurableLLMFactory(config.groq_api_key, config.openrouter_api_key)
     registry = LLMRegistry(factory)
     registry.register_slot("gatekeeper", _slot_proxy(factory, config.gatekeeper_llm, log, "gatekeeper"))
-    registry.register_slot("planner", _slot_proxy(factory, config.planner_llm, log, "planner"))
-    registry.register_slot("agent", _slot_proxy(factory, config.agent_llm, log, "agent"))
+    registry.register_slot("conversation_agent", _slot_proxy(factory, config.conversation_agent_llm, log, "conversation_agent"))
+    registry.register_slot("planner_agent", _slot_proxy(factory, config.planner_agent_llm, log, "planner_agent"))
+    registry.register_slot("executor_agent", _slot_proxy(factory, config.executor_agent_llm, log, "executor_agent"))
+    registry.register_slot("default_agent", _slot_proxy(factory, config.default_agent_llm, log, "default_agent"))
     registry.register_slot("utility", _slot_proxy(factory, config.utility_llm, log, "utility"))
     return registry
 
@@ -46,7 +50,9 @@ def _build_kernel(config: Config, log: ColorLogPrinter) -> KernelAPI:
     adapter_manager = _build_adapter_manager(config, log, tool_registry)
     history = SlidingWindowHistory(20, LLMConversationSummarizer(llm_registry.get("utility")))
     tools = ToolRuntime(tool_registry, llm_registry, adapter_manager, log)
-    agent = MainAgent(llm_registry.get("agent"), tool_registry, history, log)
+    session_store = FileAgentSessionStore(config.agent_session_log_dir)
+    orchestrator = AgentOrchestrator(build_agent_profiles(llm_registry), tool_registry, session_store, log)
+    agent = MainAgent(orchestrator, history)
     pipeline = _build_pipeline(config, log, llm_registry, history, agent)
     tools.register_tools(pipeline)
     return KernelAPI(pipeline, llm_registry, log)
