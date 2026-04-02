@@ -1,5 +1,3 @@
-import json
-
 from tusk.kernel.schemas.tool_call import ToolCall
 from tusk.kernel.schemas.tool_result import ToolResult
 from tusk.lib.agent.agent_result import AgentResult
@@ -31,9 +29,10 @@ class AgentChildRunner:
         data = {"child_profile": child.profile_id, "child_instruction": child.instruction[:120]}
         self._store.append_event(parent_session_id, "child_started", data)
 
-    def finished(self, parent_session_id: str, result: AgentResult) -> None:
-        data = {"child_session": result.session_id, "child_status": result.status}
+    def finished(self, parent_session_id: str, profile_id: str, result: AgentResult) -> None:
+        data = {"child_profile": profile_id, "child_session": result.session_id, "child_status": result.status}
         self._store.append_event(parent_session_id, "child_finished", data)
 
-    def result(self, agent_result: AgentResult) -> ToolResult:
-        return ToolResult(agent_result.status == "done", json.dumps(agent_result.to_dict()))
+    def result(self, profile_id: str, agent_result: AgentResult) -> ToolResult:
+        data = {"child_result": {"profile_id": profile_id, **agent_result.to_dict()}}
+        return ToolResult(agent_result.status == "done", agent_result.reply_text(), data)

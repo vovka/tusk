@@ -11,6 +11,7 @@ from tusk.lib.agent.agent_session_store import AgentSessionStore
 from tusk.lib.agent.runtime_message_history_builder import RuntimeMessageHistoryBuilder
 from tusk.lib.agent.runtime_result_factory import RuntimeResultFactory
 from tusk.lib.agent.runtime_step_recorder import RuntimeStepRecorder
+from tusk.lib.agent.runtime_turn_guards import RuntimeTurnGuards
 from tusk.lib.logging.interfaces.log_printer import LogPrinter
 
 __all__ = ["AgentRuntime"]
@@ -56,8 +57,9 @@ class AgentRuntime:
         executor: Callable[[ToolCall, str], ToolResult],
     ) -> AgentResult:
         repeat = RepeatedToolCallGuard()
+        guards = RuntimeTurnGuards()
         for step in range(1, profile.max_steps + 1):
-            result = self._step(session_id, profile, tools, messages, executor, repeat, step)
+            result = self._step(session_id, profile, tools, messages, executor, repeat, guards, step)
             if result is not None:
                 return result
         return self._failed(session_id, "max steps reached")
@@ -65,17 +67,21 @@ class AgentRuntime:
     def _step(
         self, session_id: str, profile: AgentProfile, tools: list[dict[str, object]],
         messages: list[dict[str, str]], executor: Callable[[ToolCall, str], ToolResult],
-        repeat: RepeatedToolCallGuard, step: int,
+        repeat: RepeatedToolCallGuard, guards: RuntimeTurnGuards, step: int,
     ) -> AgentResult | None:
         tool_call = self._tool_call(profile, messages, tools)
         self._record.requested(session_id, step, tool_call)
         if tool_call.tool_name == "done":
             return self._finish(session_id, tool_call.parameters)
+        violation = guards.violation(profile.profile_id, tool_call)
+        if violation:
+            return self._failed(session_id, violation)
         if repeat.repeated(tool_call):
             return self._failed(session_id, "repeated identical tool call")
         result = executor(tool_call, session_id)
         self._record.result(session_id, step, tool_call, result)
         self._record.appended(messages, tool_call, result)
+        guards.observe(tool_call, result)
         return None
 
     def _tool_call(self, profile: AgentProfile, messages: list[dict[str, object]], tools: list[dict[str, object]]) -> ToolCall:

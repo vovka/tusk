@@ -89,5 +89,5 @@ class AgentOrchestrator:
         child_lineage = self._guard.child_lineage(request, session_id, lineage)
         result = self._run(child, child_lineage)
         result = self._planner_results.validate(child.profile_id, result, self._registry.real_tool_names())
-        self._children.finished(session_id, result)
-        return self._children.result(result)
+        self._children.finished(session_id, child.profile_id, result)
+        return self._children.result(child.profile_id, result)
