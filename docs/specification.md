@@ -22,7 +22,7 @@ dictation are fully delegated to MCP adapters.
 
 ## 2. Configuration Specification
 
-**Source:** `tusk/lib/config/config.py` and `tusk/lib/config/config_factory.py`.
+**Source:** `tusk/shared/config/config.py` and `tusk/shared/config/config_factory.py`.
 
 All values are read from environment variables at startup. The `Config` object is
 immutable (`frozen=True`) for the lifetime of the process.
@@ -126,13 +126,13 @@ On each audio frame:
 
 ## 5. STT Engine Specification
 
-**Interface:** `tusk/lib/stt/interfaces/stt_engine.py`
+**Interface:** `tusk/shared/stt/interfaces/stt_engine.py`
 
 ```python
 def transcribe(self, audio_frames: bytes, sample_rate: int) -> Utterance
 ```
 
-### 5.1 GroqSTT — `tusk/lib/stt/providers/groq_stt.py`
+### 5.1 GroqSTT — `tusk/shared/stt/providers/groq_stt.py`
 
 - **Model:** `whisper-large-v3-turbo`
 - **Audio format:** PCM frames wrapped in WAV container via `wave` stdlib module
@@ -141,7 +141,7 @@ def transcribe(self, audio_frames: bytes, sample_rate: int) -> Utterance
   → if matched, sets `confidence=0.0`
 - **Normal result:** `confidence=1.0`
 
-### 5.2 WhisperSTT — `tusk/lib/stt/providers/whisper_stt.py`
+### 5.2 WhisperSTT — `tusk/shared/stt/providers/whisper_stt.py`
 
 - **Model loading:** `whisper.load_model(model_size)` at `__init__` time
 - **PCM decoding:** `numpy.frombuffer(audio_frames, dtype=numpy.int16) / 32768.0`
@@ -182,7 +182,7 @@ def is_valid(self, utterance: Utterance) -> bool
 
 ## 7. Gatekeeper Specification
 
-**Source:** `tusk/kernel/llm_gatekeeper.py`
+**Source:** `shells/voice/stages/gatekeeper.py`
 
 **Interface:** `tusk/kernel/interfaces/gatekeeper.py`
 
@@ -246,17 +246,11 @@ identical to a stateless gatekeeper.
 The prompt is extended with the last 6 non-summary user messages from conversation history,
 each truncated to 150 characters. This allows contextual follow-ups without a wake word.
 
-**Follow-up window timeout (`AdaptiveInteractionClock`):**
+**Follow-up window timeout:**
 
-The effective timeout adapts to interaction frequency within a 300-second activity window:
-
-| Recent interactions (last 5 min) | Effective timeout |
-|---|---|
-| ≤ 1 | `1 × FOLLOW_UP_TIMEOUT_SECONDS` |
-| ≤ 3 | `2 × FOLLOW_UP_TIMEOUT_SECONDS` |
-| > 3 | `3 × FOLLOW_UP_TIMEOUT_SECONDS` |
-
-Ceiling: `MAX_FOLLOW_UP_TIMEOUT_SECONDS`.
+The gatekeeper tracks `_last_forwarded_at` internally. When it forwarded a message
+within `follow_up_window_seconds` (default 30 s), recent context is included in the
+classification prompt so conversational follow-ups work without a wake word.
 
 **Latency impact:** No additional LLM calls. Context is formatted via string operations
 (< 1 ms). The gatekeeper prompt grows by ~200–400 tokens when context is included.
@@ -649,11 +643,10 @@ Bypasses STT, hallucination filter, and gatekeeper entirely.
 
 ### 14.1 CommandMode — `tusk/kernel/command_mode.py`
 
-**Dependencies:** `Agent`, `InteractionClock`, `RecentContextFormatter`, `LogPrinter`
+**Dependencies:** `Agent`, `LogPrinter`
 
-**gatekeeper_prompt property:**
-- Outside follow-up window: returns `_BASE_PROMPT` (static)
-- Within follow-up window: returns `_BASE_PROMPT + follow-up addendum + recent context`
+**handle(text):** Routes submitted text to the agent. The follow-up window is now
+tracked internally by `LLMGatekeeper`, not by `CommandMode`.
 
 **Base prompt excerpt:**
 ```
@@ -769,7 +762,7 @@ start_all():
 **Managed environment:** `AdapterEnvironmentBuilder` discovers a `requirements.txt` in
 the adapter directory and creates/reuses a virtualenv under `TUSK_ADAPTER_ENV_CACHE_DIR`.
 
-### 16.3 MCPClient — `tusk/lib/mcp/mcp_client.py`
+### 16.3 MCPClient — `tusk/shared/mcp/mcp_client.py`
 
 Synchronous stdio JSON-RPC 2.0 client.
 
@@ -791,7 +784,7 @@ Synchronous stdio JSON-RPC 2.0 client.
 ← {"jsonrpc": "2.0", "id": N, "result": {"content": [{"type": "text", "text": "..."}], "isError": false}}
 ```
 
-### 16.4 MCPToolProxy — `tusk/lib/mcp/mcp_tool_proxy.py`
+### 16.4 MCPToolProxy — `tusk/shared/mcp/mcp_tool_proxy.py`
 
 Bridges `MCPToolSchema` → `RegisteredTool` interface.
 
@@ -859,7 +852,7 @@ if shells:
 
 ## 18. LLM Provider Specification
 
-### 18.1 LLMProxy — `tusk/lib/llm/llm_proxy.py`
+### 18.1 LLMProxy — `tusk/shared/llm/llm_proxy.py`
 
 All LLM calls from the kernel go through `LLMProxy`.
 
@@ -868,7 +861,7 @@ All LLM calls from the kernel go through `LLMProxy`.
 - **Retry:** `LLMRetryRunner.run(operation, on_retry)` wraps every call
 - **Swap:** `swap(new_provider)` replaces `_inner` atomically; no new proxy needed
 
-### 18.2 LLMRetryRunner — `tusk/lib/llm/llm_retry_runner.py`
+### 18.2 LLMRetryRunner — `tusk/shared/llm/llm_retry_runner.py`
 
 ```
 attempts = 3
@@ -884,7 +877,7 @@ NOT retried:
     "tool_use_failed"
 ```
 
-### 18.3 GroqLLM — `tusk/lib/llm/providers/groq_llm.py`
+### 18.3 GroqLLM — `tusk/shared/llm/providers/groq_llm.py`
 
 - **Client:** `groq.Groq(api_key=..., timeout=30.0)`
 - **complete / complete_messages:** `chat.completions.create(model, messages, max_tokens=1024)`
@@ -895,7 +888,7 @@ NOT retried:
   `{"type": "json_object"}` for others
 - **label:** `"groq/<model>"`
 
-### 18.4 OpenRouterLLM — `tusk/lib/llm/providers/open_router_llm.py`
+### 18.4 OpenRouterLLM — `tusk/shared/llm/providers/open_router_llm.py`
 
 - **Client:** `openai.OpenAI(base_url="https://openrouter.ai/api/v1", timeout=15.0)`
 - **Headers:** `HTTP-Referer: https://github.com/vovka/tusk`, `X-Title: TUSK`
@@ -934,9 +927,9 @@ NOT retried:
 | Component | Exception | Behaviour |
 |---|---|---|
 | `AudioCapture` | `sounddevice.PortAudioError` | Propagates; crashes process |
-| `GroqSTT` | Any | Propagates to `Pipeline.process_audio`; utterance dropped |
-| `WhisperSTT` | Any | Propagates to `Pipeline.process_audio`; utterance dropped |
-| `HallucinationFilter` | — | Returns `False`; utterance discarded silently |
+| `GroqSTT` | Any | Propagates to `Transcriber`; utterance dropped |
+| `WhisperSTT` | Any | Propagates to `Transcriber`; utterance dropped |
+| `Sanitizer` | — | Returns `None`; utterance discarded silently |
 | `LLMGatekeeper` | JSON parse error | Returns `GateResult(False, "", 0.0)` |
 | `LLMGatekeeper` | Both LLM calls fail | Returns `GateResult(False, "", 0.0)` |
 | `MainAgent` | LLM failure | Returns `ModelFailureReplyBuilder` string; loop continues |
@@ -963,7 +956,7 @@ Target end-to-end latency from end of speech to action start: ≤ 1.5 seconds.
 |---|---|---|
 | VAD boundary detection | WebRTC VAD | Negligible (real-time) |
 | STT transcription | GroqSTT (Whisper-large-v3-turbo) | ~200–500 ms (network + cloud) |
-| Hallucination filter | `HallucinationFilter.is_valid()` | < 1 ms (string ops) |
+| Sanitizer | `Sanitizer.process()` | < 1 ms (string ops) |
 | Gatekeeper LLM call | GroqLLM (llama-3.1-8b-instant) | ~100–300 ms |
 | Conversation agent LLM call | GroqLLM (gpt-oss-120b) | ~300–600 ms |
 | Planner LLM call | GroqLLM (gpt-oss-20b, structured) | ~200–500 ms |
