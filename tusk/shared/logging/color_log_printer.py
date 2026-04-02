@@ -25,7 +25,7 @@ _TAG_COLORS: dict[str, str] = {
     "DICTATION": "\033[96m",
     "ERROR": "\033[31m",
 }
-_ALWAYS_VISIBLE = frozenset({"USER", "TUSK", "ERROR", "READY"})
+_ALWAYS_VISIBLE = frozenset({"KERNELINPUT", "TUSK", "ERROR", "READY"})
 _GROUP_BY_TAG = {
     "READY": "ready",
     "DETECTOR": "detector",
