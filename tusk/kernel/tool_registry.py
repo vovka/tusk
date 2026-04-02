@@ -34,6 +34,12 @@ class ToolRegistry:
     def planner_tools(self) -> list[RegisteredTool]:
         return [tool for tool in self.real_tools() if tool.planner_visible]
 
+    def sequence_tool_names(self) -> set[str]:
+        return {tool.name for tool in self.sequence_tools()}
+
+    def sequence_tools(self) -> list[RegisteredTool]:
+        return [tool for tool in self.real_tools() if tool.sequence_callable]
+
     def definitions_for(self, names: set[str]) -> list[dict[str, object]]:
         tools = [self._tools[name] for name in sorted(names) if name in self._tools]
         return [self._definition(tool) for tool in tools]
@@ -49,4 +55,5 @@ class ToolRegistry:
             execute=tool.execute,
             source=getattr(tool, "source", "kernel"),
             planner_visible=getattr(tool, "planner_visible", True),
+            sequence_callable=getattr(tool, "sequence_callable", False),
         )

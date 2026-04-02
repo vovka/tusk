@@ -14,3 +14,4 @@ class RegisteredTool:
     execute: Callable[[dict], ToolResult]
     source: str
     planner_visible: bool = True
+    sequence_callable: bool = False

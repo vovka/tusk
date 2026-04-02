@@ -1,6 +1,12 @@
 from tusk.kernel.tool_registry import ToolRegistry
 from tusk.kernel.agent.agent_profile import AgentProfile
 from tusk.kernel.agent.agent_run_request import AgentRunRequest
+from tusk.kernel.agent.static_tool_schemas import (
+    DEFAULT_DONE,
+    EXECUTE_TOOL_SEQUENCE,
+    PLANNER_DONE,
+    RUN_AGENT,
+)
 
 __all__ = ["AgentToolsetBuilder"]
 
@@ -11,7 +17,7 @@ class AgentToolsetBuilder:
 
     def build(self, profile: AgentProfile, request: AgentRunRequest) -> list[dict[str, object]]:
         tools: list[dict[str, object]] = [self._done_tool(profile)]
-        self._add_static_tools(tools, profile)
+        self._add_static_tools(tools, profile, request)
         self._add_runtime_tools(tools, profile, request)
         return tools
 
@@ -22,15 +28,17 @@ class AgentToolsetBuilder:
             return self._filter_runtime(request.runtime_tool_names)
         return set(profile.runtime_allowed_tool_names)
 
-    def _add_static_tools(self, tools: list[dict[str, object]], profile: AgentProfile) -> None:
+    def _add_static_tools(self, tools: list[dict[str, object]], profile: AgentProfile, request: AgentRunRequest) -> None:
         if "run_agent" in profile.static_tool_names:
             tools.append(self._run_agent_tool())
-        if "list_available_tools" in profile.static_tool_names:
-            tools.append(self._list_tools_tool())
+        if self._sequence_mode(profile, request):
+            tools.append(self._sequence_tool())
 
     def _add_runtime_tools(
         self, tools: list[dict[str, object]], profile: AgentProfile, request: AgentRunRequest,
     ) -> None:
+        if self._sequence_mode(profile, request):
+            return
         names = self.runtime_names(profile, request)
         if names:
             tools.extend(self._registry.definitions_for(names))
@@ -40,63 +48,15 @@ class AgentToolsetBuilder:
         return {name for name in names if name in real}
 
     def _done_tool(self, profile: AgentProfile) -> dict[str, object]:
-        schema = _PLANNER_DONE if profile.profile_id == "planner" else _DEFAULT_DONE
+        schema = PLANNER_DONE if profile.profile_id == "planner" else DEFAULT_DONE
         return {"type": "function", "function": {"name": "done", "description": "Finish and return a result.", "parameters": schema}}
 
     def _run_agent_tool(self) -> dict[str, object]:
-        return {"type": "function", "function": {"name": "run_agent", "description": "Delegate work to a sub-agent.", "parameters": _RUN_AGENT}}
+        return {"type": "function", "function": {"name": "run_agent", "description": "Delegate work to a sub-agent.", "parameters": RUN_AGENT}}
 
-    def _list_tools_tool(self) -> dict[str, object]:
-        return {"type": "function", "function": {"name": "list_available_tools", "description": "List available runtime tools.", "parameters": _LIST_TOOLS}}
+    def _sequence_tool(self) -> dict[str, object]:
+        text = "Execute a validated sequence of sequence-callable tools without extra LLM reasoning."
+        return {"type": "function", "function": {"name": "execute_tool_sequence", "description": text, "parameters": EXECUTE_TOOL_SEQUENCE}}
 
-
-_DEFAULT_DONE: dict[str, object] = {
-    "type": "object",
-    "properties": {
-        "status": {"type": "string", "enum": ["done", "clarify", "unknown", "failed", "need_tools"]},
-        "summary": {"type": "string"},
-        "text": {"type": "string"},
-        "payload": {"type": "object"},
-        "artifact_refs": {"type": "array", "items": {"type": "object"}},
-    },
-    "required": ["status", "summary"],
-    "additionalProperties": False,
-}
-
-_PLANNER_DONE: dict[str, object] = {
-    "type": "object",
-    "properties": {
-        "status": {"type": "string", "enum": ["done", "clarify", "unknown", "failed"]},
-        "summary": {"type": "string"},
-        "text": {"type": "string"},
-        "payload": {
-            "type": "object",
-            "properties": {
-                "selected_tool_names": {"type": "array", "items": {"type": "string"}},
-                "plan_text": {"type": "string"},
-            },
-            "required": ["selected_tool_names"],
-        },
-        "artifact_refs": {"type": "array", "items": {"type": "object"}},
-    },
-    "required": ["status", "summary"],
-    "additionalProperties": False,
-}
-
-_RUN_AGENT: dict[str, object] = {
-    "type": "object",
-    "properties": {
-        "profile_id": {"type": "string", "enum": ["planner", "executor", "default"]},
-        "instruction": {"type": "string"},
-        "runtime_tool_names": {"type": "array", "items": {"type": "string"}},
-        "session_refs": {"type": "array", "items": {"type": "string"}},
-    },
-    "required": ["profile_id", "instruction"],
-    "additionalProperties": False,
-}
-
-_LIST_TOOLS: dict[str, object] = {
-    "type": "object",
-    "properties": {},
-    "additionalProperties": False,
-}
+    def _sequence_mode(self, profile: AgentProfile, request: AgentRunRequest) -> bool:
+        return profile.profile_id == "executor" and request.execution_mode == "sequence" and request.sequence_plan is not None

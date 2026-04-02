@@ -7,6 +7,8 @@ from tusk.shared.schemas.llm_slot_config import LLMSlotConfig
 from tusk.shared.schemas.mcp_tool_result import MCPToolResult
 from tusk.shared.schemas.mcp_tool_schema import MCPToolSchema
 from tusk.shared.schemas.tool_call import ToolCall
+from tusk.shared.schemas.tool_sequence_plan import ToolSequencePlan
+from tusk.shared.schemas.tool_sequence_step import ToolSequenceStep
 from tusk.shared.schemas.tool_result import ToolResult
 from tusk.shared.schemas.utterance import Utterance
 from tusk.shared.schemas.window_info import WindowInfo
@@ -21,6 +23,8 @@ __all__ = [
     "MCPToolResult",
     "MCPToolSchema",
     "ToolCall",
+    "ToolSequencePlan",
+    "ToolSequenceStep",
     "ToolResult",
     "Utterance",
     "WindowInfo",

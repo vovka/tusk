@@ -23,9 +23,9 @@ def test_conversation_profile_has_run_agent() -> None:
     assert "run_agent" in profiles["conversation"].static_tool_names
 
 
-def test_planner_profile_has_list_tools() -> None:
+def test_planner_profile_has_no_static_tools() -> None:
     profiles = build_agent_profiles(_mock_registry())
-    assert "list_available_tools" in profiles["planner"].static_tool_names
+    assert profiles["planner"].static_tool_names == ()
 
 
 def test_executor_profile_has_no_run_agent() -> None:

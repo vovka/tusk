@@ -74,7 +74,12 @@ def _executor_call(messages: list[dict[str, str]]) -> ToolCall:
 def _planner_llm() -> object:
     return types.SimpleNamespace(label="planner", complete_tool_call=lambda *args: ToolCall("done", {
         "status": "done", "summary": "Plan ready",
-        "payload": {"selected_tool_names": ["gnome.launch_application"], "plan_text": "Launch gedit."},
+        "payload": {
+            "selected_tool_names": ["gnome.launch_application"],
+            "execution_mode": "normal",
+            "plan_text": "Launch gedit.",
+            "planned_steps": {"goal": "Launch gedit", "steps": [_step()]},
+        },
     }, "plan-1"))
 
 
@@ -109,3 +114,7 @@ def _launch_schema() -> dict[str, object]:
         "required": ["application_name"],
         "additionalProperties": False,
     }
+
+
+def _step() -> dict[str, object]:
+    return {"id": "s1", "tool_name": "gnome.launch_application", "args": {"application_name": "gedit"}}

@@ -15,6 +15,7 @@ from tusk.kernel.agent.orchestrator_tool_dispatcher import OrchestratorToolDispa
 from tusk.kernel.agent.planner_request_enricher import PlannerRequestEnricher
 from tusk.kernel.agent.planner_result_validator import PlannerResultValidator
 from tusk.kernel.agent.planner_runtime_tool_resolver import PlannerRuntimeToolResolver
+from tusk.kernel.agent.tool_sequence_executor import ToolSequenceExecutor
 from tusk.shared.logging.interfaces.log_printer import LogPrinter
 
 __all__ = ["AgentOrchestrator"]
@@ -39,10 +40,11 @@ class AgentOrchestrator:
         self._children = AgentChildRunner(store)
         self._executor_tools = ExecutorToolGuard()
         self._planner_request = PlannerRequestEnricher()
-        self._planner_results = PlannerResultValidator()
+        self._catalog = AgentToolCatalog(registry)
+        self._planner_results = PlannerResultValidator(log)
         self._resolved_tools = PlannerRuntimeToolResolver(store)
         self._tools = AgentToolsetBuilder(registry)
-        self._dispatcher = OrchestratorToolDispatcher(registry, AgentToolCatalog(registry))
+        self._dispatcher = OrchestratorToolDispatcher(registry, self._catalog, ToolSequenceExecutor(registry, store))
 
     def run(self, request: AgentRunRequest) -> AgentResult:
         return self._run(request, ())
@@ -67,7 +69,7 @@ class AgentOrchestrator:
         return None
 
     def _prepared(self, request: AgentRunRequest) -> AgentRunRequest:
-        request = self._planner_request.enrich(request, self._registry.planner_tool_names())
+        request = self._planner_request.enrich(request, self._catalog.prompt_text())
         return self._resolved_tools.resolve(request, self._registry.real_tool_names())
 
     def _check_executor(self, profile: AgentProfile, request: AgentRunRequest) -> AgentResult | None:
@@ -76,7 +78,7 @@ class AgentOrchestrator:
 
     def _execute(self, call: ToolCall, request: AgentRunRequest, lineage: tuple[tuple[str, str, str], ...], sid: str) -> ToolResult:
         agent_runner = lambda tc: self._run_agent(tc, request, lineage, sid)
-        return self._dispatcher.dispatch(call, agent_runner)
+        return self._dispatcher.dispatch(call, agent_runner, sid, set(request.runtime_tool_names), request.sequence_plan)
 
     def _run_agent(self, tool_call: ToolCall, request: AgentRunRequest, lineage: tuple[tuple[str, str, str], ...], session_id: str) -> ToolResult:
         child = self._children.request(tool_call, session_id)
@@ -88,6 +90,6 @@ class AgentOrchestrator:
         self._children.started(session_id, child)
         child_lineage = self._guard.child_lineage(request, session_id, lineage)
         result = self._run(child, child_lineage)
-        result = self._planner_results.validate(child.profile_id, result, self._registry.real_tool_names())
+        result = self._planner_results.validate(child.profile_id, result, self._registry)
         self._children.finished(session_id, child.profile_id, result)
         return self._children.result(child.profile_id, result)

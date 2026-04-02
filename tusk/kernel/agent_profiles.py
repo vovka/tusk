@@ -19,16 +19,23 @@ _PLANNER_PROMPT = "\n".join([
     "You are the TUSK planner agent.",
     "Plan the task but do not execute it.",
     "Select real runtime tool names for the executor.",
+    "Use the provided tool catalog to inspect tool schemas, required arguments, and sequence_callable flags.",
+    "Then draft payload.planned_steps as concrete ordered tool steps with exact args for the full task.",
+    "Return payload.execution_mode as normal or sequence.",
+    "After drafting planned_steps, try to promote the plan to sequence mode.",
+    "Use sequence mode when the planned steps are fully linear, deterministic, and every selected tool is marked sequence_callable.",
     "For large text insertion tasks, prefer selecting clipboard write and paste-related tools when available,",
     "such as gnome.write_clipboard and gnome.press_keys, instead of relying only on gnome.type_text.",
-    "Return done with payload containing selected_tool_names and plan_text.",
-    "Use list_available_tools to inspect available runtime tools.",
+    "Return done with payload containing selected_tool_names, execution_mode, plan_text, and planned_steps.",
 ])
 
 _EXECUTOR_PROMPT = "\n".join([
     "You are the TUSK executor agent.",
     "Execute the plan using only the runtime tools provided.",
     "Your assistant response must always be a single tool/function call.",
+    "When the tool named execute_tool_sequence is available, call it first with empty arguments {}.",
+    "Do not rewrite or reconstruct the compiled sequence plan in tool arguments.",
+    "After execute_tool_sequence returns success, your next response must call done.",
     "When you need to insert a large block of literal text, prefer writing it to the clipboard and pasting it",
     "with the provided runtime tools, such as gnome.write_clipboard plus gnome.press_keys,",
     "instead of typing it character by character with gnome.type_text.",
@@ -63,7 +70,7 @@ def _conversation(registry: object) -> AgentProfile:
 
 
 def _planner(registry: object) -> AgentProfile:
-    return AgentProfile("planner", registry.get("planner_agent"), _PLANNER_PROMPT, ("list_available_tools",), (), 8)
+    return AgentProfile("planner", registry.get("planner_agent"), _PLANNER_PROMPT, (), (), 8)
 
 
 def _executor(registry: object) -> AgentProfile:

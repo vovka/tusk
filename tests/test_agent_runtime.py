@@ -5,22 +5,22 @@ from tusk.shared.schemas.tool_call import ToolCall
 from tusk.kernel.tool_registry import ToolRegistry
 
 
-def test_planner_rejects_missing_selected_tool_names() -> None:
+def test_planner_rejects_missing_planned_steps() -> None:
     registry = ToolRegistry()
     registry.register(make_registry_tool("gnome.type_text", "type"))
     conversation = _delegate_to_planner()
     planner = _planner_with_payload({})
     reply = make_agent(conversation, registry=registry, planner_llm=planner).process_command("test")
-    assert "no valid selected_tool_names" in reply.lower()
+    assert "invalid planned_steps" in reply.lower()
 
 
-def test_planner_rejects_non_tool_names() -> None:
+def test_planner_accepts_valid_steps_with_bad_selected_names() -> None:
     registry = ToolRegistry()
     registry.register(make_registry_tool("gnome.type_text", "type"))
     conversation = _delegate_to_planner()
-    planner = _planner_with_payload({"selected_tool_names": ["executor", "desktop"]})
+    planner = _planner_with_payload(_planned_payload(["executor", "desktop"]))
     reply = make_agent(conversation, registry=registry, planner_llm=planner).process_command("test")
-    assert "no valid selected_tool_names" in reply.lower()
+    assert "child_status: done" in reply.lower()
 
 
 def test_executor_rejects_empty_tools() -> None:
@@ -93,6 +93,11 @@ def _planner_with_payload(payload: dict[str, object]) -> object:
         label="planner",
         complete_tool_call=lambda *a: ToolCall("done", {"status": "done", "summary": "planned", "payload": payload}, "p1"),
     )
+
+
+def _planned_payload(names: list[str]) -> dict[str, object]:
+    step = {"id": "s1", "tool_name": "gnome.type_text", "args": {"text": "hello"}}
+    return {"selected_tool_names": names, "execution_mode": "normal", "planned_steps": {"steps": [step]}}
 
 
 def _delegate_after_executor_done() -> object:

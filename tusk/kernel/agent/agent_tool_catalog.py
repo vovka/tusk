@@ -14,5 +14,14 @@ class AgentToolCatalog:
         tools = [self._info(tool) for tool in self._registry.planner_tools()]
         return ToolResult(True, json.dumps({"tools": tools}), {"tools": tools})
 
+    def prompt_text(self) -> str:
+        return f"Tool catalog: {self.list_tools().message}"
+
     def _info(self, tool: object) -> dict[str, object]:
-        return {"name": tool.name, "description": tool.description, "input_schema": tool.input_schema, "source": tool.source}
+        return {
+            "name": tool.name,
+            "description": tool.description,
+            "input_schema": tool.input_schema,
+            "source": tool.source,
+            "sequence_callable": tool.sequence_callable,
+        }

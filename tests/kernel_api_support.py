@@ -53,13 +53,16 @@ def make_registry_tool(
     message: str,
     *,
     planner_visible: bool = True,
+    sequence_callable: bool = False,
     input_schema: dict | None = None,
+    execute: object | None = None,
 ) -> object:
     return types.SimpleNamespace(
         name=name,
         description=message,
         input_schema=input_schema or {"type": "object", "properties": {"text": {"type": "string"}}},
-        execute=lambda _: ToolResult(True, message),
+        execute=execute or (lambda _: ToolResult(True, message)),
         source="gnome",
         planner_visible=planner_visible,
+        sequence_callable=sequence_callable,
     )

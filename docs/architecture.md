@@ -10,10 +10,11 @@ agent, and executes desktop actions via hot-pluggable MCP adapters.
 The system is split into five layers: **Shells** (voice, CLI, future), a thin **Kernel**
 (agent loop + tool dispatch), a **Shared** layer (ABCs, schemas, LLM access — depended on
 by all other layers), hot-pluggable **Adapters** (MCP servers), and swappable **Providers**
-(LLM and STT implementations). The agent pipeline uses a three-profile delegation chain: a conversation agent that
-delegates via `run_agent`, a planner agent that selects tool names and returns them in
-`done`, and an executor agent that receives those tools and calls them via MCP. All three
-profiles share the same `AgentRuntime` loop.
+(LLM and STT implementations). The agent pipeline uses a three-profile delegation chain: a
+conversation agent that delegates via `run_agent`, a planner agent that selects tool names and
+returns them in `done`, and an executor agent that either calls runtime tools step-by-step or
+invokes a compiled `execute_tool_sequence` meta tool for deterministic plans. All three profiles
+share the same `AgentRuntime` loop.
 
 Dependency direction is strict: Shells → Shared, Kernel → Shared, Adapters → Shared,
 Providers → Shared. No layer imports from a peer layer. Shells and kernel communicate
@@ -33,7 +34,8 @@ only through `kernel.submit(text)` at runtime and shared ABCs at design time.
 
 A sequence diagram of a single agent turn — from submitted text to final reply — showing
 the three-profile agent delegation chain (conversation → planner → executor), the shared
-`AgentRuntime` loop, session-store history, and MCP tool execution.
+`AgentRuntime` loop, session-store history, and both executor paths: the normal tool loop and
+the compiled sequence path.
 
 ```mermaid
 sequenceDiagram
@@ -66,16 +68,11 @@ sequenceDiagram
         LLM_C-->>RT: run_agent(profile_id="planner", instruction)
         RT->>ORC: dispatch run_agent call
 
-        ORC->>RT: run(child, planner_profile, [done, list_available_tools])
-        RT->>LLM_P: complete_tool_call(planner_prompt, messages, [done, list_available_tools])
+        ORC->>RT: run(child, planner_profile, [done])
+        Note over ORC,RT: Planner request already includes full tool catalog
+        RT->>LLM_P: complete_tool_call(planner_prompt, messages, [done])
 
-        opt planner inspects tools
-            LLM_P-->>RT: list_available_tools()
-            RT-->>LLM_P: tool names and descriptions
-            RT->>LLM_P: complete_tool_call(..., updated messages)
-        end
-
-        LLM_P-->>RT: done(payload={selected_tool_names=[...], plan_text})
+        LLM_P-->>RT: done(payload={selected_tool_names=[...], planned_steps, execution_mode, plan_text})
         RT->>SS: persist planner result (session_id_P)
         RT-->>ORC: AgentResult(session_id=session_id_P)
         ORC-->>RT: ToolResult(child_result with session_id_P)
@@ -84,21 +81,33 @@ sequenceDiagram
 
         LLM_C-->>RT: run_agent(profile_id="executor", session_refs=[session_id_P])
         RT->>ORC: dispatch run_agent call
-        ORC->>SS: final_result(session_id_P) → selected_tool_names
-        ORC->>TR: definitions_for(selected_tool_names)
-        TR-->>ORC: tool schemas (MCP tools only)
+        ORC->>SS: final_result(session_id_P) → selected_tool_names, planned_steps, execution_mode, sequence_plan
+        ORC->>TR: definitions_for(selected_tool_names) or execute_tool_sequence
+        TR-->>ORC: tool schemas
 
-        ORC->>RT: run(child, executor_profile, [done, ...MCP tools])
+        ORC->>RT: run(child, executor_profile, [done, ...tools])
 
-        loop executor tool loop — max 16 steps
-            RT->>LLM_E: complete_tool_call(executor_prompt, messages, [done, ...tools])
-            LLM_E-->>RT: tool_call(name, args)
-            Note over RT: RepeatedToolCallGuard — abort on duplicate
-            RT->>TR: get(tool_name).execute(args)
+        alt compiled sequence mode
+            RT->>LLM_E: complete_tool_call(executor_prompt, messages, [done, execute_tool_sequence])
+            LLM_E-->>RT: execute_tool_sequence({})
+            RT->>ORC: dispatch execute_tool_sequence
+            ORC->>SS: use resolved planner sequence_plan from session_id_P
+            ORC->>TR: get(step.tool_name).execute(args) for each validated step
             TR->>MCP: JSON-RPC tools/call
             MCP-->>TR: MCPToolResult
-            TR-->>RT: ToolResult
-            RT->>SS: append_event(step result)
+            TR-->>ORC: ToolResult
+            ORC-->>RT: ToolResult(sequence summary)
+        else normal executor mode
+            loop executor tool loop — max 16 steps
+                RT->>LLM_E: complete_tool_call(executor_prompt, messages, [done, ...tools])
+                LLM_E-->>RT: tool_call(name, args)
+                Note over RT: RepeatedToolCallGuard — abort on duplicate
+                RT->>TR: get(tool_name).execute(args)
+                TR->>MCP: JSON-RPC tools/call
+                MCP-->>TR: MCPToolResult
+                TR-->>RT: ToolResult
+                RT->>SS: append_event(step result)
+            end
         end
 
         LLM_E-->>RT: done(status, summary)

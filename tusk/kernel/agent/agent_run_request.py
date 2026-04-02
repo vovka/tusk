@@ -1,5 +1,7 @@
 from dataclasses import dataclass, field
 
+from tusk.shared.schemas.tool_sequence_plan import ToolSequencePlan
+
 __all__ = ["AgentRunRequest"]
 
 
@@ -12,4 +14,6 @@ class AgentRunRequest:
     parent_call_id: str = ""
     runtime_tool_names: tuple[str, ...] = ()
     session_refs: tuple[str, ...] = ()
+    execution_mode: str = "normal"
+    sequence_plan: ToolSequencePlan | None = None
     metadata: dict[str, object] = field(default_factory=dict)
