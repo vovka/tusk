@@ -86,8 +86,16 @@ def _load_shell(name: str, shells_dir: Path, config: Config, kernel: KernelAPI, 
     shell_class = getattr(module, manifest["entry_class"])
     if name != "voice":
         return shell_class()
-    gatekeeper = LLMGatekeeper(kernel.get_llm_registry().get("gatekeeper"), log, follow_up_window_seconds=config.follow_up_timeout_seconds)
+    gatekeeper = _voice_gatekeeper(config, kernel, log)
     return shell_class(config, log, stt_engine=GroqSTT(config.groq_api_key), gatekeeper=gatekeeper)
+
+
+def _voice_gatekeeper(config: Config, kernel: KernelAPI, log: ColorLogPrinter) -> LLMGatekeeper:
+    return LLMGatekeeper(
+        kernel.get_llm_registry().get("gatekeeper"),
+        log,
+        follow_up_window_seconds=config.follow_up_timeout_seconds,
+    )
 
 
 def main() -> None:

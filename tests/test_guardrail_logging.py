@@ -11,9 +11,9 @@ from tusk.shared.schemas.chat_message import ChatMessage
 
 def test_startup_options_enable_groups_from_cli_or_env() -> None:
     cli = StartupOptions.from_sources(["--show-logs", "stt,llm-with-payload,wait"], {})
-    env = StartupOptions.from_sources([], {"SHOW_LOGS": "gatekeeper"})
+    env = StartupOptions.from_sources([], {"SHOW_LOGS": "gate"})
     assert cli.log_groups == frozenset({"transcriber", "llm-request", "llm-payload", "llm-wait"})
-    assert env.log_groups == frozenset({"gatekeeper"})
+    assert env.log_groups == frozenset({"gatekeeper", "gate-recovery"})
     assert "llm-payload" in build_parser().format_help()
 
 
@@ -34,6 +34,12 @@ def test_sanitizer_logs_use_cyan_tag() -> None:
     with patch("builtins.print") as mocked:
         ColorLogPrinter(frozenset({"sanitizer"})).log("SANITIZER", "passed", "sanitizer")
     assert "\033[96m[SANITIZER]\033[0m" in mocked.call_args[0][0]
+
+
+def test_gate_recovery_logs_have_own_label() -> None:
+    with patch("builtins.print") as mocked:
+        ColorLogPrinter(frozenset({"gate-recovery"})).log("GATERECOVERY", "recovered u1", "gate-recovery")
+    assert "\033[96m[GATERECOVERY]\033[0m" in mocked.call_args[0][0]
 
 
 def test_llm_proxy_logs_request_payload_and_wait_separately() -> None:

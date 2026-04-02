@@ -21,6 +21,8 @@ class Config:
     vad_aggressiveness: int
     follow_up_timeout_seconds: float
     max_follow_up_timeout_seconds: float
+    gate_recovery_window_seconds: float
+    gate_recovery_candidate_limit: int
     shells: list[str]
     adapter_env_cache_dir: str
     conversation_log_dir: str

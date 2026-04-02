@@ -85,8 +85,11 @@ Extracted from individual STT implementations so every provider benefits.
 
 Rolling window of all surviving utterances. Every clean utterance is appended. The Gatekeeper
 reads the last N utterances via `recent(n)` to build context for its classification prompt.
-The buffer also enables retrospective recovery when the user refers back to something said
-earlier. Implements `TranscriptionBuffer` ABC (`interfaces/transcription_buffer.py`).
+The buffer also tracks gate state for each utterance (`pending`, `forwarded`, `dropped`,
+`recovered`, `consumed`). Recent utterances dropped by the gatekeeper remain eligible for
+retrospective recovery within a bounded window, so a later correction like "that previous
+one was for TUSK" can recover the earlier dropped text. Implements `TranscriptionBuffer`
+ABC (`interfaces/transcription_buffer.py`).
 
 ### Gatekeeper (`stages/gatekeeper.py`)
 
@@ -98,6 +101,11 @@ Implements `Gatekeeper` ABC (`interfaces/gatekeeper.py`).
 forwarded something recently (within `follow_up_window_seconds`, default 30 s), it includes
 recent context in the classification prompt so conversational follow-ups work without a
 wake word. No external clock or side channel is involved; the pipeline is fully linear.
+
+**Retrospective recovery** — when the current utterance is not a clear command, the
+gatekeeper can make one extra structured LLM call over recent dropped candidates from the
+buffer. If it can identify exactly one earlier dropped utterance, it forwards that prior
+text to the kernel instead of the current correction phrase.
 
 ---
 

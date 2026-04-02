@@ -63,6 +63,8 @@ class ConfigFactory:
         return {
             "follow_up_timeout_seconds": self._float("FOLLOW_UP_TIMEOUT_SECONDS", "30"),
             "max_follow_up_timeout_seconds": self._float("MAX_FOLLOW_UP_TIMEOUT_SECONDS", "120"),
+            "gate_recovery_window_seconds": self._float("GATE_RECOVERY_WINDOW_SECONDS", "60"),
+            "gate_recovery_candidate_limit": self._int("GATE_RECOVERY_CANDIDATE_LIMIT", "6"),
             "shells": self._shells(shells),
             "adapter_env_cache_dir": os.environ.get("TUSK_ADAPTER_ENV_CACHE_DIR", ".tusk_runtime/adapters"),
             "conversation_log_dir": os.environ.get("TUSK_CONVERSATION_LOG_DIR", ".tusk_runtime/conversations"),

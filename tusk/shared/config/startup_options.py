@@ -5,7 +5,7 @@ from dataclasses import dataclass
 __all__ = ["StartupOptions", "build_parser"]
 
 _LOG_GROUPS = (
-    "ready", "detector", "transcriber", "sanitizer", "buffer", "gatekeeper",
+    "ready", "detector", "transcriber", "sanitizer", "buffer", "gatekeeper", "gate-recovery",
     "kernel-input", "llm-request", "llm-payload", "llm-wait",
     "agent", "tool", "pipeline", "dictation",
     "vad", "stt", "gate", "llm", "llm-with-payload", "wait",
@@ -13,7 +13,7 @@ _LOG_GROUPS = (
 _ALIASES = {
     "vad": {"detector"},
     "stt": {"transcriber"},
-    "gate": {"gatekeeper"},
+    "gate": {"gatekeeper", "gate-recovery"},
     "llm": {"llm-request"},
     "llm-with-payload": {"llm-request", "llm-payload"},
     "wait": {"llm-wait"},
