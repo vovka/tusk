@@ -1,11 +1,11 @@
 import tempfile
 import types
 
-from tusk.kernel.agent import MainAgent
+from tusk.kernel.main_agent import MainAgent
 from tusk.kernel.agent_profiles import build_agent_profiles
-from tusk.kernel.schemas.tool_result import ToolResult
+from tusk.shared.schemas.tool_result import ToolResult
 from tusk.kernel.tool_registry import ToolRegistry
-from tusk.lib.agent import AgentOrchestrator, FileAgentSessionStore
+from tusk.kernel.agent import AgentOrchestrator, FileAgentSessionStore
 
 __all__ = ["HistoryRecorder", "make_agent", "make_registry_tool"]
 

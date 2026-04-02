@@ -3,8 +3,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
-from tusk.kernel.schemas.gate_result import GateResult
-from tusk.kernel.schemas.utterance import Utterance
+from tusk.shared.schemas.gate_result import GateResult
+from tusk.shared.schemas.utterance import Utterance
 
 if TYPE_CHECKING:
     from tusk.kernel.interfaces.pipeline_controller import PipelineController

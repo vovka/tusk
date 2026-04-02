@@ -7,213 +7,116 @@ microphone audio continuously, detects speech boundaries, transcribes speech to 
 filters ambient noise and hallucinations, passes confirmed commands to a conversation
 agent, and executes desktop actions via hot-pluggable MCP adapters.
 
-The system is split into four layers: infrastructure (`tusk/lib`), business logic
-(`tusk/kernel`), user-facing entrypoints (`shells/`), and platform-specific MCP adapters
-(`adapters/`). The agent pipeline uses a three-phase split: a conversation agent with
-only one operational tool (`execute_task`), a one-shot planner that selects a tool subset,
-and an execution agent that runs only the selected tools.
+The system is split into five layers: **Shells** (voice, CLI, future), a thin **Kernel**
+(agent loop + tool dispatch), a **Shared** layer (ABCs, schemas, LLM access — depended on
+by all other layers), hot-pluggable **Adapters** (MCP servers), and swappable **Providers**
+(LLM and STT implementations). The agent pipeline uses a three-profile delegation chain: a conversation agent that
+delegates via `run_agent`, a planner agent that selects tool names and returns them in
+`done`, and an executor agent that receives those tools and calls them via MCP. All three
+profiles share the same `AgentRuntime` loop.
+
+Dependency direction is strict: Shells → Shared, Kernel → Shared, Adapters → Shared,
+Providers → Shared. No layer imports from a peer layer. Shells and kernel communicate
+only through `kernel.submit(text)` at runtime and shared ABCs at design time.
 
 ---
 
 ## System Block Diagram
 
-```mermaid
-flowchart TD
-    subgraph SHELLS["Shells (user input)"]
-        direction LR
-        MIC["Microphone\n(AudioCapture)"]
-        VAD["Voice Activity\nDetector"]
-        CLI["CLI Shell\n(typed input)"]
-    end
+![System Block Diagram](diagrams/architecture.png)
 
-    subgraph KERNEL["Kernel (tusk/kernel)"]
-        direction TB
-
-        subgraph ROUTING["Input Routing + Context"]
-            direction LR
-            HISTORY["Sliding Window\nHistory (max 20)"]
-            CLOCK["Adaptive\nInteraction Clock"]
-            FILTER["Hallucination\nFilter"]
-            GATE["Gatekeeper\n(3-way classify)"]
-            DROP["Ambient\nDiscard"]
-        end
-
-        subgraph AGENT_PIPE["Conversation Agent Pipeline"]
-            direction LR
-            CONV["Conversation\nAgent\n(execute_task only)"]
-            PLANNER["Task Planner\n(one-shot, compact catalog)"]
-            TOOLREG["Tool Registry\n(RegisteredTool + planner_visible flag)"]
-            EXEC["Execution Agent\n(selected tools only)"]
-        end
-
-        DICTATION["Dictation\nRouter"]
-        SWITCHMODEL["Switch Model\nTool"]
-    end
-
-    subgraph LIB["Infrastructure (tusk/lib)"]
-        direction TB
-        CONFIG["Config\n(env vars)"]
-        STT["STT Engine\n(Whisper / Groq)"]
-
-        subgraph PROXY_LANES[" "]
-            direction LR
-            PG(( ))
-            PC(( ))
-            PP(( ))
-            PE(( ))
-        end
-
-        LLMPROXY["LLM Proxy\n(retry · wait · hot-swap)"]
-        LLMREG["LLM Registry\n(gatekeeper · planner · agent · utility)"]
-        MCPCLIENT["MCP Client\n(stdio JSON-RPC 2.0)"]
-    end
-
-    subgraph ADAPTERS["MCP Adapters (out-of-process)"]
-        direction LR
-        GNOME["GNOME Adapter\n21 tools\n(windows · input · mouse · clipboard)"]
-        DICTADAPTER["Dictation Adapter\n3 tools\n(start · segment · stop)"]
-    end
-
-    MIC --> VAD
-    VAD -->|"speech segment (PCM)"| STT
-    STT -->|"Utterance\n(text + confidence)"| FILTER
-    CLI -->|"text command"| GATE
-    FILTER -->|"filtered utterance"| GATE
-    GATE -->|"command / conversation"| CONV
-    GATE -->|"ambient"| DROP
-    CLOCK <-->|"activity timestamps"| GATE
-    HISTORY <-->|"recent messages"| CONV
-    HISTORY <-->|"last 6 msgs\nfor prompt"| GATE
-
-    CONV -->|"execute_task(description)"| PLANNER
-    PLANNER -->|"TaskPlan\n(tool names)"| TOOLREG
-    TOOLREG -->|"selected tool schemas"| EXEC
-    EXEC -->|"tool calls"| TOOLREG
-    EXEC -->|"need_tools → replan"| PLANNER
-    TOOLREG -->|"dispatch"| MCPCLIENT
-
-    CONV --> DICTATION
-    CONV --> SWITCHMODEL
-    DICTATION -->|"segment / stop"| MCPCLIENT
-    SWITCHMODEL --> LLMREG
-
-    GATE <--> PG
-    CONV <--> PC
-    PLANNER <--> PP
-    EXEC <--> PE
-    PG --- LLMPROXY
-    PC --- LLMPROXY
-    PP --- LLMPROXY
-    PE --- LLMPROXY
-    LLMPROXY <--> LLMREG
-
-    MCPCLIENT <-->|"stdio JSON-RPC"| GNOME
-    MCPCLIENT <-->|"stdio JSON-RPC"| DICTADAPTER
-
-    CONFIG --> LLMREG
-    CONFIG --> STT
-
-    style PG fill:transparent,stroke:transparent
-    style PC fill:transparent,stroke:transparent
-    style PP fill:transparent,stroke:transparent
-    style PE fill:transparent,stroke:transparent
-    style PROXY_LANES fill:transparent,stroke:transparent
-```
+> Source: [`docs/diagrams/architecture.svg`](diagrams/architecture.svg)
 
 ---
 
 ## Agent Workflow Diagram
 
-A sequence diagram of a single agent turn — from classified utterance to final reply — showing all LLM calls, history management, planning, and the execution tool loop.
+A sequence diagram of a single agent turn — from submitted text to final reply — showing
+the three-profile agent delegation chain (conversation → planner → executor), the shared
+`AgentRuntime` loop, session-store history, and MCP tool execution.
 
 ```mermaid
 sequenceDiagram
-    participant GK as Pipeline / Gatekeeper
+    participant CMD as CommandMode
     participant MA as MainAgent
-    participant HX as SlidingWindowHistory
-    participant LLM_A as LLM (agent slot)
-    participant LLM_U as LLM (utility slot)
-    participant ET as ExecuteTaskTool
-    participant TES as TaskExecutionService
-    participant FP as FallbackTaskPlanner
-    participant LLM_P as LLM (planner slot)
+    participant ORC as AgentOrchestrator
+    participant RT as AgentRuntime
+    participant SS as SessionStore
+    participant LLM_C as LLM (conversation)
+    participant LLM_P as LLM (planner)
+    participant LLM_E as LLM (executor)
     participant TR as ToolRegistry
-    participant EA as ExecutionAgent
     participant MCP as MCP Adapter
+    participant HX as SlidingWindowHistory
 
-    GK->>MA: process_command(text)
-    MA->>HX: append user message
-    MA->>HX: get_messages()
-    HX-->>MA: last up to 20 messages
+    CMD->>MA: process_command(text)
+    MA->>ORC: run(AgentRunRequest, profile="conversation")
 
-    alt history overflow (gt 20 messages)
-        HX->>LLM_U: summarise(oldest messages)
-        LLM_U-->>HX: summary text
-        HX->>HX: replace oldest entries with summary ChatMessage
-    end
+    Note over ORC,RT: AgentRuntime is shared by all three profiles
+    ORC->>RT: run(request, conversation_profile, [done, run_agent])
+    RT->>SS: conversation_messages(session_id)
+    SS-->>RT: prior turn messages
+    RT->>SS: append_event(user message)
+    RT->>LLM_C: complete_tool_call(system_prompt, messages, [done, run_agent])
 
-    MA->>LLM_A: complete_tool_call(history, tools=[execute_task])
+    alt LLM answers directly
+        LLM_C-->>RT: done(status="done", text="...")
+        RT->>SS: persist result
+    else LLM delegates to planner
+        LLM_C-->>RT: run_agent(profile_id="planner", instruction)
+        RT->>ORC: dispatch run_agent call
 
-    alt LLM replies directly
-        LLM_A-->>MA: assistant text
-        MA->>HX: append assistant message
-    else LLM calls execute_task
-        LLM_A-->>MA: tool_call: execute_task(task_description)
-        MA->>HX: append assistant message (tool call)
-        MA->>ET: dispatch(task_description)
-        ET->>TES: execute(task_description)
+        ORC->>RT: run(child, planner_profile, [done, list_available_tools])
+        RT->>LLM_P: complete_tool_call(planner_prompt, messages, [done, list_available_tools])
 
-        TES->>TR: catalog_text() [planner_visible=True tools only]
-        TR-->>TES: compact text "name: description" per line
-
-        TES->>FP: plan(task, catalog)
-        FP->>LLM_P: complete(planner_prompt, strict JSON schema)
-        Note right of LLM_P: One-shot structured output.<br/>Returns list of required tool names.
-        LLM_P-->>FP: TaskPlan {tool_names[]}
-
-        alt planner LLM fails
-            FP->>LLM_U: complete(same prompt, utility slot fallback)
-            LLM_U-->>FP: TaskPlan {tool_names[]}
+        opt planner inspects tools
+            LLM_P-->>RT: list_available_tools()
+            RT-->>LLM_P: tool names and descriptions
+            RT->>LLM_P: complete_tool_call(..., updated messages)
         end
 
-        FP-->>TES: TaskPlan
-        TES->>TR: get_schemas(tool_names)
-        TR-->>TES: native tool definition dicts (selected only)
+        LLM_P-->>RT: done(payload={selected_tool_names=[...], plan_text})
+        RT->>SS: persist planner result (session_id_P)
+        RT-->>ORC: AgentResult(session_id=session_id_P)
+        ORC-->>RT: ToolResult(child_result with session_id_P)
+        RT->>SS: append planner result to conversation messages
+        RT->>LLM_C: complete_tool_call(..., messages + planner result)
 
-        TES->>EA: execute(task, selected_schemas)
+        LLM_C-->>RT: run_agent(profile_id="executor", session_refs=[session_id_P])
+        RT->>ORC: dispatch run_agent call
+        ORC->>SS: final_result(session_id_P) → selected_tool_names
+        ORC->>TR: definitions_for(selected_tool_names)
+        TR-->>ORC: tool schemas (MCP tools only)
 
-        loop AgentToolLoop — max 16 steps
-            EA->>LLM_A: complete_tool_call(exec_history, selected_schemas)
-            LLM_A-->>EA: tool_call(name, args)
-            Note over EA: RepeatedToolCallGuard:<br/>abort if identical call seen before
-            EA->>TR: call_tool(name, args)
+        ORC->>RT: run(child, executor_profile, [done, ...MCP tools])
+
+        loop executor tool loop — max 16 steps
+            RT->>LLM_E: complete_tool_call(executor_prompt, messages, [done, ...tools])
+            LLM_E-->>RT: tool_call(name, args)
+            Note over RT: RepeatedToolCallGuard — abort on duplicate
+            RT->>TR: get(tool_name).execute(args)
             TR->>MCP: JSON-RPC tools/call
             MCP-->>TR: MCPToolResult
-            TR-->>EA: ToolResult
-            EA->>EA: append tool call + result to exec_history
+            TR-->>RT: ToolResult
+            RT->>SS: append_event(step result)
         end
 
-        alt execution returns need_tools and replans lt 2
-            EA-->>TES: TaskExecutionResult(need_tools, missing=[...])
-            TES->>FP: replan(task, catalog, missing_hint)
-            FP->>LLM_P: complete(updated planner prompt)
-            LLM_P-->>FP: new TaskPlan
-            FP-->>TES: new TaskPlan
-            TES->>TR: get_schemas(new_tool_names)
-            TR-->>TES: updated tool schemas
-            Note over TES,EA: restart execution loop with new schemas
-        else execution complete
-            EA-->>TES: TaskExecutionResult(success, reply)
-        end
-
-        TES-->>ET: TaskExecutionResult
-        ET-->>MA: ToolResult(message)
-        MA->>LLM_A: continue(history + tool_result)
-        LLM_A-->>MA: assistant text
-        MA->>HX: append tool result + assistant messages
+        LLM_E-->>RT: done(status, summary)
+        RT->>SS: persist executor result
+        RT-->>ORC: AgentResult
+        ORC-->>RT: ToolResult(child_result)
+        RT->>SS: append executor result to conversation messages
+        RT->>LLM_C: complete_tool_call(..., messages + executor result)
+        LLM_C-->>RT: done(status="done", text="...")
+        RT->>SS: persist conversation result
     end
 
-    MA-->>GK: KernelResponse(handled=true, reply)
+    RT-->>ORC: AgentResult
+    ORC-->>MA: AgentResult
+    MA->>HX: append(user + assistant ChatMessages)
+    Note over HX: Local cross-turn summary only — not used as LLM context
+    MA-->>CMD: reply text
+    CMD-->>CMD: KernelResponse(handled=True, reply)
 ```
 
 ---
@@ -226,20 +129,64 @@ tusk/
 ├── requirements.txt
 ├── .env.example
 ├── tusk/
-│   ├── kernel/                          # Business logic layer
-│   │   ├── interfaces/                  # Kernel ABCs (extension points)
-│   │   │   ├── agent.py                 # Agent ABC — process_command
-│   │   │   ├── conversation_history.py  # ConversationHistory ABC — message storage
+│   ├── kernel/                          # Thin orchestration layer
+│   │   ├── agent/                       # Agentic reasoning loop
+│   │   │   ├── agent_orchestrator.py    # AgentOrchestrator — routes run_agent calls to child profiles
+│   │   │   ├── agent_runtime.py         # AgentRuntime — shared turn/tool loop
+│   │   │   ├── agent_child_runner.py    # Runs child (execution) agent turns
+│   │   │   ├── agent_profile.py         # AgentProfile — prompt + tool config per role
+│   │   │   ├── agent_result.py          # AgentResult — final output from a run
+│   │   │   ├── agent_run_guard.py       # Guard: max turns, repeated call detection
+│   │   │   ├── agent_session_store.py   # AgentSessionStore ABC — persist session events
+│   │   │   ├── agent_tool_catalog.py    # Builds compact name:description catalog text
+│   │   │   ├── agent_toolset_builder.py # Selects tool schemas for the execution agent
+│   │   │   ├── executor_clipboard_guard.py # Blocks clipboard writes during safe execution
+│   │   │   ├── executor_tool_guard.py   # Validates tool calls before dispatch
+│   │   │   └── file_agent_session_store.py # File-backed session event log
+│   │   ├── interfaces/                  # Kernel ABCs
+│   │   │   ├── conversation_history.py  # ConversationHistory ABC
 │   │   │   ├── conversation_summarizer.py # ConversationSummarizer ABC
-│   │   │   ├── gatekeeper.py            # Gatekeeper ABC — utterance classification
-│   │   │   ├── interaction_clock.py     # InteractionClock ABC — follow-up window tracking
-│   │   │   ├── pipeline_controller.py   # PipelineController ABC — mode switching
-│   │   │   ├── pipeline_mode.py         # PipelineMode ABC — gatekeeper prompt + handler
-│   │   │   ├── shell.py                 # Shell ABC — start/stop interface
-│   │   │   ├── task_executor.py         # TaskExecutor ABC — execute a task plan
-│   │   │   ├── task_planner.py          # TaskPlanner ABC — build a task plan
-│   │   │   └── utterance_filter.py      # UtteranceFilter ABC — pre-gatekeeper rejection
-│   │   ├── schemas/                     # Frozen dataclasses (all inter-component data)
+│   │   │   └── pipeline_mode.py         # PipelineMode ABC — gatekeeper prompt + handler
+│   │   ├── adapter_manager.py           # AdapterManager — MCP adapter lifecycle
+│   │   ├── api.py                       # KernelAPI — submit(text) public entry point
+│   │   ├── command_mode.py              # CommandMode — routes submitted text to agent
+│   │   ├── dictation_mode.py            # AdapterDictationMode — active dictation state
+│   │   ├── dictation_router.py          # DictationRouter — routes segments and edits
+│   │   ├── llm_conversation_summarizer.py # LLM-based history compaction
+│   │   ├── main_agent.py                # MainAgent — entry point for a conversation turn
+│   │   ├── registered_tool.py           # RegisteredTool — frozen entry in ToolRegistry
+│   │   ├── repeated_tool_call_guard.py  # Detects repeated identical tool calls
+│   │   ├── sliding_window_history.py    # SlidingWindowHistory — max-20 with LLM compaction
+│   │   ├── start_dictation_tool.py      # StartDictationTool — launches dictation session
+│   │   ├── switch_model_tool.py         # SwitchModelTool — hot-swaps an LLM slot
+│   │   └── tool_runtime.py              # ToolRuntime — wires planner, executor, internal tools
+│   ├── shared/                          # Used by all layers; depends on nothing else
+│   │   ├── config/
+│   │   │   ├── config.py                # Config — frozen dataclass, all runtime settings
+│   │   │   ├── config_factory.py        # ConfigFactory — reads env vars, builds Config
+│   │   │   └── startup_options.py       # StartupOptions — CLI args (verbosity, log groups)
+│   │   ├── llm/
+│   │   │   ├── interfaces/
+│   │   │   │   ├── llm_provider.py      # LLMProvider ABC — complete, complete_tool_call, etc.
+│   │   │   │   └── llm_provider_factory.py # LLMProviderFactory ABC
+│   │   │   ├── llm_payload_logger.py    # Logs prompts and tool schemas for debugging
+│   │   │   ├── llm_proxy.py             # LLMProxy — retry + wait indicator + swap()
+│   │   │   ├── llm_registry.py          # LLMRegistry — named slots + runtime swap
+│   │   │   ├── llm_retry_policy.py      # LLMRetryPolicy — retryable error classification
+│   │   │   ├── llm_retry_runner.py      # LLMRetryRunner — exponential backoff loop
+│   │   │   └── tool_use_failed_recovery.py # Graceful recovery for tool_use_failed errors
+│   │   ├── logging/
+│   │   │   ├── interfaces/
+│   │   │   │   ├── log_printer.py       # LogPrinter ABC — log, show_wait, clear_wait
+│   │   │   │   └── conversation_logger.py # ConversationLogger ABC — log_message
+│   │   │   ├── color_log_printer.py     # ColorLogPrinter — colored console output by tag
+│   │   │   └── daily_file_logger.py     # DailyFileLogger — daily-rotation conversation log
+│   │   ├── mcp/
+│   │   │   ├── adapter_env_builder.py   # AdapterEnvironmentBuilder — managed venv setup
+│   │   │   ├── adapter_watcher.py       # AdapterWatcher — file-system hot-plug via watchdog
+│   │   │   ├── mcp_client.py            # MCPClient — stdio JSON-RPC client
+│   │   │   └── mcp_tool_proxy.py        # MCPToolProxy — adapts MCPToolSchema to RegisteredTool
+│   │   ├── schemas/                     # Frozen dataclasses (all inter-layer data)
 │   │   │   ├── app_entry.py             # AppEntry — desktop application (name + exec_cmd)
 │   │   │   ├── chat_message.py          # ChatMessage — role + content, summary detection
 │   │   │   ├── desktop_context.py       # DesktopContext — active window + window list
@@ -248,97 +195,53 @@ tusk/
 │   │   │   ├── llm_slot_config.py       # LLMSlotConfig — parsed provider/model string
 │   │   │   ├── mcp_tool_result.py       # MCPToolResult — adapter tool response
 │   │   │   ├── mcp_tool_schema.py       # MCPToolSchema — adapter tool definition
-│   │   │   ├── task_execution_result.py # TaskExecutionResult — executor output
-│   │   │   ├── task_plan.py             # TaskPlan — planner output (steps + selected tools)
 │   │   │   ├── tool_call.py             # ToolCall — tool name + parameters + call_id
 │   │   │   ├── tool_result.py           # ToolResult — success + message + data
 │   │   │   ├── utterance.py             # Utterance — transcribed text + audio + confidence
 │   │   │   └── window_info.py           # WindowInfo — title + app + geometry + active flag
-│   │   ├── agent.py                     # MainAgent — conversation agent (execute_task only)
-│   │   ├── agent_tool_loop.py           # AgentToolLoop — iterative native tool calling
-│   │   ├── adaptive_interaction_clock.py # AdaptiveInteractionClock — adaptive follow-up timeout
-│   │   ├── adapter_manager.py           # AdapterManager — MCP adapter lifecycle
-│   │   ├── command_mode.py              # CommandMode — gatekeeper prompt + command dispatch
-│   │   ├── dictation_mode.py            # AdapterDictationMode — active dictation state
-│   │   ├── dictation_router.py          # DictationRouter — routes segments and edits
-│   │   ├── dictation_state.py           # DictationState — session + adapter + desktop source
-│   │   ├── execute_task_tool.py         # ExecuteTaskTool — planner_visible=False kernel tool
-│   │   ├── execution_agent.py           # ExecutionAgent — selected-tool executor
-│   │   ├── fallback_task_planner.py     # FallbackTaskPlanner — primary/secondary fallback
-│   │   ├── hallucination_filter.py      # HallucinationFilter — pre-gatekeeper STT rejection
-│   │   ├── kernel_api.py                # KernelAPI — public submit_utterance / submit_text interface
-│   │   ├── llm_gatekeeper.py            # LLMGatekeeper — structured-output classification
-│   │   ├── llm_task_planner.py          # LLMTaskPlanner — structured-output planner
-│   │   ├── model_failure_reply_builder.py # Human-readable LLM failure messages
-│   │   ├── pipeline.py                  # Pipeline — STT → filter → gate → mode routing
-│   │   ├── recent_context_formatter.py  # RecentContextFormatter — last 6 messages for gatekeeper
-│   │   ├── registered_tool.py           # RegisteredTool — frozen entry in ToolRegistry
-│   │   ├── repeated_tool_call_guard.py  # Detects repeated identical tool calls in executor
-│   │   ├── sliding_window_history.py    # SlidingWindowHistory — max-20 with LLM compaction
-│   │   ├── start_dictation_tool.py      # StartDictationTool — launches dictation session
-│   │   ├── switch_model_tool.py         # SwitchModelTool — hot-swaps an LLM slot
-│   │   ├── task_execution_service.py    # TaskExecutionService — plan → validate → execute → replan
-│   │   ├── task_plan_parser.py          # Parses raw planner JSON into TaskPlan
-│   │   ├── task_plan_validator.py       # Validates TaskPlan before execution
-│   │   ├── task_planner_message_builder.py # Builds planner user message (task + catalog + replan)
-│   │   ├── tool_call_executor.py        # Executes a ToolCall against the registry
-│   │   ├── tool_call_parser.py          # Legacy parser (not used by native tool-calling runtime)
-│   │   ├── tool_loop_recorder.py        # Records tool calls and results into message history
-│   │   ├── tool_prompt_builder.py       # Builds compact name:description catalog text
-│   │   ├── tool_registry.py             # ToolRegistry — central tool store with planner_visible
-│   │   ├── tool_runtime.py              # ToolRuntime — wires planner, executor, internal tools
-│   │   └── visible_tool_definition_builder.py # Builds native tool definition dicts for LLM
-│   └── lib/                             # Infrastructure layer (swappable implementations)
-│       ├── config/
-│       │   ├── config.py                # Config — frozen dataclass, all runtime settings
-│       │   ├── config_factory.py        # ConfigFactory — reads env vars, builds Config
-│       │   └── startup_options.py       # StartupOptions — CLI args (verbosity, log groups)
+│   │   └── stt/
+│   │       └── interfaces/
+│   │           └── stt_engine.py        # STTEngine ABC — transcribe(audio_frames, sample_rate)
+│   └── providers/                       # Swappable implementations behind shared ABCs
 │       ├── llm/
-│       │   ├── interfaces/
-│       │   │   ├── llm_provider.py      # LLMProvider ABC — complete, complete_tool_call, etc.
-│       │   │   └── llm_provider_factory.py # LLMProviderFactory ABC — create(provider, model)
-│       │   ├── providers/
-│       │   │   ├── groq_llm.py          # GroqLLM — Groq cloud API with structured output
-│       │   │   ├── open_router_llm.py   # OpenRouterLLM — OpenRouter via OpenAI client
-│       │   │   └── configurable_llm_factory.py # Parses "provider/model" strings
-│       │   ├── llm_payload_logger.py    # Logs prompts and tool schemas for debugging
-│       │   ├── llm_proxy.py             # LLMProxy — retry + wait indicator + swap()
-│       │   ├── llm_registry.py          # LLMRegistry — four named slots + runtime swap
-│       │   ├── llm_retry_policy.py      # LLMRetryPolicy — retryable error classification
-│       │   ├── llm_retry_runner.py      # LLMRetryRunner — exponential backoff loop
-│       │   └── tool_use_failed_recovery.py # Graceful recovery for tool_use_failed errors
-│       ├── logging/
-│       │   ├── interfaces/
-│       │   │   ├── log_printer.py       # LogPrinter ABC — log, show_wait, clear_wait
-│       │   │   └── conversation_logger.py # ConversationLogger ABC — log_message
-│       │   ├── color_log_printer.py     # ColorLogPrinter — colored console output by tag
-│       │   └── daily_file_logger.py     # DailyFileLogger — daily-rotation conversation log
-│       ├── mcp/
-│       │   ├── adapter_env_builder.py   # AdapterEnvironmentBuilder — managed venv setup
-│       │   ├── adapter_watcher.py       # AdapterWatcher — file-system hot-plug via watchdog
-│       │   ├── mcp_client.py            # MCPClient — stdio JSON-RPC client
-│       │   └── mcp_tool_proxy.py        # MCPToolProxy — adapts MCPToolSchema to RegisteredTool
+│       │   ├── groq_llm.py              # GroqLLM — Groq cloud API with structured output
+│       │   ├── open_router_llm.py       # OpenRouterLLM — OpenRouter via OpenAI client
+│       │   └── configurable_llm_factory.py # Parses "provider/model" strings
 │       └── stt/
-│           ├── interfaces/
-│           │   └── stt_engine.py        # STTEngine ABC — transcribe(audio_frames, sample_rate)
-│           └── providers/
-│               ├── groq_stt.py          # GroqSTT — Groq cloud Whisper-large-v3-turbo
-│               └── whisper_stt.py       # WhisperSTT — local OpenAI Whisper model
+│           ├── groq_stt.py              # GroqSTT — Groq cloud Whisper-large-v3-turbo
+│           └── whisper_stt.py           # WhisperSTT — local OpenAI Whisper model
 ├── shells/
-│   ├── voice/
-│   │   ├── shell.json                   # Shell manifest (entry_module, entry_class)
-│   │   ├── voice_shell.py               # VoiceShell — audio capture + utterance loop
-│   │   ├── audio_capture.py             # AudioCapture — sounddevice PulseAudio stream
-│   │   └── utterance_detector.py        # UtteranceDetector — WebRTC VAD boundary detection
+│   ├── voice/                           # Six-stage composable voice pipeline
+│   │   ├── README.md                    # Voice shell architecture (see that file)
+│   │   ├── pipeline.py                  # VoicePipeline — assembles stages, dispatches GateDispatch
+│   │   ├── voice_shell.py               # VoiceShell — entry point, calls kernel.submit()
+│   │   ├── buffered_utterance.py        # BufferedUtterance — Utterance + id + gate_state
+│   │   ├── gate_dispatch.py             # GateDispatch — action + text + recovered_id
+│   │   ├── recovery_decision.py         # RecoveryDecision — action + candidate_id + reason
+│   │   ├── interfaces/
+│   │   │   ├── gatekeeper.py            # Gatekeeper ABC
+│   │   │   └── transcription_buffer.py  # TranscriptionBuffer ABC
+│   │   └── stages/
+│   │       ├── audio_capture.py         # AudioCapture — sounddevice PulseAudio stream
+│   │       ├── utterance_detector.py    # UtteranceDetector — WebRTC VAD boundary detection
+│   │       ├── transcriber.py           # Transcriber — wraps STTEngine
+│   │       ├── sanitizer.py             # Sanitizer — hallucination / ghost-phrase filter
+│   │       ├── transcription_buffer.py  # TranscriptionBuffer — rolling window + state tracking
+│   │       ├── gatekeeper.py            # LLMGatekeeper — primary classify + recovery
+│   │       ├── gatekeeper_parser.py     # JSON parsing for gate and recovery LLM responses
+│   │       ├── gatekeeper_support.py    # Helpers: schemas, dispatch builders, wake-word check
+│   │       ├── command_gate_prompt.py   # Prompt builder for the primary classification call
+│   │       ├── recovery_gate_prompt.py  # Prompt builder for the recovery LLM call
+│   │       └── recent_context_formatter.py # Formats recent utterances for context
 │   └── cli/
 │       ├── shell.json                   # Shell manifest
-│       └── cli_shell.py                 # CLIShell — stdin REPL, bypasses STT + gatekeeper
+│       └── cli_shell.py                 # CLIShell — stdin REPL, bypasses voice pipeline
 ├── adapters/
 │   ├── gnome/
 │   │   ├── adapter.json                 # Adapter manifest (name, transport, entry, provides_context)
 │   │   ├── server.py                    # GNOME MCP server entry point
 │   │   ├── gnome_tool_router.py         # Routes tool calls to handler modules
-│   │   ├── gnome_tool_schema_catalog.py # Builds all 21 tool schemas for MCP list_tools
+│   │   ├── gnome_tool_schema_catalog.py # Builds all tool schemas for MCP list_tools
 │   │   ├── gnome_application_tools.py   # launch_application
 │   │   ├── gnome_window_tools.py        # close/focus/maximize/minimize/move_resize/switch_workspace
 │   │   ├── gnome_input_tools.py         # press_keys, type_text, replace_recent_text
@@ -358,21 +261,21 @@ tusk/
 │       ├── dictation_refiner.py         # DictationRefiner — LLM-based segment cleanup
 │       └── dictation_tool_schema_catalog.py # start_dictation, process_segment, stop_dictation
 └── tests/
-    ├── test_agent_tool_loop.py
-    ├── test_task_planner.py
-    ├── test_task_executor.py
     ├── test_pipeline.py
-    └── ...                              # Full test suite for kernel + lib + adapters + shells
+    ├── test_voice_shell.py
+    ├── test_transcription_buffer.py
+    ├── test_gatekeeper_follow_up.py
+    └── ...                              # Full test suite for all layers
 ```
 
 ---
 
 ## Abstract Base Classes
 
-TUSK defines 16 ABCs that form the extension boundary between components. No concrete
-class may import another concrete class directly — only ABCs cross layer boundaries.
+TUSK defines ABCs at each layer boundary. No concrete class imports another concrete
+class directly — only ABCs cross layer boundaries.
 
-### LLMProvider — `tusk/lib/llm/interfaces/llm_provider.py`
+### LLMProvider — `tusk/shared/llm/interfaces/llm_provider.py`
 
 ```python
 @property def label(self) -> str
@@ -387,19 +290,19 @@ def complete_structured(self, system_prompt: str, user_message: str,
 JSON response conforming to a named schema — used by planner and gatekeeper. Providers
 may fall back to `complete` if structured output is unavailable.
 
-### LLMProviderFactory — `tusk/lib/llm/interfaces/llm_provider_factory.py`
+### LLMProviderFactory — `tusk/shared/llm/interfaces/llm_provider_factory.py`
 
 ```python
 def create(self, provider_name: str, model: str) -> LLMProvider
 ```
 
-### STTEngine — `tusk/lib/stt/interfaces/stt_engine.py`
+### STTEngine — `tusk/shared/stt/interfaces/stt_engine.py`
 
 ```python
 def transcribe(self, audio_frames: bytes, sample_rate: int) -> Utterance
 ```
 
-### LogPrinter — `tusk/lib/logging/interfaces/log_printer.py`
+### LogPrinter — `tusk/shared/logging/interfaces/log_printer.py`
 
 ```python
 def log(self, tag: str, message: str, group: str | None = None) -> None
@@ -409,48 +312,41 @@ def clear_wait(self) -> None
 
 `show_wait` / `clear_wait` display a spinner while waiting for an LLM response.
 
-### ConversationLogger — `tusk/lib/logging/interfaces/conversation_logger.py`
+### ConversationLogger — `tusk/shared/logging/interfaces/conversation_logger.py`
 
 ```python
 def log_message(self, message: ChatMessage) -> None
 ```
 
-### Agent — `tusk/kernel/interfaces/agent.py`
+### Gatekeeper — `shells/voice/interfaces/gatekeeper.py`
 
 ```python
-def process_command(self, command: str) -> str
+def evaluate(self, utterance: Utterance, recent: list[Utterance]) -> GateResult
+def process(self, utterance: Utterance | BufferedUtterance,
+            recent: list[Utterance],
+            candidates: list[BufferedUtterance] | None = None) -> GateDispatch
 ```
 
-### Gatekeeper — `tusk/kernel/interfaces/gatekeeper.py`
+`process` returns a `GateDispatch` (action + optional text + recovered_id). Actions:
+`forward_current`, `forward_recovered`, `forward_clarification`, `drop`. The follow-up
+window is tracked internally via `_last_forwarded_at`. Recovery is a second LLM call
+triggered when the primary classification is not `command`.
+
+### TranscriptionBuffer — `shells/voice/interfaces/transcription_buffer.py`
 
 ```python
-def evaluate(self, utterance: Utterance, system_prompt: str) -> GateResult
+def process(self, utterance: Utterance) -> BufferedUtterance | None
+def recent(self, count: int) -> list[Utterance]
+def recoverable(self, count: int, max_age_seconds: float) -> list[BufferedUtterance]
+def mark_consumed(self, entry_id: str) -> None
+def mark_dropped(self, entry_id: str) -> None
+def mark_forwarded(self, entry_id: str) -> None
+def mark_recovered(self, entry_id: str) -> None
 ```
 
-The `system_prompt` is provided by the current pipeline mode. The gatekeeper has no
-embedded prompt — it is fully stateless with respect to context and classification rules.
-
-### TaskPlanner — `tusk/kernel/interfaces/task_planner.py`
-
-```python
-def plan(self, task: str, tool_catalog: str,
-         previous_plan: TaskPlan | None = None,
-         needed_capability: str = "") -> TaskPlan
-```
-
-### TaskExecutor — `tusk/kernel/interfaces/task_executor.py`
-
-```python
-def execute(self, task: str, plan: TaskPlan) -> TaskExecutionResult
-```
-
-### InteractionClock — `tusk/kernel/interfaces/interaction_clock.py`
-
-```python
-def record_interaction(self) -> None
-def seconds_since_last_interaction(self) -> float
-def is_within_follow_up_window(self) -> bool
-```
+`process` wraps the utterance in a `BufferedUtterance` (adds `id`, `received_at`,
+`gate_state`). `recoverable` returns entries with `gate_state == "dropped"` within
+`max_age_seconds`. The pipeline calls `mark_*` after the gatekeeper decides.
 
 ### ConversationHistory — `tusk/kernel/interfaces/conversation_history.py`
 
@@ -466,36 +362,14 @@ def clear(self) -> None
 def summarize(self, messages: list[ChatMessage]) -> str
 ```
 
-### UtteranceFilter — `tusk/kernel/interfaces/utterance_filter.py`
-
-```python
-def is_valid(self, utterance: Utterance) -> bool
-```
-
-Applied after STT, before the gatekeeper. Rejects hallucinations and noise artifacts.
-
 ### PipelineMode — `tusk/kernel/interfaces/pipeline_mode.py`
 
 ```python
 @property def gatekeeper_prompt(self) -> str
-def handle_utterance(self, gate_result: GateResult, utterance: Utterance,
-                     controller: PipelineController) -> None
+def handle_command(self, text: str) -> KernelResponse
 ```
 
-### PipelineController — `tusk/kernel/interfaces/pipeline_controller.py`
-
-```python
-def set_mode(self, mode: PipelineMode) -> None
-```
-
-Implemented by `Pipeline`. Passed to `handle_utterance` so modes can trigger transitions.
-
-### Shell — `tusk/kernel/interfaces/shell.py`
-
-```python
-def start(self, api: object) -> None
-def stop(self) -> None
-```
+Used by `CommandMode` and `DictationMode` to route submitted text inside the kernel.
 
 ---
 
@@ -504,7 +378,7 @@ def stop(self) -> None
 All inter-component data is passed as immutable frozen dataclasses. No untyped dicts
 cross component boundaries.
 
-### Utterance — `tusk/kernel/schemas/utterance.py`
+### Utterance — `tusk/shared/schemas/utterance.py`
 
 | Field | Type | Description |
 |---|---|---|
@@ -513,7 +387,7 @@ cross component boundaries.
 | `duration_seconds` | `float` | Duration of the audio segment |
 | `confidence` | `float` | STT confidence score (0.0–1.0) |
 
-### GateResult — `tusk/kernel/schemas/gate_result.py`
+### GateResult — `tusk/shared/schemas/gate_result.py`
 
 | Field | Type | Description |
 |---|---|---|
@@ -524,7 +398,7 @@ cross component boundaries.
 
 The `classification` key in `metadata` holds `"command"`, `"conversation"`, or `"ambient"`.
 
-### TaskPlan — `tusk/kernel/schemas/task_plan.py`
+### TaskPlan — `tusk/shared/schemas/task_plan.py`
 
 | Field | Type | Description |
 |---|---|---|
@@ -534,7 +408,7 @@ The `classification` key in `metadata` holds `"command"`, `"conversation"`, or `
 | `selected_tools` | `list[str]` | Tool names chosen from the registry |
 | `reason` | `str` | Planner's reasoning (for logging) |
 
-### TaskExecutionResult — `tusk/kernel/schemas/task_execution_result.py`
+### TaskExecutionResult — `tusk/shared/schemas/task_execution_result.py`
 
 | Field | Type | Description |
 |---|---|---|
@@ -543,7 +417,7 @@ The `classification` key in `metadata` holds `"command"`, `"conversation"`, or `
 | `reason` | `str` | Internal reason (for logging and replan context) |
 | `needed_capability` | `str` | Populated when `status="need_tools"` |
 
-### ToolCall — `tusk/kernel/schemas/tool_call.py`
+### ToolCall — `tusk/shared/schemas/tool_call.py`
 
 | Field | Type | Description |
 |---|---|---|
@@ -551,7 +425,7 @@ The `classification` key in `metadata` holds `"command"`, `"conversation"`, or `
 | `parameters` | `dict[str, object]` | Tool input parameters |
 | `call_id` | `str` | Provider-assigned call ID (empty string if absent) |
 
-### ToolResult — `tusk/kernel/schemas/tool_result.py`
+### ToolResult — `tusk/shared/schemas/tool_result.py`
 
 | Field | Type | Description |
 |---|---|---|
@@ -559,7 +433,7 @@ The `classification` key in `metadata` holds `"command"`, `"conversation"`, or `
 | `message` | `str` | Human-readable result or error |
 | `data` | `dict \| None` | Structured output (e.g. dictation session data) |
 
-### ChatMessage — `tusk/kernel/schemas/chat_message.py`
+### ChatMessage — `tusk/shared/schemas/chat_message.py`
 
 | Field | Type | Description |
 |---|---|---|
@@ -569,14 +443,14 @@ The `classification` key in `metadata` holds `"command"`, `"conversation"`, or `
 `is_summary` property: returns `True` if content starts with `"Previous context summary: "`.
 `to_dict()` method: returns `{"role": ..., "content": ...}` for LLM API calls.
 
-### KernelResponse — `tusk/kernel/schemas/kernel_response.py`
+### KernelResponse — `tusk/shared/schemas/kernel_response.py`
 
 | Field | Type | Description |
 |---|---|---|
 | `handled` | `bool` | Whether the pipeline processed this input |
 | `reply` | `str` | Text reply to surface to the user |
 
-### MCPToolSchema — `tusk/kernel/schemas/mcp_tool_schema.py`
+### MCPToolSchema — `tusk/shared/schemas/mcp_tool_schema.py`
 
 | Field | Type | Description |
 |---|---|---|
@@ -584,7 +458,7 @@ The `classification` key in `metadata` holds `"command"`, `"conversation"`, or `
 | `description` | `str` | One-line tool description |
 | `input_schema` | `dict` | JSON Schema object describing parameters |
 
-### MCPToolResult — `tusk/kernel/schemas/mcp_tool_result.py`
+### MCPToolResult — `tusk/shared/schemas/mcp_tool_result.py`
 
 | Field | Type | Description |
 |---|---|---|
@@ -592,7 +466,7 @@ The `classification` key in `metadata` holds `"command"`, `"conversation"`, or `
 | `is_error` | `bool` | Whether the adapter reported an error |
 | `data` | `dict \| None` | Structured payload (e.g. dictation edit operations) |
 
-### LLMSlotConfig — `tusk/kernel/schemas/llm_slot_config.py`
+### LLMSlotConfig — `tusk/shared/schemas/llm_slot_config.py`
 
 | Field | Type | Description |
 |---|---|---|
@@ -601,7 +475,7 @@ The `classification` key in `metadata` holds `"command"`, `"conversation"`, or `
 
 `LLMSlotConfig.parse("groq/llama-3.1-8b-instant")` → `LLMSlotConfig("groq", "llama-3.1-8b-instant")`
 
-### DesktopContext — `tusk/kernel/schemas/desktop_context.py`
+### DesktopContext — `tusk/shared/schemas/desktop_context.py`
 
 | Field | Type | Description |
 |---|---|---|
@@ -610,7 +484,7 @@ The `classification` key in `metadata` holds `"command"`, `"conversation"`, or `
 | `open_windows` | `list[WindowInfo]` | All open windows with geometry |
 | `available_applications` | `list[AppEntry]` | Installed desktop applications |
 
-### WindowInfo — `tusk/kernel/schemas/window_info.py`
+### WindowInfo — `tusk/shared/schemas/window_info.py`
 
 | Field | Type | Description |
 |---|---|---|
@@ -620,7 +494,7 @@ The `classification` key in `metadata` holds `"command"`, `"conversation"`, or `
 | `is_active` | `bool` | Whether this is the focused window |
 | `x`, `y`, `width`, `height` | `int` | Window geometry |
 
-### AppEntry — `tusk/kernel/schemas/app_entry.py`
+### AppEntry — `tusk/shared/schemas/app_entry.py`
 
 | Field | Type | Description |
 |---|---|---|
@@ -635,185 +509,103 @@ The `classification` key in `metadata` holds `"command"`, `"conversation"`, or `
 
 ```
 AudioCapture.stream_frames()
-    → UtteranceDetector.stream_utterances()    # WebRTC VAD boundary detection
-    → KernelAPI.submit_utterance(audio, rate)
-    → Pipeline.process_audio(audio, rate)
-        → STTEngine.transcribe()               # GroqSTT cloud Whisper-large-v3-turbo
-        → HallucinationFilter.is_valid()       # Rejects ghost phrases, short noise
-        → [confidence < 0.01 → discard]
-        → [dictation active?]
-            yes → LLMGatekeeper.evaluate(utterance, DICTATION_GATE_PROMPT)
-                → [metadata_stop present?]
-                    yes → AdapterDictationMode.stop()
-                    no  → AdapterDictationMode.process_text(utterance.text)
-                              → DictationRouter.process(state, text)
-                                  → dictation.process_segment (MCP)
-                                  → gnome.type_text or gnome.replace_recent_text (MCP)
-            no  → LLMGatekeeper.evaluate(utterance, CommandMode.gatekeeper_prompt)
-                → [is_directed_at_tusk=False → discard]
-                → CommandMode.process_command(cleaned_command)
-                    → MainAgent.process_command(command)
-                        → LLMProvider.complete_tool_call()
-                        → [tool=done/clarify/unknown → return reply]
-                        → [tool=execute_task]
-                            → TaskExecutionService.run(task)
-                                → LLMTaskPlanner.plan(task, catalog)
-                                → TaskPlanValidator.validate(plan)
-                                → ExecutionAgent.execute(task, plan)
-                                    → AgentToolLoop.run(...)
-                                        → LLMProvider.complete_tool_call()
-                                        → ToolCallExecutor.execute(tool_call)
-                                            → MCPToolProxy → adapter (stdio JSON-RPC)
-                                        → [need_tools → replan, max 2 replans]
+    → UtteranceDetector.stream_utterances()    # WebRTC VAD + boundary buffering
+    → Transcriber.process(utterance)           # STTEngine.transcribe() → text
+    → Sanitizer.process(transcribed)           # hallucination / ghost-phrase filter → DROP
+    → TranscriptionBuffer.process(sanitized)   # append to rolling window
+    → LLMGatekeeper.process(buffered, recent)  # LLM 3-way classify → DROP (ambient)
+    → KernelAPI.submit(command_text)
+        → CommandMode.process_command(text)
+            → MainAgent.process_command(command)
+                → AgentOrchestrator.run(profile="conversation")
+                    → AgentRuntime: LLM_C → run_agent(profile="planner")
+                        → AgentRuntime: LLM_P → done(selected_tool_names=[...])
+                    → AgentRuntime: LLM_C → run_agent(profile="executor", session_refs)
+                        → AgentRuntime: LLM_E → ToolRegistry → MCPToolProxy
+                            → adapter (stdio JSON-RPC)
+                    → AgentRuntime: LLM_C → done(text)
     → KernelResponse(handled, reply)
+
+# Recovery path (when gatekeeper returns forward_recovered):
+    → GateDispatch(action="forward_recovered", text=prior_text, recovered_id)
+    → buffer.mark_recovered(recovered_id); buffer.mark_consumed(current_id)
+    → KernelAPI.submit(prior_text)
 ```
 
 ### CLI Shell Path
 
 ```
 stdin → CLIShell.start(api)
-    → KernelAPI.submit_text(text)
-    → Pipeline.process_text_command(text)
-    → CommandMode.process_command(text)
+    → KernelAPI.submit(text)             # bypasses entire voice pipeline
+    → CommandMode.handle(text)
     → [same from MainAgent onward]
     → KernelResponse(handled, reply)
     → print(reply)
 ```
 
-`submit_text` bypasses STT, hallucination filtering, and gatekeeping entirely.
+`submit(text)` bypasses STT, hallucination filtering, and gatekeeping entirely.
 
 ---
 
 ## Agent Structure
 
-### Conversation Agent — `tusk/kernel/agent.py`
+### Three Profiles — `tusk/kernel/agent_profiles.py`
 
-The conversation agent (`MainAgent`) maintains the user-facing history. It receives:
+All three profiles run through the same `AgentRuntime` loop. Each gets its own LLM slot,
+system prompt, allowed tools, and `max_steps`.
 
-- Prior conversation history (`SlidingWindowHistory`)
-- The new `Command: <text>` message
-- Native tool definitions for: `done`, `clarify`, `unknown`, `execute_task`
+| Profile | LLM slot | Static tools | Runtime tools | max_steps |
+|---|---|---|---|---|
+| `conversation` | `conversation_agent` | `done`, `run_agent` | — | 8 |
+| `planner` | `planner_agent` | `done`, `list_available_tools` | — | 8 |
+| `executor` | `executor_agent` | `done` | resolved from planner session | 16 |
 
-It does **not** receive desktop tool schemas, planner catalogs, or desktop context.
+**Conversation prompt (key rules):**
+- Answer directly with `done` for conversational replies.
+- Delegate actionable work: call `run_agent(profile_id="planner")` first, then
+  `run_agent(profile_id="executor", session_refs=[planner_session_id])`.
+- After executor returns `status=done`, call `done` immediately.
 
-**System prompt:**
-```
-You are TUSK, a desktop assistant.
-Use execute_task for requests that require actions, tools, apps, desktop control,
-  typing, clipboard, or model changes.
-Requests to start or stop dictation, or to switch assistant modes, are actionable
-  and must use execute_task.
-Use done for conversational replies that need no task execution.
-Use clarify when one short question is required before acting.
-Use unknown when the request cannot be handled.
-execute_task returns the final task result to the user.
-Call exactly one tool.
-```
+**Planner prompt (key rules):**
+- Plan but do not execute.
+- Use `list_available_tools` to discover runtime tool names.
+- Return `done(payload={selected_tool_names=[...], plan_text=...})`.
 
-**Tool dispatch:**
-- `done` / `clarify` / `unknown` → return `parameters["reply"]` directly
-- `execute_task` → call `TaskExecutionService.run(task)`, return the result
-- Any other tool → return an error string
+**Executor prompt (key rules):**
+- Execute using only the runtime tools provided.
+- Every response must be a single tool call.
+- Prefer clipboard + paste (`gnome.write_clipboard` + `gnome.press_keys`) for large text
+  over `gnome.type_text`.
+- Call `done` as the very next response after the final successful action.
 
-**History management:** After each command, both the command and the reply are appended
-to `SlidingWindowHistory`. When history exceeds 20 messages, the oldest half is compacted
-into a local summary message (last 6 messages of the evicted block, each truncated to
-120 chars, joined with `" | "`).
+### AgentRuntime — `tusk/kernel/agent/agent_runtime.py`
 
-### Planner — `tusk/kernel/llm_task_planner.py`
+Shared across all profiles. Each run is independent:
 
-A single structured-output LLM request. Uses `complete_structured` with a strict JSON
-schema. Falls back to `complete` with an explicit JSON format prompt if the provider
-returns a schema validation error.
+1. `RuntimeMessageHistoryBuilder` loads prior messages from `SessionStore` for this session.
+2. Appends the user instruction to messages and session store.
+3. Loops up to `profile.max_steps`:
+   - Calls `profile.llm_provider.complete_tool_call(system_prompt, messages, tools)`.
+   - `RepeatedToolCallGuard` aborts on duplicate identical call.
+   - `RuntimeTurnGuards` enforces profile-specific constraints.
+   - Dispatches the tool call; appends call + result to messages and session store.
+   - If tool is `done` → finish and persist result.
+4. Returns `AgentResult` with `session_id`, `status`, `reply_text`.
 
-**Input (user message):**
-```
-Task: <task text>
+### History Management
 
-Available tools:
-<name>: <description>
-...
-[Replan context if replanning:]
-Previous plan:
-- <step>
-...
-Previous selected tools: <tool>, <tool>
-Missing capability: <needed_capability>
-```
+`SlidingWindowHistory` is maintained by `MainAgent._remember()` after each turn (user
+command + assistant reply). It is **not** used as LLM context by `AgentRuntime` —
+the runtime reads from `SessionStore` per session. `SlidingWindowHistory` compaction
+is local string formatting (no LLM call): the oldest half is summarised as the last 6
+evicted messages truncated to 120 chars, joined with `" | "`.
 
-**Output schema:**
-```json
-{
-  "status": "execute|clarify|unknown",
-  "user_reply": "string",
-  "plan_steps": ["string"],
-  "selected_tools": ["string"],
-  "reason": "string"
-}
-```
+### Tool Handoff — `tusk/kernel/agent/planner_runtime_tool_resolver.py`
 
-**Validation rules (TaskPlanValidator):**
-- `execute` requires non-empty `plan_steps` and `selected_tools`
-- `clarify` and `unknown` require non-empty `user_reply`
-- Every `selected_tools` entry must exist in `ToolRegistry.planner_tool_names()`
-- Invalid output is converted to `TaskExecutionResult("failed", ...)` before execution
-
-### Execution Agent — `tusk/kernel/execution_agent.py`
-
-Receives the task, plan steps, and only the selected native tool schemas.
-
-**System prompt:**
-```
-You execute TUSK task plans.
-Use exactly one tool per response.
-Use only the tools provided in this execution session.
-Split long literal text into multiple gnome.type_text calls.
-Keep each gnome.type_text text argument short, about 300 characters or less.
-Use done when the task is complete.
-Use clarify when the user must answer one short question.
-Use unknown when the task cannot be handled.
-Use need_tools when the provided tool subset is insufficient.
-```
-
-**User message:**
-```
-Task:
-<task text>
-
-Plan:
-- <step 1>
-- <step 2>
-...
-```
-
-**Tool loop (`AgentToolLoop`):**
-- Maximum 16 steps per execution
-- Repeated identical tool call guard — stops with failure if the same call is seen twice
-- Terminal tools: `done`, `clarify`, `unknown`, `need_tools`
-- On `need_tools`: returns `TaskExecutionResult("need_tools", ...)` with `needed_capability`
-- On max steps exceeded: returns `TaskExecutionResult("failed", ...)`
-
----
-
-## Task Orchestration — `tusk/kernel/task_execution_service.py`
-
-```
-TaskExecutionService.run(task):
-    for attempt in range(MAX_REPLANS + 1):   # MAX_REPLANS = 2
-        plan = planner.plan(task, catalog, previous_plan, needed_capability)
-        invalid = validator.validate(plan)
-        if invalid:
-            return TaskExecutionResult("failed", ...)
-        if plan.status != "execute":
-            return TaskExecutionResult(plan.status, plan.user_reply, ...)
-        result = executor.execute(task, plan)
-        if result.status != "need_tools":
-            return result
-        previous_plan, needed_capability = plan, result.needed_capability
-    return TaskExecutionResult("failed", "I couldn't finish the task with the available tools.")
-```
-
-Final statuses: `done`, `clarify`, `unknown`, `failed`.
+When the executor profile receives `session_refs=[planner_session_id]` and no explicit
+`runtime_tool_names`, `PlannerRuntimeToolResolver` reads `selected_tool_names` from the
+planner's persisted `done` payload in `SessionStore` and validates each name against
+`ToolRegistry.real_tool_names()` before passing them to the executor.
 
 ---
 
@@ -844,10 +636,9 @@ dataclass:
 | `build_planner_catalog_text()` | `str` | `"name: description\n..."` for planner prompt |
 | `definitions_for(names)` | `list[dict]` | Native tool defs for a named subset |
 
-**Special case:** `execute_task` is registered with `planner_visible=False`. It is
-callable by the conversation agent but invisible to the planner.
-
 Adapter tools are registered as `adapter_name.tool_name` (e.g. `gnome.launch_application`).
+The planner uses `list_available_tools` (a synthetic tool in `AgentToolsetBuilder`) to
+inspect the registry at runtime — not a pre-built catalog string.
 
 ---
 
@@ -870,8 +661,8 @@ Recent context:
 ```
 The last 6 non-summary user messages from `SlidingWindowHistory` are included.
 
-`handle_gate_result`: discards `is_directed_at_tusk=False`; calls
-`agent.process_command(cleaned_command)` and records the interaction in `InteractionClock`.
+`handle_gate_result`: discards `is_directed_at_tusk=False`; calls `kernel.submit(text)`
+which routes the command to the agent.
 
 ### AdapterDictationMode — `tusk/kernel/dictation_mode.py`
 
@@ -913,7 +704,7 @@ Adapters are out-of-process MCP servers discovered from `adapter.json` manifests
 4. On failure, retries with a managed virtualenv (`AdapterEnvironmentBuilder`)
 5. `start_watcher()` watches `adapters/` for hot-plug via `watchdog`
 
-### MCPClient Protocol — `tusk/lib/mcp/mcp_client.py`
+### MCPClient Protocol — `tusk/shared/mcp/mcp_client.py`
 
 Communication is line-delimited JSON-RPC 2.0 over the subprocess's stdin/stdout:
 
@@ -926,7 +717,7 @@ Communication is line-delimited JSON-RPC 2.0 over the subprocess's stdin/stdout:
 Tool names in `tools/call` use the unscoped name (the `adapter_name.` prefix is added by
 `MCPToolProxy` during registration and stripped during dispatch).
 
-### MCPToolProxy — `tusk/lib/mcp/mcp_tool_proxy.py`
+### MCPToolProxy — `tusk/shared/mcp/mcp_tool_proxy.py`
 
 Wraps an `MCPToolSchema` to present the `RegisteredTool` interface. On `execute()`:
 1. Calls `MCPClient.call_tool(unscoped_name, parameters)` synchronously
@@ -952,12 +743,9 @@ Shells are dynamically loaded from `shell.json` manifests by `main.py`.
 
 ### VoiceShell — `shells/voice/voice_shell.py`
 
-```
-AudioCapture → UtteranceDetector → KernelAPI.submit_utterance(audio, rate)
-```
-
-Runs until `stop()` is called. `submit_utterance` returns a `KernelResponse`; the shell
-logs the reply if present. Constructed with `config` and `log_printer`.
+Builds a `VoicePipeline` from the six stages and drives it in a loop, passing
+`kernel.submit` as the callback. Logs the reply if present. See
+`shells/voice/README.md` for full pipeline details.
 
 ### CLIShell — `shells/cli/cli_shell.py`
 
@@ -973,7 +761,7 @@ shell runs on the main thread (blocking). This allows `voice` + `cli` simultaneo
 
 ## LLM Provider Specification
 
-### LLMProxy — `tusk/lib/llm/llm_proxy.py`
+### LLMProxy — `tusk/shared/llm/llm_proxy.py`
 
 Wraps any `LLMProvider`. Adds:
 
@@ -982,7 +770,7 @@ Wraps any `LLMProvider`. Adds:
 - **Payload logging:** `LLMPayloadLogger` logs system prompts and messages to the debug group
 - **Runtime swap:** `swap(provider)` replaces the inner provider without creating a new proxy
 
-### LLMRegistry — `tusk/lib/llm/llm_registry.py`
+### LLMRegistry — `tusk/shared/llm/llm_registry.py`
 
 Holds four named `LLMProxy` slots. `swap(slot_name, provider_name, model)` creates a new
 provider via `ConfigurableLLMFactory` and calls `proxy.swap()`.
@@ -991,13 +779,13 @@ Slots: `gatekeeper`, `planner`, `agent`, `utility`.
 
 In v1, the conversation agent and execution agent both use the `agent` slot.
 
-### LLMRetryRunner — `tusk/lib/llm/llm_retry_runner.py`
+### LLMRetryRunner — `tusk/shared/llm/llm_retry_runner.py`
 
 Retries on network and rate-limit errors. Does **not** retry `invalid_request_error` or
 `tool_use_failed` errors. Retried error classes: HTTP 429, 500, 502, 503, 504, connection
 errors, rate limit, timeout.
 
-### GroqLLM — `tusk/lib/llm/providers/groq_llm.py`
+### GroqLLM — `tusk/shared/llm/providers/groq_llm.py`
 
 - **Client:** `groq.Groq`, timeout 30 seconds
 - **Structured output:** Uses `response_format` with `json_schema` for models in
@@ -1007,7 +795,7 @@ errors, rate limit, timeout.
   with `tool_choice="auto"`
 - **label:** `"groq/<model>"`
 
-### OpenRouterLLM — `tusk/lib/llm/providers/open_router_llm.py`
+### OpenRouterLLM — `tusk/shared/llm/providers/open_router_llm.py`
 
 - **Client:** `openai.OpenAI` with base URL `https://openrouter.ai/api/v1`
 - **Headers:** `HTTP-Referer: https://github.com/vovka/tusk`, `X-Title: TUSK`
@@ -1018,7 +806,7 @@ errors, rate limit, timeout.
 
 ## STT Provider Specification
 
-### GroqSTT — `tusk/lib/stt/providers/groq_stt.py`
+### GroqSTT — `tusk/shared/stt/providers/groq_stt.py`
 
 - **Model:** `whisper-large-v3-turbo`
 - **Audio format:** PCM frames wrapped in a WAV container via `wave` stdlib module
@@ -1026,16 +814,17 @@ errors, rate limit, timeout.
   `[Applause]`, etc. → sets `confidence=0.0`
 - **Normal result:** `confidence=1.0`
 
-### WhisperSTT — `tusk/lib/stt/providers/whisper_stt.py`
+### WhisperSTT — `tusk/shared/stt/providers/whisper_stt.py`
 
 - **Model loading:** `whisper.load_model(model_size)` at construction time
 - **PCM decoding:** `numpy.frombuffer(audio_frames, dtype=numpy.int16) / 32768.0`
 - **Inference:** `model.transcribe(audio, fp16=False, language="en")`
 - **Confidence:** `min(1.0, max(0.0, (avg_logprob + 1.0))) * (1.0 - no_speech_prob)` per segment, averaged
 
-### HallucinationFilter — `tusk/kernel/hallucination_filter.py`
+### Sanitizer — `shells/voice/stages/sanitizer.py`
 
-Applied after STT, before the gatekeeper. Rejects:
+Applied after STT, before the buffer. Provider-agnostic hallucination and ghost-phrase
+filter. Rejects:
 - Duration < 0.4 seconds
 - Punctuation-only text
 - Text that normalizes (lowercase, strip trailing `.!?,`) to a known ghost phrase
@@ -1046,7 +835,7 @@ Applied after STT, before the gatekeeper. Rejects:
 
 ## Gatekeeper Specification
 
-**Source:** `tusk/kernel/llm_gatekeeper.py`
+**Source:** `shells/voice/stages/gatekeeper.py`
 
 ### Command Schema
 
@@ -1109,15 +898,12 @@ main()
       → SlidingWindowHistory(20, LLMConversationSummarizer(...))
       → ToolRuntime(registry, llm_registry, adapter_manager, log)
       → MainAgent(llm_registry.get("agent"), registry, history, log)
-      → _build_pipeline(config, log, llm_registry, history, agent)
-          → AdaptiveInteractionClock(follow_up_timeout, max_follow_up_timeout)
-          → RecentContextFormatter(history)
-          → CommandMode(agent, clock, formatter, log)
-          → LLMGatekeeper(llm_registry.get("gatekeeper"), log)
-          → Pipeline(GroqSTT(...), HallucinationFilter(), gatekeeper, command_mode, ...)
-      → ToolRuntime.register_tools(pipeline)   # wires StartDictationTool, SwitchModelTool, ExecuteTaskTool
-      → KernelAPI(pipeline, llm_registry, log)
-  → _load_shells(config, kernel_api)           # loads shell modules from shell.json
+      → KernelAPI(main_agent, llm_registry, log)   # exposes submit(text)
+  → _load_shells(config, kernel_api)               # loads shell modules from shell.json
+      # Voice shell builds its own six-stage pipeline:
+      → LLMGatekeeper(llm_registry.get("gatekeeper"), log)
+      → VoiceShell(config, log, stt_engine, gatekeeper)
+          → VoicePipeline(detector, transcriber, sanitizer, buffer, gatekeeper)
   → run shells (all but last in daemon threads, last blocks)
 ```
 
@@ -1155,21 +941,19 @@ main()
 | Component | Exception | Behaviour |
 |---|---|---|
 | `AudioCapture` | `sounddevice.PortAudioError` | Propagates — crashes process |
-| `GroqSTT` | Any | Propagates to `Pipeline.process_audio` — utterance dropped |
-| `WhisperSTT` | Any | Propagates to `Pipeline.process_audio` — utterance dropped |
-| `HallucinationFilter` | — | Returns `False` — utterance discarded silently |
+| `GroqSTT` | Any | Propagates to `Transcriber` — utterance dropped |
+| `WhisperSTT` | Any | Propagates to `Transcriber` — utterance dropped |
+| `Sanitizer` | — | Returns `None` — utterance discarded silently |
 | `LLMGatekeeper` | JSON parse error | Returns `GateResult(False, "", 0.0)` |
 | `LLMGatekeeper` | Both LLM calls fail | Returns `GateResult(False, "", 0.0)` |
 | `MainAgent` | LLM failure | Returns `ModelFailureReplyBuilder` message string |
-| `LLMTaskPlanner` | Structured output fails | Falls back to plain `complete` |
-| `LLMTaskPlanner` | Both calls fail | Raises — caught by `TaskExecutionService` |
-| `TaskExecutionService` | Any | Returns `TaskExecutionResult("failed", ...)` |
-| `AgentToolLoop` | LLM failure | Returns `ToolCall("unknown", ...)`, loop terminates |
-| `AgentToolLoop` | Max steps | Returns `TaskExecutionResult("failed", ...)` |
-| `AgentToolLoop` | Repeated tool call | Returns `TaskExecutionResult("failed", ...)` |
+| `AgentRuntime` | LLM failure | `ModelFailureReplyBuilder` → `done(status="failed")` |
+| `AgentRuntime` | Max steps reached | Returns `AgentResult(status="failed")` |
+| `AgentRuntime` | Repeated tool call | Returns `AgentResult(status="failed")` |
+| `PlannerResultValidator` | Invalid `selected_tool_names` | Strips unknown names; fails if none remain |
 | `MCPToolProxy` | Adapter error | Returns `ToolResult(False, error_message)` |
 | `AdapterManager` | Adapter startup fails | Logs error, continues without that adapter |
-| `Pipeline.process_audio` | Any from above | Caught — returns `KernelResponse(False, "")` |
+| `VoicePipeline.run` | Any from above | Stage returns `None` — utterance silently dropped |
 | `LLMRetryRunner` | Retryable error | Retries up to 3 times, delay `0.5 * attempt` s |
 | `LLMRetryRunner` | Non-retryable | Re-raises immediately |
 
@@ -1179,11 +963,13 @@ main()
 
 ### Kernel-Internal Tools
 
-| Tool | Name | `planner_visible` | Parameters | Execution |
-|---|---|---|---|---|
-| `ExecuteTaskTool` | `execute_task` | `False` | `task: str` | Runs `TaskExecutionService.run(task)` |
-| `StartDictationTool` | `start_dictation` | `True` | *(none)* | Starts MCP dictation session, sets pipeline mode |
-| `SwitchModelTool` | `switch_model` | `True` | `slot`, `provider`, `model` | Calls `LLMRegistry.swap()` |
+| Tool | Name | Parameters | Execution |
+|---|---|---|---|
+| `StartDictationTool` | `start_dictation` | *(none)* | Starts MCP dictation session, sets kernel dictation mode |
+| `SwitchModelTool` | `switch_model` | `slot`, `provider`, `model` | Calls `LLMRegistry.swap()` |
+
+Synthetic tools (`done`, `run_agent`, `list_available_tools`) are built dynamically by
+`AgentToolsetBuilder` per profile and are never stored in `ToolRegistry`.
 
 ### GNOME Adapter Tools (prefix: `gnome.`)
 
@@ -1255,6 +1041,7 @@ main()
 - HTTP MCP transport is not implemented. `MCPClient.connect_http()` raises
   `NotImplementedError`.
 - Dangerous-action confirmation and cross-session memory remain out of scope.
-- The `AdaptiveInteractionClock` extends the follow-up window based on recent activity:
-  1× base timeout for ≤1 recent interaction, 2× for ≤3, 3× for >3, capped at
-  `max_follow_up_timeout_seconds`.
+- The `LLMGatekeeper` tracks its own `_last_forwarded_at` timestamp. When it forwarded
+  recently (within `follow_up_window_seconds`, default 30 s), it includes recent context
+  in the classification prompt so conversational follow-ups work without a wake word.
+  No external clock or side channel is needed.

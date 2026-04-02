@@ -2,7 +2,7 @@ import types
 
 from adapters.gnome.gnome_application_tools import GnomeApplicationTools
 from adapters.gnome.server import GnomeServer
-from tusk.kernel.schemas.desktop_context import DesktopContext, WindowInfo
+from tusk.shared.schemas.desktop_context import DesktopContext, WindowInfo
 
 
 def test_search_applications_ranks_exact_name_first() -> None:

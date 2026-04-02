@@ -1,7 +1,7 @@
 import types
 
 from tusk.kernel.dictation_router import DictationRouter
-from tusk.kernel.schemas.tool_result import ToolResult
+from tusk.shared.schemas.tool_result import ToolResult
 
 
 def test_dictation_router_logs_segment_and_apply() -> None:

@@ -1,6 +1,6 @@
-from tusk.lib.llm.providers.groq_llm import _tool_or_done as groq_tool_or_done
-from tusk.lib.llm.providers.open_router_llm import _tool_or_done as openrouter_tool_or_done
-from tusk.lib.llm.tool_use_failed_recovery import ToolUseFailedRecovery
+from tusk.providers.llm.groq_llm import _tool_or_done as groq_tool_or_done
+from tusk.providers.llm.open_router_llm import _tool_or_done as openrouter_tool_or_done
+from tusk.shared.llm.tool_use_failed_recovery import ToolUseFailedRecovery
 
 
 def test_groq_tool_fallback_converts_text_to_done() -> None:

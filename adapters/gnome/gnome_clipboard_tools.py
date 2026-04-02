@@ -10,5 +10,6 @@ class GnomeClipboardTools:
         return {"success": bool(text), "message": text or "clipboard empty", "data": {"text": text}}
 
     def write_clipboard(self, arguments: dict) -> dict:
-        self._clipboard.write(arguments["text"])
-        return {"success": True, "message": "clipboard written"}
+        text = arguments["text"]
+        self._clipboard.write(text)
+        return {"success": True, "message": "clipboard written", "data": {"clipboard_text": text}}

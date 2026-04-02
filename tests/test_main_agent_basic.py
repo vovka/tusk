@@ -2,7 +2,7 @@ import json
 import types
 
 from tests.kernel_api_support import HistoryRecorder, make_agent, make_registry_tool
-from tusk.kernel.schemas.tool_call import ToolCall
+from tusk.shared.schemas.tool_call import ToolCall
 from tusk.kernel.tool_registry import ToolRegistry
 
 
@@ -63,7 +63,7 @@ def _planner_call() -> ToolCall:
 
 
 def _executor_call(messages: list[dict[str, str]]) -> ToolCall:
-    planner_result = json.loads(messages[-1]["content"])
+    planner_result = _child_result(messages)
     return ToolCall("run_agent", {
         "profile_id": "executor", "instruction": "open gedit",
         "runtime_tool_names": planner_result["payload"]["selected_tool_names"],
@@ -87,6 +87,19 @@ def _done_llm(status: str, summary: str, text: str) -> object:
 
 def _failing_llm(exc: Exception) -> object:
     return types.SimpleNamespace(label="conversation", complete_tool_call=lambda *args: (_ for _ in ()).throw(exc))
+
+
+def _child_result(messages: list[dict[str, str]]) -> dict[str, object]:
+    content = next(item["content"] for item in reversed(messages) if item["content"].startswith("[child-result]"))
+    lines = content.splitlines()[1:]
+    fields = {line.split(": ", 1)[0]: line.split(": ", 1)[1] for line in lines}
+    return {
+        "profile_id": fields["child_profile"],
+        "status": fields["child_status"],
+        "session_id": fields["child_session_id"],
+        "summary": fields["child_summary"],
+        "payload": json.loads(fields["child_payload"]),
+    }
 
 
 def _launch_schema() -> dict[str, object]:

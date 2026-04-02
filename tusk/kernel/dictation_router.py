@@ -1,13 +1,13 @@
-from tusk.kernel.schemas.tool_result import ToolResult
-from tusk.kernel.schemas.kernel_response import KernelResponse
+from tusk.shared.schemas.tool_result import ToolResult
+from tusk.shared.schemas.kernel_response import KernelResponse
 
 __all__ = ["DictationRouter"]
 
 
 class DictationRouter:
-    def __init__(self, tool_registry: object, pipeline: object, log_printer: object) -> None:
+    def __init__(self, tool_registry: object, controller: object, log_printer: object) -> None:
         self._registry = tool_registry
-        self._pipeline = pipeline
+        self._controller = controller
         self._log = log_printer
 
     def process(self, state: object, text: str) -> KernelResponse:
@@ -24,7 +24,7 @@ class DictationRouter:
 
     def stop(self, state: object) -> KernelResponse:
         self._registry.get(f"{state.adapter_name}.stop_dictation").execute({"session_id": state.session_id})
-        self._pipeline.stop_dictation()
+        self._controller.stop_dictation()
         return KernelResponse(True, "Dictation stopped.")
 
     def _segment_result(self, state: object, text: str) -> object:

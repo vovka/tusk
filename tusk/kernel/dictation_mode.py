@@ -1,6 +1,6 @@
 from tusk.kernel.dictation_state import DictationState
-from tusk.lib.logging.interfaces.log_printer import LogPrinter
-from tusk.kernel.schemas.kernel_response import KernelResponse
+from tusk.shared.logging.interfaces.log_printer import LogPrinter
+from tusk.shared.schemas.kernel_response import KernelResponse
 
 __all__ = ["AdapterDictationMode"]
 

@@ -1,6 +1,6 @@
 import tempfile
 
-from tusk.lib.agent.file_agent_session_store import FileAgentSessionStore
+from tusk.kernel.agent.file_agent_session_store import FileAgentSessionStore
 
 
 def _store() -> FileAgentSessionStore:

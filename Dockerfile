@@ -16,8 +16,8 @@ RUN apt-get update && apt-get install -y \
 RUN echo 'pcm.default pulse\nctl.default pulse' > /root/.asoundrc
 
 WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements.txt requirements-dev.txt ./
+RUN pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt
 
 COPY . .
 

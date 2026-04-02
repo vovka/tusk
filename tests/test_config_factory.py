@@ -1,4 +1,4 @@
-from tusk.lib.config import ConfigFactory
+from tusk.shared.config import ConfigFactory
 
 
 def test_config_reads_conversation_agent_llm(monkeypatch) -> None:
@@ -49,3 +49,15 @@ def test_config_defaults_agent_session_log_dir(monkeypatch) -> None:
     monkeypatch.setenv("GROQ_API_KEY", "test-key")
     monkeypatch.delenv("TUSK_AGENT_SESSION_LOG_DIR", raising=False)
     assert ConfigFactory().build().agent_session_log_dir == ".tusk_runtime/agent_sessions"
+
+
+def test_config_reads_gate_recovery_window(monkeypatch) -> None:
+    monkeypatch.setenv("GROQ_API_KEY", "test-key")
+    monkeypatch.setenv("GATE_RECOVERY_WINDOW_SECONDS", "45")
+    assert ConfigFactory().build().gate_recovery_window_seconds == 45.0
+
+
+def test_config_defaults_gate_recovery_candidate_limit(monkeypatch) -> None:
+    monkeypatch.setenv("GROQ_API_KEY", "test-key")
+    monkeypatch.delenv("GATE_RECOVERY_CANDIDATE_LIMIT", raising=False)
+    assert ConfigFactory().build().gate_recovery_candidate_limit == 6
