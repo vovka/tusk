@@ -1,4 +1,4 @@
-from tusk.lib.agent.agent_profile import AgentProfile
+from tusk.kernel.agent.agent_profile import AgentProfile
 
 __all__ = ["build_agent_profiles"]
 

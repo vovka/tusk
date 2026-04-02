@@ -1,8 +1,8 @@
 import types
 
 from tests.kernel_api_support import make_agent
-from tusk.kernel.schemas.tool_call import ToolCall
-from tusk.kernel.schemas.tool_result import ToolResult
+from tusk.shared.schemas.tool_call import ToolCall
+from tusk.shared.schemas.tool_result import ToolResult
 from tusk.kernel.tool_registry import ToolRegistry
 
 
@@ -41,13 +41,17 @@ def _clipboard_executor() -> object:
 
     def complete(prompt, messages, tools):
         state["step"] += 1
-        if state["step"] == 1:
-            return ToolCall("gnome.write_clipboard", {"text": "frozen sonnet"}, "e1")
-        if _saw_clipboard_text(messages):
-            return ToolCall("done", {"status": "done", "summary": "saw clipboard text", "text": "ok"}, "e2")
-        return ToolCall("done", {"status": "failed", "summary": "missing clipboard text", "text": "missing"}, "e2")
+        return _clipboard_step(state["step"], messages)
 
     return types.SimpleNamespace(label="executor", complete_tool_call=complete)
+
+
+def _clipboard_step(step: int, messages: list[dict[str, str]]) -> ToolCall:
+    if step == 1:
+        return ToolCall("gnome.write_clipboard", {"text": "frozen sonnet"}, "e1")
+    if _saw_clipboard_text(messages):
+        return ToolCall("done", {"status": "done", "summary": "saw clipboard text", "text": "ok"}, "e2")
+    return ToolCall("done", {"status": "failed", "summary": "missing clipboard text", "text": "missing"}, "e2")
 
 
 def _saw_clipboard_text(messages: list[dict[str, str]]) -> bool:

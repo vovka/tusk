@@ -1,12 +1,12 @@
 import types
 
-from tusk.kernel.llm_gatekeeper import LLMGatekeeper
-from tusk.kernel.schemas.utterance import Utterance
+from shells.voice.stages.gatekeeper import LLMGatekeeper
+from tusk.shared.schemas.utterance import Utterance
 
 
 def test_gatekeeper_uses_structured_output() -> None:
     calls = []
-    result = _gatekeeper(calls=calls).evaluate(_utterance("Tusk open Firefox"), "prompt")
+    result = _gatekeeper(calls=calls).evaluate(_utterance("Tusk open Firefox"), [])
     assert calls and calls[0][2] == "command_gatekeeper"
     assert result.is_directed_at_tusk
     assert result.cleaned_command == "open Firefox"
@@ -15,7 +15,7 @@ def test_gatekeeper_uses_structured_output() -> None:
 
 def test_gatekeeper_treats_conversation_as_directed() -> None:
     llm = types.SimpleNamespace(label="gate", complete_structured=lambda *a: _conversation())
-    result = LLMGatekeeper(llm, _log()).evaluate(_utterance("Tusk, how are you?"), "prompt")
+    result = LLMGatekeeper(llm, _log()).evaluate(_utterance("Tusk, how are you?"), [])
     assert result.is_directed_at_tusk
     assert result.metadata["classification"] == "conversation"
 
@@ -23,23 +23,16 @@ def test_gatekeeper_treats_conversation_as_directed() -> None:
 def test_gatekeeper_handles_wrapped_fenced_json() -> None:
     raw = '```json\n[{"arguments":{"classification":"ambient","cleaned_text":"","reason":"noise"}}]\n```'
     llm = types.SimpleNamespace(label="gate", complete_structured=lambda *a: raw)
-    result = LLMGatekeeper(llm, _log()).evaluate(_utterance("noise"), "prompt")
+    result = LLMGatekeeper(llm, _log()).evaluate(_utterance("noise"), [])
     assert not result.is_directed_at_tusk
     assert result.metadata["classification"] == "ambient"
 
 
 def test_gatekeeper_falls_back_when_structured_call_fails() -> None:
     llm = types.SimpleNamespace(label="gate", complete_structured=_structured_failure, complete=lambda *a: _command("tell me a joke"))
-    result = LLMGatekeeper(llm, _log()).evaluate(_utterance("Great, tell me a joke, please."), "prompt")
+    result = LLMGatekeeper(llm, _log()).evaluate(_utterance("Great, tell me a joke, please."), [])
     assert result.is_directed_at_tusk
     assert result.cleaned_command == "tell me a joke"
-
-
-def test_gatekeeper_uses_dictation_schema_when_prompt_requests_metadata_stop() -> None:
-    calls = []
-    prompt = "Return metadata_stop for stop intent."
-    _gatekeeper(calls=calls).evaluate(_utterance("stop dictation"), prompt)
-    assert calls and calls[0][2] == "dictation_gatekeeper"
 
 
 def _gatekeeper(calls: list[tuple]) -> LLMGatekeeper:

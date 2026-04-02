@@ -1,4 +1,4 @@
-from tusk.kernel.schemas.tool_result import ToolResult
+from tusk.shared.schemas.tool_result import ToolResult
 
 __all__ = ["SwitchModelTool"]
 

@@ -1,6 +1,6 @@
 import json
 
-from tusk.kernel.schemas.tool_call import ToolCall
+from tusk.shared.schemas.tool_call import ToolCall
 
 __all__ = ["RepeatedToolCallGuard"]
 

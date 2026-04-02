@@ -1,10 +1,10 @@
 import types
 
-from tusk.lib.agent.agent_result import AgentResult
-from tusk.lib.agent.agent_run_guard import AgentRunGuard
-from tusk.lib.agent.agent_run_request import AgentRunRequest
-from tusk.lib.agent.executor_tool_guard import ExecutorToolGuard
-from tusk.lib.agent.planner_result_validator import PlannerResultValidator
+from tusk.kernel.agent.agent_result import AgentResult
+from tusk.kernel.agent.agent_run_guard import AgentRunGuard
+from tusk.kernel.agent.agent_run_request import AgentRunRequest
+from tusk.kernel.agent.executor_tool_guard import ExecutorToolGuard
+from tusk.kernel.agent.planner_result_validator import PlannerResultValidator
 
 
 def test_guard_rejects_unknown_profile() -> None:

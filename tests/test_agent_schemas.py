@@ -1,5 +1,5 @@
-from tusk.lib.agent.agent_run_request import AgentRunRequest
-from tusk.lib.agent.agent_result import AgentResult
+from tusk.kernel.agent.agent_run_request import AgentRunRequest
+from tusk.kernel.agent.agent_result import AgentResult
 
 
 def test_run_request_defaults() -> None:

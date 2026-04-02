@@ -4,28 +4,17 @@ import sys
 import threading
 from pathlib import Path
 
-from tusk.lib.config import Config, StartupOptions
-from tusk.lib import AgentOrchestrator, FileAgentSessionStore
-from tusk.lib.llm import LLMProxy, LLMRegistry
-from tusk.lib.llm.providers import ConfigurableLLMFactory
-from tusk.lib.logging import ColorLogPrinter
-from tusk.lib.stt.providers import GroqSTT
-from tusk.kernel import (
-    AdaptiveInteractionClock,
-    CommandMode,
-    HallucinationFilter,
-    KernelAPI,
-    LLMConversationSummarizer,
-    LLMGatekeeper,
-    MainAgent,
-    Pipeline,
-    RecentContextFormatter,
-    SlidingWindowHistory,
-    ToolRegistry,
-)
+from shells.voice.stages.gatekeeper import LLMGatekeeper
+from tusk.kernel import CommandMode, KernelAPI, LLMConversationSummarizer, MainAgent, SlidingWindowHistory, ToolRegistry
 from tusk.kernel.adapter_manager import AdapterManager
+from tusk.kernel.agent import AgentOrchestrator, FileAgentSessionStore
 from tusk.kernel.agent_profiles import build_agent_profiles
 from tusk.kernel.tool_runtime import ToolRuntime
+from tusk.providers.llm import ConfigurableLLMFactory
+from tusk.providers.stt import GroqSTT
+from tusk.shared.config import Config, StartupOptions
+from tusk.shared.llm import LLMProxy, LLMRegistry
+from tusk.shared.logging import ColorLogPrinter
 
 
 def _build_log(options: StartupOptions) -> ColorLogPrinter:
@@ -53,23 +42,21 @@ def _build_kernel(config: Config, log: ColorLogPrinter) -> KernelAPI:
     tool_registry = ToolRegistry()
     adapter_manager = _build_adapter_manager(config, log, tool_registry)
     history = SlidingWindowHistory(20, LLMConversationSummarizer(llm_registry.get("utility")))
-    tools = ToolRuntime(tool_registry, llm_registry, adapter_manager, log)
     agent = _build_agent(config, log, llm_registry, tool_registry, history)
-    pipeline = _build_pipeline(config, log, llm_registry, history, agent)
-    tools.register_tools(pipeline)
-    return KernelAPI(pipeline, llm_registry, log)
+    kernel = KernelAPI(CommandMode(agent, log), llm_registry, log)
+    ToolRuntime(tool_registry, llm_registry, adapter_manager, log).register_tools(kernel)
+    return kernel
 
 
 def _build_agent(config: Config, log: ColorLogPrinter, llm_registry: LLMRegistry, tool_registry: ToolRegistry, history: object) -> MainAgent:
     store = FileAgentSessionStore(config.agent_session_log_dir)
     profiles = build_agent_profiles(llm_registry)
-    orchestrator = AgentOrchestrator(profiles, tool_registry, store, log)
-    return MainAgent(orchestrator, history)
+    return MainAgent(AgentOrchestrator(profiles, tool_registry, store, log), history)
 
 
-def _load_shells(config: Config, api: KernelAPI) -> list[object]:
+def _load_shells(config: Config, kernel: KernelAPI, log: ColorLogPrinter) -> list[object]:
     shells_dir = Path("shells")
-    return [_load_shell(name, shells_dir, config, api) for name in config.shells]
+    return [_load_shell(name, shells_dir, config, kernel, log) for name in config.shells]
 
 
 def _load_module(path: Path, dotted_name: str) -> object:
@@ -87,37 +74,33 @@ def _build_adapter_manager(config: Config, log: ColorLogPrinter, tool_registry: 
     return manager
 
 
-def _build_pipeline(config: Config, log: ColorLogPrinter, llm_registry: LLMRegistry, history: object, agent: MainAgent) -> Pipeline:
-    clock = AdaptiveInteractionClock(config.follow_up_timeout_seconds, config.max_follow_up_timeout_seconds)
-    formatter = RecentContextFormatter(history)
-    command_mode = CommandMode(agent, clock, formatter, log)
-    gatekeeper = LLMGatekeeper(llm_registry.get("gatekeeper"), log)
-    return Pipeline(GroqSTT(config.groq_api_key), HallucinationFilter(), gatekeeper, command_mode, None, config, log)
-
-
 def _slot_proxy(factory: ConfigurableLLMFactory, slot: object, log: ColorLogPrinter, name: str) -> LLMProxy:
     provider = factory.create(slot.provider_name, slot.model)
     return LLMProxy(provider, log, name)
 
 
-def _load_shell(name: str, shells_dir: Path, config: Config, api: KernelAPI) -> object:
+def _load_shell(name: str, shells_dir: Path, config: Config, kernel: KernelAPI, log: ColorLogPrinter) -> object:
     manifest = json.loads((shells_dir / name / "shell.json").read_text())
     module_name = manifest["entry_module"]
     module = _load_module(shells_dir / name / f"{module_name}.py", f"shells.{name}.{module_name}")
     shell_class = getattr(module, manifest["entry_class"])
-    return shell_class(config, api._log) if name == "voice" else shell_class()
+    if name != "voice":
+        return shell_class()
+    gatekeeper = LLMGatekeeper(kernel.get_llm_registry().get("gatekeeper"), log, follow_up_window_seconds=config.follow_up_timeout_seconds)
+    return shell_class(config, log, stt_engine=GroqSTT(config.groq_api_key), gatekeeper=gatekeeper)
 
 
 def main() -> None:
     options = StartupOptions.from_sources(sys.argv[1:])
     config = Config.from_env()
     log = _build_log(options)
-    kernel_api = _build_kernel(config, log)
-    shells = _load_shells(config, kernel_api)
+    kernel = _build_kernel(config, log)
+    shells = _load_shells(config, kernel, log)
+    submit = kernel.submit
     for shell in shells[:-1]:
-        threading.Thread(target=shell.start, args=(kernel_api,), daemon=True).start()
+        threading.Thread(target=shell.start, args=(submit,), daemon=True).start()
     if shells:
-        shells[-1].start(kernel_api)
+        shells[-1].start(submit)
 
 
 if __name__ == "__main__":

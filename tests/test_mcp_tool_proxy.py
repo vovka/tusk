@@ -1,6 +1,6 @@
 import types
 
-from tusk.lib.mcp import MCPToolProxy
+from tusk.shared.mcp import MCPToolProxy
 from tusk.kernel.tool_registry import ToolRegistry
 
 

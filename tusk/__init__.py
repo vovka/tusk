@@ -1,3 +1,3 @@
-from tusk import kernel, lib
+from tusk import kernel, providers, shared
 
-__all__ = ["kernel", "lib"]
+__all__ = ["kernel", "providers", "shared"]

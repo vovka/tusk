@@ -3,7 +3,7 @@ import json
 import shlex
 from pathlib import Path
 
-from tusk.lib.mcp import AdapterEnvironmentBuilder, AdapterWatcher, MCPClient, MCPToolProxy
+from tusk.shared.mcp import AdapterEnvironmentBuilder, AdapterWatcher, MCPClient, MCPToolProxy
 
 try:
     from watchdog.observers import Observer

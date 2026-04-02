@@ -1,15 +1,13 @@
-from tusk.kernel.interfaces.shell import Shell
-
 __all__ = ["CLIShell"]
 
 
-class CLIShell(Shell):
-    def start(self, api: object) -> None:
+class CLIShell:
+    def start(self, submit: object) -> None:
         while True:
             text = input("tusk> ")
             if text.strip().lower() in {"exit", "quit"}:
                 return
-            result = api.submit_text(text)
+            result = submit(text)
             if result.reply:
                 print(result.reply)
 

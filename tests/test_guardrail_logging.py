@@ -2,11 +2,11 @@ import tempfile
 import types
 from unittest.mock import patch
 
-from tusk.lib.config import StartupOptions
-from tusk.lib.config.startup_options import build_parser
-from tusk.lib.llm import LLMProxy
-from tusk.lib.logging import ColorLogPrinter, DailyFileLogger
-from tusk.kernel.schemas.chat_message import ChatMessage
+from tusk.shared.config import StartupOptions
+from tusk.shared.config.startup_options import build_parser
+from tusk.shared.llm import LLMProxy
+from tusk.shared.logging import ColorLogPrinter, DailyFileLogger
+from tusk.shared.schemas.chat_message import ChatMessage
 
 
 def test_startup_options_enable_groups_from_cli_or_env() -> None:

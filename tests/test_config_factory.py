@@ -1,4 +1,4 @@
-from tusk.lib.config import ConfigFactory
+from tusk.shared.config import ConfigFactory
 
 
 def test_config_reads_conversation_agent_llm(monkeypatch) -> None:

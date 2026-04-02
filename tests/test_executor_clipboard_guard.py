@@ -1,7 +1,7 @@
 import types
 
 from tests.kernel_api_support import make_agent, make_registry_tool
-from tusk.kernel.schemas.tool_call import ToolCall
+from tusk.shared.schemas.tool_call import ToolCall
 from tusk.kernel.tool_registry import ToolRegistry
 
 
@@ -58,17 +58,21 @@ def _clipboard_then_paste() -> object:
 
     def complete(prompt, messages, tools):
         state["step"] += 1
-        if state["step"] == 1:
-            return ToolCall("gnome.write_clipboard", {"text": "draft"}, "e1")
-        if state["step"] == 2:
-            return ToolCall("gnome.focus_window", {"window_title": "gedit"}, "e2")
-        if state["step"] == 3:
-            return ToolCall("gnome.press_keys", {"keys": "<ctrl>l"}, "e3")
-        if state["step"] == 4:
-            return ToolCall("gnome.press_keys", {"keys": "<ctrl>v"}, "e4")
-        return ToolCall("done", {"status": "done", "summary": "pasted", "text": "pasted"}, "e5")
+        return _clipboard_step(state["step"])
 
     return types.SimpleNamespace(label="executor", complete_tool_call=complete)
+
+
+def _clipboard_step(step: int) -> ToolCall:
+    if step == 1:
+        return ToolCall("gnome.write_clipboard", {"text": "draft"}, "e1")
+    if step == 2:
+        return ToolCall("gnome.focus_window", {"window_title": "gedit"}, "e2")
+    if step == 3:
+        return ToolCall("gnome.press_keys", {"keys": "<ctrl>l"}, "e3")
+    if step == 4:
+        return ToolCall("gnome.press_keys", {"keys": "<ctrl>v"}, "e4")
+    return ToolCall("done", {"status": "done", "summary": "pasted", "text": "pasted"}, "e5")
 
 
 def _copying_executor() -> object:
