@@ -20,6 +20,20 @@ def test_gatekeeper_treats_conversation_as_directed() -> None:
     assert result.metadata["classification"] == "conversation"
 
 
+def test_gatekeeper_forwards_wake_word_conversation() -> None:
+    llm = types.SimpleNamespace(label="gate", complete_structured=lambda *a: _conversation())
+    dispatch = LLMGatekeeper(llm, _log()).process(_utterance("Tusk, how are you?"), [])
+    assert dispatch.action == "forward_current"
+    assert dispatch.text == "how are you"
+
+
+def test_gatekeeper_drops_no_wake_conversation() -> None:
+    llm = types.SimpleNamespace(label="gate", complete_structured=lambda *a: _conversation())
+    dispatch = LLMGatekeeper(llm, _log()).process(_utterance("Where are you going to go?"), [_utterance("open Firefox")])
+    assert dispatch.action == "drop"
+    assert dispatch.text is None
+
+
 def test_gatekeeper_handles_wrapped_fenced_json() -> None:
     raw = '```json\n[{"arguments":{"classification":"ambient","cleaned_text":"","reason":"noise"}}]\n```'
     llm = types.SimpleNamespace(label="gate", complete_structured=lambda *a: raw)

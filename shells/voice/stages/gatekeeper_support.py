@@ -9,6 +9,7 @@ __all__ = [
     "PRIMARY_SCHEMA",
     "RECOVERY_SCHEMA",
     "fallback_dispatch",
+    "has_wake_word",
     "log_gate_result",
     "log_recovery",
     "normalize_recovery",
@@ -39,10 +40,15 @@ def recovered_dispatch(candidates: list[BufferedUtterance], decision: RecoveryDe
     return GateDispatch("forward_recovered", item.text, item.id)
 
 
-def fallback_dispatch(result: GateResult, utterance: Utterance) -> GateDispatch:
-    if result.metadata.get("classification") == "conversation":
+def fallback_dispatch(result: GateResult, utterance: Utterance, wake_word: bool) -> GateDispatch:
+    if result.metadata.get("classification") == "conversation" and wake_word:
         return GateDispatch("forward_current", result.cleaned_command or utterance.text)
     return GateDispatch("drop")
+
+
+def has_wake_word(text: str) -> bool:
+    words = {part.strip(".,!?") for part in text.casefold().split()}
+    return bool(words & {"tusk", "task"})
 
 
 def log_gate_result(log: LogPrinter, result: GateResult, reason: str) -> None:

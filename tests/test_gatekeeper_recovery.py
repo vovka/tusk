@@ -2,6 +2,7 @@ import types
 
 from shells.voice.buffered_utterance import BufferedUtterance
 from shells.voice.stages.gatekeeper import LLMGatekeeper
+from shells.voice.stages.recovery_gate_prompt import build_recovery_gate_prompt
 from tusk.shared.schemas.utterance import Utterance
 
 
@@ -32,6 +33,12 @@ def test_recovered_forward_refreshes_follow_up_window() -> None:
     assert "Recent context:" in prompts[-1]
 
 
+def test_recovery_prompt_normalizes_wake_word_variants() -> None:
+    prompt = build_recovery_gate_prompt("", [_variant_candidate()])
+    assert "Treat common STT wake-word variants" in prompt
+    assert "u3: Hey TASC, how do you do? | normalized: hey tusk how do you do" in prompt
+
+
 def _gatekeeper(responses: list[str], prompts: list[str] | None = None, time_source: object | None = None) -> LLMGatekeeper:
     llm = _llm(responses, [] if prompts is None else prompts)
     return LLMGatekeeper(llm, _log(), time_source=time_source or (lambda: 0.0))
@@ -43,6 +50,10 @@ def _utterance(text: str) -> Utterance:
 
 def _candidates() -> list[BufferedUtterance]:
     return [BufferedUtterance("u1", _utterance("weather report"), 1.0, "dropped"), BufferedUtterance("u2", _utterance("open Firefox"), 2.0, "dropped")]
+
+
+def _variant_candidate() -> BufferedUtterance:
+    return BufferedUtterance("u3", _utterance("Hey TASC, how do you do?"), 3.0, "dropped")
 
 
 def _llm(responses: list[str], prompts: list[str]) -> object:

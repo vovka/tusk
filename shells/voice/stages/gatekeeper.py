@@ -6,7 +6,7 @@ from shells.voice.interfaces.gatekeeper import Gatekeeper
 from shells.voice.recovery_decision import RecoveryDecision
 from shells.voice.stages.command_gate_prompt import build_command_gate_prompt
 from shells.voice.stages.gatekeeper_parser import parse_gate_result, parse_recovery_decision
-from shells.voice.stages.gatekeeper_support import PRIMARY_SCHEMA, RECOVERY_SCHEMA, fallback_dispatch, log_gate_result, log_recovery, normalize_recovery, recovered_dispatch, to_utterance
+from shells.voice.stages.gatekeeper_support import PRIMARY_SCHEMA, RECOVERY_SCHEMA, fallback_dispatch, has_wake_word, log_gate_result, log_recovery, normalize_recovery, recovered_dispatch, to_utterance
 from shells.voice.stages.recent_context_formatter import RecentContextFormatter
 from shells.voice.stages.recovery_gate_prompt import build_recovery_gate_prompt
 from tusk.shared.llm.interfaces.llm_provider import LLMProvider
@@ -64,7 +64,7 @@ class LLMGatekeeper(Gatekeeper):
             return self._forward(recovered_dispatch(candidates, recovery))
         if recovery.action == "ambiguous":
             return self._forward(GateDispatch("forward_clarification", utterance.text))
-        dispatch = fallback_dispatch(primary, utterance)
+        dispatch = fallback_dispatch(primary, utterance, has_wake_word(utterance.text))
         return self._forward(dispatch) if dispatch.action == "forward_current" else dispatch
 
     def _recover(self, utterance: Utterance, recent: list[Utterance], candidates: list[BufferedUtterance]) -> RecoveryDecision:
