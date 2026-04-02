@@ -10,9 +10,10 @@ agent, and executes desktop actions via hot-pluggable MCP adapters.
 The system is split into five layers: **Shells** (voice, CLI, future), a thin **Kernel**
 (agent loop + tool dispatch), a **Shared** layer (ABCs, schemas, LLM access — depended on
 by all other layers), hot-pluggable **Adapters** (MCP servers), and swappable **Providers**
-(LLM and STT implementations). The agent pipeline uses a three-phase split: a conversation
-agent with only one operational tool (`execute_task`), a one-shot planner that selects a
-tool subset, and an execution agent that runs only the selected tools.
+(LLM and STT implementations). The agent pipeline uses a three-profile delegation chain: a conversation agent that
+delegates via `run_agent`, a planner agent that selects tool names and returns them in
+`done`, and an executor agent that receives those tools and calls them via MCP. All three
+profiles share the same `AgentRuntime` loop.
 
 Dependency direction is strict: Shells → Shared, Kernel → Shared, Adapters → Shared,
 Providers → Shared. No layer imports from a peer layer. Shells and kernel communicate
@@ -30,96 +31,92 @@ only through `kernel.submit(text)` at runtime and shared ABCs at design time.
 
 ## Agent Workflow Diagram
 
-A sequence diagram of a single agent turn — from classified utterance to final reply — showing all LLM calls, history management, planning, and the execution tool loop.
+A sequence diagram of a single agent turn — from submitted text to final reply — showing
+the three-profile agent delegation chain (conversation → planner → executor), the shared
+`AgentRuntime` loop, session-store history, and MCP tool execution.
 
 ```mermaid
 sequenceDiagram
-    participant GK as Pipeline / Gatekeeper
+    participant CMD as CommandMode
     participant MA as MainAgent
-    participant HX as SlidingWindowHistory
-    participant LLM_A as LLM (agent slot)
-    participant LLM_U as LLM (utility slot)
-    participant ET as ExecuteTaskTool
-    participant TES as TaskExecutionService
-    participant FP as FallbackTaskPlanner
-    participant LLM_P as LLM (planner slot)
+    participant ORC as AgentOrchestrator
+    participant RT as AgentRuntime
+    participant SS as SessionStore
+    participant LLM_C as LLM (conversation)
+    participant LLM_P as LLM (planner)
+    participant LLM_E as LLM (executor)
     participant TR as ToolRegistry
-    participant EA as ExecutionAgent
     participant MCP as MCP Adapter
+    participant HX as SlidingWindowHistory
 
-    GK->>MA: process_command(text)
-    MA->>HX: append user message
-    MA->>HX: get_messages()
-    HX-->>MA: last up to 20 messages
+    CMD->>MA: process_command(text)
+    MA->>ORC: run(AgentRunRequest, profile="conversation")
 
-    alt history overflow (gt 20 messages)
-        HX->>LLM_U: summarise(oldest messages)
-        LLM_U-->>HX: summary text
-        HX->>HX: replace oldest entries with summary ChatMessage
-    end
+    Note over ORC,RT: AgentRuntime is shared by all three profiles
+    ORC->>RT: run(request, conversation_profile, [done, run_agent])
+    RT->>SS: conversation_messages(session_id)
+    SS-->>RT: prior turn messages
+    RT->>SS: append_event(user message)
+    RT->>LLM_C: complete_tool_call(system_prompt, messages, [done, run_agent])
 
-    MA->>LLM_A: complete_tool_call(history, tools=[execute_task])
+    alt LLM answers directly
+        LLM_C-->>RT: done(status="done", text="...")
+        RT->>SS: persist result
+    else LLM delegates to planner
+        LLM_C-->>RT: run_agent(profile_id="planner", instruction)
+        RT->>ORC: dispatch run_agent call
 
-    alt LLM replies directly
-        LLM_A-->>MA: assistant text
-        MA->>HX: append assistant message
-    else LLM calls execute_task
-        LLM_A-->>MA: tool_call: execute_task(task_description)
-        MA->>HX: append assistant message (tool call)
-        MA->>ET: dispatch(task_description)
-        ET->>TES: execute(task_description)
+        ORC->>RT: run(child, planner_profile, [done, list_available_tools])
+        RT->>LLM_P: complete_tool_call(planner_prompt, messages, [done, list_available_tools])
 
-        TES->>TR: catalog_text() [planner_visible=True tools only]
-        TR-->>TES: compact text "name: description" per line
-
-        TES->>FP: plan(task, catalog)
-        FP->>LLM_P: complete(planner_prompt, strict JSON schema)
-        Note right of LLM_P: One-shot structured output.<br/>Returns list of required tool names.
-        LLM_P-->>FP: TaskPlan {tool_names[]}
-
-        alt planner LLM fails
-            FP->>LLM_U: complete(same prompt, utility slot fallback)
-            LLM_U-->>FP: TaskPlan {tool_names[]}
+        opt planner inspects tools
+            LLM_P-->>RT: list_available_tools()
+            RT-->>LLM_P: tool names and descriptions
+            RT->>LLM_P: complete_tool_call(..., updated messages)
         end
 
-        FP-->>TES: TaskPlan
-        TES->>TR: get_schemas(tool_names)
-        TR-->>TES: native tool definition dicts (selected only)
+        LLM_P-->>RT: done(payload={selected_tool_names=[...], plan_text})
+        RT->>SS: persist planner result (session_id_P)
+        RT-->>ORC: AgentResult(session_id=session_id_P)
+        ORC-->>RT: ToolResult(child_result with session_id_P)
+        RT->>SS: append planner result to conversation messages
+        RT->>LLM_C: complete_tool_call(..., messages + planner result)
 
-        TES->>EA: execute(task, selected_schemas)
+        LLM_C-->>RT: run_agent(profile_id="executor", session_refs=[session_id_P])
+        RT->>ORC: dispatch run_agent call
+        ORC->>SS: final_result(session_id_P) → selected_tool_names
+        ORC->>TR: definitions_for(selected_tool_names)
+        TR-->>ORC: tool schemas (MCP tools only)
 
-        loop AgentToolLoop — max 16 steps
-            EA->>LLM_A: complete_tool_call(exec_history, selected_schemas)
-            LLM_A-->>EA: tool_call(name, args)
-            Note over EA: RepeatedToolCallGuard:<br/>abort if identical call seen before
-            EA->>TR: call_tool(name, args)
+        ORC->>RT: run(child, executor_profile, [done, ...MCP tools])
+
+        loop executor tool loop — max 16 steps
+            RT->>LLM_E: complete_tool_call(executor_prompt, messages, [done, ...tools])
+            LLM_E-->>RT: tool_call(name, args)
+            Note over RT: RepeatedToolCallGuard — abort on duplicate
+            RT->>TR: get(tool_name).execute(args)
             TR->>MCP: JSON-RPC tools/call
             MCP-->>TR: MCPToolResult
-            TR-->>EA: ToolResult
-            EA->>EA: append tool call + result to exec_history
+            TR-->>RT: ToolResult
+            RT->>SS: append_event(step result)
         end
 
-        alt execution returns need_tools and replans lt 2
-            EA-->>TES: TaskExecutionResult(need_tools, missing=[...])
-            TES->>FP: replan(task, catalog, missing_hint)
-            FP->>LLM_P: complete(updated planner prompt)
-            LLM_P-->>FP: new TaskPlan
-            FP-->>TES: new TaskPlan
-            TES->>TR: get_schemas(new_tool_names)
-            TR-->>TES: updated tool schemas
-            Note over TES,EA: restart execution loop with new schemas
-        else execution complete
-            EA-->>TES: TaskExecutionResult(success, reply)
-        end
-
-        TES-->>ET: TaskExecutionResult
-        ET-->>MA: ToolResult(message)
-        MA->>LLM_A: continue(history + tool_result)
-        LLM_A-->>MA: assistant text
-        MA->>HX: append tool result + assistant messages
+        LLM_E-->>RT: done(status, summary)
+        RT->>SS: persist executor result
+        RT-->>ORC: AgentResult
+        ORC-->>RT: ToolResult(child_result)
+        RT->>SS: append executor result to conversation messages
+        RT->>LLM_C: complete_tool_call(..., messages + executor result)
+        LLM_C-->>RT: done(status="done", text="...")
+        RT->>SS: persist conversation result
     end
 
-    MA-->>GK: KernelResponse(handled=true, reply)
+    RT-->>ORC: AgentResult
+    ORC-->>MA: AgentResult
+    MA->>HX: append(user + assistant ChatMessages)
+    Note over HX: Local cross-turn summary only — not used as LLM context
+    MA-->>CMD: reply text
+    CMD-->>CMD: KernelResponse(handled=True, reply)
 ```
 
 ---
@@ -134,7 +131,7 @@ tusk/
 ├── tusk/
 │   ├── kernel/                          # Thin orchestration layer
 │   │   ├── agent/                       # Agentic reasoning loop
-│   │   │   ├── agent_orchestrator.py    # AgentOrchestrator — conversation agent (execute_task only)
+│   │   │   ├── agent_orchestrator.py    # AgentOrchestrator — routes run_agent calls to child profiles
 │   │   │   ├── agent_runtime.py         # AgentRuntime — shared turn/tool loop
 │   │   │   ├── agent_child_runner.py    # Runs child (execution) agent turns
 │   │   │   ├── agent_profile.py         # AgentProfile — prompt + tool config per role
@@ -499,12 +496,15 @@ AudioCapture.stream_frames()
     → TranscriptionBuffer.process(sanitized)   # append to rolling window
     → LLMGatekeeper.process(buffered, recent)  # LLM 3-way classify → DROP (ambient)
     → KernelAPI.submit(command_text)
-        → CommandMode.handle(text)
-            → MainAgent.run(command)
-                → LLMProvider.complete_tool_call()
-                → [tool=execute_task]
-                    → AgentRuntime (child) → ToolRegistry → MCPToolProxy
-                        → adapter (stdio JSON-RPC)
+        → CommandMode.process_command(text)
+            → MainAgent.process_command(command)
+                → AgentOrchestrator.run(profile="conversation")
+                    → AgentRuntime: LLM_C → run_agent(profile="planner")
+                        → AgentRuntime: LLM_P → done(selected_tool_names=[...])
+                    → AgentRuntime: LLM_C → run_agent(profile="executor", session_refs)
+                        → AgentRuntime: LLM_E → ToolRegistry → MCPToolProxy
+                            → adapter (stdio JSON-RPC)
+                    → AgentRuntime: LLM_C → done(text)
     → KernelResponse(handled, reply)
 ```
 
@@ -525,134 +525,63 @@ stdin → CLIShell.start(api)
 
 ## Agent Structure
 
-### Conversation Agent — `tusk/kernel/agent.py`
+### Three Profiles — `tusk/kernel/agent_profiles.py`
 
-The conversation agent (`MainAgent`) maintains the user-facing history. It receives:
+All three profiles run through the same `AgentRuntime` loop. Each gets its own LLM slot,
+system prompt, allowed tools, and `max_steps`.
 
-- Prior conversation history (`SlidingWindowHistory`)
-- The new `Command: <text>` message
-- Native tool definitions for: `done`, `clarify`, `unknown`, `execute_task`
+| Profile | LLM slot | Static tools | Runtime tools | max_steps |
+|---|---|---|---|---|
+| `conversation` | `conversation_agent` | `done`, `run_agent` | — | 8 |
+| `planner` | `planner_agent` | `done`, `list_available_tools` | — | 8 |
+| `executor` | `executor_agent` | `done` | resolved from planner session | 16 |
 
-It does **not** receive desktop tool schemas, planner catalogs, or desktop context.
+**Conversation prompt (key rules):**
+- Answer directly with `done` for conversational replies.
+- Delegate actionable work: call `run_agent(profile_id="planner")` first, then
+  `run_agent(profile_id="executor", session_refs=[planner_session_id])`.
+- After executor returns `status=done`, call `done` immediately.
 
-**System prompt:**
-```
-You are TUSK, a desktop assistant.
-Use execute_task for requests that require actions, tools, apps, desktop control,
-  typing, clipboard, or model changes.
-Requests to start or stop dictation, or to switch assistant modes, are actionable
-  and must use execute_task.
-Use done for conversational replies that need no task execution.
-Use clarify when one short question is required before acting.
-Use unknown when the request cannot be handled.
-execute_task returns the final task result to the user.
-Call exactly one tool.
-```
+**Planner prompt (key rules):**
+- Plan but do not execute.
+- Use `list_available_tools` to discover runtime tool names.
+- Return `done(payload={selected_tool_names=[...], plan_text=...})`.
 
-**Tool dispatch:**
-- `done` / `clarify` / `unknown` → return `parameters["reply"]` directly
-- `execute_task` → call `TaskExecutionService.run(task)`, return the result
-- Any other tool → return an error string
+**Executor prompt (key rules):**
+- Execute using only the runtime tools provided.
+- Every response must be a single tool call.
+- Prefer clipboard + paste (`gnome.write_clipboard` + `gnome.press_keys`) for large text
+  over `gnome.type_text`.
+- Call `done` as the very next response after the final successful action.
 
-**History management:** After each command, both the command and the reply are appended
-to `SlidingWindowHistory`. When history exceeds 20 messages, the oldest half is compacted
-into a local summary message (last 6 messages of the evicted block, each truncated to
-120 chars, joined with `" | "`).
+### AgentRuntime — `tusk/kernel/agent/agent_runtime.py`
 
-### Planner — `tusk/kernel/llm_task_planner.py`
+Shared across all profiles. Each run is independent:
 
-A single structured-output LLM request. Uses `complete_structured` with a strict JSON
-schema. Falls back to `complete` with an explicit JSON format prompt if the provider
-returns a schema validation error.
+1. `RuntimeMessageHistoryBuilder` loads prior messages from `SessionStore` for this session.
+2. Appends the user instruction to messages and session store.
+3. Loops up to `profile.max_steps`:
+   - Calls `profile.llm_provider.complete_tool_call(system_prompt, messages, tools)`.
+   - `RepeatedToolCallGuard` aborts on duplicate identical call.
+   - `RuntimeTurnGuards` enforces profile-specific constraints.
+   - Dispatches the tool call; appends call + result to messages and session store.
+   - If tool is `done` → finish and persist result.
+4. Returns `AgentResult` with `session_id`, `status`, `reply_text`.
 
-**Input (user message):**
-```
-Task: <task text>
+### History Management
 
-Available tools:
-<name>: <description>
-...
-[Replan context if replanning:]
-Previous plan:
-- <step>
-...
-Previous selected tools: <tool>, <tool>
-Missing capability: <needed_capability>
-```
+`SlidingWindowHistory` is maintained by `MainAgent._remember()` after each turn (user
+command + assistant reply). It is **not** used as LLM context by `AgentRuntime` —
+the runtime reads from `SessionStore` per session. `SlidingWindowHistory` compaction
+is local string formatting (no LLM call): the oldest half is summarised as the last 6
+evicted messages truncated to 120 chars, joined with `" | "`.
 
-**Output schema:**
-```json
-{
-  "status": "execute|clarify|unknown",
-  "user_reply": "string",
-  "plan_steps": ["string"],
-  "selected_tools": ["string"],
-  "reason": "string"
-}
-```
+### Tool Handoff — `tusk/kernel/agent/planner_runtime_tool_resolver.py`
 
-**Validation rules (TaskPlanValidator):**
-- `execute` requires non-empty `plan_steps` and `selected_tools`
-- `clarify` and `unknown` require non-empty `user_reply`
-- Every `selected_tools` entry must exist in `ToolRegistry.planner_tool_names()`
-- Invalid output is converted to `TaskExecutionResult("failed", ...)` before execution
-
-### Execution Agent — `tusk/kernel/execution_agent.py`
-
-Receives the task, plan steps, and only the selected native tool schemas.
-
-**System prompt:**
-```
-You execute TUSK task plans.
-Use exactly one tool per response.
-Use only the tools provided in this execution session.
-Split long literal text into multiple gnome.type_text calls.
-Keep each gnome.type_text text argument short, about 300 characters or less.
-Use done when the task is complete.
-Use clarify when the user must answer one short question.
-Use unknown when the task cannot be handled.
-Use need_tools when the provided tool subset is insufficient.
-```
-
-**User message:**
-```
-Task:
-<task text>
-
-Plan:
-- <step 1>
-- <step 2>
-...
-```
-
-**Tool loop (`AgentToolLoop`):**
-- Maximum 16 steps per execution
-- Repeated identical tool call guard — stops with failure if the same call is seen twice
-- Terminal tools: `done`, `clarify`, `unknown`, `need_tools`
-- On `need_tools`: returns `TaskExecutionResult("need_tools", ...)` with `needed_capability`
-- On max steps exceeded: returns `TaskExecutionResult("failed", ...)`
-
----
-
-## Task Orchestration — `tusk/kernel/task_execution_service.py`
-
-```
-TaskExecutionService.run(task):
-    for attempt in range(MAX_REPLANS + 1):   # MAX_REPLANS = 2
-        plan = planner.plan(task, catalog, previous_plan, needed_capability)
-        invalid = validator.validate(plan)
-        if invalid:
-            return TaskExecutionResult("failed", ...)
-        if plan.status != "execute":
-            return TaskExecutionResult(plan.status, plan.user_reply, ...)
-        result = executor.execute(task, plan)
-        if result.status != "need_tools":
-            return result
-        previous_plan, needed_capability = plan, result.needed_capability
-    return TaskExecutionResult("failed", "I couldn't finish the task with the available tools.")
-```
-
-Final statuses: `done`, `clarify`, `unknown`, `failed`.
+When the executor profile receives `session_refs=[planner_session_id]` and no explicit
+`runtime_tool_names`, `PlannerRuntimeToolResolver` reads `selected_tool_names` from the
+planner's persisted `done` payload in `SessionStore` and validates each name against
+`ToolRegistry.real_tool_names()` before passing them to the executor.
 
 ---
 
@@ -683,10 +612,9 @@ dataclass:
 | `build_planner_catalog_text()` | `str` | `"name: description\n..."` for planner prompt |
 | `definitions_for(names)` | `list[dict]` | Native tool defs for a named subset |
 
-**Special case:** `execute_task` is registered with `planner_visible=False`. It is
-callable by the conversation agent but invisible to the planner.
-
 Adapter tools are registered as `adapter_name.tool_name` (e.g. `gnome.launch_application`).
+The planner uses `list_available_tools` (a synthetic tool in `AgentToolsetBuilder`) to
+inspect the registry at runtime — not a pre-built catalog string.
 
 ---
 
@@ -998,12 +926,10 @@ main()
 | `LLMGatekeeper` | JSON parse error | Returns `GateResult(False, "", 0.0)` |
 | `LLMGatekeeper` | Both LLM calls fail | Returns `GateResult(False, "", 0.0)` |
 | `MainAgent` | LLM failure | Returns `ModelFailureReplyBuilder` message string |
-| `LLMTaskPlanner` | Structured output fails | Falls back to plain `complete` |
-| `LLMTaskPlanner` | Both calls fail | Raises — caught by `TaskExecutionService` |
-| `TaskExecutionService` | Any | Returns `TaskExecutionResult("failed", ...)` |
-| `AgentToolLoop` | LLM failure | Returns `ToolCall("unknown", ...)`, loop terminates |
-| `AgentToolLoop` | Max steps | Returns `TaskExecutionResult("failed", ...)` |
-| `AgentToolLoop` | Repeated tool call | Returns `TaskExecutionResult("failed", ...)` |
+| `AgentRuntime` | LLM failure | `ModelFailureReplyBuilder` → `done(status="failed")` |
+| `AgentRuntime` | Max steps reached | Returns `AgentResult(status="failed")` |
+| `AgentRuntime` | Repeated tool call | Returns `AgentResult(status="failed")` |
+| `PlannerResultValidator` | Invalid `selected_tool_names` | Strips unknown names; fails if none remain |
 | `MCPToolProxy` | Adapter error | Returns `ToolResult(False, error_message)` |
 | `AdapterManager` | Adapter startup fails | Logs error, continues without that adapter |
 | `VoicePipeline.run` | Any from above | Stage returns `None` — utterance silently dropped |
@@ -1016,11 +942,13 @@ main()
 
 ### Kernel-Internal Tools
 
-| Tool | Name | `planner_visible` | Parameters | Execution |
-|---|---|---|---|---|
-| `ExecuteTaskTool` | `execute_task` | `False` | `task: str` | Runs `TaskExecutionService.run(task)` |
-| `StartDictationTool` | `start_dictation` | `True` | *(none)* | Starts MCP dictation session, sets pipeline mode |
-| `SwitchModelTool` | `switch_model` | `True` | `slot`, `provider`, `model` | Calls `LLMRegistry.swap()` |
+| Tool | Name | Parameters | Execution |
+|---|---|---|---|
+| `StartDictationTool` | `start_dictation` | *(none)* | Starts MCP dictation session, sets kernel dictation mode |
+| `SwitchModelTool` | `switch_model` | `slot`, `provider`, `model` | Calls `LLMRegistry.swap()` |
+
+Synthetic tools (`done`, `run_agent`, `list_available_tools`) are built dynamically by
+`AgentToolsetBuilder` per profile and are never stored in `ToolRegistry`.
 
 ### GNOME Adapter Tools (prefix: `gnome.`)
 
