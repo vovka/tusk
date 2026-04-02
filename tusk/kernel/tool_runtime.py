@@ -10,7 +10,7 @@ class ToolRuntime:
         self._manager = adapter_manager
         self._log = log
 
-    def register_tools(self, pipeline: object) -> None:
-        pipeline._dictation_router = DictationRouter(self._registry, pipeline, self._log)
+    def register_tools(self, controller: object) -> None:
+        controller.attach_dictation_router(DictationRouter(self._registry, controller, self._log))
         self._registry.register(SwitchModelTool(self._llms))
-        self._registry.register(StartDictationTool(self._registry, pipeline, self._manager))
+        self._registry.register(StartDictationTool(self._registry, controller, self._manager))

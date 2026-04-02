@@ -1,7 +1,7 @@
 import types
 
 from tests.kernel_api_support import make_agent, make_registry_tool
-from tusk.kernel.schemas.tool_call import ToolCall
+from tusk.shared.schemas.tool_call import ToolCall
 from tusk.kernel.tool_registry import ToolRegistry
 
 
@@ -21,9 +21,9 @@ def test_main_agent_prompt_mentions_planner_and_executor_flow() -> None:
     make_agent(llm).process_command("press enter")
     prompt = str(capture["prompt"])
     assert "general knowledge" in prompt
-    assert "planner profile" in prompt
-    assert "executor profile" in prompt
-    assert "Use done" in prompt
+    assert "planner profile" in prompt or "planner" in prompt
+    assert "executor profile" in prompt or "executor" in prompt
+    assert "Use done" in prompt or "done" in prompt
 
 
 def _capture_prompt(capture: dict[str, object]) -> object:

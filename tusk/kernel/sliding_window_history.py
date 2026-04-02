@@ -1,6 +1,6 @@
 from tusk.kernel.interfaces.conversation_history import ConversationHistory
 from tusk.kernel.interfaces.conversation_summarizer import ConversationSummarizer
-from tusk.kernel.schemas.chat_message import ChatMessage
+from tusk.shared.schemas.chat_message import ChatMessage
 
 __all__ = ["SlidingWindowHistory"]
 

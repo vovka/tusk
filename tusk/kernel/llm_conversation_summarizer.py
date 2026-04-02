@@ -1,6 +1,6 @@
 from tusk.kernel.interfaces.conversation_summarizer import ConversationSummarizer
-from tusk.lib.llm.interfaces.llm_provider import LLMProvider
-from tusk.kernel.schemas.chat_message import ChatMessage
+from tusk.shared.llm.interfaces.llm_provider import LLMProvider
+from tusk.shared.schemas.chat_message import ChatMessage
 
 __all__ = ["LLMConversationSummarizer"]
 

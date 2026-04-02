@@ -1,64 +1,72 @@
 import types
 
-from tusk.kernel.schemas.gate_result import GateResult
-from tusk.kernel.pipeline import Pipeline
-from tusk.kernel.schemas.kernel_response import KernelResponse
+from shells.voice.buffered_utterance import BufferedUtterance
+from shells.voice.gate_dispatch import GateDispatch
+from shells.voice.pipeline import VoicePipeline
+from tusk.shared.schemas.kernel_response import KernelResponse
+from tusk.shared.schemas.utterance import Utterance
 
 
-def test_pipeline_filters_hallucination_in_dictation_mode() -> None:
-    calls: list[str] = []
-    pipeline = Pipeline(_stt("Thank you."), _filter(calls, False), _gatekeeper(False), _command(), object(), object(), _log())
-    pipeline.set_mode(_dictation(calls))
-    result = pipeline.process_audio(b"audio", 16000)
-    assert result.handled is False
-    assert result.reply == ""
-    assert calls == ["filter"]
+def test_pipeline_submits_directed_text() -> None:
+    submits, states = [], []
+    result = list(_pipeline(GateDispatch("forward_current", "open Firefox"), states).run(_submitter(submits)))
+    assert submits == ["open Firefox"] and states == [("forwarded", "u1")]
+    assert result == [KernelResponse(True, "done")]
 
 
-def test_pipeline_stops_dictation_when_gatekeeper_marks_stop() -> None:
-    calls: list[str] = []
-    pipeline = Pipeline(_stt("Stop dictation mode"), _filter(calls, False), _gatekeeper(True), _command(), object(), object(), _log())
-    pipeline.set_mode(_dictation(calls))
-    result = pipeline.process_audio(b"audio", 16000)
-    assert result.handled is True
-    assert result.reply == "Dictation stopped."
-    assert calls == ["stop"]
+def test_pipeline_drops_sanitized_phantoms() -> None:
+    states = []
+    pipeline = VoicePipeline(_detector("audio"), _transcriber("ghost"), _dropper(), _buffer(states), _gatekeeper(GateDispatch("forward_current", "open Firefox")))
+    assert list(pipeline.run(_submitter([]))) == []
 
 
-def test_pipeline_sends_non_stop_text_to_dictation_mode() -> None:
-    calls: list[str] = []
-    pipeline = Pipeline(_stt("Could you tell me a joke?"), _filter(calls, True), _gatekeeper(False), _command(), object(), object(), _log())
-    pipeline.set_mode(_dictation(calls))
-    result = pipeline.process_audio(b"audio", 16000)
-    assert result.handled is True
-    assert result.reply == "dictation updated"
-    assert calls == ["filter", "dictation:Could you tell me a joke?"]
+def test_pipeline_drops_ambient_speech() -> None:
+    pipeline = _pipeline(GateDispatch("drop"), [])
+    assert list(pipeline.run(_submitter([]))) == []
 
 
-def _stt(text: str) -> object:
-    utterance = types.SimpleNamespace(text=text, confidence=1.0, duration_seconds=1.0)
-    return types.SimpleNamespace(transcribe=lambda audio, sample_rate: utterance)
+def test_pipeline_submits_recovered_text_and_consumes_current_entry() -> None:
+    submits, states = [], []
+    dispatch = GateDispatch("forward_recovered", "open Firefox", "u0")
+    list(_pipeline(dispatch, states).run(_submitter(submits)))
+    assert submits == ["open Firefox"]
+    assert states == [("recovered", "u0"), ("consumed", "u1")]
 
 
-def _filter(calls: list[str], valid: bool) -> object:
-    return types.SimpleNamespace(is_valid=lambda utterance: calls.append("filter") or valid)
+def _pipeline(dispatch: GateDispatch, states: list[tuple[str, str]]) -> VoicePipeline:
+    return VoicePipeline(_detector("audio"), _transcriber("open Firefox"), _sanitizer(), _buffer(states), _gatekeeper(dispatch))
 
 
-def _gatekeeper(stop: bool) -> object:
-    metadata = {"metadata_stop": "stop"} if stop else {"metadata_stop": "None"}
-    return types.SimpleNamespace(evaluate=lambda utterance, prompt: GateResult(stop, "", 1.0, metadata))
+def _buffer(states: list[tuple[str, str]]) -> object:
+    candidate = BufferedUtterance("u0", Utterance("open Firefox", b"", 1.0), 0.0, "dropped")
+    return types.SimpleNamespace(process=_process, recent=lambda count: [], recoverable=lambda count, window: [candidate], mark_forwarded=lambda entry_id: states.append(("forwarded", entry_id)), mark_dropped=lambda entry_id: states.append(("dropped", entry_id)), mark_recovered=lambda entry_id: states.append(("recovered", entry_id)), mark_consumed=lambda entry_id: states.append(("consumed", entry_id)))
 
 
-def _command() -> object:
-    return types.SimpleNamespace(process_command=lambda text: KernelResponse(True, text), gatekeeper_prompt="", handle_gate_result=lambda gate: gate)
+def _process(utterance: Utterance) -> BufferedUtterance:
+    return BufferedUtterance("u1", utterance, 1.0)
 
 
-def _dictation(calls: list[str]) -> object:
-    return types.SimpleNamespace(
-        process_text=lambda text: calls.append(f"dictation:{text}") or KernelResponse(True, "dictation updated"),
-        stop=lambda: calls.append("stop") or KernelResponse(True, "Dictation stopped."),
-    )
+def _detector(audio: str) -> object:
+    utterance = Utterance("", audio.encode(), 1.0)
+    return types.SimpleNamespace(stream_utterances=lambda: iter([utterance]))
 
 
-def _log() -> object:
-    return types.SimpleNamespace(log=lambda *args: None)
+def _dropper() -> object:
+    return types.SimpleNamespace(process=lambda utterance: None)
+
+
+def _gatekeeper(dispatch: GateDispatch) -> object:
+    return types.SimpleNamespace(process=lambda utterance, recent, candidates=None: dispatch)
+
+
+def _sanitizer() -> object:
+    return types.SimpleNamespace(process=lambda utterance: utterance)
+
+
+def _submitter(submits: list[str]) -> object:
+    return lambda text: submits.append(text) or KernelResponse(True, "done")
+
+
+def _transcriber(text: str) -> object:
+    utterance = Utterance(text, b"audio", 1.0)
+    return types.SimpleNamespace(process=lambda input_utterance: utterance)

@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from tusk.kernel.schemas.chat_message import ChatMessage
+from tusk.shared.schemas.chat_message import ChatMessage
 
 __all__ = ["ConversationHistory"]
 
