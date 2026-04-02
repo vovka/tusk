@@ -151,14 +151,15 @@ def transcribe(self, audio_frames: bytes, sample_rate: int) -> Utterance
 
 ---
 
-## 6. Hallucination Filter Specification
+## 6. Sanitizer Specification
 
-**Source:** `tusk/kernel/hallucination_filter.py`
+**Source:** `shells/voice/stages/sanitizer.py`
 
-Applied after STT, before the gatekeeper. Implements `UtteranceFilter`.
+Applied after transcription, before the buffer. Provider-agnostic hallucination and
+ghost-phrase filter. Returns `None` to drop the utterance.
 
 ```python
-def is_valid(self, utterance: Utterance) -> bool
+def process(self, utterance: Utterance) -> Utterance | None
 ```
 
 **Rejection conditions (any one triggers rejection):**
@@ -184,10 +185,11 @@ def is_valid(self, utterance: Utterance) -> bool
 
 **Source:** `shells/voice/stages/gatekeeper.py`
 
-**Interface:** `tusk/kernel/interfaces/gatekeeper.py`
+**Interface:** `shells/voice/interfaces/gatekeeper.py`
 
 ```python
-def evaluate(self, utterance: Utterance, system_prompt: str) -> GateResult
+def evaluate(self, utterance: Utterance, recent: list[Utterance]) -> GateResult
+def process(self, utterance, recent, candidates=None) -> GateDispatch
 ```
 
 ### 7.1 Schema Selection
@@ -259,257 +261,134 @@ classification prompt so conversational follow-ups work without a wake word.
 
 ## 8. Conversation Agent Specification
 
-**Source:** `tusk/kernel/agent.py`
+**Source:** `tusk/kernel/main_agent.py`, `tusk/kernel/agent_profiles.py`
 
-```python
-def process_command(self, command: str) -> str
-```
+The conversation agent runs through `AgentOrchestrator` and `AgentRuntime`. It delegates
+actionable work via the `run_agent` tool to planner and executor child profiles.
 
-### 8.1 System Prompt
+### 8.1 System Prompt (conversation profile)
 
 ```
 You are TUSK, a desktop assistant.
-Use execute_task for requests that require actions, tools, apps, desktop control,
-  typing, clipboard, or model changes.
-Requests to start or stop dictation, or to switch assistant modes, are actionable
-  and must use execute_task.
-Use done for conversational replies that need no task execution.
-Use clarify when one short question is required before acting.
-Use unknown when the request cannot be handled.
-execute_task returns the final task result to the user.
-Call exactly one tool.
+Answer general knowledge and non-tool conversation directly using done.
+For actionable work, call run_agent with the planner profile first.
+After the planner returns selected_tool_names, call run_agent with the executor profile,
+passing the planner's selected_tool_names and session_id as session_refs.
+If executor returns status=done, call done immediately.
+If executor or default children fail twice, stop and call done with a failure summary.
+Use done to finish with the final result.
 ```
 
-### 8.2 User Message Construction
+### 8.2 Tools
 
-```
-[Prior conversation messages from SlidingWindowHistory]
-{"role": "user", "content": "Command: <cleaned_command>"}
-```
-
-### 8.3 Tool Dispatch
-
-The agent calls `complete_tool_call` with definitions for `done`, `clarify`, `unknown`,
-and `execute_task`. Response handling:
-
-| Tool | Action |
+| Tool | When used |
 |---|---|
-| `done` | Return `parameters["reply"]` directly |
-| `clarify` | Return `parameters["reply"]` directly |
-| `unknown` | Return `parameters["reply"]` directly |
-| `execute_task` | Call `ToolRegistry.get("execute_task").execute({"task": ...})`, return `result.message` |
-| Anything else | Return `"Use execute_task for actionable requests."` |
+| `done` | Direct conversational reply or after sub-agents complete |
+| `run_agent` | Delegate to `planner`, `executor`, or `default` profile |
 
-### 8.4 History Management
+### 8.3 History Management
 
-After each command, the command and reply are appended as `ChatMessage` objects to
-`SlidingWindowHistory`. On `append`, if history exceeds `max_messages` (20):
+`AgentRuntime` loads prior messages from `SessionStore` (file-based, keyed by session_id)
+on each turn. `MainAgent` appends command + reply to `SlidingWindowHistory` after the
+orchestrator returns — this is for local cross-turn context only and is not passed to
+the LLM runtime.
 
-1. Evict the oldest half of messages
-2. Take the last 6 evicted messages (truncated to 120 chars each)
-3. Join with `" | "` and prepend `"Previous context summary: "`
-4. Insert the summary as a `user` role message at the start of remaining history
+### 8.4 LLM Failure Handling
 
-### 8.5 LLM Failure Handling
-
-On any exception from `complete_tool_call`, `MainAgent` logs the error and returns a
-human-readable failure string from `ModelFailureReplyBuilder`. The command is still
-appended to history.
+On any exception from `complete_tool_call`, `AgentRuntime` builds a failure message via
+`ModelFailureReplyBuilder` and synthesises a `done(status="failed")` call to terminate
+the turn cleanly.
 
 ---
 
-## 9. Planner Workflow
+## 9. Planner Agent Specification
 
-**Source:** `tusk/kernel/llm_task_planner.py`
-
-Implements `TaskPlanner`. A single structured-output LLM request using the `planner` slot.
+**Source:** `tusk/kernel/agent_profiles.py` (`planner` profile)
 
 ### 9.1 System Prompt
 
 ```
-You plan TUSK task execution.
-Read the task and compact tool catalog.
-Return execute when you can choose a minimal sufficient tool subset.
-Return clarify when the user must answer a short question before execution.
-Return unknown when the task cannot be handled.
-Do not include tools that are not needed for the plan.
-Use strict JSON only.
+You are the TUSK planner agent.
+Plan the task but do not execute it.
+Select real runtime tool names for the executor.
+For large text insertion tasks, prefer clipboard write and paste tools
+  (gnome.write_clipboard + gnome.press_keys) over gnome.type_text.
+Return done with payload containing selected_tool_names and plan_text.
+Use list_available_tools to inspect available runtime tools.
 ```
 
-### 9.2 User Message
+### 9.2 Tools
 
-Built by `TaskPlannerMessageBuilder`:
+| Tool | When used |
+|---|---|
+| `done` | Return `payload={selected_tool_names, plan_text}` |
+| `list_available_tools` | Inspect registry for real MCP tool names |
 
-```
-Task: <task text>
+### 9.3 Output
 
-Available tools:
-<name>: <description>
-<name>: <description>
-...
-```
-
-On replan (when `previous_plan` and `needed_capability` are provided):
-
-```
-Task: <task text>
-
-Available tools:
-...
-
-Previous plan:
-- <step 1>
-- <step 2>
-
-Previous selected tools: <tool1>, <tool2>
-Missing capability: <needed_capability>
-```
-
-### 9.3 Structured Output Schema
-
-```json
-{
-  "type": "object",
-  "properties": {
-    "status": {"type": "string", "enum": ["execute", "clarify", "unknown"]},
-    "user_reply": {"type": "string"},
-    "plan_steps": {"type": "array", "items": {"type": "string"}},
-    "selected_tools": {"type": "array", "items": {"type": "string"}},
-    "reason": {"type": "string"}
-  },
-  "required": ["status", "user_reply", "plan_steps", "selected_tools", "reason"],
-  "additionalProperties": false
-}
-```
-
-### 9.4 Fallback
-
-If `complete_structured` raises a `json_validate_failed` error, the planner retries with
-`complete` and an extended prompt instructing the model to return a JSON object manually.
-Other exceptions are re-raised.
-
-### 9.5 FallbackTaskPlanner
-
-`FallbackTaskPlanner` wraps a primary and a secondary `TaskPlanner` (both `LLMTaskPlanner`
-instances, using `planner` and `utility` slots respectively). If the primary raises any
-exception, it logs the failure and delegates to the secondary.
+`done.payload.selected_tool_names` — list of real tool names validated against
+`ToolRegistry.real_tool_names()` by `PlannerResultValidator` before the executor runs.
 
 ---
 
-## 10. Execution Agent Specification
+## 10. Executor Agent Specification
 
-**Source:** `tusk/kernel/execution_agent.py`
-
-Implements `TaskExecutor`.
+**Source:** `tusk/kernel/agent_profiles.py` (`executor` profile)
 
 ### 10.1 System Prompt
 
 ```
-You execute TUSK task plans.
-Use exactly one tool per response.
-Use only the tools provided in this execution session.
-Split long literal text into multiple gnome.type_text calls.
-Keep each gnome.type_text text argument short, about 300 characters or less.
-Use done when the task is complete.
-Use clarify when the user must answer one short question.
-Use unknown when the task cannot be handled.
-Use need_tools when the provided tool subset is insufficient.
+You are the TUSK executor agent.
+Execute the plan using only the runtime tools provided.
+Every response must be a single tool/function call.
+For large text, prefer gnome.write_clipboard + gnome.press_keys over gnome.type_text.
+After a successful clipboard write, do not write again until after a paste.
+Use gnome.press_keys only for shortcuts, not literal text.
+After the final successful action, your very next response must call done.
+Do not invent tool names.
 ```
 
-### 10.2 Execution Input
+### 10.2 Tools
 
-- Task text
-- Planner step list (formatted as `Task:\n<task>\n\nPlan:\n- step\n...`)
-- Native tool definitions for the selected real tools only
-- Terminal pseudo-tool definitions: `done`, `clarify`, `unknown`, `need_tools`
+`done` (required) + MCP tools resolved from the planner's `selected_tool_names` via
+`PlannerRuntimeToolResolver`. The executor receives exactly the tools the planner selected.
 
-### 10.3 AgentToolLoop — `tusk/kernel/agent_tool_loop.py`
+### 10.3 AgentRuntime Loop
 
-The execution loop (max 16 steps per execution):
+Max 16 steps (`executor` profile `max_steps=16`). Per step:
+- Calls `profile.llm_provider.complete_tool_call(system_prompt, messages, tools)`
+- `RepeatedToolCallGuard` aborts on duplicate identical `(tool_name, parameters)` pair
+- Dispatches real tools through `ToolRegistry`; synthetic `done` terminates the run
+- On LLM failure → `ModelFailureReplyBuilder` → `done(status="failed")`
 
-```
-for step in range(1, _MAX_STEPS + 1):   # _MAX_STEPS = 16
-    tool_call = llm.complete_tool_call(prompt, messages, tools)
+---
 
-    if tool_call.tool_name in terminals:
-        return _terminal(tool_call)
+## 11. AgentRuntime Specification
 
-    if repeated_tool_call_guard.repeated(tool_call):
-        return TaskExecutionResult("failed", "I need a different action...")
+**Source:** `tusk/kernel/agent/agent_runtime.py`
 
-    result = tool_call_executor.execute(tool_call, allowed_names)
-    tool_loop_recorder.add_feedback(messages, tool_call.tool_name, result)
+Shared by all three profiles (conversation, planner, executor).
 
-return TaskExecutionResult("failed", "I couldn't finish the task.")
-```
+### 11.1 Session Lifecycle
 
-**Repeated tool call guard:** detects exact duplicate `(tool_name, parameters)` pairs
-within a single execution. Returns failure immediately to prevent infinite loops.
+1. `session_id = request.session_id or store.create_session_id()`
+2. If new session: `store.start_session(session_id, profile_id, parent_session_id, ...)`
+3. `RuntimeMessageHistoryBuilder` loads prior messages from store + appends `session_refs` digests
+4. Appends user instruction to messages and store
+5. Runs loop until `done` or max steps
+6. `RuntimeResultFactory` persists final `AgentResult` to store
 
-**ToolLoopRecorder:** appends the tool call (as assistant message) and the tool result
-(as user message) to the running `messages` list so the LLM has full execution context.
+### 11.2 Terminal Condition
 
-### 10.4 Terminal Tool Handling
+`done` is the only termination tool. Parameters:
 
-| Terminal | Returns |
+| Key | Description |
 |---|---|
-| `done` | `TaskExecutionResult("done", parameters["reply"])` |
-| `clarify` | `TaskExecutionResult("clarify", parameters["reply"])` |
-| `unknown` | `TaskExecutionResult("unknown", parameters["reply"])` |
-| `need_tools` | `TaskExecutionResult("need_tools", "", reason, needed_capability)` |
+| `status` | `done`, `clarify`, `unknown`, `failed`, `need_tools` |
+| `summary` | Short human-readable result |
+| `text` | Full reply text (optional) |
+| `payload` | Structured data (planner uses `selected_tool_names`, `plan_text`) |
 
-### 10.5 LLM Failure in Loop
-
-On any exception from `complete_tool_call`, the loop returns
-`ToolCall("unknown", {"reply": <failure message>})` and terminates on that step.
-
----
-
-## 11. Task Orchestration Specification
-
-**Source:** `tusk/kernel/task_execution_service.py`
-
-### 11.1 Run Loop
-
-```python
-_MAX_REPLANS = 2
-
-def run(task):
-    try:
-        return _run(task, previous_plan=None, needed_capability="")
-    except Exception as exc:
-        return TaskExecutionResult("failed", failure_message(exc))
-
-def _run(task, previous_plan, needed_capability):
-    for attempt in range(_MAX_REPLANS + 1):
-        plan = planner.plan(task, registry.build_planner_catalog_text(),
-                            previous_plan, needed_capability)
-        invalid = validator.validate(plan)
-        if invalid:
-            return TaskExecutionResult("failed", "I couldn't build a reliable plan.", invalid)
-        if plan.status != "execute":
-            return TaskExecutionResult(plan.status, plan.user_reply, plan.reason)
-        result = executor.execute(task, plan)
-        if result.status != "need_tools":
-            return result
-        previous_plan, needed_capability = plan, result.needed_capability
-    return TaskExecutionResult("failed", "I couldn't finish the task with the available tools.",
-                               "replan limit reached")
-```
-
-### 11.2 TaskPlanValidator
-
-Validation rules applied before execution:
-
-| Rule | Condition | Failure message |
-|---|---|---|
-| Execute needs steps | `status="execute"` and `plan_steps` is empty | plan invalid |
-| Execute needs tools | `status="execute"` and `selected_tools` is empty | plan invalid |
-| Clarify needs reply | `status="clarify"` and `user_reply` is empty | plan invalid |
-| Unknown needs reply | `status="unknown"` and `user_reply` is empty | plan invalid |
-| Tools must exist | any `selected_tools` entry not in `planner_tool_names()` | plan invalid |
-
----
 
 ## 12. Tool Registry Specification
 
@@ -575,67 +454,65 @@ switch_model: Switch LLM provider/model for a slot
 
 ---
 
-## 13. Pipeline Specification
+## 13. Voice Pipeline Specification
 
-**Source:** `tusk/kernel/pipeline.py`
+**Source:** `shells/voice/pipeline.py`, `shells/voice/stages/`
 
-### 13.1 process_audio Run Loop
+The voice pipeline is a six-stage chain. Each stage either passes its result forward or
+drops it. The pipeline is owned entirely by the voice shell — the kernel only sees
+`kernel.submit(text)` calls.
 
-```python
-def process_audio(self, audio: bytes, sample_rate: int) -> KernelResponse:
-    utterance = stt_engine.transcribe(audio, sample_rate)
-    log_utterance(utterance)
-
-    if utterance.confidence < 0.01:
-        return KernelResponse(False, "")       # STT hallucination, discard
-
-    if dictation_mode is not None:             # dictation active
-        return _process_dictation_utterance(utterance)
-
-    if not utterance_filter.is_valid(utterance):
-        log "filtered utterance"
-        return KernelResponse(False, "")       # hallucination filter, discard
-
-    return _process_command_utterance(utterance)
-```
-
-### 13.2 Command Utterance Processing
+### 13.1 Main Loop
 
 ```python
-def _process_command_utterance(utterance):
-    gate = gatekeeper.evaluate(utterance, command_mode.gatekeeper_prompt)
-    return command_mode.handle_gate_result(gate)
+def _handle_utterance(utterance, submit):
+    transcribed = transcriber.process(utterance)
+    sanitized   = sanitizer.process(transcribed)      # None → drop
+    if sanitized is None: return None
+    buffered    = buffer.process(sanitized)            # BufferedUtterance
+    recent      = buffer.recent(7)[:-1]
+    candidates  = buffer.recoverable(recovery_candidate_limit, recovery_window_seconds)
+    dispatch    = gatekeeper.process(buffered, recent, candidates)
+    return _dispatch(dispatch, buffered.id, submit)
 ```
 
-### 13.3 Dictation Utterance Processing
+### 13.2 Dispatch
 
 ```python
-def _process_dictation_utterance(utterance):
-    gate = gatekeeper.evaluate(utterance, DICTATION_GATE_PROMPT)
-    if gate.metadata.get("metadata_stop") not in (None, "", "None"):
-        return dictation_mode.stop()
-    if not utterance_filter.is_valid(utterance):
-        return KernelResponse(False, "")
-    return dictation_mode.process_text(utterance.text)
+def _dispatch(result, current_id, submit):
+    if result.action == "drop" or result.text is None:
+        buffer.mark_dropped(current_id)
+        return None
+    if result.action == "forward_recovered":
+        buffer.mark_recovered(result.recovered_id)
+        buffer.mark_consumed(current_id)
+        return submit(result.text)
+    buffer.mark_forwarded(current_id)
+    return submit(result.text)
 ```
 
-### 13.4 Mode Management
+`GateDispatch.action` values: `forward_current`, `forward_recovered`,
+`forward_clarification`, `drop`.
+
+### 13.3 Gatekeeper Decision Logic
+
+Primary call classifies the utterance as `command`, `conversation`, or `ambient`.
+
+- **command** → `forward_current`
+- **conversation + wake word** → `forward_current`
+- **anything else** → triggers recovery call over recent `dropped` candidates:
+  - `recover` (single candidate identified) → `forward_recovered`
+  - `ambiguous` → `forward_clarification`
+  - `none` → `drop`
+- **ambient** → `drop`
+
+### 13.4 CLI Path
 
 ```python
-def set_mode(self, mode: object | None) -> None:
-    self._dictation_mode = mode
+KernelAPI.submit(text)  # bypasses STT, sanitizer, buffer, and gatekeeper entirely
+→ CommandMode.process_command(text)
+→ MainAgent.process_command(text)
 ```
-
-`set_mode(None)` returns to normal command mode. Called by `DictationRouter.stop()`.
-
-### 13.5 process_text_command
-
-```python
-def process_text_command(self, text: str) -> KernelResponse:
-    return command_mode.process_command(text)
-```
-
-Bypasses STT, hallucination filter, and gatekeeper entirely.
 
 ---
 
@@ -817,14 +694,16 @@ instantiated. `VoiceShell` receives `(config, log)`; `CLIShell` receives no argu
 ### 17.2 VoiceShell — `shells/voice/voice_shell.py`
 
 ```python
-def start(self, api: object) -> None:
-    for utterance in detector.stream_utterances():
+def start(self, submit: object) -> None:
+    for result in self._pipeline.run(submit):
         if not self._running:
             return
-        result = api.submit_utterance(utterance.audio_frames, config.audio_sample_rate)
         if result.reply:
             log.log("TUSK", result.reply)
 ```
+
+The pipeline handles STT, sanitization, buffering, and gatekeeper internally.
+`submit` is `kernel.submit`.
 
 ### 17.3 CLIShell — `shells/cli/cli_shell.py`
 
@@ -933,16 +812,14 @@ NOT retried:
 | `LLMGatekeeper` | JSON parse error | Returns `GateResult(False, "", 0.0)` |
 | `LLMGatekeeper` | Both LLM calls fail | Returns `GateResult(False, "", 0.0)` |
 | `MainAgent` | LLM failure | Returns `ModelFailureReplyBuilder` string; loop continues |
-| `LLMTaskPlanner` | Schema validation error | Falls back to plain `complete` |
-| `LLMTaskPlanner` | Both calls fail | Raises; caught by `TaskExecutionService` |
-| `FallbackTaskPlanner` | Primary fails | Logs and delegates to secondary planner |
-| `TaskExecutionService` | Any | Returns `TaskExecutionResult("failed", ...)` |
-| `AgentToolLoop` | LLM failure | Returns `ToolCall("unknown", ...)`, loop terminates |
-| `AgentToolLoop` | Max steps (16) | Returns `TaskExecutionResult("failed", ...)` |
-| `AgentToolLoop` | Repeated tool call | Returns `TaskExecutionResult("failed", ...)` |
+
+| `AgentRuntime` | LLM failure | `ModelFailureReplyBuilder` → `done(status="failed")` |
+| `AgentRuntime` | Max steps (8/16) | Returns `AgentResult(status="failed")` |
+| `AgentRuntime` | Repeated tool call | Returns `AgentResult(status="failed")` |
+| `PlannerResultValidator` | Invalid tool names | Strips unknowns; fails if none remain |
 | `MCPToolProxy` | Adapter error | Returns `ToolResult(False, error_message)` |
 | `AdapterManager` | Adapter startup fails | Logs error; continues without that adapter |
-| `Pipeline.process_audio` | Any from above | Caught; returns `KernelResponse(False, "")` |
+| `VoicePipeline._handle_utterance` | Any from above | Stage returns `None`; utterance dropped |
 | `LLMRetryRunner` | Retryable error | Retries up to 3 times with linear backoff |
 | `LLMRetryRunner` | Non-retryable | Re-raises immediately |
 

@@ -11,47 +11,57 @@ simply not wiring it into `VoicePipeline`.
 
 ```
 Microphone
-    │
+    │  PCM frames
     ▼
-┌─────────┐   PCM frames
-│  Audio  │──────────────────────────────────────────────────┐
-└─────────┘                                                   │
-                                                              ▼
-                                                       ┌──────────────┐
-                                                       │   Detector   │  VAD + boundary
-                                                       └──────┬───────┘  buffering
-                                                              │ Utterance
-                                                              ▼
-                                                       ┌──────────────┐
-                                                       │  Transcriber │  STT engine
-                                                       └──────┬───────┘
-                                                              │ Utterance (text)
-                                                              ▼
-                                                       ┌──────────────┐
-                                                       │  Sanitizer   │  hallucination
-                                                       └──────┬───────┘  filter  ─ DROP
-                                                              │ Utterance (clean)
-                                                              ▼
-                                                       ┌──────────────┐
-                                                       │    Buffer    │  rolling window
-                                                       └──────┬───────┘  of utterances
-                                                              │ Utterance + recent context
-                                                              ▼
-                                                       ┌──────────────┐
-                                                       │  Gatekeeper  │  LLM classify
-                                                       └──────┬───────┘  ─ DROP (ambient)
-                                                              │ command text
-                                                              ▼
-                                                       kernel.submit(text)
+┌──────────┐
+│  Audio   │
+└────┬─────┘
+     │ Utterance (PCM)
+     ▼
+┌──────────┐
+│ Detector │  VAD + boundary buffering
+└────┬─────┘
+     │ Utterance (PCM)              ← DROP: silence
+     ▼
+┌─────────────┐
+│ Transcriber │  STT engine
+└──────┬──────┘
+       │ Utterance (text)
+       ▼
+┌───────────┐
+│ Sanitizer │  hallucination filter ← DROP: phantom/ghost phrase
+└─────┬─────┘
+      │ Utterance (clean)
+      ▼
+┌────────┐
+│ Buffer │  rolling window + gate-state tracking
+└───┬────┘  (pending → forwarded | dropped | recovered | consumed)
+    │ BufferedUtterance + recent[] + recoverable candidates[]
+    ▼
+┌─────────────┐
+│ Gatekeeper  │  primary LLM classify
+└──────┬──────┘
+       │
+       ├─ command ──────────────────────────────────── kernel.submit(text)
+       │
+       ├─ conversation + wake word ─────────────────── kernel.submit(text)
+       │
+       ├─ ambiguous → recovery LLM call over dropped candidates
+       │       ├─ recover ──────────── kernel.submit(prior text)
+       │       ├─ ambiguous ─────────── kernel.submit(current text)
+       │       └─ none ───────────────────────────────── DROP
+       │
+       └─ ambient ────────────────────────────────────── DROP
 ```
 
-**Three drop points:**
+**Drop points:**
 
 | Stage | Drop reason |
 |---|---|
 | Detector | Silence / below VAD threshold |
 | Sanitizer | Hallucinated or ghost phrase |
-| Gatekeeper | Ambient speech not directed at TUSK |
+| Gatekeeper (primary) | Ambient speech — no wake word, no command intent |
+| Gatekeeper (recovery) | Ambiguous but no recoverable candidate identified |
 
 ---
 
@@ -117,11 +127,16 @@ callback. `VoicePipeline.run()` drives the loop:
 ```python
 for utterance in detector.stream_utterances():
     transcribed = transcriber.process(utterance)
-    sanitized   = sanitizer.process(transcribed)   # None → drop
-    buffered    = buffer.process(sanitized)         # None → drop
-    command     = gatekeeper.process(buffered, buffer.recent(6))  # None → drop
-    submit(command)
+    sanitized   = sanitizer.process(transcribed)             # None → drop
+    if sanitized is None: continue
+    buffered    = buffer.process(sanitized)                  # BufferedUtterance
+    recent      = buffer.recent(7)[:-1]                      # context window
+    candidates  = buffer.recoverable(limit, window)          # dropped, age-bounded
+    dispatch    = gatekeeper.process(buffered, recent, candidates)  # GateDispatch
+    # pipeline marks buffer states and calls submit() based on dispatch.action
 ```
+
+`GateDispatch.action` values: `forward_current`, `forward_recovered`, `forward_clarification`, `drop`.
 
 Stages are injected into `VoicePipeline` as plain objects. Any stage can be replaced with
 a test double or an alternative implementation without touching the others.
@@ -130,10 +145,10 @@ a test double or an alternative implementation without touching the others.
 
 ## Interfaces
 
-| ABC | File | Implemented by |
+| ABC | File | Key methods |
 |---|---|---|
-| `Gatekeeper` | `interfaces/gatekeeper.py` | `LLMGatekeeper` |
-| `TranscriptionBuffer` | `interfaces/transcription_buffer.py` | `TranscriptionBuffer` stage |
+| `Gatekeeper` | `interfaces/gatekeeper.py` | `evaluate(utterance, recent)`, `process(utterance, recent, candidates) → GateDispatch` |
+| `TranscriptionBuffer` | `interfaces/transcription_buffer.py` | `process(utterance) → BufferedUtterance`, `recent(n)`, `recoverable(n, secs)`, `mark_*(id)` |
 
 ---
 
@@ -141,20 +156,26 @@ a test double or an alternative implementation without touching the others.
 
 ```
 shells/voice/
-├── pipeline.py            # VoicePipeline — assembles and runs the six stages
-├── voice_shell.py         # VoiceShell — entry point, builds pipeline, calls submit()
+├── pipeline.py              # VoicePipeline — assembles stages, dispatches GateDispatch
+├── voice_shell.py           # VoiceShell — entry point, builds pipeline, calls submit()
+├── buffered_utterance.py    # BufferedUtterance — Utterance + id + gate_state
+├── gate_dispatch.py         # GateDispatch — action + text + recovered_id
+├── recovery_decision.py     # RecoveryDecision — action + candidate_id + reason
 ├── interfaces/
-│   ├── gatekeeper.py      # Gatekeeper ABC
+│   ├── gatekeeper.py        # Gatekeeper ABC
 │   └── transcription_buffer.py  # TranscriptionBuffer ABC
 └── stages/
-    ├── audio_capture.py       # AudioCapture — raw PCM from microphone
-    ├── utterance_detector.py  # UtteranceDetector — VAD + boundary buffering
-    ├── transcriber.py         # Transcriber — wraps STTEngine
-    ├── sanitizer.py           # Sanitizer — hallucination filter
-    ├── transcription_buffer.py # TranscriptionBuffer — rolling utterance window
-    ├── gatekeeper.py          # LLMGatekeeper — LLM-based classification
-    ├── command_gate_prompt.py # Prompt builder for the gatekeeper LLM call
-    └── recent_context_formatter.py  # Formats recent utterances for the prompt
+    ├── audio_capture.py         # AudioCapture — raw PCM from microphone
+    ├── utterance_detector.py    # UtteranceDetector — VAD + boundary buffering
+    ├── transcriber.py           # Transcriber — wraps STTEngine
+    ├── sanitizer.py             # Sanitizer — hallucination filter
+    ├── transcription_buffer.py  # TranscriptionBuffer — rolling window + state tracking
+    ├── gatekeeper.py            # LLMGatekeeper — primary classify + recovery
+    ├── gatekeeper_parser.py     # JSON parsing for gate and recovery LLM responses
+    ├── gatekeeper_support.py    # Helpers: schemas, dispatch builders, wake-word check
+    ├── command_gate_prompt.py   # Prompt builder for the primary classification call
+    ├── recovery_gate_prompt.py  # Prompt builder for the recovery LLM call
+    └── recent_context_formatter.py  # Formats recent utterances for context
 ```
 
 ---

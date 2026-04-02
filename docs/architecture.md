@@ -213,8 +213,11 @@ tusk/
 ├── shells/
 │   ├── voice/                           # Six-stage composable voice pipeline
 │   │   ├── README.md                    # Voice shell architecture (see that file)
-│   │   ├── pipeline.py                  # VoicePipeline — assembles and runs stages
+│   │   ├── pipeline.py                  # VoicePipeline — assembles stages, dispatches GateDispatch
 │   │   ├── voice_shell.py               # VoiceShell — entry point, calls kernel.submit()
+│   │   ├── buffered_utterance.py        # BufferedUtterance — Utterance + id + gate_state
+│   │   ├── gate_dispatch.py             # GateDispatch — action + text + recovered_id
+│   │   ├── recovery_decision.py         # RecoveryDecision — action + candidate_id + reason
 │   │   ├── interfaces/
 │   │   │   ├── gatekeeper.py            # Gatekeeper ABC
 │   │   │   └── transcription_buffer.py  # TranscriptionBuffer ABC
@@ -223,9 +226,12 @@ tusk/
 │   │       ├── utterance_detector.py    # UtteranceDetector — WebRTC VAD boundary detection
 │   │       ├── transcriber.py           # Transcriber — wraps STTEngine
 │   │       ├── sanitizer.py             # Sanitizer — hallucination / ghost-phrase filter
-│   │       ├── transcription_buffer.py  # TranscriptionBuffer — rolling utterance window
-│   │       ├── gatekeeper.py            # LLMGatekeeper — 3-way LLM classification
-│   │       ├── command_gate_prompt.py   # Prompt builder for the gatekeeper LLM call
+│   │       ├── transcription_buffer.py  # TranscriptionBuffer — rolling window + state tracking
+│   │       ├── gatekeeper.py            # LLMGatekeeper — primary classify + recovery
+│   │       ├── gatekeeper_parser.py     # JSON parsing for gate and recovery LLM responses
+│   │       ├── gatekeeper_support.py    # Helpers: schemas, dispatch builders, wake-word check
+│   │       ├── command_gate_prompt.py   # Prompt builder for the primary classification call
+│   │       ├── recovery_gate_prompt.py  # Prompt builder for the recovery LLM call
 │   │       └── recent_context_formatter.py # Formats recent utterances for context
 │   └── cli/
 │       ├── shell.json                   # Shell manifest
@@ -316,18 +322,31 @@ def log_message(self, message: ChatMessage) -> None
 
 ```python
 def evaluate(self, utterance: Utterance, recent: list[Utterance]) -> GateResult
-def process(self, utterance: Utterance, recent: list[Utterance]) -> str | None
+def process(self, utterance: Utterance | BufferedUtterance,
+            recent: list[Utterance],
+            candidates: list[BufferedUtterance] | None = None) -> GateDispatch
 ```
 
-Lives in the voice shell package. `process` returns the cleaned command text or `None`
-to drop the utterance. The follow-up window is tracked internally via `_last_forwarded_at`.
+`process` returns a `GateDispatch` (action + optional text + recovered_id). Actions:
+`forward_current`, `forward_recovered`, `forward_clarification`, `drop`. The follow-up
+window is tracked internally via `_last_forwarded_at`. Recovery is a second LLM call
+triggered when the primary classification is not `command`.
 
 ### TranscriptionBuffer — `shells/voice/interfaces/transcription_buffer.py`
 
 ```python
-def process(self, utterance: Utterance) -> Utterance | None
+def process(self, utterance: Utterance) -> BufferedUtterance | None
 def recent(self, count: int) -> list[Utterance]
+def recoverable(self, count: int, max_age_seconds: float) -> list[BufferedUtterance]
+def mark_consumed(self, entry_id: str) -> None
+def mark_dropped(self, entry_id: str) -> None
+def mark_forwarded(self, entry_id: str) -> None
+def mark_recovered(self, entry_id: str) -> None
 ```
+
+`process` wraps the utterance in a `BufferedUtterance` (adds `id`, `received_at`,
+`gate_state`). `recoverable` returns entries with `gate_state == "dropped"` within
+`max_age_seconds`. The pipeline calls `mark_*` after the gatekeeper decides.
 
 ### ConversationHistory — `tusk/kernel/interfaces/conversation_history.py`
 
@@ -506,6 +525,11 @@ AudioCapture.stream_frames()
                             → adapter (stdio JSON-RPC)
                     → AgentRuntime: LLM_C → done(text)
     → KernelResponse(handled, reply)
+
+# Recovery path (when gatekeeper returns forward_recovered):
+    → GateDispatch(action="forward_recovered", text=prior_text, recovered_id)
+    → buffer.mark_recovered(recovered_id); buffer.mark_consumed(current_id)
+    → KernelAPI.submit(prior_text)
 ```
 
 ### CLI Shell Path
@@ -719,12 +743,9 @@ Shells are dynamically loaded from `shell.json` manifests by `main.py`.
 
 ### VoiceShell — `shells/voice/voice_shell.py`
 
-```
-AudioCapture → UtteranceDetector → KernelAPI.submit_utterance(audio, rate)
-```
-
-Runs until `stop()` is called. `submit_utterance` returns a `KernelResponse`; the shell
-logs the reply if present. Constructed with `config` and `log_printer`.
+Builds a `VoicePipeline` from the six stages and drives it in a loop, passing
+`kernel.submit` as the callback. Logs the reply if present. See
+`shells/voice/README.md` for full pipeline details.
 
 ### CLIShell — `shells/cli/cli_shell.py`
 
