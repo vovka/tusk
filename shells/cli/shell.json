@@ -1,0 +1,6 @@
+{
+  "name": "cli",
+  "description": "CLI shell",
+  "entry_module": "cli_shell",
+  "entry_class": "CLIShell"
+}

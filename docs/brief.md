@@ -2,6 +2,20 @@
 
 ## Project Brief v0.5
 
+## Current Status Note
+
+The current codebase uses a kernel/shell/adapter split instead of the earlier core/extensions layout. The current implementation ships:
+
+- `tusk/lib` as the infrastructure layer (LLM providers, STT providers, MCP client, config)
+- `tusk/kernel` as the in-process agent runtime (pipeline, agents, gatekeeper, planner, tool registry)
+- `shells/voice` and `shells/cli`
+- `adapters/gnome` for desktop control and context
+- `adapters/dictation` for dictation cleanup/refinement
+
+The kernel uses a **planner/executor split**: a conversation agent calls `execute_task`, a one-shot planner selects tools from a compact catalog, and an execution agent runs those tools against MCP adapters. Desktop context is not auto-injected — it is pulled by the execution agent through selected adapter tools.
+
+The rest of this brief remains the broader product vision rather than a line-by-line mirror of the current code.
+
 ---
 
 ## 1. Vision
@@ -115,6 +129,8 @@ This separation means the core is portable, testable, and fully platform-agnosti
 Both tiers are fully configurable. By default, the gatekeeper runs the cheapest available model (e.g., Haiku, GPT-4o-mini, a local small model), while the main agent runs a more capable model (e.g., Opus, Sonnet, GPT-4). But users can configure any combination — including running both tiers on the same model, or running the gatekeeper locally and the main agent in the cloud.
 
 **The terms "cheap" and "smart" are relative and user-defined.** TUSK doesn't hardcode model tiers — it provides two configurable slots (gatekeeper + main agent) and lets the user decide what goes where.
+
+*Implementation note: the current runtime uses **four** LLM slots — `gatekeeper`, `planner` (one-shot tool subset selection), `agent` (main conversation + execution), and `utility` (summaries, text cleanup) — all independently configurable.*
 
 ### 3.4 Intent Detection (Hybrid)
 
@@ -283,13 +299,13 @@ These are unresolved decisions to revisit as development progresses:
 
 1. **License choice** — MIT, Apache 2.0, GPL, or other.
 2. **LLM cost management** — the two-tier architecture dramatically reduces main agent invocations, but the gatekeeper still processes every transcribed utterance. At what usage level does a local gatekeeper model become necessary?
-3. **Gatekeeper design** — should the gatekeeper return a simple yes/no, or also extract a preliminary intent category to speed up the main agent? How do we measure and tune its false-positive vs. false-negative rate? *Partially resolved: the gatekeeper now receives recent conversation context within a follow-up window to recognize contextual follow-ups without a wake word.*
-4. **Unified context schema design** — what fields belong in the context schema? How frequently should context providers push updates (continuous polling, event-driven, on-demand before each agent invocation)? How do we keep the context payload compact enough to not bloat LLM token usage?
-5. **Sub-agent lifecycle** — how long do sub-agents live? Per-task? Per-session? What are the resource limits?
-6. **Extension API design** — bidirectionality is decided (context providers + action executors), but: how are extensions discovered, loaded, and sandboxed? What's the registration protocol? Can extensions declare capabilities and required context fields?
+3. **Gatekeeper design** — should the gatekeeper return a simple yes/no, or also extract a preliminary intent category to speed up the main agent? How do we measure and tune its false-positive vs. false-negative rate? *Resolved: the gatekeeper performs 3-way classification (`command` / `conversation` / `ambient`) using structured output (strict JSON schema). It receives recent conversation context within an adaptive follow-up window to recognize contextual follow-ups without a wake word. A fallback chain (primary → utility LLM → heuristic) handles model failures.*
+4. **Unified context schema design** — what fields belong in the context schema? How frequently should context providers push updates (continuous polling, event-driven, on-demand before each agent invocation)? How do we keep the context payload compact enough to not bloat LLM token usage? *Resolved differently: desktop context is not auto-injected. The planner selects context-fetching tools from the adapter catalog; the execution agent calls them on demand as part of the tool loop. This keeps the initial LLM payload small and context fetching lazy.*
+5. **Sub-agent lifecycle** — how long do sub-agents live? Per-task? Per-session? What are the resource limits? *Partially addressed: the current implementation uses a planner/executor model per task — a one-shot planner + a short-lived execution agent — instead of persistent sub-agents. True persistent sub-agents (for complex parallel tasks) remain unimplemented.*
+6. **Extension API design** — bidirectionality is decided (context providers + action executors), but: how are extensions discovered, loaded, and sandboxed? What's the registration protocol? Can extensions declare capabilities and required context fields? *Resolved: the MCP adapter model. Adapters run as out-of-process stdio servers, declared via `adapter.json` manifests (name, command, args, env). The `AdapterManager` discovers and starts them at boot, connects via `MCPClient` (stdio JSON-RPC 2.0), and registers their tools into the kernel tool registry. Adapters are hot-pluggable — new capabilities are added by dropping in a new adapter directory.*
 7. **Dangerous action list** — what specific operations belong in the dangerous action registry? How granular should it be?
 8. **Metrics and telemetry** — what to measure and how (recognition accuracy, gatekeeper precision/recall, command latency breakdown per tier, context freshness, agent response time).
-9. **Conversation context** — *Partially resolved: the main agent maintains a sliding-window conversation history within a session (max 20 messages, with LLM-based summarization on compaction). The gatekeeper also receives recent context within a follow-up window. Cross-session memory remains an open question.*
+9. **Conversation context** — *Partially resolved: the main agent maintains a sliding-window conversation history within a session (max 20 messages, with LLM-based summarization on compaction). The gatekeeper also receives recent context within an adaptive follow-up window (30–120 seconds, scaling with interaction frequency). Cross-session memory remains an open question.*
 
 ---
 
