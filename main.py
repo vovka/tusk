@@ -96,7 +96,11 @@ def main() -> None:
     log = _build_log(options)
     kernel = _build_kernel(config, log)
     shells = _load_shells(config, kernel, log)
-    submit = kernel.submit
+    _start_shells(shells, kernel.submit, log)
+
+
+def _start_shells(shells: list[object], submit: object, log: ColorLogPrinter) -> None:
+    log.log("READY", "TUSK is ready.", "startup")
     for shell in shells[:-1]:
         threading.Thread(target=shell.start, args=(submit,), daemon=True).start()
     if shells:

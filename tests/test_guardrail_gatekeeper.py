@@ -35,6 +35,18 @@ def test_gatekeeper_falls_back_when_structured_call_fails() -> None:
     assert result.cleaned_command == "tell me a joke"
 
 
+def test_gatekeeper_logs_result_summary() -> None:
+    logs: list[tuple[str, str, str]] = []
+    LLMGatekeeper(types.SimpleNamespace(label="gate", complete_structured=lambda *a: _command("open Firefox")), _log(logs)).evaluate(
+        _utterance("Tusk open Firefox"), []
+    )
+    assert logs[-1] == (
+        "GATEKEEPER",
+        "classification=command directed=True text='open Firefox' reason='wake word'",
+        "gatekeeper",
+    )
+
+
 def _gatekeeper(calls: list[tuple]) -> LLMGatekeeper:
     llm = types.SimpleNamespace(label="gate", complete_structured=lambda *args: calls.append(args) or _command("open Firefox"))
     return LLMGatekeeper(llm, _log())
@@ -44,8 +56,9 @@ def _utterance(text: str) -> Utterance:
     return Utterance(text, b"", 1.0)
 
 
-def _log() -> object:
-    return types.SimpleNamespace(log=lambda *args: None)
+def _log(logs: list[tuple[str, str, str]] | None = None) -> object:
+    sink = logs if logs is not None else []
+    return types.SimpleNamespace(log=lambda *args: sink.append(args))
 
 
 def _command(cleaned_text: str) -> str:

@@ -8,23 +8,34 @@ _RESET = "\033[0m"
 
 _TAG_COLORS: dict[str, str] = {
     "USER": "\033[90m",
-    "VAD": "\033[33m",
-    "STT": "\033[32m",
-    "GATE": "\033[36m",
-    "LLM": "\033[34m",
+    "READY": "\033[92m",
+    "DETECTOR": "\033[33m",
+    "TRANSCRIBER": "\033[32m",
+    "SANITIZER": "\033[96m",
+    "BUFFER": "\033[95m",
+    "GATEKEEPER": "\033[36m",
+    "KERNELINPUT": "\033[37m",
+    "LLMREQUEST": "\033[34m",
     "LLMPAYLOAD": "\033[94m",
+    "LLMWAIT": "\033[37m",
     "AGENT": "\033[97m",
     "TOOL": "\033[35m",
     "PIPELINE": "\033[37m",
     "DICTATION": "\033[96m",
     "ERROR": "\033[31m",
 }
-_ALWAYS_VISIBLE = frozenset({"USER", "TUSK", "ERROR"})
+_ALWAYS_VISIBLE = frozenset({"USER", "TUSK", "ERROR", "READY"})
 _GROUP_BY_TAG = {
-    "VAD": "vad",
-    "STT": "stt",
-    "GATE": "gate",
-    "LLM": "llm",
+    "READY": "ready",
+    "DETECTOR": "detector",
+    "TRANSCRIBER": "transcriber",
+    "SANITIZER": "sanitizer",
+    "BUFFER": "buffer",
+    "GATEKEEPER": "gatekeeper",
+    "KERNELINPUT": "kernel-input",
+    "LLMREQUEST": "llm-request",
+    "LLMPAYLOAD": "llm-payload",
+    "LLMWAIT": "llm-wait",
     "AGENT": "agent",
     "TOOL": "tool",
     "PIPELINE": "pipeline",
@@ -39,19 +50,14 @@ class ColorLogPrinter(LogPrinter):
     def log(self, tag: str, message: str, group: str | None = None) -> None:
         if not self._should_print(tag, group):
             return
-        color = _TAG_COLORS.get(tag, _RESET)
-        ts = datetime.now().strftime("%H:%M:%S")
-        prefix = f"\033[2m{ts}\033[0m {color}[{tag}]\033[0m"
         lines = message.splitlines() or [""]
         for index, line in enumerate(lines):
-            line_prefix = prefix if index == 0 else f"\033[2m{ts}\033[0m {color}[{tag}]\033[0m"
-            print(f"{line_prefix} {line}{_RESET}", flush=True)
+            print(f"{self._prefix(tag)} {line}{_RESET}", flush=True)
 
     def show_wait(self, label: str, group: str = "wait") -> None:
-        if group not in self._enabled_groups:
+        if not self._should_print("LLMWAIT", group):
             return
-        ts = datetime.now().strftime("%H:%M:%S")
-        print(f"\033[37m{ts} waiting for {label}...{_RESET}", flush=True)
+        print(f"{self._prefix('LLMWAIT')} waiting for {label}...{_RESET}", flush=True)
 
     def clear_wait(self) -> None:
         pass
@@ -62,3 +68,8 @@ class ColorLogPrinter(LogPrinter):
         if not self._enabled_groups:
             return False
         return (group or _GROUP_BY_TAG.get(tag, tag.casefold())) in self._enabled_groups
+
+    def _prefix(self, tag: str) -> str:
+        color = _TAG_COLORS.get(tag, _RESET)
+        ts = datetime.now().strftime("%H:%M:%S")
+        return f"\033[2m{ts}\033[0m {color}[{tag}]\033[0m"

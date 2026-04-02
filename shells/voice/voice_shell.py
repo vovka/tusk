@@ -45,9 +45,9 @@ class VoiceShell:
             config.vad_aggressiveness,
             log_printer,
         )
-        transcriber = Transcriber(stt_engine or _missing_stt_engine(), config.audio_sample_rate)
-        buffer = TranscriptionBuffer()
-        return VoicePipeline(detector, transcriber, Sanitizer(), buffer, gatekeeper or _drop_all_gatekeeper())
+        transcriber = Transcriber(stt_engine or _missing_stt_engine(), config.audio_sample_rate, log_printer)
+        buffer = TranscriptionBuffer(log_printer)
+        return VoicePipeline(detector, transcriber, Sanitizer(log_printer), buffer, gatekeeper or _drop_all_gatekeeper())
 
     def _log_reply(self, result: object) -> None:
         reply = getattr(result, "reply", "")

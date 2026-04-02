@@ -11,6 +11,5 @@ class CommandMode:
         self._log = log_printer
 
     def process_command(self, command: str) -> KernelResponse:
-        self._log.log("GATE", f"command: {command!r}")
         reply = self._agent.process_command(command)
         return KernelResponse(True, reply)

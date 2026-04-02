@@ -12,6 +12,8 @@ class KernelAPI:
         self._dictation_router = None
 
     def submit(self, text: str) -> KernelResponse:
+        if self._log is not None:
+            self._log.log("KERNELINPUT", f"text={text!r}", "kernel-input")
         if self._dictation_mode is None:
             return self._command_mode.process_command(text)
         return self._submit_dictation(text)

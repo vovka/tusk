@@ -27,7 +27,8 @@ class LLMProxy(LLMProvider):
 
     def complete(self, system_prompt: str, user_message: str, max_tokens: int = 256) -> str:
         if self._log:
-            self._log.show_wait(self.label, "wait")
+            self._log.show_wait(self.label, "llm-wait")
+            self._log_request("complete")
             self._payload_logger.log(system_prompt, [{"role": "user", "content": user_message}])
         try:
             return self._run(lambda: self._inner.complete(system_prompt, user_message, max_tokens))
@@ -37,7 +38,8 @@ class LLMProxy(LLMProvider):
 
     def complete_messages(self, system_prompt: str, messages: list[dict]) -> str:
         if self._log:
-            self._log.show_wait(self.label, "wait")
+            self._log.show_wait(self.label, "llm-wait")
+            self._log_request("messages")
             self._payload_logger.log(system_prompt, messages)
         try:
             return self._run(lambda: self._inner.complete_messages(system_prompt, messages))
@@ -52,7 +54,8 @@ class LLMProxy(LLMProvider):
         tools: list[dict[str, object]],
     ) -> ToolCall:
         if self._log:
-            self._log.show_wait(self.label, "wait")
+            self._log.show_wait(self.label, "llm-wait")
+            self._log_request("tool-call")
             self._payload_logger.log(system_prompt, messages, tools=tools)
         try:
             return self._run(lambda: self._inner.complete_tool_call(system_prompt, messages, tools))
@@ -69,7 +72,8 @@ class LLMProxy(LLMProvider):
         max_tokens: int = 256,
     ) -> str:
         if self._log:
-            self._log.show_wait(self.label, "wait")
+            self._log.show_wait(self.label, "llm-wait")
+            self._log_request("structured")
             self._payload_logger.log(system_prompt, self._structured_messages(user_message), self._response_format(schema_name))
         try:
             return self._run(lambda: self._inner.complete_structured(system_prompt, user_message, schema_name, schema, max_tokens))
@@ -89,6 +93,10 @@ class LLMProxy(LLMProvider):
     def _run(self, operation: object) -> object:
         return self._retry.run(operation, self._log_retry)
 
+    def _log_request(self, kind: str) -> None:
+        if self._log:
+            self._log.log("LLMREQUEST", f"[{self._slot}] provider={self.label} kind={kind}", "llm-request")
+
     def _log_retry(self, exc: Exception, attempt: int) -> None:
         if self._log:
-            self._log.log("LLM", f"[{self._slot}] retry {attempt} after failure: {exc}")
+            self._log.log("LLMREQUEST", f"[{self._slot}] retry {attempt} after failure: {exc}", "llm-request")

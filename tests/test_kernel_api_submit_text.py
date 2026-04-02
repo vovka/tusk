@@ -8,3 +8,11 @@ def test_kernel_api_submit_routes_text_to_command_mode() -> None:
     command_mode = types.SimpleNamespace(process_command=lambda text: KernelResponse(True, f"ok: {text}"))
     api = KernelAPI(command_mode, types.SimpleNamespace())
     assert api.submit("open terminal") == KernelResponse(True, "ok: open terminal")
+
+
+def test_kernel_api_logs_input_text() -> None:
+    logs: list[tuple[str, str, str]] = []
+    command_mode = types.SimpleNamespace(process_command=lambda text: KernelResponse(True, f"ok: {text}"))
+    api = KernelAPI(command_mode, types.SimpleNamespace(), types.SimpleNamespace(log=lambda *args: logs.append(args)))
+    api.submit("open terminal")
+    assert logs == [("KERNELINPUT", "text='open terminal'", "kernel-input")]

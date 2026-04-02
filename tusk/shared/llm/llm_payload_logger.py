@@ -16,7 +16,7 @@ class LLMPayloadLogger:
             return
         payload = self._payload(system_prompt, messages, response_format, tools)
         text = json.dumps(payload, ensure_ascii=False, indent=2)
-        self._log.log("LLM", f"[{self._slot}] payload\n{text}", "llm-with-payload")
+        self._log.log("LLMPAYLOAD", f"[{self._slot}] payload\n{text}", "llm-payload")
 
     def _payload(
         self,

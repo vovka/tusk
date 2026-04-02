@@ -49,7 +49,7 @@ class UtteranceDetector:
 
     def _on_speech(self, voiced_frames: list[bytes], frame: bytes) -> tuple[list[bytes], int]:
         if not voiced_frames:
-            self._log.log("VAD", "speech started")
+            self._log.log("DETECTOR", "speech started", "detector")
         voiced_frames.append(frame)
         return voiced_frames, 0
 
@@ -62,7 +62,7 @@ class UtteranceDetector:
 
     def _completed_utterance(self, voiced_frames: list[bytes]) -> Utterance | None:
         if len(voiced_frames) < _MIN_VOICED_FRAMES:
-            self._log.log("VAD", f"too short, discarded ({len(voiced_frames)} frames)")
+            self._log.log("DETECTOR", f"dropped short utterance ({len(voiced_frames)} frames)", "detector")
             return None
-        self._log.log("VAD", f"utterance complete ({len(voiced_frames)} frames)")
+        self._log.log("DETECTOR", f"utterance complete ({len(voiced_frames)} frames)", "detector")
         return self._build_utterance(voiced_frames)

@@ -1,3 +1,4 @@
+from tusk.shared.logging.interfaces.log_printer import LogPrinter
 from tusk.shared.schemas.utterance import Utterance
 
 __all__ = ["Sanitizer"]
@@ -14,17 +15,41 @@ _GHOST_PHRASES = {
 
 
 class Sanitizer:
+    def __init__(self, log_printer: LogPrinter | None = None) -> None:
+        self._log = log_printer
+
     def process(self, utterance: Utterance) -> Utterance | None:
-        if utterance.duration_seconds < _MIN_DURATION:
+        reason = self._reason(utterance)
+        if reason is not None:
+            self._log_drop(reason, utterance.text)
             return None
         text = utterance.text.strip()
-        if not text or _reject(text):
-            return None
+        self._log_pass(text)
         return utterance
 
+    def _reason(self, utterance: Utterance) -> str | None:
+        if utterance.duration_seconds < _MIN_DURATION:
+            return "short-duration"
+        text = utterance.text.strip()
+        return _reject(text)
 
-def _reject(text: str) -> bool:
-    return _punctuation_only(text) or _normalize(text) in _GHOST_PHRASES or _short_word(text)
+    def _log_drop(self, reason: str, text: str) -> None:
+        if self._log:
+            self._log.log("SANITIZER", f"dropped reason={reason} text={text!r}", "sanitizer")
+
+    def _log_pass(self, text: str) -> None:
+        if self._log:
+            self._log.log("SANITIZER", f"passed text={text!r}", "sanitizer")
+
+
+def _reject(text: str) -> str | None:
+    if not text:
+        return "empty"
+    if _punctuation_only(text):
+        return "punctuation-only"
+    if _normalize(text) in _GHOST_PHRASES:
+        return "ghost-phrase"
+    return "short-word" if _short_word(text) else None
 
 
 def _normalize(text: str) -> str:

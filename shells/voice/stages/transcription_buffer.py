@@ -1,18 +1,30 @@
 from collections import deque
 
 from shells.voice.interfaces.transcription_buffer import TranscriptionBuffer as TranscriptionBufferABC
+from tusk.shared.logging.interfaces.log_printer import LogPrinter
 from tusk.shared.schemas.utterance import Utterance
 
 __all__ = ["TranscriptionBuffer"]
 
 
 class TranscriptionBuffer(TranscriptionBufferABC):
-    def __init__(self, max_utterances: int = 50) -> None:
+    def __init__(self, log_printer: LogPrinter | None = None, max_utterances: int = 50) -> None:
         self._utterances: deque[Utterance] = deque(maxlen=max_utterances)
+        self._log = log_printer
 
     def process(self, utterance: Utterance) -> Utterance:
         self._utterances.append(utterance)
+        self._log_state()
         return utterance
 
     def recent(self, count: int) -> list[Utterance]:
         return list(self._utterances)[-count:]
+
+    def _log_state(self) -> None:
+        if self._log is None:
+            return
+        self._log.log("BUFFER", self._message(), "buffer")
+
+    def _message(self) -> str:
+        lines = [f"{index}: {item.text}" for index, item in enumerate(self._utterances, start=1)]
+        return "\n".join([f"size={len(self._utterances)}", *lines])
