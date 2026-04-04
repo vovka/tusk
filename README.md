@@ -2,6 +2,12 @@
 
 An always-listening desktop AI voice assistant for Linux/GNOME.
 
+## Demo
+
+[![TUSK demo video](docs/assets/tusk-demo-thumbnail.png)](docs/assets/tusk-demo.mp4)
+
+Click the preview image to open the demo video.
+
 ## How it works
 
 1. The **voice shell** captures microphone audio, runs VAD, and feeds speech segments to the kernel. The **CLI shell** accepts typed text directly.
