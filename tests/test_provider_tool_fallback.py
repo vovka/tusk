@@ -21,6 +21,16 @@ def test_tool_use_failed_recovery_extracts_tool_call() -> None:
     assert result.parameters["text"] == "hello"
 
 
+def test_tool_use_failed_recovery_best_effort_recovers_done() -> None:
+    exc = RuntimeError(_broken_done_text())
+    result = ToolUseFailedRecovery().recover(exc)
+    assert result is not None
+    assert result.tool_name == "done"
+    assert result.parameters["status"] == "done"
+    assert result.parameters["summary"] == "Poem pasted into gedit"
+    assert result.parameters["text"].startswith("Ozymandias")
+
+
 def _response(text: str) -> object:
     message = type("Message", (), {"tool_calls": [], "content": text})()
     choice = type("Choice", (), {"message": message})()
@@ -32,4 +42,16 @@ def _tool_use_failed_text() -> str:
         "Error code: 400 - {'error': {'message': 'Failed to parse tool call arguments as JSON', "
         "'type': 'invalid_request_error', 'code': 'tool_use_failed', "
         '\'failed_generation\': \'{"name": "gnome.type_text", "arguments": {"text": "hello"}}\'}}'
+    )
+
+
+def _broken_done_text() -> str:
+    return (
+        "Error code: 400 - {'error': {'message': 'Failed to parse tool call arguments as JSON', "
+        "'type': 'invalid_request_error', 'code': 'tool_use_failed', "
+        '\'failed_generation\': \'{"name": "done", "arguments": {"artifact_refs":[],"payload":{},'
+        '"status":"done","summary":"Poem pasted into gedit","text":"Ozymandias\\n\\n'
+        "I met a traveler from an antique land\\nWho said, 'I am amazed by a statue in his hand: "
+        'It’s the ruins of a colossal stone statue in the desert, in a shape that is a statue of a king '
+        "that was once so great that it still holds power.'\"\"}'}}"
     )
