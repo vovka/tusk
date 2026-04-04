@@ -21,27 +21,27 @@ from tusk.shared.logging import ColorLogPrinter
 
 
 def _build_log(options: StartupOptions) -> ColorLogPrinter:
-    return ColorLogPrinter(options.log_groups)
+    return ColorLogPrinter(options.log_groups, options.hidden_groups)
 
 
-def _build_llm_registry(config: Config, log: ColorLogPrinter) -> LLMRegistry:
+def _build_llm_registry(config: Config, log: ColorLogPrinter, options: StartupOptions) -> LLMRegistry:
     factory = ConfigurableLLMFactory(config.groq_api_key, config.openrouter_api_key)
     registry = LLMRegistry(factory)
-    _register_slots(factory, config, log, registry)
+    _register_slots(factory, config, log, registry, options)
     return registry
 
 
-def _register_slots(factory: ConfigurableLLMFactory, config: Config, log: ColorLogPrinter, registry: LLMRegistry) -> None:
-    registry.register_slot("gatekeeper", _slot_proxy(factory, config.gatekeeper_llm, log, "gatekeeper"))
-    registry.register_slot("conversation_agent", _slot_proxy(factory, config.conversation_agent_llm, log, "conversation_agent"))
-    registry.register_slot("planner_agent", _slot_proxy(factory, config.planner_agent_llm, log, "planner_agent"))
-    registry.register_slot("executor_agent", _slot_proxy(factory, config.executor_agent_llm, log, "executor_agent"))
-    registry.register_slot("default_agent", _slot_proxy(factory, config.default_agent_llm, log, "default_agent"))
-    registry.register_slot("utility", _slot_proxy(factory, config.utility_llm, log, "utility"))
+def _register_slots(factory: ConfigurableLLMFactory, config: Config, log: ColorLogPrinter, registry: LLMRegistry, options: StartupOptions) -> None:
+    registry.register_slot("gatekeeper", _slot_proxy(factory, config.gatekeeper_llm, log, "gatekeeper", options))
+    registry.register_slot("conversation_agent", _slot_proxy(factory, config.conversation_agent_llm, log, "conversation_agent", options))
+    registry.register_slot("planner_agent", _slot_proxy(factory, config.planner_agent_llm, log, "planner_agent", options))
+    registry.register_slot("executor_agent", _slot_proxy(factory, config.executor_agent_llm, log, "executor_agent", options))
+    registry.register_slot("default_agent", _slot_proxy(factory, config.default_agent_llm, log, "default_agent", options))
+    registry.register_slot("utility", _slot_proxy(factory, config.utility_llm, log, "utility", options))
 
 
-def _build_kernel(config: Config, log: ColorLogPrinter) -> KernelAPI:
-    llm_registry = _build_llm_registry(config, log)
+def _build_kernel(config: Config, log: ColorLogPrinter, options: StartupOptions) -> KernelAPI:
+    llm_registry = _build_llm_registry(config, log, options)
     tool_registry = ToolRegistry()
     adapter_manager = _build_adapter_manager(config, log, tool_registry)
     history = SlidingWindowHistory(20, LLMConversationSummarizer(llm_registry.get("utility")))
@@ -77,9 +77,9 @@ def _build_adapter_manager(config: Config, log: ColorLogPrinter, tool_registry: 
     return manager
 
 
-def _slot_proxy(factory: ConfigurableLLMFactory, slot: object, log: ColorLogPrinter, name: str) -> LLMProxy:
+def _slot_proxy(factory: ConfigurableLLMFactory, slot: object, log: ColorLogPrinter, name: str, options: StartupOptions) -> LLMProxy:
     provider = factory.create(slot.provider_name, slot.model)
-    return LLMProxy(provider, log, name)
+    return LLMProxy(provider, log, name, enabled_log_groups=options.log_groups, preview_chars=options.llm_log_preview_chars)
 
 
 def _load_shell(name: str, shells_dir: Path, config: Config, kernel: KernelAPI, log: ColorLogPrinter) -> object:
@@ -112,7 +112,7 @@ def main() -> None:
     options = StartupOptions.from_sources(sys.argv[1:])
     config = Config.from_env()
     log = _build_log(options)
-    kernel = _build_kernel(config, log)
+    kernel = _build_kernel(config, log, options)
     shells = _load_shells(config, kernel, log)
     _start_shells(shells, kernel.submit, log)
 
