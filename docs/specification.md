@@ -38,9 +38,18 @@ immutable (`frozen=True`) for the lifetime of the process.
 | Env Var | Python Type | Default | Description |
 |---|---|---|---|
 | `GATEKEEPER_LLM` | `LLMSlotConfig` | `groq/llama-3.1-8b-instant` | Fast model for intent filtering |
-| `PLANNER_LLM` | `LLMSlotConfig` | `groq/openai/gpt-oss-20b` | Strict-schema model for one-shot planning |
-| `AGENT_LLM` | `LLMSlotConfig` | `groq/openai/gpt-oss-120b` | Capable model for conversation + execution |
+| `CONVERSATION_AGENT_LLM` | `LLMSlotConfig` | falls back to `AGENT_LLM` | Conversation profile model |
+| `PLANNER_AGENT_LLM` | `LLMSlotConfig` | falls back to `PLANNER_LLM` | Planner profile model |
+| `EXECUTOR_AGENT_LLM` | `LLMSlotConfig` | falls back to `AGENT_LLM` | Executor profile model |
+| `DEFAULT_AGENT_LLM` | `LLMSlotConfig` | falls back to `AGENT_LLM` | Default profile model |
 | `UTILITY_LLM` | `LLMSlotConfig` | `groq/llama-3.3-70b-versatile` | Model for summaries and text cleanup |
+
+Legacy fallback env vars (used when per-agent vars are absent):
+
+| Env Var | Default | Fallback for |
+|---|---|---|
+| `PLANNER_LLM` | `groq/openai/gpt-oss-20b` | `PLANNER_AGENT_LLM` |
+| `AGENT_LLM` | `groq/openai/gpt-oss-120b` | `CONVERSATION_AGENT_LLM`, `EXECUTOR_AGENT_LLM`, `DEFAULT_AGENT_LLM` |
 
 ### 2.3 Optional Fields with Defaults
 
@@ -64,10 +73,12 @@ name; the remainder is the model ID. Parsed by `LLMSlotConfig.parse()`.
 
 ```
 Provider selection in main.py:
-    "gatekeeper" → ConfigurableLLMFactory.create(GATEKEEPER_LLM.provider_name, GATEKEEPER_LLM.model)
-    "planner"    → ConfigurableLLMFactory.create(PLANNER_LLM.provider_name, PLANNER_LLM.model)
-    "agent"      → ConfigurableLLMFactory.create(AGENT_LLM.provider_name, AGENT_LLM.model)
-    "utility"    → ConfigurableLLMFactory.create(UTILITY_LLM.provider_name, UTILITY_LLM.model)
+    "gatekeeper"        → GATEKEEPER_LLM
+    "conversation_agent" → CONVERSATION_AGENT_LLM (fallback: AGENT_LLM)
+    "planner_agent"     → PLANNER_AGENT_LLM (fallback: PLANNER_LLM)
+    "executor_agent"    → EXECUTOR_AGENT_LLM (fallback: AGENT_LLM)
+    "default_agent"     → DEFAULT_AGENT_LLM (fallback: AGENT_LLM)
+    "utility"           → UTILITY_LLM
 
 Supported providers: "groq" (GroqLLM), "openrouter" (OpenRouterLLM)
 
@@ -311,23 +322,40 @@ the turn cleanly.
 You are the TUSK planner agent.
 Plan the task but do not execute it.
 Select real runtime tool names for the executor.
+Use the provided tool catalog to inspect tool schemas, required arguments,
+  and sequence_callable flags.
+Draft payload.planned_steps as concrete ordered tool steps with exact args.
+Return payload.execution_mode as normal or sequence.
+After drafting planned_steps, try to promote the plan to sequence mode when
+  all steps are linear, deterministic, and every selected tool is sequence_callable.
 For large text insertion tasks, prefer clipboard write and paste tools
   (gnome.write_clipboard + gnome.press_keys) over gnome.type_text.
-Return done with payload containing selected_tool_names and plan_text.
-Use list_available_tools to inspect available runtime tools.
+Return done with payload containing selected_tool_names, execution_mode,
+  plan_text, and planned_steps.
 ```
 
 ### 9.2 Tools
 
 | Tool | When used |
 |---|---|
-| `done` | Return `payload={selected_tool_names, plan_text}` |
-| `list_available_tools` | Inspect registry for real MCP tool names |
+| `done` | Return `payload={selected_tool_names, execution_mode, planned_steps, plan_text}` |
+
+The full tool catalog is injected into the planner's prompt context by
+`PlannerRequestEnricher` (via `AgentToolCatalog.prompt_text()`), not as a runtime tool.
 
 ### 9.3 Output
 
-`done.payload.selected_tool_names` — list of real tool names validated against
-`ToolRegistry.real_tool_names()` by `PlannerResultValidator` before the executor runs.
+`done.payload` fields:
+
+| Field | Type | Description |
+|---|---|---|
+| `selected_tool_names` | `list[str]` | Tool names; normalized from `planned_steps` by `PlannerResultValidator` |
+| `execution_mode` | `str` | `"normal"` or `"sequence"` |
+| `planned_steps` | `object` | `ToolSequencePlan`-shaped dict with `goal` and `steps` |
+| `plan_text` | `str` | Human-readable plan (optional) |
+
+`PlannerResultValidator` validates `planned_steps`, promotes `normal` → `sequence` when
+all steps are `sequence_callable`, and derives `sequence_plan` from validated steps.
 
 ---
 
@@ -341,6 +369,10 @@ Use list_available_tools to inspect available runtime tools.
 You are the TUSK executor agent.
 Execute the plan using only the runtime tools provided.
 Every response must be a single tool/function call.
+When the tool named execute_tool_sequence is available, call it first with empty
+  arguments {}.
+Do not rewrite or reconstruct the compiled sequence plan in tool arguments.
+After execute_tool_sequence returns success, your next response must call done.
 For large text, prefer gnome.write_clipboard + gnome.press_keys over gnome.type_text.
 After a successful clipboard write, do not write again until after a paste.
 Use gnome.press_keys only for shortcuts, not literal text.
@@ -348,17 +380,24 @@ After the final successful action, your very next response must call done.
 Do not invent tool names.
 ```
 
-### 10.2 Tools
+### 10.2 Tools — Normal Mode
 
 `done` (required) + MCP tools resolved from the planner's `selected_tool_names` via
 `PlannerRuntimeToolResolver`. The executor receives exactly the tools the planner selected.
+
+### 10.2b Tools — Sequence Mode
+
+`done` (required) + `execute_tool_sequence` (synthetic). No real MCP tools are exposed.
+`execute_tool_sequence` takes empty arguments; the compiled plan is already attached to
+the executor `AgentRunRequest` and retrieved by `OrchestratorToolDispatcher`.
 
 ### 10.3 AgentRuntime Loop
 
 Max 16 steps (`executor` profile `max_steps=16`). Per step:
 - Calls `profile.llm_provider.complete_tool_call(system_prompt, messages, tools)`
 - `RepeatedToolCallGuard` aborts on duplicate identical `(tool_name, parameters)` pair
-- Dispatches real tools through `ToolRegistry`; synthetic `done` terminates the run
+- Dispatches real tools or `execute_tool_sequence` through `OrchestratorToolDispatcher`;
+  synthetic `done` terminates the run
 - On LLM failure → `ModelFailureReplyBuilder` → `done(status="failed")`
 
 ---
@@ -387,7 +426,7 @@ Shared by all three profiles (conversation, planner, executor).
 | `status` | `done`, `clarify`, `unknown`, `failed`, `need_tools` |
 | `summary` | Short human-readable result |
 | `text` | Full reply text (optional) |
-| `payload` | Structured data (planner uses `selected_tool_names`, `plan_text`) |
+| `payload` | Structured data (planner uses `selected_tool_names`, `execution_mode`, `planned_steps`, `plan_text`) |
 
 
 ## 12. Tool Registry Specification
@@ -403,8 +442,9 @@ class RegisteredTool:
     description: str
     input_schema: dict
     execute: Callable[[dict], ToolResult]
-    source: str            # "kernel" or adapter name (e.g. "gnome")
-    planner_visible: bool  # default True
+    source: str              # "kernel" or adapter name (e.g. "gnome")
+    planner_visible: bool    # default True
+    sequence_callable: bool  # default False — may appear in compiled sequence plans
 ```
 
 ### 12.2 Key Methods
@@ -417,19 +457,20 @@ class RegisteredTool:
 | `real_tools()` | `→ list[RegisteredTool]` | All tools, sorted alphabetically |
 | `planner_tools()` | `→ list[RegisteredTool]` | Only `planner_visible=True` entries |
 | `planner_tool_names()` | `→ set[str]` | Name set of planner-visible tools |
-| `build_planner_catalog_text()` | `→ str` | `"name: description\n..."` (one line per tool) |
 | `definitions_for(names)` | `→ list[dict]` | Full native tool defs for a named subset, sorted |
+| `sequence_tools()` | `→ list[RegisteredTool]` | Only `sequence_callable=True` tools |
+| `sequence_tool_names()` | `→ set[str]` | Names of sequence-callable tools |
 
-### 12.3 Planner Catalog Text Format
+### 12.3 Planner Catalog Format
 
-`build_planner_catalog_text()` returns a string in the format:
-```
-gnome.close_window: Close a window
-gnome.focus_window: Focus a window
-gnome.launch_application: Launch an application
-...
-start_dictation: Start adapter-driven dictation mode
-switch_model: Switch LLM provider/model for a slot
+The planner catalog is built by `AgentToolCatalog.prompt_text()` (not `ToolRegistry`)
+and injected into the planner's instruction by `PlannerRequestEnricher`. It is a JSON
+string listing each planner-visible tool's `name`, `description`, `input_schema`,
+`source`, and `sequence_callable` flag. Example shape:
+
+```json
+{"tools": [{"name": "gnome.close_window", "description": "...", "input_schema": {...},
+            "source": "gnome", "sequence_callable": true}, ...]}
 ```
 
 ### 12.4 Native Tool Definition Format
@@ -602,6 +643,29 @@ MCP server managing dictation sessions.
 - First segment of a session: output text as-is
 - Subsequent segments: prepend a space unless the segment starts with punctuation
 - `DictationRefiner.refine(text)` is called on each segment for LLM-based cleanup
+
+### 15.4 DictationGate — `tusk/kernel/dictation_gate.py`
+
+Called by `KernelAPI._submit_dictation()` before forwarding text to
+`AdapterDictationMode`. Replaces the former hard-coded `_is_stop_request()` phrase list.
+
+**should_stop(text) → bool:**
+1. Call `LLMProvider.complete_structured(DICTATION_GATE_PROMPT, text, "dictation_gatekeeper", schema, 128)`
+2. On failure, fall back to `LLMProvider.complete(DICTATION_GATE_PROMPT, text, 128)`
+3. On second failure, return `False` (treat as dictation text)
+4. Parse JSON response; extract `directed` (bool) and `metadata_stop` (str | null)
+5. Return `True` only when `directed=true` AND `metadata_stop` is a non-empty string
+
+**Structured output schema:**
+```json
+{
+  "directed": bool,
+  "cleaned_command": "string",
+  "metadata_stop": "string | null"
+}
+```
+
+**Prompt source:** `tusk/kernel/dictation_gate_prompt.py` (`DICTATION_GATE_PROMPT`)
 
 ---
 
@@ -816,7 +880,10 @@ NOT retried:
 | `AgentRuntime` | LLM failure | `ModelFailureReplyBuilder` → `done(status="failed")` |
 | `AgentRuntime` | Max steps (8/16) | Returns `AgentResult(status="failed")` |
 | `AgentRuntime` | Repeated tool call | Returns `AgentResult(status="failed")` |
-| `PlannerResultValidator` | Invalid tool names | Strips unknowns; fails if none remain |
+| `PlannerResultValidator` | Invalid planner output | Validates `planned_steps`; promotes to sequence when eligible; fails if no valid steps |
+| `PlannerStepPlanValidator` | Malformed `planned_steps` | Rejects forbidden synthetic tools, validates step structure and args |
+| `ToolSequencePlanValidator` | Invalid sequence plan | Rejects non-`sequence_callable` tools, enforces max 8 steps |
+| `ToolSequenceExecutor` | Step failure | Aborts remaining steps; returns partial result |
 | `MCPToolProxy` | Adapter error | Returns `ToolResult(False, error_message)` |
 | `AdapterManager` | Adapter startup fails | Logs error; continues without that adapter |
 | `VoicePipeline._handle_utterance` | Any from above | Stage returns `None`; utterance dropped |
@@ -860,6 +927,12 @@ The active runtime no longer uses:
 - Described-tool tracking and learned top-tool injection
 - Persistent tool-usage ranking
 - Automatic desktop-context injection into agent prompts
+- `list_available_tools` — formerly exposed to the planner profile; replaced by full
+  tool catalog text injected into the planner's system prompt via `AgentToolCatalog`.
+  The tool is still dispatched by `OrchestratorToolDispatcher` but no longer appears
+  in any profile's toolset.
+- Hard-coded `_is_stop_request()` phrase matching in `KernelAPI` — replaced by
+  `DictationGate` LLM-based classification.
 
 `tusk/kernel/tool_call_parser.py` is still present only as a legacy helper. It is not
 used by the native tool-calling runtime.
