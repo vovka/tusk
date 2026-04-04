@@ -1,6 +1,5 @@
-import json
-
 from tusk.shared.logging.interfaces.log_printer import LogPrinter
+from tusk.shared.llm.yaml_log_formatter import YamlLogFormatter
 
 __all__ = ["LLMPayloadLogger"]
 
@@ -10,12 +9,13 @@ class LLMPayloadLogger:
         self._log = log_printer
         self._slot = slot_name
         self._label = label_getter
+        self._formatter = YamlLogFormatter()
 
     def log(self, system_prompt: str, messages: list[dict], response_format: dict | None = None, tools: list[dict[str, object]] | None = None) -> None:
         if self._log is None:
             return
         payload = self._payload(system_prompt, messages, response_format, tools)
-        text = json.dumps(payload, ensure_ascii=False, indent=2)
+        text = self._formatter.format(payload)
         self._log.log("LLMPAYLOAD", f"[{self._slot}] payload\n{text}", "llm-payload")
 
     def _payload(

@@ -45,13 +45,14 @@ def test_gate_recovery_logs_have_own_label() -> None:
 def test_llm_proxy_logs_request_payload_and_wait_separately() -> None:
     logged = []
     proxy = _proxy(logged)
-    proxy.complete("sys", "hello")
+    proxy.complete("sys\nrules", "hello")
     messages = [item for item in logged if item[0] == "log"]
     assert ("wait", "groq/model", "llm-wait") in logged
     assert _has_request(messages)
     assert _has_payload(messages)
-    assert '"slot": "agent"' in _payload(messages)
-    assert '"role": "system"' in _payload(messages)
+    assert 'slot: "agent"' in _payload(messages)
+    assert 'role: "system"' in _payload(messages)
+    assert "content: |-" in _payload(messages)
 
 
 def test_daily_file_logger_writes_jsonl() -> None:

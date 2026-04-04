@@ -56,6 +56,21 @@ These rules apply to all code in this repository. Claude must follow them withou
 - Do not create utility helpers "for future use."
 - Do not add backwards-compatibility shims for removed code.
 
+## Docker Environment (Mandatory)
+
+All development, testing, and code execution happens **inside Docker**. Never run Python, pytest, or any project command directly on the host.
+
+- **Run tests**: `docker compose exec tusk pytest tests/`
+- **Run a single test**: `docker compose exec tusk pytest tests/test_foo.py::TestClass::test_method`
+- **Run the app**: `docker compose up`
+- **Open a shell**: `docker compose exec tusk bash`
+
+If the container is not running, start it first: `docker compose up -d`
+
+Claude must never suggest or run `python`, `pytest`, or `pip` commands outside of `docker compose exec tusk ...`.
+
+---
+
 ## Coding Railguide (TDD Required)
 
 - **Tests first, always.** Before writing or changing production code, add or update unit tests that fail for the intended behavior.
