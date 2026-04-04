@@ -4,9 +4,7 @@ An always-listening desktop AI voice assistant for Linux/GNOME.
 
 ## Demo
 
-https://github.com/user-attachments/assets/f3990dbc-00ba-4a89-81d9-af1919ff2f6d
-
-Click the preview image to open the demo video.
+https://github.com/user-attachments/assets/ff5d81a0-2a9c-4eb4-beff-795700454733
 
 ## How it works
 
