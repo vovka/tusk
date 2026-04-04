@@ -4,6 +4,12 @@ An always-listening desktop AI voice assistant for Linux/GNOME.
 
 ## Demo
 
+```
+CONVERSATION_AGENT_LLM=groq/openai/gpt-oss-120b
+PLANNER_LLM=groq/openai/gpt-oss-120b
+EXECUTOR_AGENT_LLM=groq/openai/gpt-oss-20b
+```
+
 https://github.com/user-attachments/assets/ff5d81a0-2a9c-4eb4-beff-795700454733
 
 ## How it works
