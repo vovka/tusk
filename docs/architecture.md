@@ -140,35 +140,63 @@ tusk/
 ├── tusk/
 │   ├── kernel/                          # Thin orchestration layer
 │   │   ├── agent/                       # Agentic reasoning loop
-│   │   │   ├── agent_orchestrator.py    # AgentOrchestrator — routes run_agent calls to child profiles
-│   │   │   ├── agent_runtime.py         # AgentRuntime — shared turn/tool loop
-│   │   │   ├── agent_child_runner.py    # Runs child (execution) agent turns
+│   │   │   ├── agent_child_runner.py    # Runs child agent turns
+│   │   │   ├── agent_orchestrator.py    # Routes run_agent calls to child profiles
 │   │   │   ├── agent_profile.py         # AgentProfile — prompt + tool config per role
 │   │   │   ├── agent_result.py          # AgentResult — final output from a run
-│   │   │   ├── agent_run_guard.py       # Guard: max turns, repeated call detection
-│   │   │   ├── agent_session_store.py   # AgentSessionStore ABC — persist session events
-│   │   │   ├── agent_tool_catalog.py    # Builds compact name:description catalog text
-│   │   │   ├── agent_toolset_builder.py # Selects tool schemas for the execution agent
-│   │   │   ├── executor_clipboard_guard.py # Blocks clipboard writes during safe execution
-│   │   │   ├── executor_tool_guard.py   # Validates tool calls before dispatch
-│   │   │   └── file_agent_session_store.py # File-backed session event log
+│   │   │   ├── agent_run_guard.py       # Guard: max turns, depth, recursion
+│   │   │   ├── agent_run_request.py     # AgentRunRequest — frozen run parameters
+│   │   │   ├── agent_runtime.py         # AgentRuntime — shared turn/tool loop
+│   │   │   ├── agent_session_store.py   # AgentSessionStore ABC
+│   │   │   ├── agent_tool_catalog.py    # Builds catalog text with sequence_callable flags
+│   │   │   ├── agent_toolset_builder.py # Selects tool schemas per profile and mode
+│   │   │   ├── child_result_message_builder.py  # Structured [child-result] messages
+│   │   │   ├── clipboard_write_message_builder.py # [clipboard-written] context messages
+│   │   │   ├── conversation_failure_budget_guard.py # Blocks after 2 failed executors
+│   │   │   ├── conversation_run_agent_guard.py  # Blocks re-delegation after executor done
+│   │   │   ├── executor_clipboard_guard.py      # Clipboard progress enforcement
+│   │   │   ├── executor_tool_guard.py           # Validates tool calls before dispatch
+│   │   │   ├── file_agent_session_store.py      # File-backed session event log
+│   │   │   ├── orchestrator_tool_dispatcher.py  # Routes tool calls incl. execute_tool_sequence
+│   │   │   ├── planner_request_enricher.py      # Injects tool catalog into planner request
+│   │   │   ├── planner_result_validator.py      # Validates planner output + sequence promotion
+│   │   │   ├── planner_runtime_tool_resolver.py # Resolves executor tools from planner refs
+│   │   │   ├── planner_sequence_promoter.py     # Promotes normal → sequence mode
+│   │   │   ├── planner_step_plan_validator.py   # Validates planned_steps structure
+│   │   │   ├── runtime_message_history_builder.py # Builds message history for runtime
+│   │   │   ├── runtime_result_factory.py        # Creates AgentResult instances
+│   │   │   ├── runtime_step_recorder.py         # Records step results as messages
+│   │   │   ├── runtime_turn_guards.py           # Composes profile-specific constraints
+│   │   │   ├── session_event_formatter.py       # Formats session events
+│   │   │   ├── session_event_reader.py          # Reads session events
+│   │   │   ├── simple_schema_validator.py       # Lightweight JSON Schema validation
+│   │   │   ├── static_tool_schemas.py           # Done, run_agent, execute_tool_sequence schemas
+│   │   │   ├── tool_sequence_executor.py        # Executes compiled sequence plans
+│   │   │   ├── tool_sequence_plan_validator.py  # Pre-execution sequence validation
+│   │   │   └── tool_sequence_recorder.py        # Records sequence execution events
 │   │   ├── interfaces/                  # Kernel ABCs
 │   │   │   ├── conversation_history.py  # ConversationHistory ABC
 │   │   │   ├── conversation_summarizer.py # ConversationSummarizer ABC
 │   │   │   └── pipeline_mode.py         # PipelineMode ABC — gatekeeper prompt + handler
 │   │   ├── adapter_manager.py           # AdapterManager — MCP adapter lifecycle
+│   │   ├── agent_profiles.py            # build_agent_profiles() — 4 profiles
 │   │   ├── api.py                       # KernelAPI — submit(text) public entry point
 │   │   ├── command_mode.py              # CommandMode — routes submitted text to agent
+│   │   ├── dictation_gate.py            # DictationGate — LLM-based stop classification
+│   │   ├── dictation_gate_prompt.py     # Dictation-specific prompt for DictationGate
 │   │   ├── dictation_mode.py            # AdapterDictationMode — active dictation state
 │   │   ├── dictation_router.py          # DictationRouter — routes segments and edits
+│   │   ├── dictation_state.py           # DictationState — session id + adapter names
+│   │   ├── internal_tools.py            # Re-exports tool classes
 │   │   ├── llm_conversation_summarizer.py # LLM-based history compaction
 │   │   ├── main_agent.py                # MainAgent — entry point for a conversation turn
+│   │   ├── model_failure_reply_builder.py # Human-readable failure messages
 │   │   ├── registered_tool.py           # RegisteredTool — frozen entry in ToolRegistry
 │   │   ├── repeated_tool_call_guard.py  # Detects repeated identical tool calls
 │   │   ├── sliding_window_history.py    # SlidingWindowHistory — max-20 with LLM compaction
 │   │   ├── start_dictation_tool.py      # StartDictationTool — launches dictation session
 │   │   ├── switch_model_tool.py         # SwitchModelTool — hot-swaps an LLM slot
-│   │   └── tool_runtime.py              # ToolRuntime — wires planner, executor, internal tools
+│   │   └── tool_runtime.py              # ToolRuntime — wires tools + DictationRouter
 │   ├── shared/                          # Used by all layers; depends on nothing else
 │   │   ├── config/
 │   │   │   ├── config.py                # Config — frozen dataclass, all runtime settings
@@ -206,6 +234,8 @@ tusk/
 │   │   │   ├── mcp_tool_schema.py       # MCPToolSchema — adapter tool definition
 │   │   │   ├── tool_call.py             # ToolCall — tool name + parameters + call_id
 │   │   │   ├── tool_result.py           # ToolResult — success + message + data
+│   │   │   ├── tool_sequence_plan.py    # ToolSequencePlan — ordered steps + goal
+│   │   │   ├── tool_sequence_step.py    # ToolSequenceStep — step_id + tool_name + args
 │   │   │   ├── utterance.py             # Utterance — transcribed text + audio + confidence
 │   │   │   └── window_info.py           # WindowInfo — title + app + geometry + active flag
 │   │   └── stt/
@@ -407,25 +437,6 @@ cross component boundaries.
 
 The `classification` key in `metadata` holds `"command"`, `"conversation"`, or `"ambient"`.
 
-### TaskPlan — `tusk/shared/schemas/task_plan.py`
-
-| Field | Type | Description |
-|---|---|---|
-| `status` | `str` | `"execute"`, `"clarify"`, or `"unknown"` |
-| `user_reply` | `str` | Reply for clarify/unknown; may be surfaced to user |
-| `plan_steps` | `list[str]` | Ordered natural-language execution steps |
-| `selected_tools` | `list[str]` | Tool names chosen from the registry |
-| `reason` | `str` | Planner's reasoning (for logging) |
-
-### TaskExecutionResult — `tusk/shared/schemas/task_execution_result.py`
-
-| Field | Type | Description |
-|---|---|---|
-| `status` | `str` | `"done"`, `"clarify"`, `"unknown"`, `"failed"`, or `"need_tools"` |
-| `reply` | `str` | Human-readable result to surface to the user |
-| `reason` | `str` | Internal reason (for logging and replan context) |
-| `needed_capability` | `str` | Populated when `status="need_tools"` |
-
 ### ToolCall — `tusk/shared/schemas/tool_call.py`
 
 | Field | Type | Description |
@@ -510,6 +521,26 @@ The `classification` key in `metadata` holds `"command"`, `"conversation"`, or `
 | `name` | `str` | Human-readable application name |
 | `exec_cmd` | `str` | Shell command to launch the application |
 
+### ToolSequenceStep — `tusk/shared/schemas/tool_sequence_step.py`
+
+| Field | Type | Description |
+|---|---|---|
+| `step_id` | `str` | Unique step identifier |
+| `tool_name` | `str` | Name of the tool to execute |
+| `args` | `dict[str, object]` | Tool input parameters |
+
+Class methods: `from_dict(data) -> ToolSequenceStep | None`, `to_dict() -> dict`.
+
+### ToolSequencePlan — `tusk/shared/schemas/tool_sequence_plan.py`
+
+| Field | Type | Description |
+|---|---|---|
+| `steps` | `tuple[ToolSequenceStep, ...]` | Ordered sequence of tool steps |
+| `goal` | `str` | Natural-language goal description |
+
+Class methods: `from_dict(data) -> ToolSequencePlan | None`, `to_dict() -> dict`,
+`tool_names() -> set[str]`, `ordered_tool_names() -> tuple[str, ...]`.
+
 ---
 
 ## Pipeline Data Flow
@@ -566,7 +597,7 @@ system prompt, allowed tools, and `max_steps`.
 | Profile | LLM slot | Static tools | Runtime tools | max_steps |
 |---|---|---|---|---|
 | `conversation` | `conversation_agent` | `done`, `run_agent` | — | 8 |
-| `planner` | `planner_agent` | `done`, `list_available_tools` | — | 8 |
+| `planner` | `planner_agent` | `done` | — | 8 |
 | `executor` | `executor_agent` | `done` | resolved from planner session | 16 |
 
 **Conversation prompt (key rules):**
@@ -577,15 +608,25 @@ system prompt, allowed tools, and `max_steps`.
 
 **Planner prompt (key rules):**
 - Plan but do not execute.
-- Use `list_available_tools` to discover runtime tool names.
-- Return `done(payload={selected_tool_names=[...], plan_text=...})`.
+- Use the provided tool catalog (injected into prompt context) to inspect tool schemas,
+  required arguments, and `sequence_callable` flags.
+- Draft `payload.planned_steps` as concrete ordered tool steps with exact args.
+- Return `payload.execution_mode` as `normal` or `sequence`.
+- Try to promote to sequence mode when all steps are linear, deterministic, and every tool
+  is `sequence_callable`.
+- For large text insertion, prefer clipboard write + paste tools over `gnome.type_text`.
+- Return `done(payload={selected_tool_names, execution_mode, plan_text, planned_steps})`.
 
 **Executor prompt (key rules):**
 - Execute using only the runtime tools provided.
 - Every response must be a single tool call.
+- When `execute_tool_sequence` is available, call it first with empty arguments `{}`.
+- Do not rewrite or reconstruct the compiled sequence plan in tool arguments.
+- After `execute_tool_sequence` returns success, call `done` immediately.
 - Prefer clipboard + paste (`gnome.write_clipboard` + `gnome.press_keys`) for large text
-  over `gnome.type_text`.
-- Call `done` as the very next response after the final successful action.
+  over `gnome.type_text`. After a clipboard write, move toward focus/paste.
+- Use `gnome.press_keys` only for shortcuts, not for literal text or URLs.
+- Call the tool named `done` (not a natural-language reply) after the final action.
 
 ### AgentRuntime — `tusk/kernel/agent/agent_runtime.py`
 
@@ -601,6 +642,19 @@ Shared across all profiles. Each run is independent:
    - If tool is `done` → finish and persist result.
 4. Returns `AgentResult` with `session_id`, `status`, `reply_text`.
 
+**RuntimeTurnGuards** composes profile-specific constraints:
+- `ConversationRunAgentGuard` — blocks the conversation profile from calling `run_agent`
+  again after an executor or default child already returned `status=done`. Planner `done` is
+  intermediate and does NOT trigger this guard.
+- `ConversationFailureBudgetGuard` — blocks further delegation after two failed executor or
+  default child runs in the same conversation turn.
+- `ExecutorClipboardGuard` — blocks repeated `gnome.write_clipboard` calls and requires
+  progress toward `gnome.focus_window` or a paste shortcut before allowing another write.
+- `ClipboardWriteMessageBuilder` — surfaces clipboard text as a `[clipboard-written]`
+  message so the executor sees the exact text already prepared.
+- `RuntimeStepRecorder` / `ChildResultMessageBuilder` — formats child-agent results as
+  structured `[child-result]` assistant messages instead of raw JSON user messages.
+
 ### History Management
 
 `SlidingWindowHistory` is maintained by `MainAgent._remember()` after each turn (user
@@ -611,10 +665,28 @@ evicted messages truncated to 120 chars, joined with `" | "`.
 
 ### Tool Handoff — `tusk/kernel/agent/planner_runtime_tool_resolver.py`
 
-When the executor profile receives `session_refs=[planner_session_id]` and no explicit
-`runtime_tool_names`, `PlannerRuntimeToolResolver` reads `selected_tool_names` from the
-planner's persisted `done` payload in `SessionStore` and validates each name against
-`ToolRegistry.real_tool_names()` before passing them to the executor.
+When the executor profile receives `session_refs=[planner_session_id]`,
+`PlannerRuntimeToolResolver` reads the planner's persisted `done` payload from
+`SessionStore` and resolves three fields for the executor request:
+- `runtime_tool_names` — validated against `ToolRegistry.real_tool_names()`. When a
+  `sequence_plan` is present, names are derived from `plan.ordered_tool_names()` instead.
+- `execution_mode` — `"normal"` or `"sequence"`, carried from the planner payload.
+- `sequence_plan` — a `ToolSequencePlan` materialized from `planned_steps` or
+  `sequence_plan` in the planner payload.
+
+### Agent Delegation Model
+
+Delegation is controlled solely by `AgentProfile.static_tool_names`. A profile that
+includes `"run_agent"` can delegate; a profile that omits it cannot. The `run_agent` schema
+is global: any profile that has the tool can request `planner`, `executor`, or `default` as
+the child profile. `AgentRunGuard` blocks self-recursion and excessive depth but does NOT
+enforce parent-specific child-profile allowlists.
+
+Current delegation permissions:
+- `conversation`: has `run_agent` — can delegate to any child profile.
+- `planner`: no `run_agent` — cannot delegate.
+- `executor`: no `run_agent` — cannot delegate.
+- `default`: has `run_agent` — can delegate to any child profile.
 
 ---
 
@@ -631,6 +703,7 @@ dataclass:
 | `execute` | `Callable[[dict], ToolResult]` | Execution function |
 | `source` | `str` | `"kernel"` or adapter name (e.g. `"gnome"`) |
 | `planner_visible` | `bool` | Whether planner catalog includes this tool |
+| `sequence_callable` | `bool` | Whether the tool may appear in a compiled sequence plan (default `False`) |
 
 **Key methods:**
 
@@ -644,10 +717,15 @@ dataclass:
 | `planner_tool_names()` | `set[str]` | Names of planner-visible tools |
 | `build_planner_catalog_text()` | `str` | `"name: description\n..."` for planner prompt |
 | `definitions_for(names)` | `list[dict]` | Native tool defs for a named subset |
+| `sequence_tools()` | `list[RegisteredTool]` | Only `sequence_callable=True` tools |
+| `sequence_tool_names()` | `set[str]` | Names of sequence-callable tools |
 
 Adapter tools are registered as `adapter_name.tool_name` (e.g. `gnome.launch_application`).
-The planner uses `list_available_tools` (a synthetic tool in `AgentToolsetBuilder`) to
-inspect the registry at runtime — not a pre-built catalog string.
+The planner receives the full tool catalog as text in its system prompt context via
+`AgentToolCatalog`, which exposes each tool's name, description, parameters, and
+`sequence_callable` flag. The synthetic `list_available_tools` tool is retained in
+`OrchestratorToolDispatcher` for backward compatibility but is no longer exposed to the
+planner profile.
 
 ---
 
@@ -684,6 +762,44 @@ it through the active desktop adapter (`gnome.type_text` or `gnome.replace_recen
 
 **stop():** Calls `DictationRouter.stop()` which calls `dictation.stop_dictation` (MCP)
 and clears the pipeline's dictation mode pointer.
+
+**Stop detection — `tusk/kernel/dictation_gate.py`:** `KernelAPI` consults `DictationGate`
+before forwarding text to `AdapterDictationMode`. `DictationGate` uses the gatekeeper LLM
+with a dictation-specific prompt (`tusk/kernel/dictation_gate_prompt.py`) and a structured
+output schema to classify whether a spoken segment is a stop request. Stop detection relies
+on the model returning `metadata_stop` (a non-null string), not on hard-coded phrase
+matching. When structured output fails, `DictationGate` falls back to a plain `complete()`
+call with flexible JSON parsing. If both calls fail, the segment is treated as dictation
+text (not a stop).
+
+### Tool Sequence Execution
+
+The executor can run a compiled deterministic plan through a single synthetic tool
+`execute_tool_sequence` instead of making per-step LLM calls. This reduces latency and
+token cost for short desktop workflows.
+
+**Validation pipeline:**
+1. `PlannerStepPlanValidator` validates `planned_steps` structure at planner output —
+   rejects forbidden synthetic tools, checks step schema and args against tool input
+   schemas. Does NOT check `sequence_callable`.
+2. `PlannerSequencePromoter` promotes `execution_mode=normal` to `sequence` when all steps
+   are linear and every tool is `sequence_callable`. Logs promotion under `SEQPROMOTE`.
+3. `PlannerResultValidator` orchestrates step validation, promotion, and derives
+   `sequence_plan` from validated `planned_steps`.
+4. `ToolSequencePlanValidator` runs immediately before execution — re-checks
+   `sequence_callable`, rejects forbidden tools, enforces max 8 steps.
+
+**Forbidden tools in sequence plans:** `done`, `run_agent`, `list_available_tools`,
+`execute_tool_sequence`.
+
+**Execution:** `ToolSequenceExecutor` iterates the validated plan, calling
+`ToolRegistry.get(step.tool_name).execute(args)` for each step. `ToolSequenceRecorder`
+records `sequence_started`, `sequence_step_requested`, `sequence_step_result`, and
+`sequence_finished` events to the session store. On any step failure, remaining steps are
+aborted and a partial-result `ToolResult` is returned.
+
+**Known limitations:** No wait/polling primitives, no step-output references, no retry
+policies, no branching or loops. Sequence mode is limited to already-synchronous tools.
 
 ---
 
@@ -733,6 +849,14 @@ Wraps an `MCPToolSchema` to present the `RegisteredTool` interface. On `execute(
 2. Converts `MCPToolResult` to `ToolResult`
 3. Returns `ToolResult(success=not is_error, message=content, data=data)`
 
+`MCPToolProxy` sets `sequence_callable` based on a scoped-name allowlist in
+`mcp_tool_proxy.py`. The GNOME allowlist includes window management, input simulation,
+mouse, and clipboard tools. `gnome.launch_application` and `gnome.open_uri` are excluded
+because their success semantics do not guarantee that dependent UI state is ready for the
+next step. Read-only inspection tools (`gnome.read_clipboard`, `gnome.get_desktop_context`,
+`gnome.get_active_window`, `gnome.list_windows`, `gnome.search_applications`) are excluded
+as they are not needed in sequence plans.
+
 ---
 
 ## Shell Model
@@ -781,12 +905,11 @@ Wraps any `LLMProvider`. Adds:
 
 ### LLMRegistry — `tusk/shared/llm/llm_registry.py`
 
-Holds four named `LLMProxy` slots. `swap(slot_name, provider_name, model)` creates a new
+Holds six named `LLMProxy` slots. `swap(slot_name, provider_name, model)` creates a new
 provider via `ConfigurableLLMFactory` and calls `proxy.swap()`.
 
-Slots: `gatekeeper`, `planner`, `agent`, `utility`.
-
-In v1, the conversation agent and execution agent both use the `agent` slot.
+Slots: `gatekeeper`, `conversation_agent`, `planner_agent`, `executor_agent`,
+`default_agent`, `utility`.
 
 ### LLMRetryRunner — `tusk/shared/llm/llm_retry_runner.py`
 
@@ -906,8 +1029,9 @@ main()
           → AdapterManager.start_watcher()     # file-system hot-plug
       → SlidingWindowHistory(20, LLMConversationSummarizer(...))
       → ToolRuntime(registry, llm_registry, adapter_manager, log)
-      → MainAgent(llm_registry.get("agent"), registry, history, log)
-      → KernelAPI(main_agent, llm_registry, log)   # exposes submit(text)
+      → _build_agent(config, log, llm_registry, tool_registry, history)
+      → KernelAPI(CommandMode(agent, log), llm_registry, log, DictationGate(...))
+      → ToolRuntime(...).register_tools(kernel)    # attaches DictationRouter + tools
   → _load_shells(config, kernel_api)               # loads shell modules from shell.json
       # Voice shell builds its own six-stage pipeline:
       → LLMGatekeeper(llm_registry.get("gatekeeper"), log)
@@ -959,7 +1083,10 @@ main()
 | `AgentRuntime` | LLM failure | `ModelFailureReplyBuilder` → `done(status="failed")` |
 | `AgentRuntime` | Max steps reached | Returns `AgentResult(status="failed")` |
 | `AgentRuntime` | Repeated tool call | Returns `AgentResult(status="failed")` |
-| `PlannerResultValidator` | Invalid `selected_tool_names` | Strips unknown names; fails if none remain |
+| `PlannerResultValidator` | Invalid planner output | Validates `planned_steps` against tool schemas; promotes to sequence when eligible; fails if no valid steps remain |
+| `PlannerStepPlanValidator` | Malformed `planned_steps` | Rejects forbidden synthetic tools, validates step structure and args against schemas |
+| `ToolSequencePlanValidator` | Invalid sequence plan | Pre-execution: rejects non-`sequence_callable` tools, forbidden tools, max 8 steps |
+| `ToolSequenceExecutor` | Step failure | Aborts remaining steps; returns `ToolResult(False, ...)` with partial results |
 | `MCPToolProxy` | Adapter error | Returns `ToolResult(False, error_message)` |
 | `AdapterManager` | Adapter startup fails | Logs error, continues without that adapter |
 | `VoicePipeline.run` | Any from above | Stage returns `None` — utterance silently dropped |
@@ -977,8 +1104,11 @@ main()
 | `StartDictationTool` | `start_dictation` | *(none)* | Starts MCP dictation session, sets kernel dictation mode |
 | `SwitchModelTool` | `switch_model` | `slot`, `provider`, `model` | Calls `LLMRegistry.swap()` |
 
-Synthetic tools (`done`, `run_agent`, `list_available_tools`) are built dynamically by
+Synthetic tools (`done`, `run_agent`, `execute_tool_sequence`) are built dynamically by
 `AgentToolsetBuilder` per profile and are never stored in `ToolRegistry`.
+`list_available_tools` is retained in `OrchestratorToolDispatcher` for backward
+compatibility but is no longer exposed to any profile. `execute_tool_sequence` is exposed
+only to the executor profile in sequence mode.
 
 ### GNOME Adapter Tools (prefix: `gnome.`)
 
