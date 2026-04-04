@@ -256,6 +256,7 @@ tusk/
 │   │   ├── voice_shell.py               # VoiceShell — entry point, calls kernel.submit()
 │   │   ├── buffered_utterance.py        # BufferedUtterance — Utterance + id + gate_state
 │   │   ├── gate_dispatch.py             # GateDispatch — action + text + recovered_id
+│   │   ├── gatekeeper_slot.py           # GatekeeperSlot — mutable proxy; swapped at dictation start/stop
 │   │   ├── recovery_decision.py         # RecoveryDecision — action + candidate_id + reason
 │   │   ├── interfaces/
 │   │   │   ├── gatekeeper.py            # Gatekeeper ABC
@@ -267,6 +268,7 @@ tusk/
 │   │       ├── sanitizer.py             # Sanitizer — hallucination / ghost-phrase filter
 │   │       ├── transcription_buffer.py  # TranscriptionBuffer — rolling window + state tracking
 │   │       ├── gatekeeper.py            # LLMGatekeeper — primary classify + recovery
+│   │       ├── dictation_gatekeeper.py  # DictationGatekeeper — forwards all text; LLM stop detection
 │   │       ├── gatekeeper_parser.py     # JSON parsing for gate and recovery LLM responses
 │   │       ├── gatekeeper_support.py    # Helpers: schemas, dispatch builders, wake-word check
 │   │       ├── command_gate_prompt.py   # Prompt builder for the primary classification call
@@ -297,7 +299,7 @@ tusk/
 │   └── dictation/
 │       ├── adapter.json                 # Adapter manifest (provides_context=false)
 │       ├── server.py                    # DictationServer — MCP server for dictation sessions
-│       ├── dictation_refiner.py         # DictationRefiner — LLM-based segment cleanup
+│       ├── dictation_refiner.py         # DictationRefiner — LLM cleanup (unused; reserved for future proofreading)
 │       └── dictation_tool_schema_catalog.py # start_dictation, process_segment, stop_dictation
 └── tests/
     ├── test_pipeline.py
@@ -553,7 +555,9 @@ AudioCapture.stream_frames()
     → Transcriber.process(utterance)           # STTEngine.transcribe() → text
     → Sanitizer.process(transcribed)           # hallucination / ghost-phrase filter → DROP
     → TranscriptionBuffer.process(sanitized)   # append to rolling window
-    → LLMGatekeeper.process(buffered, recent)  # LLM 3-way classify → DROP (ambient)
+    → GatekeeperSlot.process(buffered, recent)  # delegates to active inner gatekeeper
+        # command mode:   LLMGatekeeper — LLM 3-way classify → DROP (ambient)
+        # dictation mode: DictationGatekeeper — forward all; LLM stop detection → DROP (stop phrase)
     → KernelAPI.submit(command_text)
         → CommandMode.process_command(text)
             → MainAgent.process_command(command)
@@ -763,14 +767,20 @@ it through the active desktop adapter (`gnome.type_text` or `gnome.replace_recen
 **stop():** Calls `DictationRouter.stop()` which calls `dictation.stop_dictation` (MCP)
 and clears the pipeline's dictation mode pointer.
 
-**Stop detection — `tusk/kernel/dictation_gate.py`:** `KernelAPI` consults `DictationGate`
-before forwarding text to `AdapterDictationMode`. `DictationGate` uses the gatekeeper LLM
-with a dictation-specific prompt (`tusk/kernel/dictation_gate_prompt.py`) and a structured
-output schema to classify whether a spoken segment is a stop request. Stop detection relies
-on the model returning `metadata_stop` (a non-null string), not on hard-coded phrase
-matching. When structured output fails, `DictationGate` falls back to a plain `complete()`
-call with flexible JSON parsing. If both calls fail, the segment is treated as dictation
-text (not a stop).
+**Stop detection — `shells/voice/stages/dictation_gatekeeper.py`:** When dictation starts,
+`KernelAPI` fires an `on_dictation_started` callback (wired in `main.py`) that swaps the
+`GatekeeperSlot`'s inner delegate from `LLMGatekeeper` to `DictationGatekeeper`. On every
+utterance, `DictationGatekeeper` calls `DictationGate.should_stop(text)` which uses the
+gatekeeper LLM with a dictation-specific prompt (`tusk/kernel/dictation_gate_prompt.py`) to
+classify whether the spoken segment is a stop request. Stop detection relies on the model
+returning `metadata_stop` (a non-null string), not on hard-coded phrase matching. When
+structured output fails, `DictationGate` falls back to a plain `complete()` call. If both
+fail, the segment is forwarded as literal dictation text.
+
+On stop detection, `DictationGatekeeper` calls `kernel.request_dictation_stop()` which
+triggers the full stop sequence: adapter cleanup via `DictationRouter.stop()`, kernel state
+reset via `stop_dictation()`, and an `on_dictation_stopped` callback that swaps the slot
+back to `LLMGatekeeper`. The stop phrase itself is dropped (not typed).
 
 ### Tool Sequence Execution
 

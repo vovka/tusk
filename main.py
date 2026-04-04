@@ -4,11 +4,14 @@ import sys
 import threading
 from pathlib import Path
 
+from shells.voice.gatekeeper_slot import GatekeeperSlot
+from shells.voice.stages.dictation_gatekeeper import DictationGatekeeper
 from shells.voice.stages.gatekeeper import LLMGatekeeper
 from tusk.kernel import CommandMode, KernelAPI, LLMConversationSummarizer, MainAgent, SlidingWindowHistory, ToolRegistry
 from tusk.kernel.adapter_manager import AdapterManager
 from tusk.kernel.agent import AgentOrchestrator, FileAgentSessionStore
 from tusk.kernel.agent_profiles import build_agent_profiles
+from tusk.kernel.dictation_gate import DictationGate
 from tusk.kernel.tool_runtime import ToolRuntime
 from tusk.providers.llm import ConfigurableLLMFactory
 from tusk.providers.stt import GroqSTT
@@ -90,12 +93,19 @@ def _load_shell(name: str, shells_dir: Path, config: Config, kernel: KernelAPI, 
     return shell_class(config, log, stt_engine=GroqSTT(config.groq_api_key), gatekeeper=gatekeeper)
 
 
-def _voice_gatekeeper(config: Config, kernel: KernelAPI, log: ColorLogPrinter) -> LLMGatekeeper:
-    return LLMGatekeeper(
-        kernel.get_llm_registry().get("gatekeeper"),
-        log,
-        follow_up_window_seconds=config.follow_up_timeout_seconds,
+def _voice_gatekeeper(config: Config, kernel: KernelAPI, log: ColorLogPrinter) -> GatekeeperSlot:
+    llm_gk = LLMGatekeeper(kernel.get_llm_registry().get("gatekeeper"), log, follow_up_window_seconds=config.follow_up_timeout_seconds)
+    dictation_gate = DictationGate(kernel.get_llm_registry().get("gatekeeper"), log)
+    return _wire_dictation_gatekeeper(kernel, llm_gk, dictation_gate, log)
+
+
+def _wire_dictation_gatekeeper(kernel: KernelAPI, llm_gk: LLMGatekeeper, dictation_gate: DictationGate, log: ColorLogPrinter) -> GatekeeperSlot:
+    slot = GatekeeperSlot(llm_gk)
+    kernel.set_dictation_callbacks(
+        on_start=lambda: slot.swap(DictationGatekeeper(dictation_gate, kernel.request_dictation_stop, log)),
+        on_stop=lambda: slot.swap(llm_gk),
     )
+    return slot
 
 
 def main() -> None:

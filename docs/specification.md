@@ -642,12 +642,18 @@ MCP server managing dictation sessions.
 **Segment logic:**
 - First segment of a session: output text as-is
 - Subsequent segments: prepend a space unless the segment starts with punctuation
-- `DictationRefiner.refine(text)` is called on each segment for LLM-based cleanup
+- Segments are inserted verbatim (STT output only; no LLM refinement applied)
+
+> **Temporary:** `DictationRefiner` (`adapters/dictation/dictation_refiner.py`) exists but is
+> not wired in. It was disabled because small LLMs would interpret instruction-like phrases
+> (e.g. "tell me a joke") as commands rather than literal text. Proofreading/punctuation
+> correction will be re-introduced once a reliable approach is identified.
 
 ### 15.4 DictationGate — `tusk/kernel/dictation_gate.py`
 
-Called by `KernelAPI._submit_dictation()` before forwarding text to
-`AdapterDictationMode`. Replaces the former hard-coded `_is_stop_request()` phrase list.
+Called by `DictationGatekeeper` (`shells/voice/stages/dictation_gatekeeper.py`) on every
+utterance while dictation mode is active. Stop detection happens at the voice pipeline
+level — the segment never reaches `KernelAPI` when a stop is detected.
 
 **should_stop(text) → bool:**
 1. Call `LLMProvider.complete_structured(DICTATION_GATE_PROMPT, text, "dictation_gatekeeper", schema, 128)`

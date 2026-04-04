@@ -3,16 +3,13 @@ import sys
 import uuid
 
 try:
-    from dictation_refiner import DictationRefiner
     from dictation_tool_schema_catalog import DictationToolSchemaCatalog
 except ImportError:  # pragma: no cover
-    from adapters.dictation.dictation_refiner import DictationRefiner
     from adapters.dictation.dictation_tool_schema_catalog import DictationToolSchemaCatalog
 
 class DictationServer:
     def __init__(self) -> None:
         self._sessions: dict[str, str] = {}
-        self._refiner = DictationRefiner()
         self._schemas = DictationToolSchemaCatalog().build()
 
     def serve(self) -> None:
@@ -33,7 +30,7 @@ class DictationServer:
         session_id = arguments["session_id"]
         text = arguments["text"].strip()
         previous = self._sessions.get(session_id, "")
-        segment = self._segment(previous, self._refiner.refine(text))
+        segment = self._segment(previous, text)
         self._sessions[session_id] = f"{previous}{segment}"
         return self._update_payload(segment)
 
