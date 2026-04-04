@@ -4,7 +4,7 @@ An always-listening desktop AI voice assistant for Linux/GNOME.
 
 ## Demo
 
-[![TUSK demo video](docs/assets/tusk-demo-thumbnail.png)](docs/assets/tusk-demo.mp4)
+https://github.com/user-attachments/assets/f3990dbc-00ba-4a89-81d9-af1919ff2f6d
 
 Click the preview image to open the demo video.
 
