@@ -82,7 +82,7 @@ class LLMGatekeeper(Gatekeeper):
             log_gate_result(self._log, result, reason)
             return result
         except Exception as exc:
-            self._log.log("GATEKEEPER", f"parse error: {exc}", "gatekeeper")
+            self._log.log("ERROR", f"gatekeeper parse error: {exc}")
             return GateResult(False, "", 0.0)
 
     def _parsed_recovery(self, raw: str, candidates: list[BufferedUtterance]) -> RecoveryDecision:
@@ -92,7 +92,7 @@ class LLMGatekeeper(Gatekeeper):
             log_recovery(self._log, item)
             return item
         except Exception as exc:
-            self._log.log("GATERECOVERY", f"parse error: {exc}", "gate-recovery")
+            self._log.log("ERROR", f"gate recovery parse error: {exc}")
             return RecoveryDecision("none", reason="parse error")
 
     def _complete(self, prompt: str, text: str, name: str, schema: dict) -> str:
@@ -103,7 +103,7 @@ class LLMGatekeeper(Gatekeeper):
         try:
             return self._llm.complete(prompt, text, 256)
         except Exception as exc:
-            self._log.log("GATEKEEPER", f"{name} fallback completion failed: {exc}", "gatekeeper")
+            self._log.log("ERROR", f"{name} fallback completion failed: {exc}")
             return ""
 
     def _forward(self, dispatch: GateDispatch) -> GateDispatch:

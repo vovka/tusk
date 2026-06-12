@@ -18,16 +18,28 @@ def parse_recovery_decision(raw: str) -> RecoveryDecision:
 
 
 def _decoded(raw: str) -> dict:
-    return _unwrap(json.loads(_extract_json(raw)))
+    return _unwrap(_loaded(raw.strip()))
 
 
-def _extract_json(raw: str) -> str:
-    text = raw.strip()
-    return text.split("```")[1].lstrip("json").strip() if "```" in text else text
+def _loaded(text: str) -> dict | list:
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        return _first_json_object(text)
+
+
+def _first_json_object(text: str) -> dict:
+    start = text.find("{")
+    if start < 0:
+        raise ValueError(f"no JSON object in gate response: {text[:80]!r}")
+    value, _ = json.JSONDecoder().raw_decode(text[start:])
+    return value
 
 
 def _unwrap(data: dict | list) -> dict:
-    item = data[0] if isinstance(data, list) else data
+    item = data[0] if isinstance(data, list) and data else data
+    if not isinstance(item, dict):
+        raise ValueError("gate response is not a JSON object")
     return item["arguments"] if "arguments" in item else item
 
 
