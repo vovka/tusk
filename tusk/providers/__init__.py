@@ -1,3 +1,3 @@
-from tusk.providers import llm, stt
+from tusk.providers import llm, stt, tts
 
-__all__ = ["llm", "stt"]
+__all__ = ["llm", "stt", "tts"]

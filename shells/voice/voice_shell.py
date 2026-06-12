@@ -4,6 +4,7 @@ from shells.voice.gate_dispatch import GateDispatch
 from shells.voice.pipeline import VoicePipeline
 from shells.voice.stages.audio_capture import AudioCapture
 from shells.voice.stages.sanitizer import Sanitizer
+from shells.voice.stages.speech_playback import SpeechPlayback
 from shells.voice.stages.transcriber import Transcriber
 from shells.voice.stages.transcription_buffer import TranscriptionBuffer
 from shells.voice.stages.utterance_detector import UtteranceDetector
@@ -19,9 +20,13 @@ class VoiceShell:
         stt_engine: object | None = None,
         gatekeeper: object | None = None,
         pipeline: object | None = None,
+        tts_engine: object | None = None,
+        playback: object | None = None,
     ) -> None:
         self._pipeline = pipeline or self._build_pipeline(config, log_printer, stt_engine, gatekeeper)
         self._log = log_printer
+        self._tts = tts_engine
+        self._playback = playback or SpeechPlayback()
         self._running = True
 
     def start(self, submit: object) -> None:
@@ -61,8 +66,20 @@ class VoiceShell:
 
     def _log_reply(self, result: object) -> None:
         reply = getattr(result, "reply", "")
-        if reply:
-            self._log.log("TUSK", reply)
+        if not reply:
+            return
+        self._log.log("TUSK", reply)
+        self._speak(reply)
+
+    def _speak(self, reply: str) -> None:
+        if self._tts is None:
+            return
+        # ponytail: the mic hears this playback and the gatekeeper drops it as
+        # ambient — add mute-during-playback if it ever loops.
+        try:
+            self._playback.play(self._tts.synthesize(reply))
+        except Exception as exc:
+            self._log.log("ERROR", f"tts failed: {exc}")
 
 
 def _missing_stt_engine() -> object:
