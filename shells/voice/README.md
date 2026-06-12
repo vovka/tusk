@@ -5,6 +5,9 @@ a text command delivered to the kernel via `kernel.submit(text)`. Each stage has
 responsibility and passes its result forward or drops it. A developer can omit any stage by
 simply not wiring it into `VoicePipeline`.
 
+Capture and VAD run on a producer thread feeding a queue (sub-millisecond handoff); STT,
+gatekeeper, and agent run on the consumer, so speech during an agent run is queued, not lost.
+
 ---
 
 ## Pipeline Diagram

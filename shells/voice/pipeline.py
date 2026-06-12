@@ -1,3 +1,5 @@
+import queue
+import threading
 from collections.abc import Callable, Iterator
 
 from shells.voice.gate_dispatch import GateDispatch
@@ -27,10 +29,24 @@ class VoicePipeline:
         self._recovery_limit = recovery_candidate_limit
 
     def run(self, submit: Callable[[str], KernelResponse]) -> Iterator[KernelResponse]:
-        for utterance in self._detector.stream_utterances():
-            result = self._handle_utterance(utterance, submit)
+        utterances: queue.Queue[Utterance | Exception | None] = queue.Queue()
+        threading.Thread(target=self._capture_into, args=(utterances,), daemon=True).start()
+        while (item := utterances.get()) is not None:
+            if isinstance(item, Exception):
+                raise item
+            result = self._handle_utterance(item, submit)
             if result is not None:
                 yield result
+
+    def _capture_into(self, utterances: "queue.Queue[Utterance | Exception | None]") -> None:
+        # ponytail: capture+VAD stay real-time on this thread; STT and the agent run on
+        # the consumer, so speech during an agent run is processed afterwards, not lost.
+        try:
+            for utterance in self._detector.stream_utterances():
+                utterances.put(utterance)
+            utterances.put(None)
+        except Exception as exc:
+            utterances.put(exc)
 
     def _handle_utterance(
         self,
