@@ -1,7 +1,7 @@
 import select
 import subprocess
-
-from tusk.shared.mcp.mcp_stderr_reader import MCPStderrReader
+import threading
+from collections import deque
 
 __all__ = ["MCPStdioTransport"]
 
@@ -10,7 +10,9 @@ class MCPStdioTransport:
     def __init__(self, command: list[str], cwd: str, env: dict | None, response_timeout_seconds: float) -> None:
         self._timeout = response_timeout_seconds
         self._process = subprocess.Popen(command, cwd=cwd, env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        self._stderr_reader = MCPStderrReader(self._process.stderr)
+        self._stderr_lines: deque[str] = deque(maxlen=50)
+        self._stderr_thread = threading.Thread(target=self._drain_stderr, daemon=True)
+        self._stderr_thread.start()
 
     def write_line(self, line: str) -> None:
         assert self._process.stdin is not None
@@ -18,12 +20,15 @@ class MCPStdioTransport:
         self._process.stdin.flush()
 
     def read_line(self) -> str | None:
+        # ponytail: select on the fd relies on the strict one-line-per-request protocol —
+        # move to non-blocking reads if a server ever streams extra stdout lines.
         assert self._process.stdout is not None
         ready, _, _ = select.select([self._process.stdout], [], [], self._timeout)
         return self._process.stdout.readline() if ready else None
 
     def stderr_text(self) -> str:
-        return self._stderr_reader.text()
+        self._stderr_thread.join(timeout=0.5)
+        return "\n".join(self._stderr_lines).strip()
 
     def is_running(self) -> bool:
         return self._process.poll() is None
@@ -40,3 +45,8 @@ class MCPStdioTransport:
         except subprocess.TimeoutExpired:
             self._process.kill()
             self._process.wait()
+
+    def _drain_stderr(self) -> None:
+        assert self._process.stderr is not None
+        for line in self._process.stderr:
+            self._stderr_lines.append(line.rstrip("\n"))

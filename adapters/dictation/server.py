@@ -44,13 +44,13 @@ class DictationServer:
         return {"content": [{"type": "text", "text": message}], "isError": True, "data": None}
 
     def _tool_start_dictation(self, arguments: dict) -> dict:
+        # ponytail: prune only here — sessions are only created here, so growth stays bounded.
         self._sessions.prune_stale()
         session_id = str(uuid.uuid4())
         self._sessions.set(session_id, "")
         return {"success": True, "message": "dictation started", "data": {"session_id": session_id}}
 
     def _tool_process_segment(self, arguments: dict) -> dict:
-        self._sessions.prune_stale()
         session_id = arguments["session_id"]
         text = arguments["text"].strip()
         previous = self._sessions.get(session_id)
