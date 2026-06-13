@@ -1000,18 +1000,24 @@ REPL loop: `input("tusk> ")` → `KernelAPI.submit_text(text)` → print reply. 
 
 ### TrayShell — `shells/tray/tray_shell.py`
 
-Optional status-and-control shell. Owns the GUI main loop via a `TrayBackend`, so it must be
-**last** in `TUSK_SHELLS` (e.g. `voice,tray`) — `start()` blocks. It registers a
-`TrayStatusSink` into the `StatusReporterHub`, renders the icon from `AppStatus`
-(`StatusIconResolver`), and builds the menu (`TrayMenuBuilder`) wired to injected actions
-(pause/resume via `PipelineControl`, open logs, restart, exit via a shutdown callback). It
+Optional status-and-control shell. Owns the GUI main loop via a `TrayBackend`, so it must run
+on the main thread. The shell loader places `tray` **last** automatically (see Threading), so
+its position in `TUSK_SHELLS` does not matter. It registers a `TrayStatusSink` into the
+`StatusReporterHub`, renders the icon from `AppStatus` (`StatusIconResolver`), and builds the
+menu (`TrayMenuBuilder`) wired to injected actions (pause/resume via `PipelineControl`, open
+logs, restart, exit via a shutdown callback). If the GUI loop crashes, `start()` does not
+return — it blocks on the shutdown event so the daemon voice shell keeps running headless. It
 holds no business logic and the kernel never imports it. See §22 of the specification.
 
 ### Threading
 
 When multiple shells are configured, all but the last start in daemon threads. The last
-shell runs on the main thread (blocking). This allows `voice` + `cli`, or `voice` + `tray`
-(tray last, owning the GUI loop), simultaneously.
+shell runs on the main thread (blocking). This allows `voice` + `cli`, or `voice` + `tray`,
+simultaneously. Because GTK/AppIndicator main loops must run on the main thread, the loader
+**reorders `tray` to the end** of the resolved shell list regardless of its position in
+`TUSK_SHELLS` — the constraint is enforced, not left to the user. The process stays alive as
+long as the last shell blocks; `TrayShell` keeps blocking on a shutdown event even if its GUI
+loop dies, so a tray crash degrades to headless rather than killing the daemon voice shell.
 
 ---
 
@@ -1157,15 +1163,17 @@ main()
       → KernelAPI(CommandMode(agent, log), llm_registry, log, DictationGate(...), reporter)
       → ToolRuntime(...).register_tools(kernel)    # attaches DictationRouter + tools
   → reporter.set_models(...)                       # initial model labels from LLMRegistry
-  → _load_shells(config, kernel_api)               # loads shell modules from shell.json
+  → _load_shells(config, kernel_api)               # loads shell modules; reorders "tray" last
       # Voice shell builds its own six-stage pipeline and exposes PipelineControl:
       → LLMGatekeeper(llm_registry.get("gatekeeper"), log)
       → VoiceShell(config, log, stt_engine, gatekeeper, reporter)
           → VoicePipeline(detector, transcriber, sanitizer, buffer, gatekeeper, reporter)
-      # Tray shell (when "tray" in TUSK_SHELLS, loaded last):
-      → TrayShell(reporter, pipeline_control, shutdown_callback, config)
+      # Tray shell (when "tray" in TUSK_SHELLS, forced last by the loader):
+      → TrayShell(reporter, pipeline_control, shutdown_event, config)
           → reporter.attach_sink(TrayStatusSink(...))   # late-binds the real sink
-  → run shells (all but last in daemon threads, last blocks — tray owns the GUI loop)
+  → run shells (all but last in daemon threads, last blocks). The loader moves "tray"
+    to the end so its GUI loop owns the main thread. TrayShell blocks on shutdown_event,
+    so a GUI-loop crash degrades to headless instead of returning and killing daemons.
 ```
 
 The tray is wired only here in `main.py` (the wiring layer, which is allowed to know about
@@ -1238,7 +1246,7 @@ abstractions and never import `shells.tray`. When no tray shell is loaded, the
 | `LLMRetryRunner` | Non-retryable | Re-raises immediately |
 | `TrayShell` | Tray library `ImportError` | Logs once; runs no-op (no icon); TUSK otherwise unaffected |
 | `StatusReporterHub` | `StatusSink.publish` raises | Caught + logged; never propagates to the producer |
-| `TrayStatusSink` | GUI main-loop crash | `TrayShell.stop()`; process continues headless |
+| `TrayShell` | GUI main-loop crash | Backend torn down + logged; `start()` blocks on the shutdown event so daemon shells keep running headless; process exits only on the shutdown callback |
 
 ---
 
