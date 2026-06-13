@@ -23,7 +23,7 @@ class DictationServer:
             request = json.loads(line)
         except json.JSONDecodeError:
             return
-        if "id" not in request:
+        if not isinstance(request, dict) or "id" not in request:
             return
         self._write(request["id"], self._payload(request))
 
@@ -52,6 +52,8 @@ class DictationServer:
 
     def _tool_process_segment(self, arguments: dict) -> dict:
         session_id = arguments["session_id"]
+        if session_id not in self._sessions:
+            return {"success": False, "message": f"session {session_id} not found or expired"}
         text = arguments["text"].strip()
         previous = self._sessions.get(session_id)
         segment = self._segment(previous, text)

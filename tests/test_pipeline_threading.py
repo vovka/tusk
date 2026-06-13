@@ -25,6 +25,19 @@ def test_pipeline_propagates_capture_failures() -> None:
         list(pipeline.run(lambda text: KernelResponse(True, "done")))
 
 
+def test_capture_thread_stops_when_generator_is_closed() -> None:
+    proceed = threading.Event()
+    pipeline = _pipeline(_endless_detector(proceed))
+    before = set(threading.enumerate())
+    generator = pipeline.run(lambda text: KernelResponse(True, "done"))
+    next(generator)
+    capture_thread = (set(threading.enumerate()) - before).pop()
+    generator.close()
+    proceed.set()
+    capture_thread.join(timeout=2.0)
+    assert not capture_thread.is_alive()
+
+
 def _pipeline(detector: object) -> VoicePipeline:
     transcribed = Utterance("open Firefox", b"audio", 1.0)
     return VoicePipeline(
@@ -49,6 +62,15 @@ def _failing_detector() -> object:
     def stream():
         yield Utterance("", b"one", 1.0)
         raise RuntimeError("microphone unplugged")
+
+    return types.SimpleNamespace(stream_utterances=stream)
+
+
+def _endless_detector(proceed: threading.Event) -> object:
+    def stream():
+        while True:
+            yield Utterance("", b"x", 1.0)
+            proceed.wait(timeout=5.0)
 
     return types.SimpleNamespace(stream_utterances=stream)
 

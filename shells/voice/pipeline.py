@@ -29,8 +29,19 @@ class VoicePipeline:
         self._recovery_limit = recovery_candidate_limit
 
     def run(self, submit: Callable[[str], KernelResponse]) -> Iterator[KernelResponse]:
+        stop = threading.Event()
         utterances: queue.Queue[Utterance | Exception | None] = queue.Queue()
-        threading.Thread(target=self._capture_into, args=(utterances,), daemon=True).start()
+        threading.Thread(target=self._capture_into, args=(utterances, stop), daemon=True).start()
+        try:
+            yield from self._consume(utterances, submit)
+        finally:
+            stop.set()
+
+    def _consume(
+        self,
+        utterances: "queue.Queue[Utterance | Exception | None]",
+        submit: Callable[[str], KernelResponse],
+    ) -> Iterator[KernelResponse]:
         while (item := utterances.get()) is not None:
             if isinstance(item, Exception):
                 raise item
@@ -38,11 +49,13 @@ class VoicePipeline:
             if result is not None:
                 yield result
 
-    def _capture_into(self, utterances: "queue.Queue[Utterance | Exception | None]") -> None:
+    def _capture_into(self, utterances: "queue.Queue[Utterance | Exception | None]", stop: threading.Event) -> None:
         # ponytail: capture+VAD stay real-time on this thread; STT and the agent run on
         # the consumer, so speech during an agent run is processed afterwards, not lost.
         try:
             for utterance in self._detector.stream_utterances():
+                if stop.is_set():
+                    return
                 utterances.put(utterance)
             utterances.put(None)
         except Exception as exc:

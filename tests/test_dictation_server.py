@@ -45,6 +45,17 @@ def test_malformed_request_line_is_skipped(capsys) -> None:
     assert capsys.readouterr().out == ""
 
 
+def test_non_dict_request_line_is_skipped(capsys) -> None:
+    DictationServer()._handle_line("123")
+    assert capsys.readouterr().out == ""
+
+
+def test_process_segment_on_unknown_session_returns_error() -> None:
+    payload = DictationServer()._tool_process_segment({"session_id": "missing", "text": "hi"})
+    assert payload["success"] is False
+    assert "missing" in payload["message"]
+
+
 def test_tool_crash_is_answered_as_error(capsys) -> None:
     line = json.dumps({"jsonrpc": "2.0", "id": 7, "method": "tools/call", "params": {"name": "process_segment", "arguments": {}}})
     DictationServer()._handle_line(line)
