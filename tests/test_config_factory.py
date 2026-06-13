@@ -61,3 +61,19 @@ def test_config_defaults_gate_recovery_candidate_limit(monkeypatch) -> None:
     monkeypatch.setenv("GROQ_API_KEY", "test-key")
     monkeypatch.delenv("GATE_RECOVERY_CANDIDATE_LIMIT", raising=False)
     assert ConfigFactory().build().gate_recovery_candidate_limit == 6
+
+
+def test_config_defaults_tray_icon_theme_and_activity(monkeypatch) -> None:
+    monkeypatch.setenv("GROQ_API_KEY", "test-key")
+    monkeypatch.delenv("TUSK_TRAY_ICON_THEME", raising=False)
+    monkeypatch.delenv("TUSK_TRAY_SHOW_LAST_ACTIVITY", raising=False)
+    config = ConfigFactory().build()
+    assert config.tray_icon_theme == "light" and config.tray_show_last_activity is False
+
+
+def test_config_reads_tray_overrides(monkeypatch) -> None:
+    monkeypatch.setenv("GROQ_API_KEY", "test-key")
+    monkeypatch.setenv("TUSK_TRAY_ICON_THEME", "dark")
+    monkeypatch.setenv("TUSK_TRAY_SHOW_LAST_ACTIVITY", "true")
+    config = ConfigFactory().build()
+    assert config.tray_icon_theme == "dark" and config.tray_show_last_activity is True

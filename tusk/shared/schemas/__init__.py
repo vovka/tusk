@@ -1,4 +1,6 @@
 from tusk.shared.schemas.app_entry import AppEntry
+from tusk.shared.schemas.app_mode import AppMode
+from tusk.shared.schemas.app_status import AppStatus
 from tusk.shared.schemas.chat_message import ChatMessage
 from tusk.shared.schemas.desktop_context import DesktopContext
 from tusk.shared.schemas.gate_result import GateResult
@@ -6,6 +8,7 @@ from tusk.shared.schemas.kernel_response import KernelResponse
 from tusk.shared.schemas.llm_slot_config import LLMSlotConfig
 from tusk.shared.schemas.mcp_tool_result import MCPToolResult
 from tusk.shared.schemas.mcp_tool_schema import MCPToolSchema
+from tusk.shared.schemas.status_snapshot import StatusSnapshot
 from tusk.shared.schemas.tool_call import ToolCall
 from tusk.shared.schemas.tool_sequence_plan import ToolSequencePlan
 from tusk.shared.schemas.tool_sequence_step import ToolSequenceStep
@@ -15,6 +18,8 @@ from tusk.shared.schemas.window_info import WindowInfo
 
 __all__ = [
     "AppEntry",
+    "AppMode",
+    "AppStatus",
     "ChatMessage",
     "DesktopContext",
     "GateResult",
@@ -22,6 +27,7 @@ __all__ = [
     "LLMSlotConfig",
     "MCPToolResult",
     "MCPToolSchema",
+    "StatusSnapshot",
     "ToolCall",
     "ToolSequencePlan",
     "ToolSequenceStep",

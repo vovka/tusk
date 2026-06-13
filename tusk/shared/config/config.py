@@ -27,6 +27,8 @@ class Config:
     adapter_env_cache_dir: str
     conversation_log_dir: str
     agent_session_log_dir: str
+    tray_icon_theme: str
+    tray_show_last_activity: bool
 
     @staticmethod
     def from_env() -> "Config":

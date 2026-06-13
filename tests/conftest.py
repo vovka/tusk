@@ -14,6 +14,32 @@ def pytest_sessionstart(session) -> None:
     _stub_whisper()
     _stub_groq()
     _stub_openai()
+    _stub_pystray()
+    _stub_pil()
+    _stub_gi()
+
+
+def _stub_pystray() -> None:
+    icon = lambda name: SimpleNamespace(name=name, icon=None, title=None, menu=None, run=lambda: None, stop=lambda: None)
+    menu_item = lambda text, action=None, enabled=True: SimpleNamespace(text=text, action=action, enabled=enabled)
+    mod = types.ModuleType("pystray")
+    mod.Icon, mod.MenuItem, mod.Menu = icon, menu_item, lambda *items: SimpleNamespace(items=items)
+    _stub_module("pystray", mod)
+
+
+def _stub_pil() -> None:
+    image = types.ModuleType("PIL.Image")
+    image.open = lambda path: SimpleNamespace(path=path)
+    pil = types.ModuleType("PIL")
+    pil.Image = image
+    _stub_module("PIL", pil)
+    _stub_module("PIL.Image", image)
+
+
+def _stub_gi() -> None:
+    mod = types.ModuleType("gi")
+    mod.require_version = lambda *args, **kwargs: None
+    _stub_module("gi", mod)
 
 
 def _stub_sounddevice() -> None:

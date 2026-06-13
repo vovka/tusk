@@ -6,3 +6,6 @@ openai
 groq
 watchdog
 mcp
+pystray
+Pillow
+PyGObject

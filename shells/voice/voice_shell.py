@@ -1,3 +1,4 @@
+import threading
 import types
 
 from shells.voice.gate_dispatch import GateDispatch
@@ -7,6 +8,7 @@ from shells.voice.stages.sanitizer import Sanitizer
 from shells.voice.stages.transcriber import Transcriber
 from shells.voice.stages.transcription_buffer import TranscriptionBuffer
 from shells.voice.stages.utterance_detector import UtteranceDetector
+from tusk.shared.schemas.app_status import AppStatus
 
 __all__ = ["VoiceShell"]
 
@@ -19,7 +21,11 @@ class VoiceShell:
         stt_engine: object | None = None,
         gatekeeper: object | None = None,
         pipeline: object | None = None,
+        reporter: object | None = None,
     ) -> None:
+        self._reporter = reporter
+        self._pause_gate = threading.Event()
+        self._pause_gate.set()
         self._pipeline = pipeline or self._build_pipeline(config, log_printer, stt_engine, gatekeeper)
         self._log = log_printer
         self._running = True
@@ -32,6 +38,18 @@ class VoiceShell:
 
     def stop(self) -> None:
         self._running = False
+
+    def pause(self) -> None:
+        self._pause_gate.clear()
+        self._report(AppStatus.PAUSED)
+
+    def resume(self) -> None:
+        self._pause_gate.set()
+        self._report(AppStatus.LISTENING)
+
+    def _report(self, status: AppStatus) -> None:
+        if self._reporter is not None:
+            self._reporter.set_status(status)
 
     def _build_pipeline(
         self,
@@ -48,12 +66,12 @@ class VoiceShell:
             TranscriptionBuffer(log_printer),
             gatekeeper or _drop_all_gatekeeper(),
             settings[0],
-            settings[1],
+            settings[1], self._reporter,
         )
 
     def _detector(self, config: object, log_printer: object) -> UtteranceDetector:
         return UtteranceDetector(
-            AudioCapture(config.audio_sample_rate, config.audio_frame_duration_ms),
+            AudioCapture(config.audio_sample_rate, config.audio_frame_duration_ms, self._pause_gate),
             config.audio_sample_rate,
             config.vad_aggressiveness,
             log_printer,

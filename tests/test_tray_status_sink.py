@@ -1,0 +1,49 @@
+import types
+
+from shells.tray.status_icon_resolver import StatusIconResolver
+from shells.tray.tray_menu_actions import TrayMenuActions
+from shells.tray.tray_menu_builder import TrayMenuBuilder
+from shells.tray.tray_status_sink import TrayStatusSink
+from tusk.shared.schemas.app_mode import AppMode
+from tusk.shared.schemas.app_status import AppStatus
+from tusk.shared.schemas.status_snapshot import StatusSnapshot
+
+
+def _backend() -> object:
+    calls: dict = {}
+    return types.SimpleNamespace(
+        calls=calls,
+        set_icon=lambda value: calls.__setitem__("icon", value),
+        set_tooltip=lambda value: calls.__setitem__("tooltip", value),
+        set_menu=lambda value: calls.__setitem__("menu", value),
+    )
+
+
+def _actions() -> TrayMenuActions:
+    return TrayMenuActions(lambda: None, lambda: None, lambda: None, lambda: None, lambda: None)
+
+
+def _sink(backend: object) -> TrayStatusSink:
+    return TrayStatusSink(backend, StatusIconResolver("light"), TrayMenuBuilder(), _actions())
+
+
+def test_publish_renders_icon_tooltip_and_menu() -> None:
+    backend = _backend()
+    _sink(backend).publish(StatusSnapshot(AppStatus.LISTENING, AppMode.DEFAULT, mic_device="Mic A"))
+    assert backend.calls["icon"] == "shells/tray/icons/light/active.png"
+    assert backend.calls["tooltip"] == "TUSK — listening"
+    assert backend.calls["menu"][0].label == "Status: listening"
+
+
+def test_publish_uses_injected_marshal_to_defer_render() -> None:
+    backend = _backend()
+    queued: list = []
+    sink = TrayStatusSink(backend, StatusIconResolver("light"), TrayMenuBuilder(), _actions(), marshal=queued.append)
+    sink.publish(StatusSnapshot(AppStatus.LISTENING, AppMode.DEFAULT))
+    assert backend.calls == {} and len(queued) == 1
+
+
+def test_stopped_status_does_not_set_icon() -> None:
+    backend = _backend()
+    _sink(backend).publish(StatusSnapshot(AppStatus.STOPPED, AppMode.DEFAULT))
+    assert "icon" not in backend.calls

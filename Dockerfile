@@ -11,6 +11,10 @@ RUN apt-get update && apt-get install -y \
     libpulse-dev \
     libasound2-plugins \
     libglib2.0-bin \
+    libgirepository1.0-dev \
+    python3-gi \
+    gir1.2-gtk-3.0 \
+    gir1.2-ayatanaappindicator3-0.1 \
     && rm -rf /var/lib/apt/lists/*
 
 RUN echo 'pcm.default pulse\nctl.default pulse' > /root/.asoundrc
