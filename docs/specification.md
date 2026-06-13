@@ -62,11 +62,11 @@ Legacy fallback env vars (used when per-agent vars are absent):
 | `VAD_AGGRESSIVENESS` | `int` | `2` | `0`, `1`, `2`, or `3` |
 | `FOLLOW_UP_TIMEOUT_SECONDS` | `float` | `30` | Positive float (seconds) |
 | `MAX_FOLLOW_UP_TIMEOUT_SECONDS` | `float` | `120` | Positive float (seconds); follow-up window ceiling |
-| `TUSK_SHELLS` | `list[str]` | `["voice"]` | Comma-separated: `voice`, `cli`, `tray`. When `tray` is present it must be **last** (it owns the blocking GUI loop) |
+| `TUSK_SHELLS` | `list[str]` | `["voice"]` | Comma-separated: `voice`, `cli`, `tray`. The shell loader automatically orders `tray` **last** (it owns the blocking GUI loop), so position in the env var does not matter |
 | `TUSK_ADAPTER_ENV_CACHE_DIR` | `str` | `".tusk_runtime/adapters"` | Directory for managed adapter venvs |
 | `TUSK_CONVERSATION_LOG_DIR` | `str` | `".tusk_runtime/conversations"` | Directory for daily conversation logs (parsed but not active) |
 | `TUSK_TRAY_ICON_THEME` | `str` | `"light"` | `light`, `dark` — icon asset set used by the tray shell |
-| `TUSK_TRAY_SHOW_LAST_ACTIVITY` | `bool` | `true` | `true`, `false` — show the last command/reply line in the tray menu |
+| `TUSK_TRAY_SHOW_LAST_ACTIVITY` | `bool` | `false` | `true`, `false` — opt-in: show the last command/reply line in the tray menu (off by default; the transcript may contain sensitive speech) |
 
 ### 2.4 LLM Slot Format and Provider Selection
 
@@ -899,7 +899,7 @@ NOT retried:
 | `LLMRetryRunner` | Non-retryable | Re-raises immediately |
 | `TrayShell` | Tray library `ImportError` | Logs once; shell runs in no-op mode (no icon); rest of TUSK unaffected |
 | `StatusReporterHub` | `StatusSink.publish` raises | Caught in `_emit`; logged; never propagates to the producer (protects the hot path) |
-| `TrayStatusSink` | GUI main-loop crash | `TrayShell.stop()` is called; the process continues headless |
+| `TrayShell` | GUI main-loop crash | Backend torn down + logged; `TrayShell.start()` then blocks on the shutdown event instead of returning, so daemon shells (e.g. `voice`) keep running headless; the process exits only when the shutdown callback fires |
 
 ---
 
@@ -993,9 +993,14 @@ Pause/resume flows back into the pipeline through the `PipelineControl` ABC
 
 | Env Var | Python Type | Default | Valid Values |
 |---|---|---|---|
-| `TUSK_SHELLS` | `list[str]` | `["voice"]` | Add `tray` (must be **last** — it owns the blocking GUI loop) |
+| `TUSK_SHELLS` | `list[str]` | `["voice"]` | Add `tray`; the loader reorders it **last** automatically (it owns the blocking GUI loop) |
 | `TUSK_TRAY_ICON_THEME` | `str` | `"light"` | `light`, `dark` |
-| `TUSK_TRAY_SHOW_LAST_ACTIVITY` | `bool` | `true` | `true`, `false` |
+| `TUSK_TRAY_SHOW_LAST_ACTIVITY` | `bool` | `false` | `true`, `false` — opt-in (see §2.3 privacy note) |
+
+**Shell ordering is enforced, not assumed.** GTK/AppIndicator main loops must run on the
+main thread, so `tray` cannot run in a daemon thread. The shell loader moves `tray` to the
+end of the resolved shell list regardless of its position in `TUSK_SHELLS`, rather than
+relying on the user to order it correctly.
 
 ### 22.4 Menu Specification
 
@@ -1005,7 +1010,7 @@ Built by `TrayMenuBuilder` from a `StatusSnapshot` + injected `TrayMenuActions` 
 |---|---|---|
 | `Status: <status>` | disabled | Info line; when `ERROR`, appends `detail` |
 | `Mode: <mode>` | disabled | Info line; single extensible line |
-| `Last: <detail>` | disabled | Last command/reply; hidden if `TUSK_TRAY_SHOW_LAST_ACTIVITY=false` |
+| `Last: <detail>` | disabled | Last command/reply; shown only when `TUSK_TRAY_SHOW_LAST_ACTIVITY=true` (hidden by default) |
 | `Mic: <device>` | disabled | Active input device label |
 | `Models ▸` | submenu | One disabled child per slot: `slot: provider/model` |
 | `Pause` / `Resume` | enabled | `PipelineControl.pause()` / `.resume()`; label flips on status |
