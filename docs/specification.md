@@ -837,13 +837,21 @@ Abstracts the editor backend. Selected by `TUSK_CODING_EDITOR_DRIVER`.
 **InputAutomationEditorDriver — `tusk/kernel/input_automation_editor_driver.py`** (default,
 editor-agnostic). DI: `(tool_registry, desktop_source)`. Reuses existing `gnome.*` tools —
 no new GNOME primitives:
-- `read_buffer()` → `press_keys("<ctrl>a")`, `press_keys("<ctrl>c")`, `{source}.read_clipboard` → `data["text"]`
+- `read_buffer()` → snapshot clipboard via `{source}.read_clipboard`, then `press_keys("<ctrl>a")`, `press_keys("<ctrl>c")`, `{source}.read_clipboard` → `data["text"]`, then restore the snapshot via `{source}.write_clipboard`
 - `goto_line(n)` → `press_keys("<ctrl>g")`, `{source}.type_text(str(n))`, `press_keys("Return")`
-- `select_range(selection)` → `goto_line(start)`, `Home`, then shift+Down / shift+End to span the range
-- `paste(text)` → `{source}.write_clipboard(text)`, `press_keys("<ctrl>v")`
+- `select_range(selection)` → `goto_line(selection.start_line)`, `Home`, then shift+Down / shift+End to span the range
+- `paste(text)` → snapshot clipboard, `{source}.write_clipboard(text)`, `press_keys("<ctrl>v")`, then restore the snapshot
 - `type_text(text)` → `{source}.type_text`
 - `press_keys(keys)` → `{source}.press_keys`
 - `replace_buffer(text)` → `press_keys("<ctrl>a")`, `paste(text)`
+
+**Clipboard preservation:** because this driver uses the system clipboard for both reading
+(`Ctrl+C`) and writing (`Ctrl+V`), every operation that touches the clipboard first reads
+and stashes the user's current clipboard contents and restores them once the operation
+completes (`ClipboardGuard`, a small context manager wrapping `read_clipboard` /
+`write_clipboard`). This prevents coding mode from silently destroying clipboard data the
+user was holding. The `VSCodeEditorDriver` avoids the clipboard entirely and so needs no
+such guard.
 
 **VSCodeEditorDriver — `tusk/kernel/vscode_editor_driver.py`** (future, contract only).
 Same ABC over a VS Code extension exposing `getBuffer()`, `gotoLine(n)`, `applyEdit(range, text)`,
@@ -858,15 +866,15 @@ extension itself is out of scope; only the driver contract is fixed so it is swa
 
 - **LineAnchoredEditStrategy** (`line_anchored`, default): `insert` → `goto_line` + anchor + `paste(new_text)`; `replace` → `select_range` + `paste(new_text)`; `delete` → `select_range` + `press_keys("Delete")`. Pastes only the changed region.
 - **FullReplaceEditStrategy** (`full_replace`): `driver.replace_buffer(edit.full_buffer)`. The fallback and the resync / recovery path.
-- **RawKeyEditStrategy** (`raw_key`): arrows / Home / End / Delete / BackSpace + `type_text` at positions; no clipboard.
-- **FallbackEditStrategy** (`tusk/kernel/fallback_edit_strategy.py`): composes `(primary, fallback)`; on a `RuntimeError` from the primary it re-applies via `FullReplaceEditStrategy`. This realizes "default to line-anchored, fall back to full-replace" without branching in the router.
+- **RawKeyEditStrategy** (`raw_key`): arrows / Home / End / Delete / BackSpace + `type_text` at positions; no clipboard. **Trade-off:** typing character-by-character is slow for multi-line edits and is the most likely to trigger editor autocomplete / IntelliSense popups that swallow or corrupt simulated keystrokes. It is intended only for small, single-line edits; larger edits should use `line_anchored` or `full_replace`.
+- **FallbackEditStrategy** (`tusk/kernel/fallback_edit_strategy.py`): composes `(primary, fallback)`; on a `RuntimeError` from the primary it re-applies via `FullReplaceEditStrategy`. **Feedback limitation:** the input-automation driver is fire-and-forget GUI automation (`xdotool` via `gnome.*`) with no channel to observe the editor, so a mis-applied line-anchored edit (line drift, focus loss) does **not** raise — automatic fallback is therefore only effective for drivers with a bidirectional feedback channel (the future `VSCodeEditorDriver`). Under input automation, recovery is user-initiated: the user asks TUSK to resync, which runs `FullReplaceEditStrategy` to repaint the authoritative buffer (see §17.7).
 
 ### 17.7 Buffer Ownership
 
 - The buffer is read exactly once at session start (`StartCodingTool` → `driver.read_buffer()`), seeding the adapter `BufferModel`.
 - The adapter is the authoritative model; every `process_intent` applies ops to it.
 - The router applies the same ops to the editor via the strategy/driver — model and editor stay in lockstep because all changes flow through TUSK.
-- **Limitation:** the model assumes the user makes no manual edits during a session. Manual edits are not detected and cause drift; `FullReplaceEditStrategy` (re-pasting `full_buffer`) is the deterministic resync.
+- **Limitation:** the model assumes the user makes no manual edits during a session. Manual edits are not detected and cause drift. Because the input-automation driver has no feedback channel (§17.6), drift cannot be detected automatically under that driver; `FullReplaceEditStrategy` (re-pasting `full_buffer`) is the deterministic resync, triggered by the user asking TUSK to resync. Feedback-capable drivers (future `VSCodeEditorDriver`) can read the buffer back and trigger resync automatically.
 
 ---
 
