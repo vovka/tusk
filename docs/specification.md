@@ -42,6 +42,7 @@ immutable (`frozen=True`) for the lifetime of the process.
 | `PLANNER_AGENT_LLM` | `LLMSlotConfig` | falls back to `PLANNER_LLM` | Planner profile model |
 | `EXECUTOR_AGENT_LLM` | `LLMSlotConfig` | falls back to `AGENT_LLM` | Executor profile model |
 | `DEFAULT_AGENT_LLM` | `LLMSlotConfig` | falls back to `AGENT_LLM` | Default profile model |
+| `CODING_AGENT_LLM` | `LLMSlotConfig` | falls back to `AGENT_LLM` | Coding agent model — turns intent + buffer into edit operations |
 | `UTILITY_LLM` | `LLMSlotConfig` | `groq/llama-3.3-70b-versatile` | Model for summaries and text cleanup |
 
 Legacy fallback env vars (used when per-agent vars are absent):
@@ -67,6 +68,8 @@ Legacy fallback env vars (used when per-agent vars are absent):
 | `TUSK_CONVERSATION_LOG_DIR` | `str` | `".tusk_runtime/conversations"` | Directory for daily conversation logs (parsed but not active) |
 | `TUSK_TRAY_ICON_THEME` | `str` | `"light"` | `light`, `dark` — icon asset set used by the tray shell |
 | `TUSK_TRAY_SHOW_LAST_ACTIVITY` | `bool` | `false` | `true`, `false` — opt-in: show the last command/reply line in the tray menu (off by default; the transcript may contain sensitive speech) |
+| `TUSK_CODING_EDITOR_DRIVER` | `str` | `"input_automation"` | `input_automation` (any editor via `gnome.*`) or `vscode` (future plugin driver) |
+| `TUSK_CODING_EDIT_STRATEGY` | `str` | `"line_anchored"` | `line_anchored`, `full_replace`, or `raw_key` |
 
 ### 2.4 LLM Slot Format and Provider Selection
 
@@ -80,6 +83,7 @@ Provider selection in main.py:
     "planner_agent"     → PLANNER_AGENT_LLM (fallback: PLANNER_LLM)
     "executor_agent"    → EXECUTOR_AGENT_LLM (fallback: AGENT_LLM)
     "default_agent"     → DEFAULT_AGENT_LLM (fallback: AGENT_LLM)
+    "coding_agent"      → CODING_AGENT_LLM (fallback: AGENT_LLM)
     "utility"           → UTILITY_LLM
 
 Supported providers: "groq" (GroqLLM), "openrouter" (OpenRouterLLM)
@@ -746,9 +750,129 @@ Bridges `MCPToolSchema` → `RegisteredTool` interface.
 
 ---
 
-## 17. Shell Specification
+## 17. Coding Specification
 
-### 17.1 Shell Discovery
+Coding mode is the pair-coding sibling of dictation mode (§15). Spoken intent is converted
+into structured code edits and applied to the focused editor through a swappable
+`EditorDriver` and `EditApplicationStrategy`. TUSK never writes files on disk.
+
+### 17.1 StartCodingTool — `tusk/kernel/start_coding_tool.py`
+
+```
+name = "start_coding"
+description = "Start adapter-driven pair-coding mode"
+planner_visible = True
+```
+
+**execute():**
+1. Resolve the desktop source (`adapter_manager.primary_desktop_source()`, e.g. `"gnome"`) and build the configured `EditorDriver`.
+2. Read the buffer once via `driver.read_buffer()` (select-all → copy → `read_clipboard`).
+3. Call `ToolRegistry.get("coding.start_coding_session").execute({"initial_buffer": buffer})`
+4. If not found: return `ToolResult(False, "coding adapter is not available")`
+5. Build `CodingState("coding", data["session_id"], desktop_source, driver_name, strategy_name)`
+6. Call `controller.start_coding(state)`
+7. Return `ToolResult(True, "Coding started.", data)`
+
+### 17.2 CodingRouter — `tusk/kernel/coding_router.py`
+
+**process(state, text):**
+1. Call `ToolRegistry.get("coding.process_intent").execute({"session_id": ..., "intent": text})`
+2. Convert each entry in `data.operations` into a typed `EditOperation`
+3. For each op: `self._strategy.apply(op, self._driver)`
+4. Return `KernelResponse(True/False, message)`
+
+**stop(state):**
+1. Call `ToolRegistry.get("coding.stop_coding_session").execute({"session_id": ...})`
+2. Call `controller.stop_coding()` — sets `_coding_mode = None`
+3. Return `KernelResponse(True, "Coding stopped.")`
+
+### 17.3 CodingServer — `adapters/coding/server.py`
+
+MCP server managing coding sessions. Holds an authoritative `BufferModel` per session
+and runs the coding LLM via `CodingEditPlanner`.
+
+**Tools:**
+
+| Tool | Input | Output |
+|---|---|---|
+| `start_coding_session` | `initial_buffer` | `{"session_id": "<uuid>"}` in `data` |
+| `process_intent` | `session_id`, `intent` | `{"operations": [EditOperation...], "should_stop": false}` in `data` |
+| `stop_coding_session` | `session_id` | Success confirmation |
+
+**Intent logic:**
+- `CodingEditPlanner` calls the coding LLM (`coding_agent` slot) with the intent plus the current `BufferModel.to_text()`, using `complete_structured` against the `EditOperation` JSON schema.
+- Each returned op is applied to the stored model via `BufferModel.with_edit(op)` so the adapter model stays in lockstep with what the driver will type.
+- Each op carries `full_buffer` (the model after the op) to support full-replace / resync.
+
+### 17.4 CodingGate — `tusk/kernel/coding_gate.py`
+
+Called by `CodingGatekeeper` (`shells/voice/stages/coding_gatekeeper.py`) on every
+utterance while coding mode is active. Stop detection happens at the voice pipeline
+level — the intent never reaches `KernelAPI` when a stop is detected.
+
+**should_stop(text) → bool:**
+1. Call `LLMProvider.complete_structured(CODING_GATE_PROMPT, text, "coding_gatekeeper", schema, 128)`
+2. On failure, fall back to `LLMProvider.complete(CODING_GATE_PROMPT, text, 128)`
+3. On second failure, return `False` (treat as a coding instruction)
+4. Parse JSON response; extract `directed` (bool) and `metadata_stop` (str | null)
+5. Return `True` only when `directed=true` AND `metadata_stop` is a non-empty string
+
+**Structured output schema:**
+```json
+{
+  "directed": bool,
+  "cleaned_command": "string",
+  "metadata_stop": "string | null"
+}
+```
+
+**Prompt source:** `tusk/kernel/coding_gate_prompt.py` (`CODING_GATE_PROMPT`) — instructs the
+model that the only command to detect is a request to stop coding; all other speech is a
+literal coding instruction.
+
+### 17.5 EditorDriver — `tusk/kernel/interfaces/editor_driver.py`
+
+Abstracts the editor backend. Selected by `TUSK_CODING_EDITOR_DRIVER`.
+
+**InputAutomationEditorDriver — `tusk/kernel/input_automation_editor_driver.py`** (default,
+editor-agnostic). DI: `(tool_registry, desktop_source)`. Reuses existing `gnome.*` tools —
+no new GNOME primitives:
+- `read_buffer()` → `press_keys("<ctrl>a")`, `press_keys("<ctrl>c")`, `{source}.read_clipboard` → `data["text"]`
+- `goto_line(n)` → `press_keys("<ctrl>g")`, `{source}.type_text(str(n))`, `press_keys("Return")`
+- `select_range(selection)` → `goto_line(start)`, `Home`, then shift+Down / shift+End to span the range
+- `paste(text)` → `{source}.write_clipboard(text)`, `press_keys("<ctrl>v")`
+- `type_text(text)` → `{source}.type_text`
+- `press_keys(keys)` → `{source}.press_keys`
+- `replace_buffer(text)` → `press_keys("<ctrl>a")`, `paste(text)`
+
+**VSCodeEditorDriver — `tusk/kernel/vscode_editor_driver.py`** (future, contract only).
+Same ABC over a VS Code extension exposing `getBuffer()`, `gotoLine(n)`, `applyEdit(range, text)`,
+`replaceAll(text)` (stdio MCP adapter or localhost socket). `read_buffer()` calls `getBuffer()`
+directly — no clipboard round-trip — and edits map to `TextEditor.edit(...)` ranges. The
+extension itself is out of scope; only the driver contract is fixed so it is swappable.
+
+### 17.6 EditApplicationStrategy — `tusk/kernel/interfaces/edit_application_strategy.py`
+
+`apply(edit, driver)` maps one `EditOperation` onto driver calls. Selected by
+`TUSK_CODING_EDIT_STRATEGY`.
+
+- **LineAnchoredEditStrategy** (`line_anchored`, default): `insert` → `goto_line` + anchor + `paste(new_text)`; `replace` → `select_range` + `paste(new_text)`; `delete` → `select_range` + `press_keys("Delete")`. Pastes only the changed region.
+- **FullReplaceEditStrategy** (`full_replace`): `driver.replace_buffer(edit.full_buffer)`. The fallback and the resync / recovery path.
+- **RawKeyEditStrategy** (`raw_key`): arrows / Home / End / Delete / BackSpace + `type_text` at positions; no clipboard.
+- **FallbackEditStrategy** (`tusk/kernel/fallback_edit_strategy.py`): composes `(primary, fallback)`; on a `RuntimeError` from the primary it re-applies via `FullReplaceEditStrategy`. This realizes "default to line-anchored, fall back to full-replace" without branching in the router.
+
+### 17.7 Buffer Ownership
+
+- The buffer is read exactly once at session start (`StartCodingTool` → `driver.read_buffer()`), seeding the adapter `BufferModel`.
+- The adapter is the authoritative model; every `process_intent` applies ops to it.
+- The router applies the same ops to the editor via the strategy/driver — model and editor stay in lockstep because all changes flow through TUSK.
+- **Limitation:** the model assumes the user makes no manual edits during a session. Manual edits are not detected and cause drift; `FullReplaceEditStrategy` (re-pasting `full_buffer`) is the deterministic resync.
+
+---
+
+## 18. Shell Specification
+
+### 18.1 Shell Discovery
 
 `main.py` reads `shells/{name}/shell.json` for each name in `config.shells`:
 
@@ -763,7 +887,7 @@ Bridges `MCPToolSchema` → `RegisteredTool` interface.
 The module is loaded via `importlib.util.spec_from_file_location` and the class is
 instantiated. `VoiceShell` receives `(config, log)`; `CLIShell` receives no arguments.
 
-### 17.2 VoiceShell — `shells/voice/voice_shell.py`
+### 18.2 VoiceShell — `shells/voice/voice_shell.py`
 
 ```python
 def start(self, submit: object) -> None:
@@ -777,7 +901,7 @@ def start(self, submit: object) -> None:
 The pipeline handles STT, sanitization, buffering, and gatekeeper internally.
 `submit` is `kernel.submit`.
 
-### 17.3 CLIShell — `shells/cli/cli_shell.py`
+### 18.3 CLIShell — `shells/cli/cli_shell.py`
 
 ```python
 def start(self, api: object) -> None:
@@ -790,7 +914,7 @@ def start(self, api: object) -> None:
             print(result.reply)
 ```
 
-### 17.4 Threading Model
+### 18.4 Threading Model
 
 ```python
 for shell in shells[:-1]:
@@ -801,9 +925,9 @@ if shells:
 
 ---
 
-## 18. LLM Provider Specification
+## 19. LLM Provider Specification
 
-### 18.1 LLMProxy — `tusk/shared/llm/llm_proxy.py`
+### 19.1 LLMProxy — `tusk/shared/llm/llm_proxy.py`
 
 All LLM calls from the kernel go through `LLMProxy`.
 
@@ -812,7 +936,7 @@ All LLM calls from the kernel go through `LLMProxy`.
 - **Retry:** `LLMRetryRunner.run(operation, on_retry)` wraps every call
 - **Swap:** `swap(new_provider)` replaces `_inner` atomically; no new proxy needed
 
-### 18.2 LLMRetryRunner — `tusk/shared/llm/llm_retry_runner.py`
+### 19.2 LLMRetryRunner — `tusk/shared/llm/llm_retry_runner.py`
 
 ```
 attempts = 3
@@ -828,7 +952,7 @@ NOT retried:
     "tool_use_failed"
 ```
 
-### 18.3 GroqLLM — `tusk/shared/llm/providers/groq_llm.py`
+### 19.3 GroqLLM — `tusk/shared/llm/providers/groq_llm.py`
 
 - **Client:** `groq.Groq(api_key=..., timeout=30.0)`
 - **complete / complete_messages:** `chat.completions.create(model, messages, max_tokens=1024)`
@@ -839,7 +963,7 @@ NOT retried:
   `{"type": "json_object"}` for others
 - **label:** `"groq/<model>"`
 
-### 18.4 OpenRouterLLM — `tusk/shared/llm/providers/open_router_llm.py`
+### 19.4 OpenRouterLLM — `tusk/shared/llm/providers/open_router_llm.py`
 
 - **Client:** `openai.OpenAI(base_url="https://openrouter.ai/api/v1", timeout=15.0)`
 - **Headers:** `HTTP-Referer: https://github.com/vovka/tusk`, `X-Title: TUSK`
@@ -848,7 +972,7 @@ NOT retried:
 
 ---
 
-## 19. Data Flow Invariants
+## 20. Data Flow Invariants
 
 1. **All inter-component data is immutable.** Every schema type is a frozen dataclass.
 
@@ -871,9 +995,17 @@ NOT retried:
 7. **Tools are the only place platform-specific execution logic lives.** `Pipeline`,
    `MainAgent`, and `CommandMode` contain no platform-specific code.
 
+8. **In coding mode, the editor buffer is read exactly once at session start.** After
+   that the adapter's `BufferModel` is authoritative; every editor mutation has a matching
+   model mutation (`BufferModel.with_edit`). TUSK never reads from or writes to disk.
+
+9. **`EditOperation` crosses the adapter→router boundary as a typed object.** `CodingRouter`
+   converts the JSON-RPC `data` payload into `EditOperation` instances before any strategy
+   runs — no raw dicts pass beyond the router.
+
 ---
 
-## 20. Error Handling Contracts
+## 21. Error Handling Contracts
 
 | Component | Exception | Behaviour |
 |---|---|---|
@@ -903,7 +1035,7 @@ NOT retried:
 
 ---
 
-## 21. Latency Budget
+## 22. Latency Budget
 
 Target end-to-end latency from end of speech to action start: ≤ 1.5 seconds.
 
@@ -927,6 +1059,21 @@ Target end-to-end latency from end of speech to action start: ≤ 1.5 seconds.
 **Dictation mode additional latency:**
 - Raw text insert: ~10–30 ms (xdotool type via gnome adapter)
 - LLM segment refinement: ~200–500 ms (runs in `process_segment`, refines before typing)
+
+**Coding mode additional latency** (active only in coding mode):
+
+| Stage | Implementation | Expected Latency |
+|---|---|---|
+| Buffer read at session start | select-all + copy + `read_clipboard` | ~30–80 ms (one-time, off the per-utterance path) |
+| Coding edit-planning LLM call | `coding_agent` provider, structured | ~400–900 ms (dominant; carries the buffer as context) |
+| Clipboard write per edit | `write_clipboard` + Ctrl+V | ~10–30 ms per edit |
+| Line-anchored navigation | Ctrl+G + selection key presses | ~10–40 ms per edit |
+| Full-replace fallback | select-all + paste | ~20–60 ms (scales with buffer size) |
+
+The coding LLM call dominates and is heavier than the dictation refinement call because it
+carries the buffer as context. Per-edit clipboard round-trips and input simulation add
+tens of ms each and multiply when one intent yields several ops. The buffer read is a
+one-time cost at session start, off the per-utterance hot path.
 
 ---
 
@@ -1070,3 +1217,16 @@ The active runtime no longer uses:
 
 `tusk/kernel/tool_call_parser.py` is still present only as a legacy helper. It is not
 used by the native tool-calling runtime.
+
+---
+
+## 24. Coding — Out of Scope
+
+Deferred for the coding feature (see brief §10):
+
+- **Multi-file editing** — the design targets a single focused buffer; cross-file refactors are unaddressed.
+- **Manual-edit conflict detection** — manual edits mid-session are not detected; periodic re-read + diff reconciliation is future work.
+- **Syntax / language awareness** — the coding agent is language-agnostic; no parser/LSP integration.
+- **Undo integration** — TUSK edits are not mapped to editor undo grouping.
+- **Autocomplete / IntelliSense interference** — completion popups may capture simulated keystrokes; the VS Code-extension driver is the intended mitigation.
+- **Multi-op line drift** — when one intent yields several edits, later edits must account for line numbers shifted by earlier ones, or fall back to full-buffer replace.

@@ -183,26 +183,40 @@ tusk/
 │   │   │   ├── conversation_history.py  # ConversationHistory ABC
 │   │   │   ├── conversation_summarizer.py # ConversationSummarizer ABC
 │   │   │   ├── pipeline_control.py      # PipelineControl ABC — pause/resume mic capture
+│   │   │   ├── editor_driver.py         # EditorDriver ABC — read/navigate/edit the editor buffer
+│   │   │   ├── edit_application_strategy.py # EditApplicationStrategy ABC — apply(edit, driver)
 │   │   │   └── pipeline_mode.py         # PipelineMode ABC — gatekeeper prompt + handler
 │   │   ├── adapter_manager.py           # AdapterManager — MCP adapter lifecycle
 │   │   ├── agent_profiles.py            # build_agent_profiles() — 4 profiles
 │   │   ├── api.py                       # KernelAPI — submit(text) public entry point
+│   │   ├── coding_gate.py               # CodingGate — LLM-based stop-coding classification
+│   │   ├── coding_gate_prompt.py        # Coding-specific prompt for CodingGate
+│   │   ├── coding_mode.py               # AdapterCodingMode — active coding state
+│   │   ├── coding_router.py             # CodingRouter — intent → edit ops → editor
+│   │   ├── coding_state.py              # CodingState — session id + driver + strategy names
 │   │   ├── command_mode.py              # CommandMode — routes submitted text to agent
 │   │   ├── dictation_gate.py            # DictationGate — LLM-based stop classification
 │   │   ├── dictation_gate_prompt.py     # Dictation-specific prompt for DictationGate
 │   │   ├── dictation_mode.py            # AdapterDictationMode — active dictation state
 │   │   ├── dictation_router.py          # DictationRouter — routes segments and edits
 │   │   ├── dictation_state.py           # DictationState — session id + adapter names
+│   │   ├── fallback_edit_strategy.py    # FallbackEditStrategy — primary → full-replace on failure
+│   │   ├── full_replace_edit_strategy.py # FullReplaceEditStrategy — select-all + paste buffer
+│   │   ├── input_automation_editor_driver.py # InputAutomationEditorDriver — drives editor via gnome.*
 │   │   ├── internal_tools.py            # Re-exports tool classes
+│   │   ├── line_anchored_edit_strategy.py # LineAnchoredEditStrategy — goto-line + paste region (default)
 │   │   ├── llm_conversation_summarizer.py # LLM-based history compaction
 │   │   ├── main_agent.py                # MainAgent — entry point for a conversation turn
 │   │   ├── model_failure_reply_builder.py # Human-readable failure messages
+│   │   ├── raw_key_edit_strategy.py     # RawKeyEditStrategy — arrows/Home/End/Delete + type
 │   │   ├── registered_tool.py           # RegisteredTool — frozen entry in ToolRegistry
 │   │   ├── repeated_tool_call_guard.py  # Detects repeated identical tool calls
 │   │   ├── sliding_window_history.py    # SlidingWindowHistory — max-20 with LLM compaction
+│   │   ├── start_coding_tool.py         # StartCodingTool — reads buffer + launches coding session
 │   │   ├── start_dictation_tool.py      # StartDictationTool — launches dictation session
 │   │   ├── switch_model_tool.py         # SwitchModelTool — hot-swaps an LLM slot
-│   │   └── tool_runtime.py              # ToolRuntime — wires tools + DictationRouter
+│   │   ├── tool_runtime.py              # ToolRuntime — wires tools + DictationRouter + CodingRouter
+│   │   └── vscode_editor_driver.py      # VSCodeEditorDriver — future plugin-backed driver (contract only)
 │   ├── shared/                          # Used by all layers; depends on nothing else
 │   │   ├── config/
 │   │   │   ├── config.py                # Config — frozen dataclass, all runtime settings
@@ -233,8 +247,11 @@ tusk/
 │   │   │   ├── app_entry.py             # AppEntry — desktop application (name + exec_cmd)
 │   │   │   ├── app_mode.py              # AppMode — interaction mode enum (default, dictation, …)
 │   │   │   ├── app_status.py            # AppStatus — operational status enum (listening, reacting, …)
+│   │   │   ├── buffer_selection.py      # BufferSelection — inclusive start/end line range
 │   │   │   ├── chat_message.py          # ChatMessage — role + content, summary detection
+│   │   │   ├── coding_gate_result.py    # CodingGateResult — stop-coding classification output
 │   │   │   ├── desktop_context.py       # DesktopContext — active window + window list
+│   │   │   ├── edit_operation.py        # EditOperation — insert/replace/delete + target + text
 │   │   │   ├── gate_result.py           # GateResult — gatekeeper output
 │   │   │   ├── kernel_response.py       # KernelResponse — final handled + reply
 │   │   │   ├── llm_slot_config.py       # LLMSlotConfig — parsed provider/model string
@@ -291,6 +308,7 @@ tusk/
 │   │       ├── sanitizer.py             # Sanitizer — hallucination / ghost-phrase filter
 │   │       ├── transcription_buffer.py  # TranscriptionBuffer — rolling window + state tracking
 │   │       ├── gatekeeper.py            # LLMGatekeeper — primary classify + recovery
+│   │       ├── coding_gatekeeper.py     # CodingGatekeeper — forwards all text; LLM stop-coding detection
 │   │       ├── dictation_gatekeeper.py  # DictationGatekeeper — forwards all text; LLM stop detection
 │   │       ├── gatekeeper_parser.py     # JSON parsing for gate and recovery LLM responses
 │   │       ├── gatekeeper_support.py    # Helpers: schemas, dispatch builders, wake-word check
@@ -331,11 +349,17 @@ tusk/
 │   │   ├── app_catalog.py               # search_applications — installed desktop app search
 │   │   ├── open_uri_tool.py             # open_uri — xdg-open
 │   │   └── desktop_context.py           # DesktopContext snapshot builder
-│   └── dictation/
+│   ├── dictation/
+│   │   ├── adapter.json                 # Adapter manifest (provides_context=false)
+│   │   ├── server.py                    # DictationServer — MCP server for dictation sessions
+│   │   ├── dictation_refiner.py         # DictationRefiner — LLM cleanup (unused; reserved for future proofreading)
+│   │   └── dictation_tool_schema_catalog.py # start_dictation, process_segment, stop_dictation
+│   └── coding/
 │       ├── adapter.json                 # Adapter manifest (provides_context=false)
-│       ├── server.py                    # DictationServer — MCP server for dictation sessions
-│       ├── dictation_refiner.py         # DictationRefiner — LLM cleanup (unused; reserved for future proofreading)
-│       └── dictation_tool_schema_catalog.py # start_dictation, process_segment, stop_dictation
+│       ├── server.py                    # CodingServer — MCP server holding the buffer model
+│       ├── buffer_model.py              # BufferModel — immutable lines; with_edit returns new model
+│       ├── coding_edit_planner.py       # CodingEditPlanner — (intent + buffer) → EditOperation(s)
+│       └── coding_tool_schema_catalog.py # start_coding_session, process_intent, stop_coding_session
 └── tests/
     ├── test_pipeline.py
     ├── test_voice_shell.py
@@ -445,7 +469,37 @@ def summarize(self, messages: list[ChatMessage]) -> str
 def handle_command(self, text: str) -> KernelResponse
 ```
 
-Used by `CommandMode` and `DictationMode` to route submitted text inside the kernel.
+Used by `CommandMode`, `DictationMode`, and `CodingMode` to route submitted text inside
+the kernel.
+
+### EditorDriver — `tusk/kernel/interfaces/editor_driver.py`
+
+```python
+def read_buffer(self) -> str
+def goto_line(self, line_number: int) -> None
+def select_range(self, selection: BufferSelection) -> None
+def paste(self, text: str) -> None
+def type_text(self, text: str) -> None
+def press_keys(self, keys: str) -> None
+def replace_buffer(self, text: str) -> None
+```
+
+Abstracts the editor backend for coding mode. Methods are intentionally low-level so the
+edit-application strategies can compose them. `InputAutomationEditorDriver` implements
+them via the `gnome.*` tools (editor-agnostic, no plugin); the future
+`VSCodeEditorDriver` implements the same contract over a VS Code extension. Every method
+sits on the coding hot path — its latency cost is documented in the specification.
+
+### EditApplicationStrategy — `tusk/kernel/interfaces/edit_application_strategy.py`
+
+```python
+def apply(self, edit: EditOperation, driver: EditorDriver) -> None
+```
+
+Maps a single `EditOperation` onto a sequence of `EditorDriver` calls. Depends only on
+the `EditOperation` schema and the `EditorDriver` ABC. Implementations:
+`LineAnchoredEditStrategy` (default), `FullReplaceEditStrategy` (fallback / resync),
+`RawKeyEditStrategy`, and the composing `FallbackEditStrategy`.
 
 ### StatusReporter — `tusk/shared/status/interfaces/status_reporter.py`
 
@@ -550,6 +604,57 @@ The `classification` key in `metadata` holds `"command"`, `"conversation"`, or `
 |---|---|---|
 | `handled` | `bool` | Whether the pipeline processed this input |
 | `reply` | `str` | Text reply to surface to the user |
+
+### EditOperation — `tusk/shared/schemas/edit_operation.py`
+
+| Field | Type | Description |
+|---|---|---|
+| `kind` | `str` | `"insert"`, `"replace"`, or `"delete"` |
+| `target_start` | `int` | 1-based start line of the target range |
+| `target_end` | `int` | 1-based end line (equals `target_start` for single-line / insert) |
+| `new_text` | `str` | Replacement or inserted text (empty for delete) |
+| `anchor` | `str` | `"line_start"` or `"line_end"` — caret anchor within the target |
+| `full_buffer` | `str` | Authoritative full buffer after this op (used by full-replace / resync) |
+
+Produced by the coding adapter and converted from the JSON-RPC `data` payload into typed
+`EditOperation` instances by `CodingRouter` before reaching any strategy.
+
+### BufferSelection — `tusk/shared/schemas/buffer_selection.py`
+
+| Field | Type | Description |
+|---|---|---|
+| `start_line` | `int` | 1-based inclusive start line |
+| `end_line` | `int` | 1-based inclusive end line |
+
+### CodingGateResult — `tusk/shared/schemas/coding_gate_result.py`
+
+| Field | Type | Description |
+|---|---|---|
+| `is_directed_at_tusk` | `bool` | `True` only for a stop-coding command |
+| `cleaned_command` | `str` | Cleaned stop command (empty otherwise) |
+| `stop_reason` | `str \| None` | Short stop reason, or `None` |
+
+### CodingState — `tusk/kernel/coding_state.py`
+
+| Field | Type | Description |
+|---|---|---|
+| `adapter_name` | `str` | MCP adapter name (`"coding"`) |
+| `session_id` | `str` | Adapter session id |
+| `desktop_source` | `str` | Input-automation source (e.g. `"gnome"`) |
+| `driver_name` | `str` | Selected `EditorDriver` (`"input_automation"` / `"vscode"`) |
+| `strategy_name` | `str` | Selected edit strategy (`"line_anchored"` / `"full_replace"` / `"raw_key"`) |
+
+### BufferModel — `adapters/coding/buffer_model.py`
+
+| Member | Type | Description |
+|---|---|---|
+| `lines` | `tuple[str, ...]` | Immutable line list — the authoritative buffer model |
+| `from_text(text)` | classmethod → `BufferModel` | Build a model from a raw buffer string |
+| `to_text()` | `str` | Render the model back to a buffer string |
+| `with_edit(op)` | `EditOperation` → `BufferModel` | Return a new model with the op applied |
+
+Lives in the coding adapter (alongside its owner, like `DictationState` lives in the
+kernel). Immutable — edits produce new instances.
 
 ### MCPToolSchema — `tusk/shared/schemas/mcp_tool_schema.py`
 
@@ -670,6 +775,7 @@ AudioCapture.stream_frames()
     → GatekeeperSlot.process(buffered, recent)  # delegates to active inner gatekeeper
         # command mode:   LLMGatekeeper — LLM 3-way classify → DROP (ambient)
         # dictation mode: DictationGatekeeper — forward all; LLM stop detection → DROP (stop phrase)
+        # coding mode:    CodingGatekeeper — forward all; LLM stop-coding detection → DROP (stop phrase)
     → KernelAPI.submit(command_text)
         → CommandMode.process_command(text)
             → MainAgent.process_command(command)
@@ -700,6 +806,36 @@ stdin → CLIShell.start(api)
 ```
 
 `submit(text)` bypasses STT, hallucination filtering, and gatekeeping entirely.
+
+### Coding Mode Path
+
+```
+# Entered by start_coding (reads the buffer once, then owns it):
+StartCodingTool.execute()
+    → driver.read_buffer()                       # Ctrl+A → Ctrl+C → gnome.read_clipboard
+    → coding.start_coding_session(initial_buffer) # seeds adapter BufferModel → session_id
+    → KernelAPI.start_coding(CodingState)         # swaps in CodingGatekeeper
+
+# Per utterance while coding mode is active:
+GatekeeperSlot.process(...) → CodingGatekeeper
+    → CodingGate.should_stop(text)?
+        # yes → kernel.request_coding_stop() → DROP
+        # no  → forward as a coding instruction
+    → KernelAPI.submit(intent) → AdapterCodingMode.process_text(intent)
+        → CodingRouter.process(state, intent)
+            → coding.process_intent(session_id, intent)   # adapter (stdio JSON-RPC)
+                → CodingEditPlanner: (intent + BufferModel) --LLM--> [EditOperation]
+                → BufferModel.with_edit(op)                # adapter model updated
+                → data = {operations, should_stop}
+            → for each op: EditApplicationStrategy.apply(EditOperation, EditorDriver)
+                → InputAutomationEditorDriver → gnome.* primitives
+                     (Ctrl+G / select range / write_clipboard + Ctrl+V / type_text)
+    → editor buffer mutated (the deliverable)
+```
+
+The adapter's `BufferModel` and the editor stay in lockstep because every change flows
+through TUSK. `EditOperation.full_buffer` lets `FullReplaceEditStrategy` re-paste the
+authoritative buffer as a resync / recovery path.
 
 ---
 
@@ -894,6 +1030,36 @@ triggers the full stop sequence: adapter cleanup via `DictationRouter.stop()`, k
 reset via `stop_dictation()`, and an `on_dictation_stopped` callback that swaps the slot
 back to `LLMGatekeeper`. The stop phrase itself is dropped (not typed).
 
+### AdapterCodingMode — `tusk/kernel/coding_mode.py`
+
+Active when `start_coding` has been executed. Holds a `CodingState` (session ID, adapter
+name, desktop source, selected driver, selected strategy). Structurally a sibling of
+`AdapterDictationMode` — the difference is that spoken intent is converted into structured
+code edits rather than inserted verbatim.
+
+**process_text(text):** Forwards the spoken intent to `CodingRouter.process()`. The router
+calls `coding.process_intent` (MCP), which runs the coding LLM over the intent plus the
+adapter's authoritative `BufferModel` and returns one or more `EditOperation`s. The router
+converts each into a typed `EditOperation` and applies it via the injected
+`EditApplicationStrategy` + `EditorDriver` (e.g. `LineAnchoredEditStrategy` over
+`InputAutomationEditorDriver`, which composes `gnome.*` key/clipboard tools).
+
+**stop():** Calls `CodingRouter.stop()` which calls `coding.stop_coding_session` (MCP) and
+clears the pipeline's coding mode pointer.
+
+**Stop detection — `shells/voice/stages/coding_gatekeeper.py`:** When coding starts,
+`KernelAPI` fires an `on_coding_started` callback (wired in `main.py`) that swaps the
+`GatekeeperSlot`'s inner delegate from `LLMGatekeeper` to `CodingGatekeeper`. On every
+utterance, `CodingGatekeeper` calls `CodingGate.should_stop(text)`, which uses the
+gatekeeper LLM with a coding-specific prompt (`tusk/kernel/coding_gate_prompt.py`) — the
+only command it detects is a request to stop coding; everything else is forwarded as a
+coding instruction. The parse/fallback chain mirrors `DictationGate`: structured output
+first, plain `complete()` fallback, and on double failure the text is forwarded as an
+instruction. On stop detection, `CodingGatekeeper` calls `kernel.request_coding_stop()`,
+which runs the full stop sequence (`CodingRouter.stop()`, `stop_coding()`, and an
+`on_coding_stopped` callback that swaps the slot back to `LLMGatekeeper`). No new slot
+class is needed — `GatekeeperSlot.swap()` already supports arbitrary inner gatekeepers.
+
 ### Tool Sequence Execution
 
 The executor can run a compiled deterministic plan through a single synthetic tool
@@ -927,7 +1093,10 @@ policies, no branching or loops. Sequence mode is limited to already-synchronous
 
 ## Adapter Model
 
-Adapters are out-of-process MCP servers discovered from `adapter.json` manifests.
+Adapters are out-of-process MCP servers discovered from `adapter.json` manifests. The
+shipped adapters are `gnome` (`provides_context=true`), `dictation`, and `coding` (both
+`provides_context=false`). The `coding` adapter holds the authoritative buffer model and
+runs the coding LLM; it does not provide desktop context.
 
 ### Manifest Schema (`adapter.json`)
 
@@ -1293,6 +1462,7 @@ tray shell is loaded, the `NullStatusSink` stays in place and status reporting i
 | Tool | Name | Parameters | Execution |
 |---|---|---|---|
 | `StartDictationTool` | `start_dictation` | *(none)* | Starts MCP dictation session, sets kernel dictation mode |
+| `StartCodingTool` | `start_coding` | *(none)* | Reads the editor buffer once, starts MCP coding session, sets kernel coding mode |
 | `SwitchModelTool` | `switch_model` | `slot`, `provider`, `model` | Calls `LLMRegistry.swap()` |
 
 Synthetic tools (`done`, `run_agent`, `execute_tool_sequence`) are built dynamically by
@@ -1362,6 +1532,17 @@ only to the executor profile in sequence mode.
 | `process_segment` | `session_id`, `text` | Refines text, returns edit operation |
 | `stop_dictation` | `session_id` | Closes session |
 
+### Coding Adapter Tools (prefix: `coding.`)
+
+| Tool | Parameters | Execution |
+|---|---|---|
+| `start_coding_session` | `initial_buffer` | Creates session, seeds `BufferModel`, returns `session_id` |
+| `process_intent` | `session_id`, `intent` | Coding LLM turns intent + buffer into `EditOperation`(s); updates model; returns ops |
+| `stop_coding_session` | `session_id` | Closes session |
+
+The input-automation driver reuses the existing `gnome.*` primitives (`press_keys`,
+`type_text`, `read_clipboard`, `write_clipboard`) — coding mode adds no new GNOME tools.
+
 ---
 
 ## Notes
@@ -1381,3 +1562,9 @@ only to the executor profile in sequence mode.
   cannot satisfy from inside the container.
 - The `TrayBackend` ABC isolates the tray library so other Linux desktops, macOS, and Windows
   backends can be added later without changing `TrayShell`, the sink, or the menu builder.
+- Coding mode reads the editor buffer exactly once at session start and then owns an
+  authoritative in-memory `BufferModel`; it never writes files on disk. Every edit is
+  applied to the model and the editor in lockstep. Manual edits made by the user during a
+  session are **not detected** — they would cause the model to drift from the editor. The
+  full-replace strategy (re-pasting `EditOperation.full_buffer`) is the resync / recovery
+  path and is what `FallbackEditStrategy` uses when a line-anchored apply fails.
