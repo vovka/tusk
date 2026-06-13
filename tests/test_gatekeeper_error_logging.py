@@ -25,7 +25,7 @@ def test_recovery_parse_failure_is_logged_as_error() -> None:
     log = _RecordingLog()
     responses = ['{"classification":"ambient","cleaned_text":"","reason":"x"}', "still not json"]
     gatekeeper = LLMGatekeeper(_llm(responses), log)
-    gatekeeper.process(_utterance("hm"), [], [_candidate()])
+    gatekeeper.process(_utterance("no that one"), [], [_candidate()])
     assert "ERROR" in log.tags
 
 
