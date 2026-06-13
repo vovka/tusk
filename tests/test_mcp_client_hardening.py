@@ -17,6 +17,16 @@ _GARBAGE = "print('this is not json', flush=True)\nimport time\ntime.sleep(30)\n
 _STUBBORN = "import signal, time\nsignal.signal(signal.SIGTERM, signal.SIG_IGN)\n" + _REPLY + "time.sleep(30)\n"
 _NOISY = "import sys\nsys.stderr.write('x' * 1048576)\nsys.stderr.flush()\n" + _REPLY
 _CRASHING = "import sys\nsys.stderr.write('boom diagnostics')\nsys.exit(1)\n"
+_PARTIAL = "import sys, time\nsys.stdout.write('{\"partial\":')\nsys.stdout.flush()\ntime.sleep(30)\n"
+
+
+def test_request_times_out_when_server_writes_partial_line() -> None:
+    client = MCPClient(response_timeout_seconds=0.5)
+    started = time.monotonic()
+    with pytest.raises(RuntimeError, match="timed out"):
+        asyncio.run(client.connect_stdio(["python", "-c", _PARTIAL], cwd="."))
+    assert time.monotonic() - started < 5.0
+    asyncio.run(client.shutdown())
 
 
 def test_request_times_out_when_server_hangs() -> None:

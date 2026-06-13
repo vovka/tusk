@@ -1,4 +1,4 @@
-import select
+import queue
 import subprocess
 import threading
 from collections import deque
@@ -21,11 +21,15 @@ class MCPStdioTransport:
         self._process.stdin.flush()
 
     def read_line(self) -> str | None:
-        # ponytail: select on the fd relies on the strict one-line-per-request protocol —
-        # move to non-blocking reads if a server ever streams extra stdout lines.
+        # ponytail: readline on a daemon thread so the timeout also covers a server that
+        # writes a partial line and then stalls; the leaked reader ends on process exit.
         assert self._process.stdout is not None
-        ready, _, _ = select.select([self._process.stdout], [], [], self._timeout)
-        return self._process.stdout.readline() if ready else None
+        line: "queue.Queue[str]" = queue.Queue(maxsize=1)
+        threading.Thread(target=lambda: line.put(self._process.stdout.readline()), daemon=True).start()
+        try:
+            return line.get(timeout=self._timeout)
+        except queue.Empty:
+            return None
 
     def stderr_text(self) -> str:
         self._stderr_thread.join(timeout=0.5)
