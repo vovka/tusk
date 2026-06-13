@@ -7,7 +7,7 @@ microphone audio continuously, detects speech boundaries, transcribes speech to 
 filters ambient noise and hallucinations, passes confirmed commands to a conversation
 agent, and executes desktop actions via hot-pluggable MCP adapters.
 
-The system is split into five layers: **Shells** (voice, CLI, future), a thin **Kernel**
+The system is split into five layers: **Shells** (voice, CLI, tray, future), a thin **Kernel**
 (agent loop + tool dispatch), a **Shared** layer (ABCs, schemas, LLM access — depended on
 by all other layers), hot-pluggable **Adapters** (MCP servers), and swappable **Providers**
 (LLM and STT implementations). The agent pipeline uses a three-profile delegation chain: a
@@ -27,6 +27,10 @@ only through `kernel.submit(text)` at runtime and shared ABCs at design time.
 ![System Block Diagram](diagrams/architecture.png)
 
 > Source: [`docs/diagrams/architecture.svg`](diagrams/architecture.svg)
+>
+> Note: the diagram predates the optional `tray` shell. The tray status indicator and its
+> `StatusReporter → StatusSink` / `PipelineControl` wiring are described textually below and in
+> §22 of the specification; the diagram will be refreshed in a follow-up.
 
 ---
 
@@ -177,6 +181,7 @@ tusk/
 │   │   ├── interfaces/                  # Kernel ABCs
 │   │   │   ├── conversation_history.py  # ConversationHistory ABC
 │   │   │   ├── conversation_summarizer.py # ConversationSummarizer ABC
+│   │   │   ├── pipeline_control.py      # PipelineControl ABC — pause/resume mic capture
 │   │   │   └── pipeline_mode.py         # PipelineMode ABC — gatekeeper prompt + handler
 │   │   ├── adapter_manager.py           # AdapterManager — MCP adapter lifecycle
 │   │   ├── agent_profiles.py            # build_agent_profiles() — 4 profiles
@@ -225,6 +230,8 @@ tusk/
 │   │   │   └── mcp_tool_proxy.py        # MCPToolProxy — adapts MCPToolSchema to RegisteredTool
 │   │   ├── schemas/                     # Frozen dataclasses (all inter-layer data)
 │   │   │   ├── app_entry.py             # AppEntry — desktop application (name + exec_cmd)
+│   │   │   ├── app_mode.py              # AppMode — interaction mode enum (default, dictation, …)
+│   │   │   ├── app_status.py            # AppStatus — operational status enum (listening, reacting, …)
 │   │   │   ├── chat_message.py          # ChatMessage — role + content, summary detection
 │   │   │   ├── desktop_context.py       # DesktopContext — active window + window list
 │   │   │   ├── gate_result.py           # GateResult — gatekeeper output
@@ -232,12 +239,19 @@ tusk/
 │   │   │   ├── llm_slot_config.py       # LLMSlotConfig — parsed provider/model string
 │   │   │   ├── mcp_tool_result.py       # MCPToolResult — adapter tool response
 │   │   │   ├── mcp_tool_schema.py       # MCPToolSchema — adapter tool definition
+│   │   │   ├── status_snapshot.py       # StatusSnapshot — status + mode + detail + mic + models
 │   │   │   ├── tool_call.py             # ToolCall — tool name + parameters + call_id
 │   │   │   ├── tool_result.py           # ToolResult — success + message + data
 │   │   │   ├── tool_sequence_plan.py    # ToolSequencePlan — ordered steps + goal
 │   │   │   ├── tool_sequence_step.py    # ToolSequenceStep — step_id + tool_name + args
 │   │   │   ├── utterance.py             # Utterance — transcribed text + audio + confidence
 │   │   │   └── window_info.py           # WindowInfo — title + app + geometry + active flag
+│   │   ├── status/
+│   │   │   ├── interfaces/
+│   │   │   │   ├── status_reporter.py   # StatusReporter ABC — what producers call
+│   │   │   │   └── status_sink.py       # StatusSink ABC — what the tray implements
+│   │   │   ├── status_reporter_hub.py   # StatusReporterHub — holds state, builds + publishes snapshots
+│   │   │   └── null_status_sink.py      # NullStatusSink — no-op sink (default when no tray)
 │   │   └── stt/
 │   │       └── interfaces/
 │   │           └── stt_engine.py        # STTEngine ABC — transcribe(audio_frames, sample_rate)
@@ -274,9 +288,21 @@ tusk/
 │   │       ├── command_gate_prompt.py   # Prompt builder for the primary classification call
 │   │       ├── recovery_gate_prompt.py  # Prompt builder for the recovery LLM call
 │   │       └── recent_context_formatter.py # Formats recent utterances for context
-│   └── cli/
-│       ├── shell.json                   # Shell manifest
-│       └── cli_shell.py                 # CLIShell — stdin REPL, bypasses voice pipeline
+│   ├── cli/
+│   │   ├── shell.json                   # Shell manifest
+│   │   └── cli_shell.py                 # CLIShell — stdin REPL, bypasses voice pipeline
+│   └── tray/                            # Status-and-control tray indicator (optional shell)
+│       ├── shell.json                   # Shell manifest (entry_class: TrayShell)
+│       ├── tray_shell.py                # TrayShell — owns the GUI loop; start()/stop()
+│       ├── interfaces/
+│       │   └── tray_backend.py          # TrayBackend ABC — cross-platform tray seam
+│       ├── appindicator_tray_backend.py # AppIndicatorTrayBackend — pystray/AppIndicator backend
+│       ├── tray_status_sink.py          # TrayStatusSink — StatusSink; marshals snapshot to GUI thread
+│       ├── status_icon_resolver.py      # StatusIconResolver — pure AppStatus → icon asset map
+│       ├── tray_menu_builder.py         # TrayMenuBuilder — builds menu items from a StatusSnapshot
+│       ├── tray_menu_actions.py         # TrayMenuActions — DI container of action callables
+│       ├── tray_menu_item.py            # TrayMenuItem — frozen menu item schema
+│       └── icons/                       # Per-status icon assets (light/dark themes)
 ├── adapters/
 │   ├── gnome/
 │   │   ├── adapter.json                 # Adapter manifest (name, transport, entry, provides_context)
@@ -412,6 +438,50 @@ def handle_command(self, text: str) -> KernelResponse
 
 Used by `CommandMode` and `DictationMode` to route submitted text inside the kernel.
 
+### StatusReporter — `tusk/shared/status/interfaces/status_reporter.py`
+
+```python
+def set_status(self, status: AppStatus, detail: str = "") -> None
+def set_mode(self, mode: AppMode) -> None
+def set_models(self, models: tuple[tuple[str, str], ...]) -> None
+def set_mic_device(self, device: str) -> None
+```
+
+What producers (the voice pipeline and `KernelAPI`) call to report state. Producers depend
+only on this abstraction and never know whether a tray is present.
+
+### StatusSink — `tusk/shared/status/interfaces/status_sink.py`
+
+```python
+def publish(self, snapshot: StatusSnapshot) -> None
+```
+
+Implemented by observers. `NullStatusSink` is a no-op default; `TrayStatusSink` marshals the
+snapshot onto the GUI thread. `publish` must return immediately (never block the producer).
+
+### PipelineControl — `tusk/kernel/interfaces/pipeline_control.py`
+
+```python
+def pause(self) -> None    # suspend microphone capture
+def resume(self) -> None   # resume microphone capture
+```
+
+Implemented by the voice shell. The tray calls it (via an injected reference) so "Pause"
+actually stops capture rather than dropping commands downstream.
+
+### TrayBackend — `shells/tray/interfaces/tray_backend.py`
+
+```python
+def run(self) -> None
+def stop(self) -> None
+def set_icon(self, name: str) -> None
+def set_tooltip(self, text: str) -> None
+def set_menu(self, items: tuple[TrayMenuItem, ...]) -> None
+```
+
+Cross-platform seam. v1 ships `AppIndicatorTrayBackend` (`pystray` + AppIndicator). Future
+macOS/Windows/Qt backends are new classes behind this ABC — `TrayShell` is unchanged.
+
 ---
 
 ## Schemas
@@ -542,6 +612,39 @@ Class methods: `from_dict(data) -> ToolSequenceStep | None`, `to_dict() -> dict`
 
 Class methods: `from_dict(data) -> ToolSequencePlan | None`, `to_dict() -> dict`,
 `tool_names() -> set[str]`, `ordered_tool_names() -> tuple[str, ...]`.
+
+### AppStatus — `tusk/shared/schemas/app_status.py`
+
+`Enum` of operational states: `STARTING`, `LISTENING`, `REACTING`, `PAUSED`, `ERROR`,
+`STOPPED`. "Running" is implicit (any non-`STOPPED`). The tray icon is a pure function of this
+value (`StatusIconResolver`).
+
+### AppMode — `tusk/shared/schemas/app_mode.py`
+
+`Enum` of interaction modes: `DEFAULT`, `DICTATION` (future modes such as `CODING_ASSISTANT`
+are added here). Independent of `AppStatus`; surfaced in the tray menu, not the icon.
+
+### StatusSnapshot — `tusk/shared/schemas/status_snapshot.py`
+
+| Field | Type | Description |
+|---|---|---|
+| `status` | `AppStatus` | Current operational state |
+| `mode` | `AppMode` | Current interaction mode |
+| `detail` | `str` | Secondary line — last command/reply or error text |
+| `mic_device` | `str` | Active input device label |
+| `models` | `tuple[tuple[str, str], ...]` | `(slot_name, "provider/model")` pairs |
+
+Immutable snapshot built by `StatusReporterHub` and passed to `StatusSink.publish`.
+`models` is a tuple-of-tuples (not a dict) to satisfy the no-untyped-dicts + immutability rules.
+
+### TrayMenuItem — `shells/tray/tray_menu_item.py`
+
+| Field | Type | Description |
+|---|---|---|
+| `label` | `str` | Display text |
+| `action` | `Callable[[], None] \| None` | Click handler; `None` for disabled info lines |
+| `enabled` | `bool` | Whether the item is clickable |
+| `children` | `tuple[TrayMenuItem, ...]` | Submenu items (e.g. the models submenu) |
 
 ---
 
@@ -895,10 +998,20 @@ Builds a `VoicePipeline` from the six stages and drives it in a loop, passing
 REPL loop: `input("tusk> ")` → `KernelAPI.submit_text(text)` → print reply. Exits on
 `"exit"` or `"quit"`. Takes no constructor arguments.
 
+### TrayShell — `shells/tray/tray_shell.py`
+
+Optional status-and-control shell. Owns the GUI main loop via a `TrayBackend`, so it must be
+**last** in `TUSK_SHELLS` (e.g. `voice,tray`) — `start()` blocks. It registers a
+`TrayStatusSink` into the `StatusReporterHub`, renders the icon from `AppStatus`
+(`StatusIconResolver`), and builds the menu (`TrayMenuBuilder`) wired to injected actions
+(pause/resume via `PipelineControl`, open logs, restart, exit via a shutdown callback). It
+holds no business logic and the kernel never imports it. See §22 of the specification.
+
 ### Threading
 
 When multiple shells are configured, all but the last start in daemon threads. The last
-shell runs on the main thread (blocking). This allows `voice` + `cli` simultaneously.
+shell runs on the main thread (blocking). This allows `voice` + `cli`, or `voice` + `tray`
+(tray last, owning the GUI loop), simultaneously.
 
 ---
 
@@ -1031,7 +1144,8 @@ main()
   → StartupOptions.from_sources(sys.argv)
   → Config.from_env()                          # reads all TUSK_* env vars
   → _build_log(options)                        # ColorLogPrinter with log groups
-  → _build_kernel(config, log)
+  → StatusReporterHub(NullStatusSink())        # default sink; real sink attached by tray later
+  → _build_kernel(config, log, reporter)
       → _build_llm_registry(config, log)       # 4 LLMProxy slots
       → ToolRegistry()
       → _build_adapter_manager(config, log, registry)
@@ -1040,15 +1154,24 @@ main()
       → SlidingWindowHistory(20, LLMConversationSummarizer(...))
       → ToolRuntime(registry, llm_registry, adapter_manager, log)
       → _build_agent(config, log, llm_registry, tool_registry, history)
-      → KernelAPI(CommandMode(agent, log), llm_registry, log, DictationGate(...))
+      → KernelAPI(CommandMode(agent, log), llm_registry, log, DictationGate(...), reporter)
       → ToolRuntime(...).register_tools(kernel)    # attaches DictationRouter + tools
+  → reporter.set_models(...)                       # initial model labels from LLMRegistry
   → _load_shells(config, kernel_api)               # loads shell modules from shell.json
-      # Voice shell builds its own six-stage pipeline:
+      # Voice shell builds its own six-stage pipeline and exposes PipelineControl:
       → LLMGatekeeper(llm_registry.get("gatekeeper"), log)
-      → VoiceShell(config, log, stt_engine, gatekeeper)
-          → VoicePipeline(detector, transcriber, sanitizer, buffer, gatekeeper)
-  → run shells (all but last in daemon threads, last blocks)
+      → VoiceShell(config, log, stt_engine, gatekeeper, reporter)
+          → VoicePipeline(detector, transcriber, sanitizer, buffer, gatekeeper, reporter)
+      # Tray shell (when "tray" in TUSK_SHELLS, loaded last):
+      → TrayShell(reporter, pipeline_control, shutdown_callback, config)
+          → reporter.attach_sink(TrayStatusSink(...))   # late-binds the real sink
+  → run shells (all but last in daemon threads, last blocks — tray owns the GUI loop)
 ```
+
+The tray is wired only here in `main.py` (the wiring layer, which is allowed to know about
+shells). The kernel and pipeline depend solely on the `StatusReporter` / `PipelineControl`
+abstractions and never import `shells.tray`. When no tray shell is loaded, the
+`NullStatusSink` stays in place and status reporting is a no-op.
 
 ---
 
@@ -1077,6 +1200,17 @@ main()
 7. **Tools are the only place platform-specific execution logic lives.** `Pipeline`,
    `MainAgent`, and `CommandMode` are platform-agnostic.
 
+8. **Status notifications never block producers.** `StatusSink.publish` returns immediately;
+   the tray marshals updates onto its own GUI thread. `StatusReporterHub` swallows sink
+   exceptions so a broken UI can never propagate into the audio or kernel threads.
+
+9. **Core emits status only through the `StatusReporter` abstraction.** No core module
+   (kernel or voice pipeline) imports `shells.tray`. The tray is wired in `main.py` only.
+
+10. **`AppStatus` is the single source of truth for the indicator.** The icon is a pure
+    function of it (`StatusIconResolver`); new interaction modes are added to `AppMode` plus a
+    `set_mode` call — the tray requires no change.
+
 ---
 
 ## Error Handling
@@ -1102,6 +1236,9 @@ main()
 | `VoicePipeline.run` | Any from above | Stage returns `None` — utterance silently dropped |
 | `LLMRetryRunner` | Retryable error | Retries up to 3 times, delay `0.5 * attempt` s |
 | `LLMRetryRunner` | Non-retryable | Re-raises immediately |
+| `TrayShell` | Tray library `ImportError` | Logs once; runs no-op (no icon); TUSK otherwise unaffected |
+| `StatusReporterHub` | `StatusSink.publish` raises | Caught + logged; never propagates to the producer |
+| `TrayStatusSink` | GUI main-loop crash | `TrayShell.stop()`; process continues headless |
 
 ---
 
@@ -1194,3 +1331,9 @@ only to the executor profile in sequence mode.
   recently (within `follow_up_window_seconds`, default 30 s), it includes recent context
   in the classification prompt so conversational follow-ups work without a wake word.
   No external clock or side channel is needed.
+- The tray indicator (§22 of the specification) uses the StatusNotifierItem / AppIndicator
+  D-Bus protocol. On GNOME/Wayland the icon appears only when the host has the "AppIndicator
+  and KStatusNotifierItem Support" GNOME Shell extension enabled — a host prerequisite TUSK
+  cannot satisfy from inside the container.
+- The `TrayBackend` ABC isolates the tray library so other Linux desktops, macOS, and Windows
+  backends can be added later without changing `TrayShell`, the sink, or the menu builder.

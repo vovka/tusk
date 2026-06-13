@@ -62,9 +62,11 @@ Legacy fallback env vars (used when per-agent vars are absent):
 | `VAD_AGGRESSIVENESS` | `int` | `2` | `0`, `1`, `2`, or `3` |
 | `FOLLOW_UP_TIMEOUT_SECONDS` | `float` | `30` | Positive float (seconds) |
 | `MAX_FOLLOW_UP_TIMEOUT_SECONDS` | `float` | `120` | Positive float (seconds); follow-up window ceiling |
-| `TUSK_SHELLS` | `list[str]` | `["voice"]` | Comma-separated: `voice`, `cli` |
+| `TUSK_SHELLS` | `list[str]` | `["voice"]` | Comma-separated: `voice`, `cli`, `tray`. When `tray` is present it must be **last** (it owns the blocking GUI loop) |
 | `TUSK_ADAPTER_ENV_CACHE_DIR` | `str` | `".tusk_runtime/adapters"` | Directory for managed adapter venvs |
 | `TUSK_CONVERSATION_LOG_DIR` | `str` | `".tusk_runtime/conversations"` | Directory for daily conversation logs (parsed but not active) |
+| `TUSK_TRAY_ICON_THEME` | `str` | `"light"` | `light`, `dark` — icon asset set used by the tray shell |
+| `TUSK_TRAY_SHOW_LAST_ACTIVITY` | `bool` | `true` | `true`, `false` — show the last command/reply line in the tray menu |
 
 ### 2.4 LLM Slot Format and Provider Selection
 
@@ -895,6 +897,9 @@ NOT retried:
 | `VoicePipeline._handle_utterance` | Any from above | Stage returns `None`; utterance dropped |
 | `LLMRetryRunner` | Retryable error | Retries up to 3 times with linear backoff |
 | `LLMRetryRunner` | Non-retryable | Re-raises immediately |
+| `TrayShell` | Tray library `ImportError` | Logs once; shell runs in no-op mode (no icon); rest of TUSK unaffected |
+| `StatusReporterHub` | `StatusSink.publish` raises | Caught in `_emit`; logged; never propagates to the producer (protects the hot path) |
+| `TrayStatusSink` | GUI main-loop crash | `TrayShell.stop()` is called; the process continues headless |
 
 ---
 
@@ -913,6 +918,8 @@ Target end-to-end latency from end of speech to action start: ≤ 1.5 seconds.
 | Execution agent LLM call | GroqLLM (gpt-oss-120b) | ~300–600 ms |
 | MCP tool execution | stdio JSON-RPC | ~10–50 ms |
 | Context formatting | `RecentContextFormatter` | < 1 ms (string ops) |
+| Status notification | `StatusReporterHub.set_status` → `StatusSink.publish` | < 1 ms (attribute set + dataclass build; off the hot path) |
+| Tray UI redraw | `TrayStatusSink` → GUI idle callback | Off-thread (GLib idle); never blocks audio/kernel threads |
 
 **Total (typical path, no replan):** STT + gatekeeper + agent + planner + executor
 = ~1.1–2.5 seconds. Replanning adds one additional planner + executor round.
@@ -923,7 +930,117 @@ Target end-to-end latency from end of speech to action start: ≤ 1.5 seconds.
 
 ---
 
-## 22. Removed Runtime Behavior
+## 22. Tray UI Specification
+
+**Source:** `shells/tray/` (the `tray` shell). The tray is an optional status-and-control
+surface. It **observes** application status and **controls** pause/resume + lifecycle; it
+contains no business logic and the kernel has no import dependency on it.
+
+### 22.1 Status and Mode States
+
+Operational status (`AppStatus`, `tusk/shared/schemas/app_status.py`) and interaction mode
+(`AppMode`, `tusk/shared/schemas/app_mode.py`) are independent. "Running" is implicit — any
+non-`STOPPED` status. `idle` is intentionally not a distinct status; the always-listening
+product collapses idle into `LISTENING` to avoid icon flicker between utterances.
+
+| `AppStatus` | Trigger | Icon | Tooltip |
+|---|---|---|---|
+| `STARTING` | Process up, pipeline not yet listening | neutral | `TUSK — starting` |
+| `LISTENING` | Mic active, awaiting/processing speech | active | `TUSK — listening` |
+| `REACTING` | A command was accepted; agent is processing | busy | `TUSK — reacting` |
+| `PAUSED` | Capture suspended by the user | muted | `TUSK — paused` |
+| `ERROR` | Last operation failed / degraded | error | `TUSK — error: <detail>` |
+| `STOPPED` | Shutting down | (icon removed) | — |
+
+| `AppMode` | Meaning |
+|---|---|
+| `DEFAULT` | Normal command/conversation mode |
+| `DICTATION` | Dictation session active |
+| *(future)* `CODING_ASSISTANT` | Added to the enum + a `set_mode` call; the tray needs no change |
+
+The icon is a pure function of `AppStatus` (`StatusIconResolver`). The mode is shown in the
+menu and tooltip, not encoded in the icon.
+
+### 22.2 Status Propagation
+
+Producers (the voice pipeline and `KernelAPI`) depend only on the `StatusReporter` ABC and
+never know a tray exists. The flow is:
+
+```
+producer → StatusReporter.set_status/set_mode/set_models/set_mic_device
+         → StatusReporterHub  (holds current state, builds a StatusSnapshot)
+         → StatusSink.publish(snapshot)
+              → NullStatusSink   (no-op; injected when no tray is loaded)
+              → TrayStatusSink   (marshals onto the GUI thread, updates icon + menu)
+```
+
+Emit points:
+
+- **Voice pipeline** (`shells/voice/pipeline.py`): `LISTENING` before waiting on utterances;
+  `REACTING` immediately before `submit(...)`, back to `LISTENING` after.
+- **KernelAPI** (`tusk/kernel/api.py`): `submit` emits `REACTING` on entry and the prior
+  status on exit (single choke point; no agent-runtime hook). `start_dictation` /
+  `stop_dictation` emit `set_mode(DICTATION)` / `set_mode(DEFAULT)`.
+- **Models**: `main.py` calls `set_models(...)` once at startup from `LLMRegistry`; the
+  `switch_model` tool calls it again after a runtime swap.
+
+Pause/resume flows back into the pipeline through the `PipelineControl` ABC
+(`tusk/kernel/interfaces/pipeline_control.py`), implemented by the voice shell:
+`pause()` suspends mic capture and emits `PAUSED`; `resume()` restarts capture and emits
+`LISTENING`. Because capture itself stops, processing genuinely halts (no STT, no LLM).
+
+### 22.3 Configuration
+
+| Env Var | Python Type | Default | Valid Values |
+|---|---|---|---|
+| `TUSK_SHELLS` | `list[str]` | `["voice"]` | Add `tray` (must be **last** — it owns the blocking GUI loop) |
+| `TUSK_TRAY_ICON_THEME` | `str` | `"light"` | `light`, `dark` |
+| `TUSK_TRAY_SHOW_LAST_ACTIVITY` | `bool` | `true` | `true`, `false` |
+
+### 22.4 Menu Specification
+
+Built by `TrayMenuBuilder` from a `StatusSnapshot` + injected `TrayMenuActions` callables.
+
+| Item | Enabled | Action |
+|---|---|---|
+| `Status: <status>` | disabled | Info line; when `ERROR`, appends `detail` |
+| `Mode: <mode>` | disabled | Info line; single extensible line |
+| `Last: <detail>` | disabled | Last command/reply; hidden if `TUSK_TRAY_SHOW_LAST_ACTIVITY=false` |
+| `Mic: <device>` | disabled | Active input device label |
+| `Models ▸` | submenu | One disabled child per slot: `slot: provider/model` |
+| `Pause` / `Resume` | enabled | `PipelineControl.pause()` / `.resume()`; label flips on status |
+| `Open logs` | enabled | Opens the runtime log location |
+| `Restart` | enabled | Graceful restart of the assistant |
+| `Exit` | enabled | Graceful shutdown callback — stops every shell, then terminates |
+
+### 22.5 Tray Backend and Host Prerequisites
+
+- **Backend abstraction:** `TrayBackend` ABC (`shells/tray/interfaces/tray_backend.py`) with
+  `run()`, `stop()`, `set_icon(name)`, `set_tooltip(text)`, `set_menu(items)`. v1 ships
+  `AppIndicatorTrayBackend` (`pystray` + AppIndicator/GTK). Future macOS/Windows/Qt backends
+  are new classes behind the same ABC.
+- **Protocol:** StatusNotifierItem over D-Bus (already forwarded into the container). GNOME on
+  Wayland has no legacy XEmbed tray — the icon appears only when the host has the
+  **"AppIndicator and KStatusNotifierItem Support"** GNOME Shell extension enabled. This is a
+  host prerequisite TUSK cannot satisfy from inside Docker.
+- **Dependencies:** `requirements.txt` adds `pystray`, `Pillow`, `PyGObject`. The Dockerfile
+  adds the GI/AppIndicator stack (`gir1.2-gtk-3.0`, `gir1.2-ayatanaappindicator3-0.1` or
+  `libayatana-appindicator3-1`, `libgirepository1.0-dev`, `python3-gi`).
+- **Headless/tests:** the tray library import is guarded (`try/except ImportError`) exactly as
+  `AudioCapture` guards `sounddevice`; on failure the shell runs no-op. `TrayStatusSink`,
+  `StatusIconResolver`, and `TrayMenuBuilder` are pure/logic-only so they unit-test without any
+  GUI library; `conftest.py` stubs `pystray` and `gi`.
+
+### 22.6 Latency Note
+
+Status calls are synchronous in-process method calls beside the hot path (not inside any
+STT/LLM/network call), costing < 1 ms. **Hard requirement:** `StatusSink.publish` must enqueue
+onto the GUI thread (e.g. `GLib.idle_add`) and return immediately, so a slow redraw can never
+stall the audio or kernel threads (see §21).
+
+---
+
+## 23. Removed Runtime Behavior
 
 The active runtime no longer uses:
 
