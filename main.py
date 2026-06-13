@@ -46,8 +46,7 @@ def _build_kernel(config: Config, log: ColorLogPrinter, options: StartupOptions,
 
 def _build_agent(config: Config, log: ColorLogPrinter, llm_registry: LLMRegistry, tool_registry: ToolRegistry, history: object) -> MainAgent:
     store = FileAgentSessionStore(config.agent_session_log_dir)
-    profiles = build_agent_profiles(llm_registry)
-    return MainAgent(AgentOrchestrator(profiles, tool_registry, store, log), history)
+    return MainAgent(AgentOrchestrator(build_agent_profiles(llm_registry), tool_registry, store, log), history)
 
 
 def _build_adapter_manager(config: Config, log: ColorLogPrinter, tool_registry: ToolRegistry) -> AdapterManager:

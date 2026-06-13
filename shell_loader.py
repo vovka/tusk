@@ -4,8 +4,10 @@ import threading
 from pathlib import Path
 
 from shells.voice.gatekeeper_slot import GatekeeperSlot
+from shells.voice.stages.coding_gatekeeper import CodingGatekeeper
 from shells.voice.stages.dictation_gatekeeper import DictationGatekeeper
 from shells.voice.stages.gatekeeper import LLMGatekeeper
+from tusk.kernel.coding_gate import CodingGate
 from tusk.kernel.dictation_gate import DictationGate
 from tusk.providers.stt import GroqSTT
 from tusk.providers.tts import GroqTTS
@@ -58,18 +60,26 @@ class ShellLoader:
         return shell
 
     def _gatekeeper(self) -> GatekeeperSlot:
-        registry = self._kernel.get_llm_registry()
-        llm_gk = LLMGatekeeper(registry.get("gatekeeper"), self._log, follow_up_window_seconds=self._config.follow_up_timeout_seconds)
-        dictation_gate = DictationGate(registry.get("gatekeeper"), self._log)
-        return self._wire(llm_gk, dictation_gate)
-
-    def _wire(self, llm_gk: LLMGatekeeper, dictation_gate: DictationGate) -> GatekeeperSlot:
+        gk_llm = self._kernel.get_llm_registry().get("gatekeeper")
+        llm_gk = LLMGatekeeper(gk_llm, self._log, follow_up_window_seconds=self._config.follow_up_timeout_seconds)
         slot = GatekeeperSlot(llm_gk)
+        self._wire_dictation(slot, llm_gk, gk_llm)
+        self._wire_coding(slot, llm_gk, gk_llm)
+        return slot
+
+    def _wire_dictation(self, slot: GatekeeperSlot, llm_gk: LLMGatekeeper, gk_llm: object) -> None:
+        gate = DictationGate(gk_llm, self._log)
         self._kernel.set_dictation_callbacks(
-            on_start=lambda: slot.swap(DictationGatekeeper(dictation_gate, self._kernel.request_dictation_stop, self._log)),
+            on_start=lambda: slot.swap(DictationGatekeeper(gate, self._kernel.request_dictation_stop, self._log)),
             on_stop=lambda: slot.swap(llm_gk),
         )
-        return slot
+
+    def _wire_coding(self, slot: GatekeeperSlot, llm_gk: LLMGatekeeper, gk_llm: object) -> None:
+        gate = CodingGate(gk_llm, self._log)
+        self._kernel.set_coding_callbacks(
+            on_start=lambda: slot.swap(CodingGatekeeper(gate, self._kernel.request_coding_stop, self._log)),
+            on_stop=lambda: slot.swap(llm_gk),
+        )
 
     def _load_class(self, name: str) -> object:
         manifest = json.loads((Path("shells") / name / "shell.json").read_text())

@@ -20,11 +20,18 @@ class KernelAPI:
         self._llm_registry = llm_registry
         self._log = log
         self._reporter = reporter
+        self._init_state()
+        self._init_status_reporting()
+
+    def _init_state(self) -> None:
         self._dictation_mode = None
         self._dictation_router = None
-        self._init_status_reporting()
+        self._coding_mode = None
+        self._coding_router = None
         self._on_dictation_started: Callable[[], None] | None = None
         self._on_dictation_stopped: Callable[[], None] | None = None
+        self._on_coding_started: Callable[[], None] | None = None
+        self._on_coding_stopped: Callable[[], None] | None = None
 
     def _init_status_reporting(self) -> None:
         self._status_lock = Lock()
@@ -42,9 +49,11 @@ class KernelAPI:
             self._log.log("KERNELINPUT", f"text={text!r}", "kernel-input")
 
     def _route(self, text: str) -> KernelResponse:
-        if self._dictation_mode is None:
-            return self._command_mode.process_command(text)
-        return self._dictation_mode.process_text(text)
+        if self._coding_mode is not None:
+            return self._coding_mode.process_text(text)
+        if self._dictation_mode is not None:
+            return self._dictation_mode.process_text(text)
+        return self._command_mode.process_command(text)
 
     def _submit_reported(self, text: str) -> KernelResponse:
         self._begin_reported_submit(text)
@@ -98,6 +107,33 @@ class KernelAPI:
         if self._on_dictation_stopped is not None:
             self._on_dictation_stopped()
         self._report_mode(AppMode.DEFAULT)
+
+    def set_coding_callbacks(
+        self, on_start: Callable[[], None], on_stop: Callable[[], None]
+    ) -> None:
+        self._on_coding_started = on_start
+        self._on_coding_stopped = on_stop
+
+    def request_coding_stop(self) -> KernelResponse:
+        if self._coding_mode is None:
+            return KernelResponse(False, "")
+        return self._coding_mode.stop()
+
+    def attach_coding_router(self, router: object) -> None:
+        self._coding_router = router
+
+    def start_coding(self, state: object) -> KernelResponse:
+        from tusk.kernel.coding_mode import AdapterCodingMode
+
+        self._coding_mode = AdapterCodingMode(state, self._coding_router, self._log)
+        if self._on_coding_started is not None:
+            self._on_coding_started()
+        return KernelResponse(True, "Coding started.")
+
+    def stop_coding(self) -> None:
+        self._coding_mode = None
+        if self._on_coding_stopped is not None:
+            self._on_coding_stopped()
 
     def get_llm_registry(self) -> object:
         return self._llm_registry
