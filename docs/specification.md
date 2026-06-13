@@ -1028,9 +1028,12 @@ Built by `TrayMenuBuilder` from a `StatusSnapshot` + injected `TrayMenuActions` 
   Wayland has no legacy XEmbed tray — the icon appears only when the host has the
   **"AppIndicator and KStatusNotifierItem Support"** GNOME Shell extension enabled. This is a
   host prerequisite TUSK cannot satisfy from inside Docker.
-- **Dependencies:** `requirements.txt` adds `pystray`, `Pillow`, `PyGObject`. The Dockerfile
-  adds the GI/AppIndicator stack (`gir1.2-gtk-3.0`, `gir1.2-ayatanaappindicator3-0.1` or
-  `libayatana-appindicator3-1`, `libgirepository1.0-dev`, `python3-gi`).
+- **Dependencies:** `requirements.txt` adds the pure-Python `pystray` and `Pillow`. PyGObject
+  (`gi`) is supplied by the distro rather than built from source: the Dockerfile installs the GI
+  stack via apt (`python3-gi`, `python3-gi-cairo`, `gir1.2-gtk-3.0`,
+  `gir1.2-ayatanaappindicator3-0.1`) and exposes the system `dist-packages` to the image's
+  same-ABI Python with `PYTHONPATH=/usr/lib/python3/dist-packages` (avoids the fragile pip
+  PyGObject build on slim images). `PYSTRAY_BACKEND=appindicator` pins the backend.
 - **Headless/tests:** the tray library import is guarded (`try/except ImportError`) exactly as
   `AudioCapture` guards `sounddevice`; on failure the shell runs no-op. `TrayStatusSink`,
   `StatusIconResolver`, and `TrayMenuBuilder` are pure/logic-only so they unit-test without any

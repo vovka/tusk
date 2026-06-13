@@ -16,11 +16,14 @@ class AppIndicatorTrayBackend(TrayBackend):
         if pystray is None:
             raise RuntimeError("pystray is not installed")
         self._icon = pystray.Icon(name)
+        self._running = False
 
     def run(self) -> None:
+        self._running = True
         self._icon.run()
 
     def stop(self) -> None:
+        self._running = False
         self._icon.stop()
 
     def set_icon(self, name: str) -> None:
@@ -31,6 +34,8 @@ class AppIndicatorTrayBackend(TrayBackend):
 
     def set_menu(self, items: tuple[TrayMenuItem, ...]) -> None:
         self._icon.menu = pystray.Menu(*[self._convert(item) for item in items])
+        if self._running:
+            self._icon.update_menu()
 
     def _convert(self, item: TrayMenuItem) -> object:
         if item.children:
