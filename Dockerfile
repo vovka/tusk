@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y \
     wmctrl \
     xdotool \
     xclip \
+    wl-clipboard \
     pulseaudio-utils \
     libpulse-dev \
     libasound2-plugins \

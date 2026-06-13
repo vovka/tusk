@@ -42,6 +42,14 @@ request. The planner selects only the tools needed per task, keeping each LLM ca
 - Linux with GNOME desktop
 - PulseAudio or PipeWire-PulseAudio (standard on modern GNOME)
 
+### Display server support
+
+Clipboard read/write works natively on both X11 and Wayland — the GNOME adapter
+selects `wl-clipboard` on a Wayland session (`XDG_SESSION_TYPE=wayland` or
+`WAYLAND_DISPLAY` set) and `xclip` on X11. Input simulation and window management
+still rely on `xdotool`/`wmctrl`, which require X11; on Wayland they work only
+through XWayland and cannot drive native Wayland windows.
+
 ## Setup
 
 ### 1. Clone the repository
