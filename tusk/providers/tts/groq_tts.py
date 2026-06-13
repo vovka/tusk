@@ -9,7 +9,7 @@ __all__ = ["GroqTTS"]
 
 
 class GroqTTS(TTSEngine):
-    def __init__(self, api_key: str, model: str = "playai-tts", voice: str = "Fritz-PlayAI") -> None:
+    def __init__(self, api_key: str, model: str = "canopylabs/orpheus-v1-english", voice: str = "daniel") -> None:
         if Groq is None:
             raise RuntimeError("groq package is not installed")
         self._client = Groq(api_key=api_key)
