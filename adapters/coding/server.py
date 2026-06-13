@@ -2,6 +2,7 @@ import json
 import os
 import sys
 import uuid
+from pathlib import Path
 
 try:
     from buffer_model import BufferModel
@@ -67,7 +68,12 @@ class CodingServer:
         return {}
 
 
+def _repo_root() -> str:
+    return str(Path(__file__).resolve().parents[2])
+
+
 def _default_planner() -> CodingEditPlanner:  # pragma: no cover
+    sys.path.insert(0, _repo_root())
     from tusk.providers.llm import ConfigurableLLMFactory
 
     factory = ConfigurableLLMFactory(os.environ.get("GROQ_API_KEY", ""), os.environ.get("OPENROUTER_API_KEY", ""))
