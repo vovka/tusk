@@ -189,6 +189,7 @@ tusk/
 │   │   ├── adapter_manager.py           # AdapterManager — MCP adapter lifecycle
 │   │   ├── agent_profiles.py            # build_agent_profiles() — 4 profiles
 │   │   ├── api.py                       # KernelAPI — submit(text) public entry point
+│   │   ├── clipboard_guard.py           # ClipboardGuard — saves/restores clipboard around input-automation ops
 │   │   ├── coding_gate.py               # CodingGate — LLM-based stop-coding classification
 │   │   ├── coding_gate_prompt.py        # Coding-specific prompt for CodingGate
 │   │   ├── coding_mode.py               # AdapterCodingMode — active coding state
@@ -1567,4 +1568,9 @@ The input-automation driver reuses the existing `gnome.*` primitives (`press_key
   applied to the model and the editor in lockstep. Manual edits made by the user during a
   session are **not detected** — they would cause the model to drift from the editor. The
   full-replace strategy (re-pasting `EditOperation.full_buffer`) is the resync / recovery
-  path and is what `FallbackEditStrategy` uses when a line-anchored apply fails.
+  path. Under the input-automation driver (fire-and-forget GUI automation, no feedback
+  channel) drift cannot be detected automatically, so resync is user-initiated;
+  feedback-capable drivers (future `VSCodeEditorDriver`) can trigger it automatically.
+- The input-automation driver uses the system clipboard for `Ctrl+C` / `Ctrl+V`, so it
+  saves and restores the user's clipboard around every operation (`ClipboardGuard`) to
+  avoid clobbering clipboard data the user was holding.
