@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from tusk.kernel.agent_backends import AgentBackend, AgentRequest, AgentResult
 from tusk.kernel.command_mode import CommandMode
@@ -6,11 +6,11 @@ from tusk.kernel.command_mode import CommandMode
 
 @dataclass
 class RecordingBackend(AgentBackend):
-    request: AgentRequest | None = None
+    requests: list[AgentRequest] = field(default_factory=list)
 
     def run(self, request: AgentRequest) -> AgentResult:
-        self.request = request
-        return AgentResult(True, "Done.")
+        self.requests.append(request)
+        return AgentResult(True, "Done.", "next-session")
 
 
 class NullLogPrinter:
@@ -21,6 +21,14 @@ class NullLogPrinter:
 def test_command_mode_sends_command_agent_request() -> None:
     backend = RecordingBackend()
     response = CommandMode(backend, NullLogPrinter()).process_command("open browser")
-    assert backend.request == AgentRequest(user_text="open browser", mode="command")
+    assert backend.requests[0] == AgentRequest(user_text="open browser", mode="command")
     assert response.handled is True
     assert response.reply == "Done."
+
+
+def test_command_mode_propagates_backend_session_id() -> None:
+    backend = RecordingBackend()
+    command_mode = CommandMode(backend, NullLogPrinter())
+    command_mode.process_command("open browser")
+    command_mode.process_command("close browser")
+    assert backend.requests[1] == AgentRequest("close browser", "command", "next-session")
