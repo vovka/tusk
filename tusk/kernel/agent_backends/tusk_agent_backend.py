@@ -8,6 +8,8 @@ __all__ = ["TuskAgentBackend"]
 
 class TuskAgentBackend(AgentBackend):
     def __init__(self, agent: Agent) -> None:
+        if agent is None:
+            raise ValueError("agent cannot be None")
         self._agent = agent
 
     @property
@@ -19,6 +21,8 @@ class TuskAgentBackend(AgentBackend):
         return False
 
     def run(self, request: AgentRequest) -> AgentResult:
+        if request is None:
+            raise ValueError("request cannot be None")
         reply = self._agent.process_command(request.user_text)
-        metadata = {"backend": self.name, "mode": request.mode}
+        metadata = {**request.metadata, "backend": self.name, "mode": request.mode}
         return AgentResult(True, reply, request.session_id, metadata)

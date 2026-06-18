@@ -15,7 +15,7 @@ class AgentResult:
 
     def __post_init__(self) -> None:
         status = self.status or _status_from_handled(self.handled)
-        final_text = self.final_text or self.reply
+        final_text = self.final_text or self.reply or ""
         object.__setattr__(self, "status", status)
         object.__setattr__(self, "final_text", final_text)
 
