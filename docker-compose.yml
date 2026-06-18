@@ -5,12 +5,14 @@ services:
       - .env
     environment:
       DISPLAY: ${DISPLAY:-:0}
+      XAUTHORITY: /root/.Xauthority
       PULSE_SERVER: unix:/run/user/1000/pulse/native
       PYTHONUNBUFFERED: "1"
       DBUS_SESSION_BUS_ADDRESS: unix:path=/run/user/1000/bus
       SHOW_LOGS: ${SHOW_LOGS:-}
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix
+      - ${XAUTHORITY:-~/.Xauthority}:/root/.Xauthority:ro
       - /run/user/1000/pulse/native:/run/user/1000/pulse/native
       - ~/.cache/whisper:/root/.cache/whisper
       - /run/user/1000/bus:/run/user/1000/bus

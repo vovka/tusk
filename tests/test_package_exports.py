@@ -30,6 +30,7 @@ def test_shared_layer_exports_present() -> None:
     assert "logging" in shared.__all__
     assert "schemas" in shared.__all__
     assert "stt" in shared.__all__
+    assert "tts" in shared.__all__
     assert "Config" in config.__all__
     assert "LLMProxy" in llm.__all__
     assert "LLMProvider" in llm_interfaces.__all__
@@ -46,6 +47,7 @@ def test_shared_nested_exports_present() -> None:
 def test_provider_exports_present() -> None:
     assert "llm" in providers.__all__
     assert "stt" in providers.__all__
+    assert "tts" in providers.__all__
     assert "ConfigurableLLMFactory" in llm_providers.__all__
     assert "GroqSTT" in stt_providers.__all__
 

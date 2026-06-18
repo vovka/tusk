@@ -19,6 +19,7 @@ class Config:
     audio_sample_rate: int
     audio_frame_duration_ms: int
     vad_aggressiveness: int
+    tts_enabled: bool
     follow_up_timeout_seconds: float
     max_follow_up_timeout_seconds: float
     gate_recovery_window_seconds: float

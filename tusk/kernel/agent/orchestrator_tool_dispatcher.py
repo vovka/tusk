@@ -4,6 +4,7 @@ from tusk.shared.schemas.tool_call import ToolCall
 from tusk.shared.schemas.tool_result import ToolResult
 from tusk.kernel.tool_registry import ToolRegistry
 from tusk.kernel.agent.agent_tool_catalog import AgentToolCatalog
+from tusk.kernel.agent.simple_schema_validator import SimpleSchemaValidator
 from tusk.kernel.agent.tool_sequence_executor import ToolSequenceExecutor
 from tusk.shared.schemas.tool_sequence_plan import ToolSequencePlan
 
@@ -11,10 +12,11 @@ __all__ = ["OrchestratorToolDispatcher"]
 
 
 class OrchestratorToolDispatcher:
-    def __init__(self, tool_registry: ToolRegistry, catalog: AgentToolCatalog, sequence_executor: ToolSequenceExecutor) -> None:
+    def __init__(self, tool_registry: ToolRegistry, catalog: AgentToolCatalog, sequence_executor: ToolSequenceExecutor, validator: SimpleSchemaValidator | None = None) -> None:
         self._registry = tool_registry
         self._catalog = catalog
         self._sequence = sequence_executor
+        self._validator = validator or SimpleSchemaValidator()
 
     def dispatch(
         self,
@@ -42,6 +44,10 @@ class OrchestratorToolDispatcher:
 
     def _real_tool(self, tool_call: ToolCall) -> ToolResult:
         try:
-            return self._registry.get(tool_call.tool_name).execute(tool_call.parameters)
+            tool = self._registry.get(tool_call.tool_name)
         except KeyError:
             return ToolResult(False, f"unknown tool: {tool_call.tool_name}")
+        error = self._validator.validate(tool.input_schema, tool_call.parameters)
+        if error is not None:
+            return ToolResult(False, f"invalid arguments for {tool_call.tool_name}: {error}")
+        return tool.execute(tool_call.parameters)

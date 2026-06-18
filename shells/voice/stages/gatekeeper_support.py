@@ -14,8 +14,11 @@ __all__ = [
     "log_recovery",
     "normalize_recovery",
     "recovered_dispatch",
+    "recovery_worthwhile",
     "to_utterance",
 ]
+
+_REFERENCE_CUES = frozenset({"that", "those", "this", "these", "previous", "last", "earlier", "before", "again", "instead", "actually", "meant", "one", "it", "them", "prior", "recent", "other", "no", "yes", "yeah"})
 
 PRIMARY_SCHEMA = {
     "type": "object",
@@ -49,6 +52,17 @@ def fallback_dispatch(result: GateResult, utterance: Utterance, wake_word: bool)
 def has_wake_word(text: str) -> bool:
     words = {part.strip(".,!?") for part in text.casefold().split()}
     return bool(words & {"tusk", "task"})
+
+
+def recovery_worthwhile(utterance: Utterance, primary: GateResult, candidates: list[BufferedUtterance]) -> bool:
+    # ponytail: skip the recovery LLM call for clearly non-referential ambient chatter.
+    # Ceiling: a cue-less, wake-word-less correction classified ambient is dropped, not recovered.
+    if not candidates:
+        return False
+    if primary.metadata.get("classification") != "ambient" or has_wake_word(utterance.text):
+        return True
+    words = {part.strip(".,!?") for part in utterance.text.casefold().split()}
+    return bool(words & _REFERENCE_CUES)
 
 
 def log_gate_result(log: LogPrinter, result: GateResult, reason: str) -> None:

@@ -50,7 +50,8 @@ def _stub_groq() -> None:
             msg = SimpleNamespace(content='{"tool":"done"}')
             self.chat = SimpleNamespace(completions=SimpleNamespace(create=lambda **k: SimpleNamespace(choices=[SimpleNamespace(message=msg)])))
             trans = SimpleNamespace(create=lambda **k: SimpleNamespace(text="hello"))
-            self.audio = SimpleNamespace(transcriptions=trans)
+            speech = SimpleNamespace(create=lambda **k: SimpleNamespace(read=lambda: b"WAVDATA"))
+            self.audio = SimpleNamespace(transcriptions=trans, speech=speech)
     mod = types.ModuleType("groq")
     mod.Groq = Groq
     _stub_module("groq", mod)

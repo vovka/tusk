@@ -61,3 +61,14 @@ def test_config_defaults_gate_recovery_candidate_limit(monkeypatch) -> None:
     monkeypatch.setenv("GROQ_API_KEY", "test-key")
     monkeypatch.delenv("GATE_RECOVERY_CANDIDATE_LIMIT", raising=False)
     assert ConfigFactory().build().gate_recovery_candidate_limit == 6
+
+
+def test_tts_enabled_by_default(monkeypatch) -> None:
+    monkeypatch.setenv("GROQ_API_KEY", "test-key")
+    assert ConfigFactory().build().tts_enabled is True
+
+
+def test_tts_can_be_disabled(monkeypatch) -> None:
+    monkeypatch.setenv("GROQ_API_KEY", "test-key")
+    monkeypatch.setenv("TUSK_TTS", "off")
+    assert ConfigFactory().build().tts_enabled is False

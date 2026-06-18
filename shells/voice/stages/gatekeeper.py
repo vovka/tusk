@@ -6,7 +6,7 @@ from shells.voice.interfaces.gatekeeper import Gatekeeper
 from shells.voice.recovery_decision import RecoveryDecision
 from shells.voice.stages.command_gate_prompt import build_command_gate_prompt
 from shells.voice.stages.gatekeeper_parser import parse_gate_result, parse_recovery_decision
-from shells.voice.stages.gatekeeper_support import PRIMARY_SCHEMA, RECOVERY_SCHEMA, fallback_dispatch, has_wake_word, log_gate_result, log_recovery, normalize_recovery, recovered_dispatch, to_utterance
+from shells.voice.stages.gatekeeper_support import PRIMARY_SCHEMA, RECOVERY_SCHEMA, fallback_dispatch, has_wake_word, log_gate_result, log_recovery, normalize_recovery, recovered_dispatch, recovery_worthwhile, to_utterance
 from shells.voice.stages.recent_context_formatter import RecentContextFormatter
 from shells.voice.stages.recovery_gate_prompt import build_recovery_gate_prompt
 from tusk.shared.llm.interfaces.llm_provider import LLMProvider
@@ -59,7 +59,7 @@ class LLMGatekeeper(Gatekeeper):
         primary: GateResult,
         candidates: list[BufferedUtterance],
     ) -> GateDispatch:
-        recovery = self._recover(utterance, recent, candidates)
+        recovery = self._recover(utterance, recent, primary, candidates)
         if recovery.action == "recover":
             return self._forward(recovered_dispatch(candidates, recovery))
         if recovery.action == "ambiguous":
@@ -67,8 +67,8 @@ class LLMGatekeeper(Gatekeeper):
         dispatch = fallback_dispatch(primary, utterance, has_wake_word(utterance.text))
         return self._forward(dispatch) if dispatch.action == "forward_current" else dispatch
 
-    def _recover(self, utterance: Utterance, recent: list[Utterance], candidates: list[BufferedUtterance]) -> RecoveryDecision:
-        if not candidates:
+    def _recover(self, utterance: Utterance, recent: list[Utterance], primary: GateResult, candidates: list[BufferedUtterance]) -> RecoveryDecision:
+        if not recovery_worthwhile(utterance, primary, candidates):
             return RecoveryDecision("none")
         prompt = build_recovery_gate_prompt(self._formatter.format(recent), candidates)
         raw = self._complete(prompt, utterance.text, "command_gate_recovery", RECOVERY_SCHEMA)
@@ -82,7 +82,7 @@ class LLMGatekeeper(Gatekeeper):
             log_gate_result(self._log, result, reason)
             return result
         except Exception as exc:
-            self._log.log("GATEKEEPER", f"parse error: {exc}", "gatekeeper")
+            self._log.log("ERROR", f"gatekeeper parse error: {exc}")
             return GateResult(False, "", 0.0)
 
     def _parsed_recovery(self, raw: str, candidates: list[BufferedUtterance]) -> RecoveryDecision:
@@ -92,7 +92,7 @@ class LLMGatekeeper(Gatekeeper):
             log_recovery(self._log, item)
             return item
         except Exception as exc:
-            self._log.log("GATERECOVERY", f"parse error: {exc}", "gate-recovery")
+            self._log.log("ERROR", f"gate recovery parse error: {exc}")
             return RecoveryDecision("none", reason="parse error")
 
     def _complete(self, prompt: str, text: str, name: str, schema: dict) -> str:
@@ -103,7 +103,7 @@ class LLMGatekeeper(Gatekeeper):
         try:
             return self._llm.complete(prompt, text, 256)
         except Exception as exc:
-            self._log.log("GATEKEEPER", f"{name} fallback completion failed: {exc}", "gatekeeper")
+            self._log.log("ERROR", f"{name} fallback completion failed: {exc}")
             return ""
 
     def _forward(self, dispatch: GateDispatch) -> GateDispatch:

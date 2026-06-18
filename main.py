@@ -15,6 +15,7 @@ from tusk.kernel.dictation_gate import DictationGate
 from tusk.kernel.tool_runtime import ToolRuntime
 from tusk.providers.llm import ConfigurableLLMFactory
 from tusk.providers.stt import GroqSTT
+from tusk.providers.tts import GroqTTS
 from tusk.shared.config import Config, StartupOptions
 from tusk.shared.llm import LLMProxy, LLMRegistry
 from tusk.shared.logging import ColorLogPrinter
@@ -90,7 +91,8 @@ def _load_shell(name: str, shells_dir: Path, config: Config, kernel: KernelAPI, 
     if name != "voice":
         return shell_class()
     gatekeeper = _voice_gatekeeper(config, kernel, log)
-    return shell_class(config, log, stt_engine=GroqSTT(config.groq_api_key), gatekeeper=gatekeeper)
+    tts_engine = GroqTTS(config.groq_api_key) if config.tts_enabled else None
+    return shell_class(config, log, stt_engine=GroqSTT(config.groq_api_key), gatekeeper=gatekeeper, tts_engine=tts_engine)
 
 
 def _voice_gatekeeper(config: Config, kernel: KernelAPI, log: ColorLogPrinter) -> GatekeeperSlot:
