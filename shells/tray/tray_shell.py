@@ -30,6 +30,7 @@ class TrayShell:
         backend = self._resolve_backend()
         if backend is not None:
             self._attach(backend)
+            self._prime_icon(backend)
             self._run_backend(backend)
         self._shutdown_event.wait()
 
@@ -50,9 +51,19 @@ class TrayShell:
             return None
 
     def _attach(self, backend: object) -> None:
-        resolver = StatusIconResolver(self._config.tray_icon_theme)
-        sink = TrayStatusSink(backend, resolver, TrayMenuBuilder(), self._actions(), self._config.tray_show_last_activity, self._marshal)
+        sink = TrayStatusSink(
+            backend, self._resolver(), TrayMenuBuilder(), self._actions(),
+            self._config.tray_show_last_activity, self._marshal,
+        )
         self._reporter.attach_sink(sink)
+
+    def _resolver(self) -> StatusIconResolver:
+        return StatusIconResolver(self._config.tray_icon_theme)
+
+    def _prime_icon(self, backend: object) -> None:
+        icon = self._resolver().resolve(self._reporter.status)
+        if icon:
+            backend.set_icon(icon)
 
     def _marshal(self, render: object) -> None:
         try:

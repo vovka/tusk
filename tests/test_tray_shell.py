@@ -40,6 +40,19 @@ def test_pause_menu_item_is_wired_to_pipeline_control() -> None:
     assert control.calls == ["pause"]
 
 
+def test_icon_is_primed_before_run_when_render_is_deferred() -> None:
+    state = types.SimpleNamespace(icon=None, icon_at_run=None)
+    backend = _backend()
+    backend.set_icon = lambda value: setattr(state, "icon", value)
+    backend.run = lambda: setattr(state, "icon_at_run", state.icon)
+    event = threading.Event()
+    event.set()
+    shell = TrayShell(StatusReporterHub(NullStatusSink()), _control(), event, _config(), backend)
+    shell._marshal = lambda render: None  # GLib defers the first render until after run()
+    shell.start(lambda text: None)
+    assert state.icon_at_run is not None
+
+
 def test_gui_crash_degrades_to_headless_without_raising() -> None:
     backend = _backend()
     backend.run = _raise
