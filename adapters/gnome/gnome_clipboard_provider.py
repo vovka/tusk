@@ -11,11 +11,17 @@ class GnomeClipboardProvider:
         self._wayland = self._is_wayland()
 
     def read(self) -> str:
-        result = subprocess.run(self._read_command(), capture_output=True, text=True, check=False)
+        try:
+            result = subprocess.run(self._read_command(), capture_output=True, text=True, check=False)
+        except OSError:
+            return ""
         return result.stdout
 
     def write(self, text: str) -> None:
-        subprocess.run(self._write_command(), input=text, text=True, check=False)
+        try:
+            subprocess.run(self._write_command(), input=text, text=True, check=False)
+        except OSError:
+            pass
 
     def _read_command(self) -> list[str]:
         return ["wl-paste", "--no-newline"] if self._wayland else ["xclip", *_XCLIP_ARGS, "-o"]

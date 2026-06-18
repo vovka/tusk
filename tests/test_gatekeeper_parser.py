@@ -40,6 +40,11 @@ def test_parses_arguments_wrapped_json() -> None:
     assert result.metadata["classification"] == "command"
 
 
+def test_parses_json_after_non_json_braces() -> None:
+    result, _ = parse_gate_result(f"Consider {{x}} then {_PAYLOAD}")
+    assert result.cleaned_command == "open firefox"
+
+
 def test_parses_recovery_decision_embedded_in_prose() -> None:
     decision = parse_recovery_decision('Decision: {"action": "recover", "candidate_id": "u2", "reason": "match"} done.')
     assert decision.action == "recover"

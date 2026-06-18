@@ -24,6 +24,16 @@ def test_uses_wl_clipboard_when_wayland_display_set(monkeypatch) -> None:
     assert _write_argv() == ["wl-copy"]
 
 
+def test_read_returns_empty_when_clipboard_tool_missing(monkeypatch) -> None:
+    with patch("adapters.gnome.gnome_clipboard_provider.subprocess.run", side_effect=FileNotFoundError):
+        assert GnomeClipboardProvider().read() == ""
+
+
+def test_write_survives_missing_clipboard_tool(monkeypatch) -> None:
+    with patch("adapters.gnome.gnome_clipboard_provider.subprocess.run", side_effect=FileNotFoundError):
+        GnomeClipboardProvider().write("hi")
+
+
 def _read_argv() -> list[str]:
     captured: list[str] = []
     with patch("adapters.gnome.gnome_clipboard_provider.subprocess.run", side_effect=_capture(captured)):

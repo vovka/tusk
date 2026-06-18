@@ -30,10 +30,13 @@ def _loaded(text: str) -> dict | list:
 
 def _first_json_object(text: str) -> dict:
     start = text.find("{")
-    if start < 0:
-        raise ValueError(f"no JSON object in gate response: {text[:80]!r}")
-    value, _ = json.JSONDecoder().raw_decode(text[start:])
-    return value
+    while start >= 0:
+        try:
+            value, _ = json.JSONDecoder().raw_decode(text[start:])
+            return value
+        except json.JSONDecodeError:
+            start = text.find("{", start + 1)
+    raise ValueError(f"no JSON object in gate response: {text[:80]!r}")
 
 
 def _unwrap(data: dict | list) -> dict:

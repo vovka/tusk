@@ -1,3 +1,5 @@
+import types
+
 from tusk.shared.llm import LLMRetryPolicy
 
 
@@ -5,6 +7,20 @@ class _StatusCodeError(Exception):
     def __init__(self, message: str, status_code: int) -> None:
         super().__init__(message)
         self.status_code = status_code
+
+
+def _response_error(message: str, status_code: int) -> Exception:
+    exc = Exception(message)
+    exc.response = types.SimpleNamespace(status_code=status_code)
+    return exc
+
+
+def test_retries_when_status_code_nested_in_response() -> None:
+    assert LLMRetryPolicy().should_retry(_response_error("upstream broke", 503)) is True
+
+
+def test_does_not_retry_client_error_nested_in_response() -> None:
+    assert LLMRetryPolicy().should_retry(_response_error("missing", 404)) is False
 
 
 def test_retries_when_status_code_is_rate_limited() -> None:

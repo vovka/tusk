@@ -12,22 +12,21 @@ class MCPStdioTransport:
         self._process = subprocess.Popen(command, cwd=cwd, env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         self._stderr_lock = threading.Lock()
         self._stderr_lines: deque[str] = deque(maxlen=50)
-        self._stderr_thread = threading.Thread(target=self._drain_stderr, daemon=True)
-        self._stderr_thread.start()
+        self._stdout_queue: "queue.Queue[str]" = queue.Queue()
+        self._stderr_thread = self._spawn(self._drain_stderr)
+        self._spawn(self._drain_stdout)
 
     def write_line(self, line: str) -> None:
+        # ponytail: drop any late reply to a timed-out request so it can't be mistaken
+        # for the response to this one — the protocol is strictly request/response.
         assert self._process.stdin is not None
+        self._discard_pending()
         self._process.stdin.write(line + "\n")
         self._process.stdin.flush()
 
     def read_line(self) -> str | None:
-        # ponytail: readline on a daemon thread so the timeout also covers a server that
-        # writes a partial line and then stalls; the leaked reader ends on process exit.
-        assert self._process.stdout is not None
-        line: "queue.Queue[str]" = queue.Queue(maxsize=1)
-        threading.Thread(target=lambda: line.put(self._process.stdout.readline()), daemon=True).start()
         try:
-            return line.get(timeout=self._timeout)
+            return self._stdout_queue.get(timeout=self._timeout)
         except queue.Empty:
             return None
 
@@ -45,12 +44,32 @@ class MCPStdioTransport:
         self._process.terminate()
         self._wait_or_kill()
 
+    def _spawn(self, target: object) -> threading.Thread:
+        thread = threading.Thread(target=target, daemon=True)
+        thread.start()
+        return thread
+
+    def _discard_pending(self) -> None:
+        while True:
+            try:
+                self._stdout_queue.get_nowait()
+            except queue.Empty:
+                return
+
     def _wait_or_kill(self) -> None:
         try:
             self._process.wait(timeout=1.0)
         except subprocess.TimeoutExpired:
             self._process.kill()
             self._process.wait()
+
+    def _drain_stdout(self) -> None:
+        # ponytail: one reader keeps lines ordered and bounds threads to one per process,
+        # instead of spawning (and leaking) a reader on every request.
+        assert self._process.stdout is not None
+        for line in self._process.stdout:
+            self._stdout_queue.put(line)
+        self._stdout_queue.put("")
 
     def _drain_stderr(self) -> None:
         assert self._process.stderr is not None

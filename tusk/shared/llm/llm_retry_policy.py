@@ -24,8 +24,8 @@ class LLMRetryPolicy:
             return False
         if isinstance(exc, (ConnectionError, TimeoutError)):
             return True
-        status_code = getattr(exc, "status_code", None)
-        if isinstance(status_code, int):
+        status_code = self._status_code(exc)
+        if status_code is not None:
             return status_code == 429 or status_code >= 500
         return any(term in str(exc).lower() for term in _RETRY_TERMS)
 
@@ -33,4 +33,10 @@ class LLMRetryPolicy:
         text = str(exc).lower()
         if any(term in text for term in _BLOCKED_TERMS):
             return True
-        return getattr(exc, "status_code", None) in _BLOCKED_STATUS_CODES
+        return self._status_code(exc) in _BLOCKED_STATUS_CODES
+
+    def _status_code(self, exc: Exception) -> int | None:
+        code = getattr(exc, "status_code", None)
+        if code is None:
+            code = getattr(getattr(exc, "response", None), "status_code", None)
+        return code if isinstance(code, int) else None
