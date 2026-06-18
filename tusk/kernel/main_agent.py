@@ -19,8 +19,7 @@ class MainAgent(AgentBackend):
         return BackendAgentResult(True, reply, self._session_id)
 
     def _set_session_id(self, session_id: str) -> None:
-        if session_id:
-            self._session_id = session_id
+        self._session_id = session_id
 
     def process_command(self, command: str) -> str:
         result = self._orchestrator.run(AgentRunRequest(command, "conversation", self._session_id))
