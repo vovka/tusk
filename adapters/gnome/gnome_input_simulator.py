@@ -8,7 +8,7 @@ _BUTTON_MAP = {"left": 1, "right": 3, "middle": 2}
 class GnomeInputSimulator:
     def press_keys(self, keys: str) -> None:
         normalized = self._normalize_keys(keys)
-        result = subprocess.run(["xdotool", "key", "--clearmodifiers", "--delay", "0", normalized], check=False)
+        result = subprocess.run(["xdotool", "key", "--clearmodifiers", "--delay", "0", normalized], check=False, capture_output=True, text=True)
         self._raise_on_failure(result, normalized)
 
     def _normalize_keys(self, keys: str) -> str:
@@ -36,7 +36,9 @@ class GnomeInputSimulator:
 
     def _raise_on_failure(self, result: object, keys: str) -> None:
         if getattr(result, "returncode", 0) != 0:
-            raise RuntimeError(f"failed to press keys: {keys}")
+            stderr = getattr(result, "stderr", "").strip()
+            suffix = f": {stderr}" if stderr else ""
+            raise RuntimeError(f"failed to press keys: {keys}{suffix}")
 
     def type_text(self, text: str) -> None:
         result = subprocess.run(
