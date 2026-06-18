@@ -18,7 +18,10 @@ class WavConcatenator:
     def _open_writer(self, buffer: io.BytesIO, sample: bytes) -> wave.Wave_write:
         writer = wave.open(buffer, "wb")
         with wave.open(io.BytesIO(sample), "rb") as reader:
-            writer.setparams(reader.getparams())
+            writer.setnchannels(reader.getnchannels())
+            writer.setsampwidth(reader.getsampwidth())
+            writer.setframerate(reader.getframerate())
+            writer.setcomptype(reader.getcomptype(), reader.getcompname())
         return writer
 
     def _frames(self, clip: bytes) -> bytes:

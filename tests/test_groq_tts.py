@@ -30,6 +30,14 @@ def test_groq_tts_chunks_long_input_under_orpheus_limit() -> None:
     assert _wav_frames(result) == b"\x01\x02" * len(inputs)
 
 
+def test_groq_tts_concatenates_wavs_without_copying_large_frame_count() -> None:
+    inputs: list[str] = []
+    clip = _wav_bytes_with_declared_frames(b"\x01\x02", 0xFFFFFFFF)
+    with patch("tusk.providers.tts.groq_tts.Groq", return_value=_chunk_client(inputs, clip)):
+        result = GroqTTS("test-key").synthesize("word " * 100)
+    assert _wav_frames(result) == b"\x01\x02" * len(inputs)
+
+
 def _recording_client(captured: dict[str, object]) -> object:
     def create(**kwargs: object) -> object:
         captured.update(kwargs)
@@ -59,3 +67,10 @@ def _wav_bytes(frames: bytes) -> bytes:
 def _wav_frames(data: bytes) -> bytes:
     with wave.open(io.BytesIO(data), "rb") as reader:
         return reader.readframes(reader.getnframes())
+
+
+def _wav_bytes_with_declared_frames(frames: bytes, frame_count: int) -> bytes:
+    data = bytearray(_wav_bytes(frames))
+    data[40:44] = (frame_count * 2 & 0xFFFFFFFF).to_bytes(4, "little")
+    data[4:8] = (36 + int.from_bytes(data[40:44], "little") & 0xFFFFFFFF).to_bytes(4, "little")
+    return bytes(data)
