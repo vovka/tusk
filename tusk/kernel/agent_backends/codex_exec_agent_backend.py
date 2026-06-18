@@ -1,4 +1,9 @@
-import json, os, shlex, subprocess, time; from pathlib import Path
+import json
+import os
+import shlex
+import subprocess
+import time
+from pathlib import Path
 
 from tusk.kernel.agent_backends.agent_backend import AgentBackend
 from tusk.kernel.agent_backends.agent_request import AgentRequest
@@ -41,9 +46,10 @@ class CodexExecAgentBackend(AgentBackend):
         return self._completed(request, completed, started_at)
 
     def _execute(self, request: AgentRequest) -> subprocess.CompletedProcess:
+        request_env = getattr(request, "environment", None) or {}
         return subprocess.run(
             self._command(request.user_text), cwd=self._cwd(request), timeout=self._timeout(request),
-            env={**os.environ, **getattr(request, "environment", {})}, capture_output=True, text=True,
+            env={**os.environ, **request_env}, capture_output=True, text=True,
         )
 
     def _command(self, prompt: str) -> list[str]:
@@ -99,7 +105,9 @@ class CodexExecAgentBackend(AgentBackend):
 
     def _timeout(self, request: AgentRequest) -> object:
         timeout = getattr(request, "timeout_seconds", None)
-        return timeout or getattr(self._config, "codex_exec_timeout_seconds")
+        if timeout is not None:
+            return timeout
+        return getattr(self._config, "codex_exec_timeout_seconds")
 
     def _value(self, name: str) -> str:
         return str(getattr(self._config, name, "")).strip()
@@ -109,7 +117,9 @@ class CodexExecAgentBackend(AgentBackend):
         return [flag, value] if value else []
 
     def _extra_args(self) -> list[str]:
-        configured = getattr(self._config, "codex_exec_extra_args", ())
+        configured = getattr(self._config, "codex_exec_extra_args", None)
+        if not configured:
+            return []
         return shlex.split(configured) if isinstance(configured, str) else list(configured)
 
     def _exit_message(self, completed: subprocess.CompletedProcess) -> str:
