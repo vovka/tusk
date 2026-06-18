@@ -30,6 +30,15 @@ class Config:
     agent_session_log_dir: str
     tray_icon_theme: str
     tray_show_last_activity: bool
+    agent_backend: str
+    codex_exec_binary: str
+    codex_exec_model: str
+    codex_exec_timeout_seconds: int
+    codex_exec_workdir: str
+    codex_exec_sandbox_mode: str
+    codex_exec_extra_args: tuple[str, ...]
+    codex_exec_output_schema_path: str
+    codex_exec_log_raw_events: bool
 
     @staticmethod
     def from_env() -> "Config":
