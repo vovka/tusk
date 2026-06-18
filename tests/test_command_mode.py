@@ -1,21 +1,7 @@
-from dataclasses import dataclass, field
-
-from tusk.kernel.agent_backends import AgentBackend, AgentRequest, AgentResult
+from tusk.kernel.agent_backends import AgentRequest
 from tusk.kernel.command_mode import CommandMode
-
-
-@dataclass
-class RecordingBackend(AgentBackend):
-    requests: list[AgentRequest] = field(default_factory=list)
-
-    def run(self, request: AgentRequest) -> AgentResult:
-        self.requests.append(request)
-        return AgentResult(True, "Done.", "next-session")
-
-
-class NullLogPrinter:
-    def log(self, source: str, message: str, style: str) -> None:
-        pass
+from tests.null_log_printer import NullLogPrinter
+from tests.recording_backend import RecordingBackend
 
 
 def test_command_mode_sends_command_agent_request() -> None:

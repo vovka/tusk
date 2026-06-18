@@ -22,3 +22,12 @@ def test_main_agent_run_uses_request_session_id() -> None:
     result = MainAgent(orchestrator, history).run(request)
     assert orchestrator.requests[0].session_id == "input-session"
     assert result.session_id == "result-session"
+
+
+def test_main_agent_run_clears_request_session_id() -> None:
+    orchestrator = RecordingOrchestrator()
+    history = types.SimpleNamespace(append=lambda message: None)
+    agent = MainAgent(orchestrator, history)
+    agent.run(AgentRequest("open browser", "command", "old-session"))
+    agent.run(AgentRequest("close browser", "command", ""))
+    assert orchestrator.requests[1].session_id == ""
