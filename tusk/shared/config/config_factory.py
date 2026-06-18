@@ -1,4 +1,5 @@
 import os
+import shlex
 
 from tusk.shared.config.config import Config
 from tusk.shared.schemas.llm_slot_config import LLMSlotConfig
@@ -21,8 +22,14 @@ class ConfigFactory:
     def _float(self, name: str, default: str) -> float:
         return float(os.environ.get(name, default))
 
+    def _bool(self, name: str, default: str) -> bool:
+        return os.environ.get(name, default).lower() in ("true", "1", "yes", "on")
+
     def _shells(self, value: str) -> list[str]:
         return [item.strip() for item in value.split(",") if item.strip()]
+
+    def _items(self, value: str) -> tuple[str, ...]:
+        return tuple(shlex.split(value))
 
     def _base_values(self, shells: str) -> dict:
         return {**self._llm_values(), **self._runtime_values(shells)}
@@ -49,7 +56,11 @@ class ConfigFactory:
         }
 
     def _runtime_values(self, shells: str) -> dict:
-        return {**self._audio_values(), **self._environment_values(shells)}
+        return {
+            **self._audio_values(),
+            **self._environment_values(shells),
+            **self._codex_exec_values(),
+        }
 
     def _audio_values(self) -> dict:
         return {
@@ -71,3 +82,27 @@ class ConfigFactory:
             "conversation_log_dir": os.environ.get("TUSK_CONVERSATION_LOG_DIR", ".tusk_runtime/conversations"),
             "agent_session_log_dir": os.environ.get("TUSK_AGENT_SESSION_LOG_DIR", ".tusk_runtime/agent_sessions"),
         }
+
+    def _codex_exec_values(self) -> dict:
+        return {**self._codex_exec_process_values(), **self._codex_exec_output_values()}
+
+    def _codex_exec_process_values(self) -> dict:
+        return {
+            "agent_backend": os.environ.get("AGENT_BACKEND", "tusk"),
+            "codex_exec_binary": os.environ.get("CODEX_EXEC_BINARY", "codex"),
+            "codex_exec_model": os.environ.get("CODEX_EXEC_MODEL", ""),
+            "codex_exec_timeout_seconds": self._int("CODEX_EXEC_TIMEOUT_SECONDS", "60"),
+            "codex_exec_workdir": os.environ.get("CODEX_EXEC_WORKDIR", ""),
+            "codex_exec_sandbox_mode": os.environ.get("CODEX_EXEC_SANDBOX_MODE", "read-only"),
+            "codex_exec_extra_args": self._items(os.environ.get("CODEX_EXEC_EXTRA_ARGS", "")),
+        }
+
+    def _codex_exec_output_values(self) -> dict:
+        return {
+            "codex_exec_output_schema_path": os.environ.get("CODEX_EXEC_OUTPUT_SCHEMA_PATH", self._schema_path()),
+            "codex_exec_log_raw_events": self._bool("CODEX_EXEC_LOG_RAW_EVENTS", "false"),
+        }
+
+    def _schema_path(self) -> str:
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        return os.path.join(base_dir, "schemas", "codex_exec_output_schema.json")
