@@ -28,9 +28,10 @@ class AgentBackendFactory:
         raise ValueError(f"Unknown agent backend '{backend_name}'")
 
     def _backend_name(self) -> str:
-        return str(getattr(self._config, "agent_backend", "tusk"))
+        return str(getattr(self._config, "agent_backend", "tusk")).strip().lower()
 
     def _selected(self, backend: AgentBackend) -> AgentBackend:
-        message = f"Selected agent backend: {backend.name}"
+        backend_name = getattr(backend, "name", "unknown")
+        message = f"Selected agent backend: {backend_name}"
         self._log_printer.log("agent_backend", message, "agent")
         return backend
