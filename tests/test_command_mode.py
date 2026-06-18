@@ -17,4 +17,8 @@ def test_command_mode_propagates_backend_session_id() -> None:
     command_mode = CommandMode(backend, NullLogPrinter())
     command_mode.process_command("open browser")
     command_mode.process_command("close browser")
-    assert backend.requests[1] == AgentRequest("close browser", "command", "next-session")
+    assert backend.requests[1] == AgentRequest(
+        user_text="close browser",
+        mode="command",
+        session_id="next-session",
+    )
