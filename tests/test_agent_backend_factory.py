@@ -1,32 +1,11 @@
 import pytest
 
+from tests.backend_config import BackendConfig
+from tests.recording_agent import RecordingAgent
+from tests.recording_log_printer import RecordingLogPrinter
 from tusk.kernel.agent_backends.agent_backend_factory import AgentBackendFactory
 from tusk.kernel.agent_backends.codex_exec_agent_backend import CodexExecAgentBackend
 from tusk.kernel.agent_backends.tusk_agent_backend import TuskAgentBackend
-
-
-class RecordingAgent:
-    def process_command(self, command: str) -> str:
-        return command
-
-
-class RecordingLogPrinter:
-    def __init__(self) -> None:
-        self.messages: list[tuple[str, str, str | None]] = []
-
-    def log(self, tag: str, message: str, group: str | None = None) -> None:
-        self.messages.append((tag, message, group))
-
-    def show_wait(self, label: str, group: str = "wait") -> None:
-        pass
-
-    def clear_wait(self) -> None:
-        pass
-
-
-class BackendConfig:
-    def __init__(self, agent_backend: str) -> None:
-        self.agent_backend = agent_backend
 
 
 def factory(agent_backend: str) -> tuple[AgentBackendFactory, RecordingLogPrinter]:
