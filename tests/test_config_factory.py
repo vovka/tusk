@@ -15,8 +15,8 @@ def set_codex_env(monkeypatch) -> None:
         "AGENT_BACKEND": "codex", "CODEX_EXEC_BINARY": "/usr/local/bin/codex",
         "CODEX_EXEC_MODEL": "gpt-5.5", "CODEX_EXEC_TIMEOUT_SECONDS": "120",
         "CODEX_EXEC_WORKDIR": "/workspace/project", "CODEX_EXEC_SANDBOX_MODE": "workspace-write",
-        "CODEX_EXEC_EXTRA_ARGS": "--json, --dangerously-bypass-approvals",
-        "CODEX_EXEC_OUTPUT_SCHEMA_PATH": "/tmp/schema.json", "CODEX_EXEC_LOG_RAW_EVENTS": "true",
+        "CODEX_EXEC_EXTRA_ARGS": "--json --message \"hello world\" --tags=key1=val1,key2=val2",
+        "CODEX_EXEC_OUTPUT_SCHEMA_PATH": "/tmp/schema.json", "CODEX_EXEC_LOG_RAW_EVENTS": "yes",
     }
     for name, value in values.items():
         monkeypatch.setenv(name, value)
@@ -102,7 +102,7 @@ def test_config_defaults_codex_exec_values(monkeypatch) -> None:
     assert codex_values(ConfigFactory().build()) == {
         "agent_backend": "tusk", "codex_exec_binary": "codex", "codex_exec_model": "",
         "codex_exec_timeout_seconds": 60, "codex_exec_workdir": "", "codex_exec_sandbox_mode": "read-only",
-        "codex_exec_extra_args": (), "codex_exec_output_schema_path": "tusk/shared/schemas/codex_exec_output_schema.json",
+        "codex_exec_extra_args": (), "codex_exec_output_schema_path": ConfigFactory()._schema_path(),
         "codex_exec_log_raw_events": False,
     }
 
@@ -114,6 +114,6 @@ def test_config_reads_codex_exec_values(monkeypatch) -> None:
         "agent_backend": "codex", "codex_exec_binary": "/usr/local/bin/codex", "codex_exec_model": "gpt-5.5",
         "codex_exec_timeout_seconds": 120, "codex_exec_workdir": "/workspace/project",
         "codex_exec_sandbox_mode": "workspace-write",
-        "codex_exec_extra_args": ("--json", "--dangerously-bypass-approvals"),
+        "codex_exec_extra_args": ("--json", "--message", "hello world", "--tags=key1=val1,key2=val2"),
         "codex_exec_output_schema_path": "/tmp/schema.json", "codex_exec_log_raw_events": True,
     }

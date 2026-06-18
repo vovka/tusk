@@ -1,5 +1,5 @@
 import os
-import re
+import shlex
 
 from tusk.shared.config.config import Config
 from tusk.shared.schemas.llm_slot_config import LLMSlotConfig
@@ -23,13 +23,13 @@ class ConfigFactory:
         return float(os.environ.get(name, default))
 
     def _bool(self, name: str, default: str) -> bool:
-        return os.environ.get(name, default).lower() == "true"
+        return os.environ.get(name, default).lower() in ("true", "1", "yes", "on")
 
     def _shells(self, value: str) -> list[str]:
         return [item.strip() for item in value.split(",") if item.strip()]
 
     def _items(self, value: str) -> tuple[str, ...]:
-        return tuple(item for item in re.split(r"[\s,]+", value.strip()) if item)
+        return tuple(shlex.split(value))
 
     def _base_values(self, shells: str) -> dict:
         return {**self._llm_values(), **self._runtime_values(shells)}
@@ -104,4 +104,5 @@ class ConfigFactory:
         }
 
     def _schema_path(self) -> str:
-        return "tusk/shared/schemas/codex_exec_output_schema.json"
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        return os.path.join(base_dir, "schemas", "codex_exec_output_schema.json")

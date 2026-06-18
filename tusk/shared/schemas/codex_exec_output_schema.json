@@ -5,12 +5,6 @@
   "properties": {
     "reply": {
       "type": "string"
-    },
-    "tool_calls": {
-      "type": "array",
-      "items": {
-        "type": "object"
-      }
     }
   },
   "required": [
