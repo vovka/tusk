@@ -1,11 +1,11 @@
 import json
 import os
-import shlex
 import subprocess
 import time
 from pathlib import Path
 
 from tusk.kernel.agent_backends.agent_backend import AgentBackend
+from tusk.kernel.agent_backends.codex_exec_command_builder import CodexExecCommandBuilder
 from tusk.kernel.agent_backends.agent_request import AgentRequest
 from tusk.kernel.agent_backends.agent_result import AgentResult
 from tusk.shared.logging.interfaces.log_printer import LogPrinter
@@ -20,6 +20,7 @@ class CodexExecAgentBackend(AgentBackend):
         if log_printer is None:
             raise ValueError("log_printer cannot be None")
         self._config = config
+        self._command_builder = CodexExecCommandBuilder(config)
         self._log_printer = log_printer
 
     @property
@@ -48,18 +49,9 @@ class CodexExecAgentBackend(AgentBackend):
     def _execute(self, request: AgentRequest) -> subprocess.CompletedProcess:
         request_env = getattr(request, "environment", None) or {}
         return subprocess.run(
-            self._command(request.user_text), cwd=self._cwd(request), timeout=self._timeout(request),
+            self._command_builder.build(request.user_text), cwd=self._cwd(request), timeout=self._timeout(request),
             env={**os.environ, **request_env}, capture_output=True, text=True,
         )
-
-    def _command(self, prompt: str) -> list[str]:
-        command = [self._value("codex_exec_binary"), "exec", "--json"]
-        command.extend(["--output-schema", str(Path(self._value("codex_exec_output_schema_path")))])
-        command.extend(self._optional_flag("--model", "codex_exec_model"))
-        command.extend(self._optional_flag("--sandbox", "codex_exec_sandbox_mode"))
-        command.extend(self._extra_args())
-        command.append(prompt)
-        return command
 
     def _completed(
         self, request: AgentRequest, completed: subprocess.CompletedProcess, started_at: float
@@ -100,27 +92,17 @@ class CodexExecAgentBackend(AgentBackend):
         return str(parsed.get("reply") or parsed.get("final_text") or "")
 
     def _cwd(self, request: AgentRequest) -> str | None:
-        directory = getattr(request, "working_directory", "") or self._value("codex_exec_workdir")
+        directory = getattr(request, "working_directory", "") or self._config_value("codex_exec_workdir")
         return str(Path(directory)) if directory else None
+
+    def _config_value(self, name: str) -> str:
+        return str(getattr(self._config, name, "")).strip()
 
     def _timeout(self, request: AgentRequest) -> object:
         timeout = getattr(request, "timeout_seconds", None)
         if timeout is not None:
             return timeout
         return getattr(self._config, "codex_exec_timeout_seconds")
-
-    def _value(self, name: str) -> str:
-        return str(getattr(self._config, name, "")).strip()
-
-    def _optional_flag(self, flag: str, name: str) -> list[str]:
-        value = self._value(name)
-        return [flag, value] if value else []
-
-    def _extra_args(self) -> list[str]:
-        configured = getattr(self._config, "codex_exec_extra_args", None)
-        if not configured:
-            return []
-        return shlex.split(configured) if isinstance(configured, str) else list(configured)
 
     def _exit_message(self, completed: subprocess.CompletedProcess) -> str:
         summary = str(completed.stderr or "").strip()[:300]
