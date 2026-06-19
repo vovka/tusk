@@ -8,6 +8,7 @@ from shells.voice.gatekeeper_slot import GatekeeperSlot
 from shells.voice.stages.dictation_gatekeeper import DictationGatekeeper
 from shells.voice.stages.gatekeeper import LLMGatekeeper
 from tusk.kernel import CommandMode, KernelAPI, LLMConversationSummarizer, MainAgent, SlidingWindowHistory, ToolRegistry
+from tusk.kernel.agent_backends import AgentBackendFactory
 from tusk.kernel.adapter_manager import AdapterManager
 from tusk.kernel.agent import AgentOrchestrator, FileAgentSessionStore
 from tusk.kernel.agent_profiles import build_agent_profiles
@@ -47,7 +48,8 @@ def _build_kernel(config: Config, log: ColorLogPrinter, options: StartupOptions)
     adapter_manager = _build_adapter_manager(config, log, tool_registry)
     history = SlidingWindowHistory(20, LLMConversationSummarizer(llm_registry.get("utility")))
     agent = _build_agent(config, log, llm_registry, tool_registry, history)
-    kernel = KernelAPI(CommandMode(agent, log), llm_registry, log)
+    backend = AgentBackendFactory(agent, config, log).create()
+    kernel = KernelAPI(CommandMode(backend, log), llm_registry, log)
     ToolRuntime(tool_registry, llm_registry, adapter_manager, log).register_tools(kernel)
     return kernel
 
