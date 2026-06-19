@@ -26,6 +26,7 @@ class TrayStatusSink(StatusSink):
         self._actions = actions
         self._show_last_activity = show_last_activity
         self._marshal = marshal or (lambda render: render())
+        self._last_menu: tuple | None = None
 
     def publish(self, snapshot: StatusSnapshot) -> None:
         self._marshal(lambda: self._render(snapshot))
@@ -35,7 +36,15 @@ class TrayStatusSink(StatusSink):
         if icon:
             self._backend.set_icon(icon)
         self._backend.set_tooltip(self._tooltip(snapshot))
-        self._backend.set_menu(self._menu_builder.build(snapshot, self._actions, self._show_last_activity))
+        self._update_menu(snapshot)
+
+    def _update_menu(self, snapshot: StatusSnapshot) -> None:
+        # Rebuilding collapses any open submenu, so only do it on real change.
+        menu = self._menu_builder.build(snapshot, self._actions, self._show_last_activity)
+        if menu == self._last_menu:
+            return
+        self._last_menu = menu
+        self._backend.set_menu(menu)
 
     def _tooltip(self, snapshot: StatusSnapshot) -> str:
         if snapshot.status is AppStatus.ERROR and snapshot.detail:

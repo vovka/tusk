@@ -47,3 +47,29 @@ def test_stopped_status_does_not_set_icon() -> None:
     backend = _backend()
     _sink(backend).publish(StatusSnapshot(AppStatus.STOPPED, AppMode.DEFAULT))
     assert "icon" not in backend.calls
+
+
+def _counting_backend() -> object:
+    counts = {"menu": 0}
+    return types.SimpleNamespace(
+        counts=counts,
+        set_icon=lambda value: None,
+        set_tooltip=lambda value: None,
+        set_menu=lambda value: counts.__setitem__("menu", counts["menu"] + 1),
+    )
+
+
+def test_unchanged_snapshot_does_not_rebuild_menu() -> None:
+    backend = _counting_backend()
+    sink = _sink(backend)
+    sink.publish(StatusSnapshot(AppStatus.LISTENING, AppMode.DEFAULT))
+    sink.publish(StatusSnapshot(AppStatus.LISTENING, AppMode.DEFAULT))
+    assert backend.counts["menu"] == 1
+
+
+def test_changed_snapshot_rebuilds_menu() -> None:
+    backend = _counting_backend()
+    sink = _sink(backend)
+    sink.publish(StatusSnapshot(AppStatus.LISTENING, AppMode.DEFAULT))
+    sink.publish(StatusSnapshot(AppStatus.REACTING, AppMode.DEFAULT))
+    assert backend.counts["menu"] == 2
