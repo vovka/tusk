@@ -106,3 +106,4 @@ def test_codex_exec_backend_handles_invalid_json(monkeypatch) -> None:
     result = backend().run(AgentRequest("prompt", "command"))
     assert result.status == "failed"
     assert "Invalid JSON" in result.reply
+
