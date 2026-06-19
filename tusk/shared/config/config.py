@@ -31,6 +31,7 @@ class Config:
     tray_icon_theme: str
     tray_show_last_activity: bool
     agent_backend: str
+    agent_backend_fallback: str
     codex_exec_binary: str
     codex_exec_model: str
     codex_exec_timeout_seconds: int
