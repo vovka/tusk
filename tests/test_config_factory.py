@@ -1,3 +1,6 @@
+import json
+from pathlib import Path
+
 from tusk.shared.config import Config, ConfigFactory
 
 CODEX_ENV_NAMES = "AGENT_BACKEND CODEX_EXEC_BINARY CODEX_EXEC_MODEL CODEX_EXEC_TIMEOUT_SECONDS CODEX_EXEC_WORKDIR CODEX_EXEC_SANDBOX_MODE CODEX_EXEC_EXTRA_ARGS CODEX_EXEC_OUTPUT_SCHEMA_PATH CODEX_EXEC_LOG_RAW_EVENTS".split()
@@ -117,3 +120,20 @@ def test_config_reads_codex_exec_values(monkeypatch) -> None:
         "codex_exec_extra_args": ("--json", "--message", "hello world", "--tags=key1=val1,key2=val2"),
         "codex_exec_output_schema_path": "/tmp/schema.json", "codex_exec_log_raw_events": True,
     }
+
+
+def test_config_default_codex_exec_schema_path_exists(monkeypatch) -> None:
+    monkeypatch.setenv("GROQ_API_KEY", "test-key")
+    monkeypatch.delenv("CODEX_EXEC_OUTPUT_SCHEMA_PATH", raising=False)
+    path = ConfigFactory().build().codex_exec_output_schema_path
+    assert Path(path).exists()
+
+
+def test_config_default_codex_exec_schema_allows_backend_reply_fields(monkeypatch) -> None:
+    monkeypatch.setenv("GROQ_API_KEY", "test-key")
+    path = ConfigFactory().build().codex_exec_output_schema_path
+    schema = json.loads(Path(path).read_text())
+    properties = schema["properties"]
+    assert schema["required"] == ["status"]
+    assert "reply" in properties
+    assert "final_text" in properties

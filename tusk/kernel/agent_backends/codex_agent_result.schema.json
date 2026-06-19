@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tusk.local/schemas/codex-agent-result.schema.json",
+  "title": "Codex Agent Result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["status"],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["success", "failed", "cancelled", "timeout"]
+    },
+    "final_text": {"type": "string"},
+    "reply": {"type": "string"},
+    "tool_calls": {"type": "array"},
+    "events": {"type": "array"},
+    "error": {},
+    "usage": {"type": "object"},
+    "metadata": {"type": "object"}
+  }
+}
