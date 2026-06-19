@@ -53,3 +53,4 @@ def test_tusk_agent_backend_lets_programmer_errors_surface() -> None:
 def test_agent_result_uses_empty_string_when_reply_is_missing() -> None:
     result = AgentResult(True, None)
     assert result.final_text == ""
+

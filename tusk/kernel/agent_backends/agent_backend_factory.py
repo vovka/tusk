@@ -23,7 +23,7 @@ class AgentBackendFactory:
     def create(self) -> AgentBackend:
         backend_name = self._backend_name()
         if backend_name == "tusk":
-            return self._selected(TuskAgentBackend(self._agent))
+            return self._selected(TuskAgentBackend(self._agent, self._log_printer))
         if backend_name == "codex_exec":
             return self._selected(self._codex_exec_backend())
         raise ValueError(f"Unknown agent backend '{backend_name}'")
@@ -32,7 +32,7 @@ class AgentBackendFactory:
         backend = CodexExecAgentBackend(self._config, self._log_printer)
         if self._fallback_name() != "tusk":
             return backend
-        return FallbackAgentBackend(backend, TuskAgentBackend(self._agent))
+        return FallbackAgentBackend(backend, TuskAgentBackend(self._agent, self._log_printer))
 
     def _fallback_name(self) -> str:
         return str(getattr(self._config, "agent_backend_fallback", "")).strip().lower()
