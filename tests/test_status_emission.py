@@ -112,16 +112,19 @@ def _raise_value_error(*args: object) -> object:
 def test_concurrent_kernel_submits_restore_original_status_once() -> None:
     hub, published = _hub()
     hub.set_status(AppStatus.LISTENING)
-    command_mode = _BlockingCommandMode()
-    api = KernelAPI(command_mode, types.SimpleNamespace(), None, hub)
+    _submit_concurrently(KernelAPI(_BlockingCommandMode(), types.SimpleNamespace(), None, hub))
+    assert hub.status == AppStatus.LISTENING
+    assert [s.status for s in published].count(AppStatus.LISTENING) == 2
+
+
+def _submit_concurrently(api: KernelAPI) -> None:
+    command_mode = api._command_mode
     first = threading.Thread(target=lambda: api.submit("first"))
     first.start()
     command_mode.started.wait(1)
     api.submit("second")
     command_mode.release.set()
     first.join(1)
-    assert hub.status == AppStatus.LISTENING
-    assert [s.status for s in published].count(AppStatus.LISTENING) == 2
 
 
 class _BlockingCommandMode:

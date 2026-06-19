@@ -1,5 +1,6 @@
 import sys
 import types
+from contextlib import contextmanager
 from types import SimpleNamespace
 
 
@@ -28,18 +29,19 @@ def _stub_pystray() -> None:
 
 
 def _stub_pil() -> None:
-    class StubImage:
-        def __init__(self, path): self.path = path
-        def __enter__(self): return self
-        def __exit__(self, *args): return None
-        def load(self): return None
-        def copy(self): return SimpleNamespace(path=self.path)
     image = types.ModuleType("PIL.Image")
-    image.open = lambda path: StubImage(path)
+    image.open = _open_stub_image
     pil = types.ModuleType("PIL")
     pil.Image = image
     _stub_module("PIL", pil)
     _stub_module("PIL.Image", image)
+
+
+
+
+@contextmanager
+def _open_stub_image(path: str) -> object:
+    yield SimpleNamespace(path=path, load=lambda: None, copy=lambda: SimpleNamespace(path=path))
 
 
 def _stub_gi() -> None:

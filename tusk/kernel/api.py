@@ -22,11 +22,14 @@ class KernelAPI:
         self._reporter = reporter
         self._dictation_mode = None
         self._dictation_router = None
+        self._init_status_reporting()
+        self._on_dictation_started: Callable[[], None] | None = None
+        self._on_dictation_stopped: Callable[[], None] | None = None
+
+    def _init_status_reporting(self) -> None:
         self._status_lock = Lock()
         self._active_submissions = 0
         self._restore_status = AppStatus.LISTENING
-        self._on_dictation_started: Callable[[], None] | None = None
-        self._on_dictation_stopped: Callable[[], None] | None = None
 
     def submit(self, text: str) -> KernelResponse:
         self._log_input(text)
