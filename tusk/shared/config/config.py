@@ -29,6 +29,7 @@ class Config:
     conversation_log_dir: str
     agent_session_log_dir: str
     agent_backend: str
+    agent_backend_fallback: str
     codex_exec_binary: str
     codex_exec_model: str
     codex_exec_timeout_seconds: int
