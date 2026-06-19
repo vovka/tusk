@@ -4,13 +4,14 @@
   "title": "Codex Agent Result",
   "type": "object",
   "additionalProperties": false,
-  "required": ["status", "final_text"],
+  "required": ["status"],
   "properties": {
     "status": {
       "type": "string",
       "enum": ["success", "failed", "cancelled", "timeout"]
     },
     "final_text": {"type": "string"},
+    "reply": {"type": "string"},
     "tool_calls": {"type": "array"},
     "events": {"type": "array"},
     "error": {},

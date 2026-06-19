@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from tusk.shared.config import Config, ConfigFactory
@@ -126,3 +127,13 @@ def test_config_default_codex_exec_schema_path_exists(monkeypatch) -> None:
     monkeypatch.delenv("CODEX_EXEC_OUTPUT_SCHEMA_PATH", raising=False)
     path = ConfigFactory().build().codex_exec_output_schema_path
     assert Path(path).exists()
+
+
+def test_config_default_codex_exec_schema_allows_backend_reply_fields(monkeypatch) -> None:
+    monkeypatch.setenv("GROQ_API_KEY", "test-key")
+    path = ConfigFactory().build().codex_exec_output_schema_path
+    schema = json.loads(Path(path).read_text())
+    properties = schema["properties"]
+    assert schema["required"] == ["status"]
+    assert "reply" in properties
+    assert "final_text" in properties
