@@ -26,6 +26,15 @@ def completed(stdout: str = '{"reply":"Done."}') -> subprocess.CompletedProcess:
     return subprocess.CompletedProcess(["codex"], 0, stdout, "")
 
 
+def run_broken_tusk_backend(log_printer: RecordingLogPrinter) -> None:
+    class BrokenAgent:
+        def process_command(self, command: str) -> str:
+            raise RuntimeError("boom")
+
+    request = AgentRequest("open", "command", metadata={"request_id": "req-1"})
+    TuskAgentBackend(BrokenAgent(), log_printer).run(request)
+
+
 def test_codex_exec_backend_logs_success_lifecycle(monkeypatch) -> None:
     log_printer = RecordingLogPrinter()
     monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: completed())
@@ -57,6 +66,15 @@ def test_codex_exec_backend_logs_schema_failure(monkeypatch) -> None:
     assert any("schema parsing failure backend=codex_exec session_id=session-2" in message for message in messages)
 
 
+def test_codex_exec_backend_handles_none_metadata(monkeypatch) -> None:
+    log_printer = RecordingLogPrinter()
+    monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: completed())
+    result = CodexExecAgentBackend(config(), log_printer).run(request(metadata=None))
+    messages = [message for _, message, _ in log_printer.messages]
+    assert result.metadata["backend"] == "codex_exec"
+    assert any("request_id=unknown" in message for message in messages)
+
+
 def test_tusk_agent_backend_logs_success_lifecycle() -> None:
     log_printer = RecordingLogPrinter()
     TuskAgentBackend(RecordingAgent(), log_printer).run(AgentRequest("open browser", "command", "session-1"))
@@ -69,14 +87,9 @@ def test_tusk_agent_backend_logs_success_lifecycle() -> None:
 
 
 def test_tusk_agent_backend_logs_failure_lifecycle() -> None:
-    class BrokenAgent:
-        def process_command(self, command: str) -> str:
-            raise RuntimeError("boom")
-
     log_printer = RecordingLogPrinter()
     with pytest.raises(RuntimeError, match="boom"):
-        request = AgentRequest("open", "command", metadata={"request_id": "req-1"})
-        TuskAgentBackend(BrokenAgent(), log_printer).run(request)
+        run_broken_tusk_backend(log_printer)
     messages = [message for _, message, _ in log_printer.messages]
     assert messages[0] == "backend start backend=tusk request_id=req-1"
     assert "backend end backend=tusk request_id=req-1" in messages[1]

@@ -24,29 +24,18 @@ class TuskAgentBackend(AgentBackend):
         return False
 
     def run(self, request: AgentRequest) -> AgentResult:
-        if request is None:
-            raise ValueError("request cannot be None")
-        started_at = self._start(request)
+        if request is None: raise ValueError("request cannot be None")
+        started_at = self._run_logger.start(request) if self._run_logger else None
         try:
             result = self._result(request)
         except Exception as error:
-            self._failure(request, started_at, error)
+            if self._run_logger and started_at is not None:
+                self._run_logger.failure(request, started_at, "failed", str(error))
             raise
-        self._end(request, started_at, result)
+        if self._run_logger and started_at is not None: self._run_logger.end(request, started_at, result)
         return result
 
     def _result(self, request: AgentRequest) -> AgentResult:
         reply = self._agent.process_command(request.user_text)
-        metadata = {**request.metadata, "backend": self.name, "mode": request.mode}
+        metadata = {**(request.metadata or {}), "backend": self.name, "mode": request.mode}
         return AgentResult(True, reply, request.session_id, metadata)
-
-    def _start(self, request: AgentRequest) -> float:
-        return self._run_logger.start(request) if self._run_logger else 0.0
-
-    def _end(self, request: AgentRequest, started_at: float, result: AgentResult) -> None:
-        if self._run_logger:
-            self._run_logger.end(request, started_at, result)
-
-    def _failure(self, request: AgentRequest, started_at: float, error: Exception) -> None:
-        if self._run_logger:
-            self._run_logger.failure(request, started_at, "failed", str(error))

@@ -42,7 +42,8 @@ class BackendRunLogger:
         )
 
     def _request_ref(self, request: AgentRequest) -> str:
-        request_id = request.metadata.get("request_id", "")
+        metadata = request.metadata or {}
+        request_id = metadata.get("request_id", "")
         if request.session_id:
             return f"session_id={request.session_id}"
         return f"request_id={request_id}" if request_id else "request_id=unknown"
