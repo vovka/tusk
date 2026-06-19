@@ -17,17 +17,19 @@ def _labels(snapshot: StatusSnapshot, show_last: bool = False) -> list[str]:
 
 def test_menu_hides_last_activity_by_default() -> None:
     snapshot = StatusSnapshot(AppStatus.LISTENING, AppMode.DEFAULT, "open Firefox", "Mic A")
-    assert _labels(snapshot) == ["Status: listening", "Mode: default", "Mic: Mic A", "Models", "Pause", "Open logs", "Restart", "Exit"]
+    assert _labels(snapshot) == ["Mode: default", "Mic: Mic A", "Models", "Pause", "Open logs", "Restart", "Exit"]
+
+
+def test_menu_omits_volatile_status_line() -> None:
+    # The status line changed on every say->reply and collapsed open submenus;
+    # status now lives in the icon/tooltip so the menu stays stable.
+    snapshot = StatusSnapshot(AppStatus.LISTENING, AppMode.DEFAULT)
+    assert not any(label.startswith("Status:") for label in _labels(snapshot))
 
 
 def test_menu_shows_last_activity_when_opted_in() -> None:
     snapshot = StatusSnapshot(AppStatus.LISTENING, AppMode.DEFAULT, "open Firefox")
     assert "Last: open Firefox" in _labels(snapshot, show_last=True)
-
-
-def test_error_status_line_includes_detail() -> None:
-    snapshot = StatusSnapshot(AppStatus.ERROR, AppMode.DEFAULT, "stt timeout")
-    assert _labels(snapshot)[0] == "Status: error: stt timeout"
 
 
 def test_pause_label_flips_to_resume_when_paused() -> None:

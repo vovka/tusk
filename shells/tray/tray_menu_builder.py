@@ -19,17 +19,11 @@ class TrayMenuBuilder:
         return tuple(items)
 
     def _info_lines(self, snapshot: StatusSnapshot, show_last_activity: bool) -> list[TrayMenuItem]:
-        lines = [self._status_line(snapshot), self._info("Mode", snapshot.mode.value)]
+        lines = [self._info("Mode", snapshot.mode.value)]
         if show_last_activity:
             lines.append(self._info("Last", snapshot.detail))
         lines.append(self._info("Mic", snapshot.mic_device))
         return lines
-
-    def _status_line(self, snapshot: StatusSnapshot) -> TrayMenuItem:
-        label = snapshot.status.value
-        if snapshot.status is AppStatus.ERROR and snapshot.detail:
-            label = f"{label}: {snapshot.detail}"
-        return self._info("Status", label)
 
     def _models_item(self, snapshot: StatusSnapshot) -> TrayMenuItem:
         children = tuple(self._info(slot, model) for slot, model in snapshot.models)

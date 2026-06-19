@@ -32,7 +32,13 @@ def test_publish_renders_icon_tooltip_and_menu() -> None:
     _sink(backend).publish(StatusSnapshot(AppStatus.LISTENING, AppMode.DEFAULT, mic_device="Mic A"))
     assert backend.calls["icon"] == "shells/tray/icons/light/active.png"
     assert backend.calls["tooltip"] == "TUSK — listening"
-    assert backend.calls["menu"][0].label == "Status: listening"
+    assert backend.calls["menu"][0].label == "Mode: default"
+
+
+def test_error_detail_surfaces_in_tooltip() -> None:
+    backend = _backend()
+    _sink(backend).publish(StatusSnapshot(AppStatus.ERROR, AppMode.DEFAULT, "stt timeout"))
+    assert backend.calls["tooltip"] == "TUSK — error: stt timeout"
 
 
 def test_publish_uses_injected_marshal_to_defer_render() -> None:
@@ -67,9 +73,19 @@ def test_unchanged_snapshot_does_not_rebuild_menu() -> None:
     assert backend.counts["menu"] == 1
 
 
-def test_changed_snapshot_rebuilds_menu() -> None:
+def test_status_flip_does_not_rebuild_menu() -> None:
+    # say -> reply flips LISTENING -> REACTING; the menu must stay put so an
+    # open submenu does not collapse. Status is shown by the icon/tooltip only.
     backend = _counting_backend()
     sink = _sink(backend)
     sink.publish(StatusSnapshot(AppStatus.LISTENING, AppMode.DEFAULT))
     sink.publish(StatusSnapshot(AppStatus.REACTING, AppMode.DEFAULT))
+    assert backend.counts["menu"] == 1
+
+
+def test_menu_structure_change_rebuilds_menu() -> None:
+    backend = _counting_backend()
+    sink = _sink(backend)
+    sink.publish(StatusSnapshot(AppStatus.LISTENING, AppMode.DEFAULT))
+    sink.publish(StatusSnapshot(AppStatus.PAUSED, AppMode.DEFAULT))
     assert backend.counts["menu"] == 2

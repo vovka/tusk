@@ -1006,9 +1006,12 @@ relying on the user to order it correctly.
 
 Built by `TrayMenuBuilder` from a `StatusSnapshot` + injected `TrayMenuActions` callables.
 
+Status is conveyed by the icon and tooltip, not a menu line: pystray rebuilds
+the whole menu on any change, which collapses an open submenu, so the volatile
+status (which flips on every `LISTENING`↔`REACTING`) is kept out of the menu.
+
 | Item | Enabled | Action |
 |---|---|---|
-| `Status: <status>` | disabled | Info line; when `ERROR`, appends `detail` |
 | `Mode: <mode>` | disabled | Info line; single extensible line |
 | `Last: <detail>` | disabled | Last command/reply; shown only when `TUSK_TRAY_SHOW_LAST_ACTIVITY=true` (hidden by default) |
 | `Mic: <device>` | disabled | Active input device label |
