@@ -29,6 +29,10 @@ def _build_llm_registry(config: Config, log: ColorLogPrinter, options: StartupOp
     return registry
 
 
+def _build_kernel(config: Config, log: ColorLogPrinter, options: StartupOptions) -> KernelAPI:
+    return build_kernel(config, log, _build_llm_registry(config, log, options))
+
+
 def _register_slots(factory: ConfigurableLLMFactory, config: Config, log: ColorLogPrinter, registry: LLMRegistry, options: StartupOptions) -> None:
     registry.register_slot("gatekeeper", _slot_proxy(factory, config.gatekeeper_llm, log, "gatekeeper", options))
     registry.register_slot("conversation_agent", _slot_proxy(factory, config.conversation_agent_llm, log, "conversation_agent", options))
@@ -87,8 +91,7 @@ def main() -> None:
     options = StartupOptions.from_sources(sys.argv[1:])
     config = Config.from_env()
     log = _build_log(options)
-    llm_registry = _build_llm_registry(config, log, options)
-    kernel = build_kernel(config, log, llm_registry)
+    kernel = _build_kernel(config, log, options)
     shells = _load_shells(config, kernel, log)
     _start_shells(shells, kernel.submit, log)
 
