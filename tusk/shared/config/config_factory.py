@@ -89,6 +89,7 @@ class ConfigFactory:
     def _codex_exec_process_values(self) -> dict:
         return {
             "agent_backend": os.environ.get("AGENT_BACKEND", "tusk"),
+            "agent_backend_fallback": os.environ.get("AGENT_BACKEND_FALLBACK", ""),
             "codex_exec_binary": os.environ.get("CODEX_EXEC_BINARY", "codex"),
             "codex_exec_model": os.environ.get("CODEX_EXEC_MODEL", ""),
             "codex_exec_timeout_seconds": self._int("CODEX_EXEC_TIMEOUT_SECONDS", "60"),
