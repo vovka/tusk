@@ -28,8 +28,14 @@ def _stub_pystray() -> None:
 
 
 def _stub_pil() -> None:
+    class StubImage:
+        def __init__(self, path): self.path = path
+        def __enter__(self): return self
+        def __exit__(self, *args): return None
+        def load(self): return None
+        def copy(self): return SimpleNamespace(path=self.path)
     image = types.ModuleType("PIL.Image")
-    image.open = lambda path: SimpleNamespace(path=path)
+    image.open = lambda path: StubImage(path)
     pil = types.ModuleType("PIL")
     pil.Image = image
     _stub_module("PIL", pil)

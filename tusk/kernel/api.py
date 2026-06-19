@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from threading import Lock
 
 from tusk.shared.schemas.app_mode import AppMode
 from tusk.shared.schemas.app_status import AppStatus
@@ -21,6 +22,9 @@ class KernelAPI:
         self._reporter = reporter
         self._dictation_mode = None
         self._dictation_router = None
+        self._status_lock = Lock()
+        self._active_submissions = 0
+        self._restore_status = AppStatus.LISTENING
         self._on_dictation_started: Callable[[], None] | None = None
         self._on_dictation_stopped: Callable[[], None] | None = None
 
@@ -40,12 +44,24 @@ class KernelAPI:
         return self._dictation_mode.process_text(text)
 
     def _submit_reported(self, text: str) -> KernelResponse:
-        prior = self._reporter.status
-        self._reporter.set_status(AppStatus.REACTING, text)
+        self._begin_reported_submit(text)
         try:
             return self._route(text)
         finally:
-            self._reporter.set_status(prior)
+            self._end_reported_submit()
+
+    def _begin_reported_submit(self, text: str) -> None:
+        with self._status_lock:
+            if self._active_submissions == 0:
+                self._restore_status = self._reporter.status
+            self._active_submissions += 1
+            self._reporter.set_status(AppStatus.REACTING, text)
+
+    def _end_reported_submit(self) -> None:
+        with self._status_lock:
+            self._active_submissions -= 1
+            if self._active_submissions == 0:
+                self._reporter.set_status(self._restore_status)
 
     def _report_mode(self, mode: AppMode) -> None:
         if self._reporter is not None:

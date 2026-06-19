@@ -69,9 +69,20 @@ class TrayShell:
         try:
             from gi.repository import GLib
         except (ImportError, ValueError):
-            render()
+            self._safe_render(render)
             return
-        GLib.idle_add(lambda: bool(render()))
+        GLib.idle_add(lambda: self._safe_render(render))
+
+    def _safe_render(self, render: object) -> bool:
+        try:
+            render()
+        except Exception as exc:
+            self._log_render_failure(exc)
+        return False
+
+    def _log_render_failure(self, exc: Exception) -> None:
+        if hasattr(self._config, "log"):
+            self._config.log("TRAY", f"tray render failed: {exc}", "tray")
 
     def _run_backend(self, backend: object) -> None:
         try:
@@ -83,7 +94,11 @@ class TrayShell:
         return TrayMenuActions(self._control.pause, self._control.resume, self._open_logs, self._restart, self.stop)
 
     def _open_logs(self) -> None:
-        subprocess.Popen(["xdg-open", self._config.conversation_log_dir])
+        if sys.platform == "win32":
+            os.startfile(self._config.conversation_log_dir)
+            return
+        opener = "open" if sys.platform == "darwin" else "xdg-open"
+        subprocess.Popen([opener, self._config.conversation_log_dir])
 
     def _restart(self) -> None:
         os.execv(sys.executable, [sys.executable, *sys.argv])

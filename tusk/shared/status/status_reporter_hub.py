@@ -26,19 +26,27 @@ class StatusReporterHub(StatusReporter):
         self._emit()
 
     def set_status(self, status: AppStatus, detail: str = "") -> None:
+        if self._status == status and self._detail == detail:
+            return
         self._status = status
         self._detail = detail
         self._emit()
 
     def set_mode(self, mode: AppMode) -> None:
+        if self._mode == mode:
+            return
         self._mode = mode
         self._emit()
 
     def set_models(self, models: tuple[tuple[str, str], ...]) -> None:
+        if self._models == tuple(models):
+            return
         self._models = tuple(models)
         self._emit()
 
     def set_mic_device(self, device: str) -> None:
+        if self._mic_device == device:
+            return
         self._mic_device = device
         self._emit()
 

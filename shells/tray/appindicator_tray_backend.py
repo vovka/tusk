@@ -27,7 +27,9 @@ class AppIndicatorTrayBackend(TrayBackend):
         self._icon.stop()
 
     def set_icon(self, name: str) -> None:
-        self._icon.icon = Image.open(name)
+        with Image.open(name) as image:
+            image.load()
+            self._icon.icon = image.copy()
 
     def set_tooltip(self, text: str) -> None:
         self._icon.title = text

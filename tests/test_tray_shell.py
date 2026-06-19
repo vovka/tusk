@@ -72,3 +72,11 @@ def test_missing_backend_library_runs_no_op() -> None:
 
 def _raise() -> None:
     raise RuntimeError("gui crashed")
+
+
+def test_marshal_catches_render_errors() -> None:
+    logs: list[tuple] = []
+    config = types.SimpleNamespace(**_config().__dict__, log=lambda *args: logs.append(args))
+    shell = TrayShell(StatusReporterHub(NullStatusSink()), _control(), threading.Event(), config, _backend())
+    assert shell._safe_render(_raise) is False
+    assert logs and logs[0][0] == "TRAY"

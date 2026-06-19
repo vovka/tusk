@@ -17,11 +17,15 @@ class AudioCapture:
         self._pause_gate = pause_gate
 
     def stream_frames(self) -> Iterator[bytes]:
-        with self._open_stream() as stream:
-            while True:
-                self._await_resume()
-                data, _ = stream.read(self._frame_size)
-                yield bytes(data)
+        while True:
+            self._await_resume()
+            with self._open_stream() as stream:
+                while self._is_resumed():
+                    data, _ = stream.read(self._frame_size)
+                    yield bytes(data)
+
+    def _is_resumed(self) -> bool:
+        return self._pause_gate is None or self._pause_gate.is_set()
 
     def _open_stream(self) -> object:
         return sd.RawInputStream(samplerate=self._sample_rate, blocksize=self._frame_size, dtype="int16", channels=1)

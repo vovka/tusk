@@ -1,3 +1,4 @@
+import threading
 import types
 
 from shells.voice.buffered_utterance import BufferedUtterance
@@ -106,3 +107,32 @@ def _swap_params() -> dict:
 
 def _raise_value_error(*args: object) -> object:
     raise ValueError("bad slot")
+
+
+def test_concurrent_kernel_submits_restore_original_status_once() -> None:
+    hub, published = _hub()
+    hub.set_status(AppStatus.LISTENING)
+    command_mode = _BlockingCommandMode()
+    api = KernelAPI(command_mode, types.SimpleNamespace(), None, hub)
+    first = threading.Thread(target=lambda: api.submit("first"))
+    first.start()
+    command_mode.started.wait(1)
+    api.submit("second")
+    command_mode.release.set()
+    first.join(1)
+    assert hub.status == AppStatus.LISTENING
+    assert [s.status for s in published].count(AppStatus.LISTENING) == 2
+
+
+class _BlockingCommandMode:
+    def __init__(self) -> None:
+        self.started = threading.Event()
+        self.release = threading.Event()
+        self.calls = 0
+
+    def process_command(self, text: str) -> KernelResponse:
+        self.calls += 1
+        if text == "first":
+            self.started.set()
+            self.release.wait(1)
+        return KernelResponse(True, text)

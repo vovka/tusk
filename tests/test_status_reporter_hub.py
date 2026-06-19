@@ -49,3 +49,11 @@ def test_sink_exception_never_propagates_and_is_logged() -> None:
 
 def _raise(snapshot: object) -> None:
     raise RuntimeError("gui down")
+
+
+def test_unchanged_status_is_not_published_again() -> None:
+    sink, published = _recording_sink()
+    hub = StatusReporterHub(sink)
+    hub.set_status(AppStatus.LISTENING)
+    hub.set_status(AppStatus.LISTENING)
+    assert len(published) == 1
