@@ -1,0 +1,6 @@
+{
+  "name": "tray",
+  "description": "Tray shell",
+  "entry_module": "tray_shell",
+  "entry_class": "TrayShell"
+}
