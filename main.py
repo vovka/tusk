@@ -7,13 +7,9 @@ from pathlib import Path
 from shells.voice.gatekeeper_slot import GatekeeperSlot
 from shells.voice.stages.dictation_gatekeeper import DictationGatekeeper
 from shells.voice.stages.gatekeeper import LLMGatekeeper
-from tusk.kernel import CommandMode, KernelAPI, LLMConversationSummarizer, MainAgent, SlidingWindowHistory, ToolRegistry
-from tusk.kernel.agent_backends import AgentBackendFactory
-from tusk.kernel.adapter_manager import AdapterManager
-from tusk.kernel.agent import AgentOrchestrator, FileAgentSessionStore
-from tusk.kernel.agent_profiles import build_agent_profiles
+from tusk.kernel import KernelAPI
 from tusk.kernel.dictation_gate import DictationGate
-from tusk.kernel.tool_runtime import ToolRuntime
+from tusk.kernel.startup import build_kernel
 from tusk.providers.llm import ConfigurableLLMFactory
 from tusk.providers.stt import GroqSTT
 from tusk.providers.tts import GroqTTS
@@ -42,24 +38,6 @@ def _register_slots(factory: ConfigurableLLMFactory, config: Config, log: ColorL
     registry.register_slot("utility", _slot_proxy(factory, config.utility_llm, log, "utility", options))
 
 
-def _build_kernel(config: Config, log: ColorLogPrinter, options: StartupOptions) -> KernelAPI:
-    llm_registry = _build_llm_registry(config, log, options)
-    tool_registry = ToolRegistry()
-    adapter_manager = _build_adapter_manager(config, log, tool_registry)
-    history = SlidingWindowHistory(20, LLMConversationSummarizer(llm_registry.get("utility")))
-    agent = _build_agent(config, log, llm_registry, tool_registry, history)
-    backend = AgentBackendFactory(agent, config, log).create()
-    kernel = KernelAPI(CommandMode(backend, log), llm_registry, log)
-    ToolRuntime(tool_registry, llm_registry, adapter_manager, log).register_tools(kernel)
-    return kernel
-
-
-def _build_agent(config: Config, log: ColorLogPrinter, llm_registry: LLMRegistry, tool_registry: ToolRegistry, history: object) -> MainAgent:
-    store = FileAgentSessionStore(config.agent_session_log_dir)
-    profiles = build_agent_profiles(llm_registry)
-    return MainAgent(AgentOrchestrator(profiles, tool_registry, store, log), history)
-
-
 def _load_shells(config: Config, kernel: KernelAPI, log: ColorLogPrinter) -> list[object]:
     shells_dir = Path("shells")
     return [_load_shell(name, shells_dir, config, kernel, log) for name in config.shells]
@@ -71,13 +49,6 @@ def _load_module(path: Path, dotted_name: str) -> object:
     assert spec.loader is not None
     spec.loader.exec_module(module)
     return module
-
-
-def _build_adapter_manager(config: Config, log: ColorLogPrinter, tool_registry: ToolRegistry) -> AdapterManager:
-    manager = AdapterManager("adapters", tool_registry, log, config.adapter_env_cache_dir)
-    manager.run_async(manager.start_all())
-    manager.start_watcher()
-    return manager
 
 
 def _slot_proxy(factory: ConfigurableLLMFactory, slot: object, log: ColorLogPrinter, name: str, options: StartupOptions) -> LLMProxy:
@@ -116,7 +87,8 @@ def main() -> None:
     options = StartupOptions.from_sources(sys.argv[1:])
     config = Config.from_env()
     log = _build_log(options)
-    kernel = _build_kernel(config, log, options)
+    llm_registry = _build_llm_registry(config, log, options)
+    kernel = build_kernel(config, log, llm_registry)
     shells = _load_shells(config, kernel, log)
     _start_shells(shells, kernel.submit, log)
 

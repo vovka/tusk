@@ -1,7 +1,7 @@
 import types
 
-import main
-from tests.recording_backend import RecordingBackend
+from tests.factory_stub import FactoryStub
+from tusk.kernel import startup
 from tusk.shared.schemas.kernel_response import KernelResponse
 
 
@@ -15,30 +15,33 @@ class RuntimeStub:
         self.registrations.append(kernel)
 
 
-class FactoryStub:
-    instances: list["FactoryStub"] = []
-
-    def __init__(self, agent: object, config: object, log: object) -> None:
-        self.agent = agent
-        self.config = config
-        self.log = log
-        self.backend = RecordingBackend()
-        self.instances.append(self)
-
-    def create(self) -> RecordingBackend:
-        return self.backend
-
-
 def test_kernel_startup_submits_text_through_selected_backend(monkeypatch: object) -> None:
+    FactoryStub.instances.clear()
+    RuntimeStub.registrations.clear()
     agent = types.SimpleNamespace(name="main-agent")
     config = types.SimpleNamespace(agent_backend="codex_exec")
-    monkeypatch.setattr(main, "AgentBackendFactory", FactoryStub)
-    monkeypatch.setattr(main, "ToolRuntime", RuntimeStub)
-    monkeypatch.setattr(main, "_build_llm_registry", lambda *args: types.SimpleNamespace(get=lambda name: object()))
-    monkeypatch.setattr(main, "_build_adapter_manager", lambda *args: object())
-    monkeypatch.setattr(main, "_build_agent", lambda *args: agent)
-    kernel = main._build_kernel(config, types.SimpleNamespace(log=lambda *args: None), types.SimpleNamespace())
+    _patch_startup(monkeypatch, agent)
+    kernel = startup.build_kernel(config, _log(), _llm_registry())
     assert kernel.submit("open browser") == KernelResponse(True, "Done.")
+    _assert_factory_received(agent, config, "open browser")
+
+
+def _patch_startup(monkeypatch: object, agent: object) -> None:
+    monkeypatch.setattr(startup, "AgentBackendFactory", FactoryStub)
+    monkeypatch.setattr(startup, "ToolRuntime", RuntimeStub)
+    monkeypatch.setattr(startup, "build_adapter_manager", lambda *args: object())
+    monkeypatch.setattr(startup, "build_agent", lambda *args: agent)
+
+
+def _llm_registry() -> object:
+    return types.SimpleNamespace(get=lambda name: object())
+
+
+def _log() -> object:
+    return types.SimpleNamespace(log=lambda *args: None)
+
+
+def _assert_factory_received(agent: object, config: object, user_text: str) -> None:
     assert FactoryStub.instances[0].agent is agent
     assert FactoryStub.instances[0].config is config
-    assert FactoryStub.instances[0].backend.requests[0].user_text == "open browser"
+    assert FactoryStub.instances[0].backend.requests[0].user_text == user_text
