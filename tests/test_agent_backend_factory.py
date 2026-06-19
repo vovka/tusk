@@ -57,7 +57,19 @@ def test_fallback_backend_runs_tusk_after_codex_failed_result() -> None:
     codex.run.return_value = AgentResult(False, "bad", metadata={"backend": "codex_exec"})
     tusk.run.return_value = AgentResult(True, "ok", metadata={"backend": "tusk"})
     result = FallbackAgentBackend(codex, tusk).run(AgentRequest("prompt", "command"))
-    assert result is tusk.run.return_value
+    assert result.handled == tusk.run.return_value.handled
+    assert result.reply == tusk.run.return_value.reply
+    assert result.status == tusk.run.return_value.status
+    assert result.metadata["codex_exec_failure"]["reply"] == "bad"
+
+
+def test_fallback_backend_handles_missing_tusk_metadata() -> None:
+    codex = Mock()
+    tusk = Mock()
+    codex.run.return_value = AgentResult(False, "bad", metadata={"backend": "codex_exec"})
+    tusk.run.return_value = AgentResult(True, "ok", metadata=None)  # type: ignore[arg-type]
+    result = FallbackAgentBackend(codex, tusk).run(AgentRequest("prompt", "command"))
+    assert result.metadata["codex_exec_failure"]["status"] == "failed"
     assert result.metadata["codex_exec_failure"]["reply"] == "bad"
 
 

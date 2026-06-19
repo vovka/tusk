@@ -32,7 +32,8 @@ class FallbackAgentBackend(AgentBackend):
 
     def _fallback_result(self, request: AgentRequest, primary_result: AgentResult) -> AgentResult:
         fallback_result = self._fallback.run(request)
-        metadata = {**fallback_result.metadata, "codex_exec_failure": self._failure_details(primary_result)}
+        fallback_metadata = fallback_result.metadata or {}
+        metadata = {**fallback_metadata, "codex_exec_failure": self._failure_details(primary_result)}
         return replace(fallback_result, metadata=metadata)
 
     def _failure_details(self, result: AgentResult) -> dict[str, object]:
