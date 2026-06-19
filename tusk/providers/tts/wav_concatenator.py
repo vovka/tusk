@@ -18,7 +18,11 @@ class WavConcatenator:
     def _open_writer(self, buffer: io.BytesIO, sample: bytes) -> wave.Wave_write:
         writer = wave.open(buffer, "wb")
         with wave.open(io.BytesIO(sample), "rb") as reader:
-            writer.setparams(reader.getparams())
+            # Skip setparams: a streamed clip declares a placeholder frame count
+            # that would overflow the output header's size field.
+            writer.setnchannels(reader.getnchannels())
+            writer.setsampwidth(reader.getsampwidth())
+            writer.setframerate(reader.getframerate())
         return writer
 
     def _frames(self, clip: bytes) -> bytes:

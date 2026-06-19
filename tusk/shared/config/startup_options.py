@@ -32,7 +32,7 @@ class StartupOptions:
 
     @classmethod
     def from_sources(cls, argv: list[str] | None = None, environ: dict[str, str] | None = None) -> "StartupOptions":
-        env = environ or os.environ
+        env = os.environ if environ is None else environ
         args = build_parser().parse_args(argv)
         shown, hidden = _groups(args.show_logs, env.get("SHOW_LOGS", ""))
         return cls(frozenset(shown), frozenset(hidden), _preview(args.llm_log_preview_chars, env))

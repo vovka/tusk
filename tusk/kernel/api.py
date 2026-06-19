@@ -1,5 +1,8 @@
 from collections.abc import Callable
+from threading import Lock
 
+from tusk.shared.schemas.app_mode import AppMode
+from tusk.shared.schemas.app_status import AppStatus
 from tusk.shared.schemas.kernel_response import KernelResponse
 
 __all__ = ["KernelAPI"]
@@ -11,21 +14,61 @@ class KernelAPI:
         command_mode: object,
         llm_registry: object,
         log: object | None = None,
+        reporter: object | None = None,
     ) -> None:
         self._command_mode = command_mode
         self._llm_registry = llm_registry
         self._log = log
+        self._reporter = reporter
         self._dictation_mode = None
         self._dictation_router = None
+        self._init_status_reporting()
         self._on_dictation_started: Callable[[], None] | None = None
         self._on_dictation_stopped: Callable[[], None] | None = None
 
+    def _init_status_reporting(self) -> None:
+        self._status_lock = Lock()
+        self._active_submissions = 0
+        self._restore_status = AppStatus.LISTENING
+
     def submit(self, text: str) -> KernelResponse:
+        self._log_input(text)
+        if self._reporter is None:
+            return self._route(text)
+        return self._submit_reported(text)
+
+    def _log_input(self, text: str) -> None:
         if self._log is not None:
             self._log.log("KERNELINPUT", f"text={text!r}", "kernel-input")
+
+    def _route(self, text: str) -> KernelResponse:
         if self._dictation_mode is None:
             return self._command_mode.process_command(text)
         return self._dictation_mode.process_text(text)
+
+    def _submit_reported(self, text: str) -> KernelResponse:
+        self._begin_reported_submit(text)
+        try:
+            return self._route(text)
+        finally:
+            self._end_reported_submit()
+
+    def _begin_reported_submit(self, text: str) -> None:
+        with self._status_lock:
+            if self._active_submissions == 0:
+                self._restore_status = self._reporter.status
+            self._active_submissions += 1
+            self._reporter.set_status(AppStatus.REACTING, text)
+
+    def _end_reported_submit(self) -> None:
+        with self._status_lock:
+            self._active_submissions -= 1
+            if self._active_submissions == 0:
+                self._reporter.set_status(self._restore_status)
+
+    def _report_mode(self, mode: AppMode) -> None:
+        if self._reporter is not None:
+            self._reporter.set_mode(mode)
 
     def set_dictation_callbacks(
         self, on_start: Callable[[], None], on_stop: Callable[[], None]
@@ -47,12 +90,14 @@ class KernelAPI:
         self._dictation_mode = AdapterDictationMode(state, self._dictation_router, self._log)
         if self._on_dictation_started is not None:
             self._on_dictation_started()
+        self._report_mode(AppMode.DICTATION)
         return KernelResponse(True, "Dictation started.")
 
     def stop_dictation(self) -> None:
         self._dictation_mode = None
         if self._on_dictation_stopped is not None:
             self._on_dictation_stopped()
+        self._report_mode(AppMode.DEFAULT)
 
     def get_llm_registry(self) -> object:
         return self._llm_registry

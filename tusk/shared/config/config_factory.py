@@ -21,6 +21,9 @@ class ConfigFactory:
     def _float(self, name: str, default: str) -> float:
         return float(os.environ.get(name, default))
 
+    def _bool(self, name: str, default: str) -> bool:
+        return os.environ.get(name, default).strip().lower() == "true"
+
     def _shells(self, value: str) -> list[str]:
         return [item.strip() for item in value.split(",") if item.strip()]
 
@@ -61,6 +64,9 @@ class ConfigFactory:
         }
 
     def _environment_values(self, shells: str) -> dict:
+        return {**self._core_env_values(shells), **self._tray_values()}
+
+    def _core_env_values(self, shells: str) -> dict:
         return {
             "follow_up_timeout_seconds": self._float("FOLLOW_UP_TIMEOUT_SECONDS", "30"),
             "max_follow_up_timeout_seconds": self._float("MAX_FOLLOW_UP_TIMEOUT_SECONDS", "120"),
@@ -70,4 +76,10 @@ class ConfigFactory:
             "adapter_env_cache_dir": os.environ.get("TUSK_ADAPTER_ENV_CACHE_DIR", ".tusk_runtime/adapters"),
             "conversation_log_dir": os.environ.get("TUSK_CONVERSATION_LOG_DIR", ".tusk_runtime/conversations"),
             "agent_session_log_dir": os.environ.get("TUSK_AGENT_SESSION_LOG_DIR", ".tusk_runtime/agent_sessions"),
+        }
+
+    def _tray_values(self) -> dict:
+        return {
+            "tray_icon_theme": os.environ.get("TUSK_TRAY_ICON_THEME", "light"),
+            "tray_show_last_activity": self._bool("TUSK_TRAY_SHOW_LAST_ACTIVITY", "false"),
         }

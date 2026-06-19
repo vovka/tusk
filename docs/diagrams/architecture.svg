@@ -86,16 +86,21 @@
   <text class="ts" x="560" y="81" text-anchor="middle" dominant-baseline="central">stdin readline</text>
 </g>
 
-<!-- Future shell -->
-<rect x="470" y="120" width="180" height="46" rx="14" fill="none" stroke="#B4B2A9" stroke-width="0.5" stroke-dasharray="6 3" opacity="0.2"/>
-<text class="ts" x="560" y="148" text-anchor="middle" opacity="0.3">future shells</text>
-<line x1="560" y1="166" x2="560" y2="248" stroke="#B4B2A9" stroke-width="0.5" stroke-dasharray="4 2" opacity="0.2"/>
+<!-- Tray shell -->
+<rect x="520" y="116" width="130" height="82" rx="14" fill="none" stroke="#B4B2A9" stroke-width="0.5" stroke-dasharray="6 3" opacity="0.5"/>
+<text class="th" x="536" y="140">Tray shell</text>
+<g class="c-amber">
+  <rect x="528" y="152" width="114" height="34" rx="6" stroke-width="0.5"/>
+  <text class="ts" x="585" y="169" text-anchor="middle" dominant-baseline="central">icon + menu</text>
+</g>
+<!-- Tray observes the shared Status layer (StatusSink) -->
+<path d="M650 157 H660 V540 H676" fill="none" class="leader" marker-end="url(#arrow)"/>
 
 <!-- submit(text) arrows -->
 <line x1="180" y1="198" x2="180" y2="248" stroke="#B4B2A9" stroke-width="0.5" stroke-dasharray="4 2"/>
-<line x1="560" y1="96" x2="560" y2="248" stroke="#B4B2A9" stroke-width="0.5" stroke-dasharray="4 2"/>
+<line x1="500" y1="106" x2="500" y2="248" stroke="#B4B2A9" stroke-width="0.5" stroke-dasharray="4 2"/>
 <text class="ts" x="168" y="224" opacity="0.5">submit(text)</text>
-<text class="ts" x="510" y="224" opacity="0.5">submit(text)</text>
+<text class="ts" x="450" y="224" opacity="0.5">submit(text)</text>
 
 <!-- ===== KERNEL ===== -->
 <rect x="30" y="250" width="620" height="240" rx="16" fill="none" stroke="#5F5E5A" stroke-width="1" opacity="0.5"/>
@@ -167,8 +172,14 @@
 
 <g class="c-blue">
   <rect x="678" y="518" width="132" height="44" rx="8" stroke-width="0.5"/>
-  <text class="th" x="744" y="534" text-anchor="middle" dominant-baseline="central">Event bus</text>
-  <text class="ts" x="744" y="552" text-anchor="middle" dominant-baseline="central">future</text>
+  <text class="th" x="744" y="534" text-anchor="middle" dominant-baseline="central">Status</text>
+  <text class="ts" x="744" y="552" text-anchor="middle" dominant-baseline="central">reporter + sink</text>
+</g>
+
+<g class="c-blue">
+  <rect x="678" y="572" width="132" height="44" rx="8" stroke-width="0.5"/>
+  <text class="th" x="744" y="588" text-anchor="middle" dominant-baseline="central">Event bus</text>
+  <text class="ts" x="744" y="606" text-anchor="middle" dominant-baseline="central">future</text>
 </g>
 
 <!-- ===== ADAPTERS ===== -->
@@ -205,7 +216,7 @@
 <!-- ===== PROVIDERS ===== -->
 <text class="ts" x="40" y="790" opacity="0.4">Providers (swappable implementations behind shared ABCs)</text>
 
-<rect x="30" y="800" width="620" height="100" rx="14" fill="none" stroke="#B4B2A9" stroke-width="0.5" stroke-dasharray="6 3" opacity="0.5"/>
+<rect x="30" y="800" width="620" height="130" rx="14" fill="none" stroke="#B4B2A9" stroke-width="0.5" stroke-dasharray="6 3" opacity="0.5"/>
 
 <text class="ts" x="50" y="822" opacity="0.45">LLM providers</text>
 <g class="c-gray">
@@ -227,6 +238,12 @@
 <g class="c-gray">
   <rect x="500" y="832" width="110" height="30" rx="6" stroke-width="0.5"/>
   <text class="ts" x="555" y="847" text-anchor="middle" dominant-baseline="central">Local Whisper</text>
+</g>
+
+<text class="ts" x="50" y="884" opacity="0.45">TTS providers</text>
+<g class="c-gray">
+  <rect x="50" y="894" width="120" height="30" rx="6" stroke-width="0.5"/>
+  <text class="ts" x="110" y="909" text-anchor="middle" dominant-baseline="central">Groq Orpheus</text>
 </g>
 
 <!-- Shared to Providers -->

@@ -1,24 +1,16 @@
-import importlib.util
-import json
 import sys
-import threading
-from pathlib import Path
 
-from shells.voice.gatekeeper_slot import GatekeeperSlot
-from shells.voice.stages.dictation_gatekeeper import DictationGatekeeper
-from shells.voice.stages.gatekeeper import LLMGatekeeper
+from shell_loader import ShellLoader
 from tusk.kernel import CommandMode, KernelAPI, LLMConversationSummarizer, MainAgent, SlidingWindowHistory, ToolRegistry
 from tusk.kernel.adapter_manager import AdapterManager
 from tusk.kernel.agent import AgentOrchestrator, FileAgentSessionStore
 from tusk.kernel.agent_profiles import build_agent_profiles
-from tusk.kernel.dictation_gate import DictationGate
 from tusk.kernel.tool_runtime import ToolRuntime
 from tusk.providers.llm import ConfigurableLLMFactory
-from tusk.providers.stt import GroqSTT
-from tusk.providers.tts import GroqTTS
 from tusk.shared.config import Config, StartupOptions
 from tusk.shared.llm import LLMProxy, LLMRegistry
 from tusk.shared.logging import ColorLogPrinter
+from tusk.shared.status import NullStatusSink, StatusReporterHub
 
 
 def _build_log(options: StartupOptions) -> ColorLogPrinter:
@@ -41,14 +33,14 @@ def _register_slots(factory: ConfigurableLLMFactory, config: Config, log: ColorL
     registry.register_slot("utility", _slot_proxy(factory, config.utility_llm, log, "utility", options))
 
 
-def _build_kernel(config: Config, log: ColorLogPrinter, options: StartupOptions) -> KernelAPI:
+def _build_kernel(config: Config, log: ColorLogPrinter, options: StartupOptions, reporter: StatusReporterHub) -> KernelAPI:
     llm_registry = _build_llm_registry(config, log, options)
     tool_registry = ToolRegistry()
     adapter_manager = _build_adapter_manager(config, log, tool_registry)
     history = SlidingWindowHistory(20, LLMConversationSummarizer(llm_registry.get("utility")))
     agent = _build_agent(config, log, llm_registry, tool_registry, history)
-    kernel = KernelAPI(CommandMode(agent, log), llm_registry, log)
-    ToolRuntime(tool_registry, llm_registry, adapter_manager, log).register_tools(kernel)
+    kernel = KernelAPI(CommandMode(agent, log), llm_registry, log, reporter)
+    ToolRuntime(tool_registry, llm_registry, adapter_manager, log, reporter).register_tools(kernel)
     return kernel
 
 
@@ -56,19 +48,6 @@ def _build_agent(config: Config, log: ColorLogPrinter, llm_registry: LLMRegistry
     store = FileAgentSessionStore(config.agent_session_log_dir)
     profiles = build_agent_profiles(llm_registry)
     return MainAgent(AgentOrchestrator(profiles, tool_registry, store, log), history)
-
-
-def _load_shells(config: Config, kernel: KernelAPI, log: ColorLogPrinter) -> list[object]:
-    shells_dir = Path("shells")
-    return [_load_shell(name, shells_dir, config, kernel, log) for name in config.shells]
-
-
-def _load_module(path: Path, dotted_name: str) -> object:
-    spec = importlib.util.spec_from_file_location(dotted_name, path)
-    module = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    spec.loader.exec_module(module)
-    return module
 
 
 def _build_adapter_manager(config: Config, log: ColorLogPrinter, tool_registry: ToolRegistry) -> AdapterManager:
@@ -83,48 +62,14 @@ def _slot_proxy(factory: ConfigurableLLMFactory, slot: object, log: ColorLogPrin
     return LLMProxy(provider, log, name, enabled_log_groups=options.log_groups, preview_chars=options.llm_log_preview_chars)
 
 
-def _load_shell(name: str, shells_dir: Path, config: Config, kernel: KernelAPI, log: ColorLogPrinter) -> object:
-    manifest = json.loads((shells_dir / name / "shell.json").read_text())
-    module_name = manifest["entry_module"]
-    module = _load_module(shells_dir / name / f"{module_name}.py", f"shells.{name}.{module_name}")
-    shell_class = getattr(module, manifest["entry_class"])
-    if name != "voice":
-        return shell_class()
-    gatekeeper = _voice_gatekeeper(config, kernel, log)
-    tts_engine = GroqTTS(config.groq_api_key) if config.tts_enabled else None
-    return shell_class(config, log, stt_engine=GroqSTT(config.groq_api_key), gatekeeper=gatekeeper, tts_engine=tts_engine)
-
-
-def _voice_gatekeeper(config: Config, kernel: KernelAPI, log: ColorLogPrinter) -> GatekeeperSlot:
-    llm_gk = LLMGatekeeper(kernel.get_llm_registry().get("gatekeeper"), log, follow_up_window_seconds=config.follow_up_timeout_seconds)
-    dictation_gate = DictationGate(kernel.get_llm_registry().get("gatekeeper"), log)
-    return _wire_dictation_gatekeeper(kernel, llm_gk, dictation_gate, log)
-
-
-def _wire_dictation_gatekeeper(kernel: KernelAPI, llm_gk: LLMGatekeeper, dictation_gate: DictationGate, log: ColorLogPrinter) -> GatekeeperSlot:
-    slot = GatekeeperSlot(llm_gk)
-    kernel.set_dictation_callbacks(
-        on_start=lambda: slot.swap(DictationGatekeeper(dictation_gate, kernel.request_dictation_stop, log)),
-        on_stop=lambda: slot.swap(llm_gk),
-    )
-    return slot
-
-
 def main() -> None:
     options = StartupOptions.from_sources(sys.argv[1:])
     config = Config.from_env()
     log = _build_log(options)
-    kernel = _build_kernel(config, log, options)
-    shells = _load_shells(config, kernel, log)
-    _start_shells(shells, kernel.submit, log)
-
-
-def _start_shells(shells: list[object], submit: object, log: ColorLogPrinter) -> None:
-    log.log("READY", "TUSK is ready.", "startup")
-    for shell in shells[:-1]:
-        threading.Thread(target=shell.start, args=(submit,), daemon=True).start()
-    if shells:
-        shells[-1].start(submit)
+    reporter = StatusReporterHub(NullStatusSink(), log)
+    kernel = _build_kernel(config, log, options, reporter)
+    reporter.set_models(kernel.get_llm_registry().model_labels())
+    ShellLoader(config, kernel, log, reporter).start()
 
 
 if __name__ == "__main__":

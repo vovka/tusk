@@ -184,12 +184,14 @@ TUSK is **AI-first**. The core of the application is an AI agent, not a command 
 | Extension | Capabilities |
 |---|---|
 | **Linux/GNOME Desktop** | **Context provider:** active window, window list/positions/sizes, workspace layout, screen geometry, running applications. **Action executor:** open/close/resize/move/focus windows; launch applications; keyboard key presses; semantic mouse control. First reference extension — not part of the core. |
+| **System Tray Indicator** | Status-only tray icon (StatusNotifierItem / AppIndicator) showing whether TUSK is running, listening, reacting, or paused. Click menu exposes the current interaction mode, the models in use, the active mic device, and quick actions (Pause/Resume, Open logs, Restart, Exit). Ships as the `tray` shell extension; the core stays unaware of it and reports status only through an abstraction. |
+
+This is a **status-and-control surface, not a full GUI**: it indicates state and offers a few lifecycle actions. A richer visual interface for TUSK itself remains future work.
 
 ### Out of Scope (v1)
 
 - Other operating systems (Windows, macOS) — future extensions
-- Text-to-speech / voice responses — future core module
-- GUI / visual interface for TUSK itself
+- Full GUI / visual control surface for TUSK itself (beyond the status tray indicator above)
 - Smart home or IoT integration — future extensions
 - Mobile platforms
 
@@ -306,6 +308,14 @@ These are unresolved decisions to revisit as development progresses:
 7. **Dangerous action list** — what specific operations belong in the dangerous action registry? How granular should it be?
 8. **Metrics and telemetry** — what to measure and how (recognition accuracy, gatekeeper precision/recall, command latency breakdown per tier, context freshness, agent response time).
 9. **Conversation context** — *Partially resolved: the main agent maintains a sliding-window conversation history within a session (max 20 messages, with LLM-based summarization on compaction). The gatekeeper also receives recent context within an adaptive follow-up window (30–120 seconds, scaling with interaction frequency). Cross-session memory remains an open question.*
+
+10. **Tray pause semantics** — *Resolved: "Pause" mutes microphone capture entirely (capture is suspended at the voice shell, so no audio is transcribed or processed), rather than dropping commands later in the pipeline. This is the most privacy-friendly meaning and saves CPU/network. Resume restarts capture.*
+
+11. **Tray indicator: interaction mode** — *Resolved: the menu shows the current interaction mode as a single, extensible line. Today modes are `default` and `dictation`; a future `coding-assistant` mode (and others) is added by extending the `AppMode` enum and a single `set_mode` call — the tray needs no change.*
+
+12. **Tray indicator: platform reach** — *Decided: v1 targets Linux/GNOME via `pystray` over the StatusNotifierItem / AppIndicator (D-Bus) protocol, which requires the host's "AppIndicator and KStatusNotifierItem Support" GNOME Shell extension (Wayland has no XEmbed tray). A `TrayBackend` abstraction isolates this choice so macOS, Windows, and other-Linux backends can be added later without reworking the indicator.*
+
+13. **Tray menu extras** — open: whether to add per-error notifications, an audio level meter, or links to docs/settings. Deferred until the status-and-control MVP lands.
 
 ---
 

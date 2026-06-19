@@ -24,3 +24,6 @@ class LLMRegistry:
     @property
     def slot_names(self) -> list[str]:
         return list(self._slots.keys())
+
+    def model_labels(self) -> tuple[tuple[str, str], ...]:
+        return tuple((name, proxy.label) for name, proxy in self._slots.items())

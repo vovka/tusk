@@ -62,9 +62,11 @@ Legacy fallback env vars (used when per-agent vars are absent):
 | `VAD_AGGRESSIVENESS` | `int` | `2` | `0`, `1`, `2`, or `3` |
 | `FOLLOW_UP_TIMEOUT_SECONDS` | `float` | `30` | Positive float (seconds) |
 | `MAX_FOLLOW_UP_TIMEOUT_SECONDS` | `float` | `120` | Positive float (seconds); follow-up window ceiling |
-| `TUSK_SHELLS` | `list[str]` | `["voice"]` | Comma-separated: `voice`, `cli` |
+| `TUSK_SHELLS` | `list[str]` | `["voice"]` | Comma-separated: `voice`, `cli`, `tray`. The shell loader automatically orders `tray` **last** (it owns the blocking GUI loop), so position in the env var does not matter |
 | `TUSK_ADAPTER_ENV_CACHE_DIR` | `str` | `".tusk_runtime/adapters"` | Directory for managed adapter venvs |
 | `TUSK_CONVERSATION_LOG_DIR` | `str` | `".tusk_runtime/conversations"` | Directory for daily conversation logs (parsed but not active) |
+| `TUSK_TRAY_ICON_THEME` | `str` | `"light"` | `light`, `dark` — icon asset set used by the tray shell |
+| `TUSK_TRAY_SHOW_LAST_ACTIVITY` | `bool` | `false` | `true`, `false` — opt-in: show the last command/reply line in the tray menu (off by default; the transcript may contain sensitive speech) |
 
 ### 2.4 LLM Slot Format and Provider Selection
 
@@ -895,6 +897,9 @@ NOT retried:
 | `VoicePipeline._handle_utterance` | Any from above | Stage returns `None`; utterance dropped |
 | `LLMRetryRunner` | Retryable error | Retries up to 3 times with linear backoff |
 | `LLMRetryRunner` | Non-retryable | Re-raises immediately |
+| `TrayShell` | Tray library `ImportError` | Logs once; shell runs in no-op mode (no icon); rest of TUSK unaffected |
+| `StatusReporterHub` | `StatusSink.publish` raises | Caught in `_emit`; logged; never propagates to the producer (protects the hot path) |
+| `TrayShell` | GUI main-loop crash | Backend torn down + logged; `TrayShell.start()` then blocks on the shutdown event instead of returning, so daemon shells (e.g. `voice`) keep running headless; the process exits only when the shutdown callback fires |
 
 ---
 
@@ -913,6 +918,8 @@ Target end-to-end latency from end of speech to action start: ≤ 1.5 seconds.
 | Execution agent LLM call | GroqLLM (gpt-oss-120b) | ~300–600 ms |
 | MCP tool execution | stdio JSON-RPC | ~10–50 ms |
 | Context formatting | `RecentContextFormatter` | < 1 ms (string ops) |
+| Status notification | `StatusReporterHub.set_status` → `StatusSink.publish` | < 1 ms (attribute set + dataclass build; off the hot path) |
+| Tray UI redraw | `TrayStatusSink` → GUI idle callback | Off-thread (GLib idle); never blocks audio/kernel threads |
 
 **Total (typical path, no replan):** STT + gatekeeper + agent + planner + executor
 = ~1.1–2.5 seconds. Replanning adds one additional planner + executor round.
@@ -923,7 +930,128 @@ Target end-to-end latency from end of speech to action start: ≤ 1.5 seconds.
 
 ---
 
-## 22. Removed Runtime Behavior
+## 22. Tray UI Specification
+
+**Source:** `shells/tray/` (the `tray` shell). The tray is an optional status-and-control
+surface. It **observes** application status and **controls** pause/resume + lifecycle; it
+contains no business logic and the kernel has no import dependency on it.
+
+### 22.1 Status and Mode States
+
+Operational status (`AppStatus`, `tusk/shared/schemas/app_status.py`) and interaction mode
+(`AppMode`, `tusk/shared/schemas/app_mode.py`) are independent. "Running" is implicit — any
+non-`STOPPED` status. `idle` is intentionally not a distinct status; the always-listening
+product collapses idle into `LISTENING` to avoid icon flicker between utterances.
+
+| `AppStatus` | Trigger | Icon | Tooltip |
+|---|---|---|---|
+| `STARTING` | Process up, pipeline not yet listening | neutral | `TUSK — starting` |
+| `LISTENING` | Mic active, awaiting/processing speech | active | `TUSK — listening` |
+| `REACTING` | A command was accepted; agent is processing | busy | `TUSK — reacting` |
+| `PAUSED` | Capture suspended by the user | muted | `TUSK — paused` |
+| `ERROR` | Last operation failed / degraded | error | `TUSK — error: <detail>` |
+| `STOPPED` | Shutting down | (icon removed) | — |
+
+| `AppMode` | Meaning |
+|---|---|
+| `DEFAULT` | Normal command/conversation mode |
+| `DICTATION` | Dictation session active |
+| *(future)* `CODING_ASSISTANT` | Added to the enum + a `set_mode` call; the tray needs no change |
+
+The icon is a pure function of `AppStatus` (`StatusIconResolver`). The mode is shown in the
+menu and tooltip, not encoded in the icon.
+
+### 22.2 Status Propagation
+
+Producers (the voice pipeline and `KernelAPI`) depend only on the `StatusReporter` ABC and
+never know a tray exists. The flow is:
+
+```
+producer → StatusReporter.set_status/set_mode/set_models/set_mic_device
+         → StatusReporterHub  (holds current state, builds a StatusSnapshot)
+         → StatusSink.publish(snapshot)
+              → NullStatusSink   (no-op; injected when no tray is loaded)
+              → TrayStatusSink   (marshals onto the GUI thread, updates icon + menu)
+```
+
+Emit points:
+
+- **Voice pipeline** (`shells/voice/pipeline.py`): `LISTENING` before waiting on utterances;
+  `REACTING` immediately before `submit(...)`, back to `LISTENING` after.
+- **KernelAPI** (`tusk/kernel/api.py`): `submit` emits `REACTING` on entry and the prior
+  status on exit (single choke point; no agent-runtime hook). `start_dictation` /
+  `stop_dictation` emit `set_mode(DICTATION)` / `set_mode(DEFAULT)`.
+- **Models**: `main.py` calls `set_models(...)` once at startup from `LLMRegistry`; the
+  `switch_model` tool calls it again after a runtime swap.
+
+Pause/resume flows back into the pipeline through the `PipelineControl` ABC
+(`tusk/kernel/interfaces/pipeline_control.py`), implemented by the voice shell:
+`pause()` suspends mic capture and emits `PAUSED`; `resume()` restarts capture and emits
+`LISTENING`. Because capture itself stops, processing genuinely halts (no STT, no LLM).
+
+### 22.3 Configuration
+
+| Env Var | Python Type | Default | Valid Values |
+|---|---|---|---|
+| `TUSK_SHELLS` | `list[str]` | `["voice"]` | Add `tray`; the loader reorders it **last** automatically (it owns the blocking GUI loop) |
+| `TUSK_TRAY_ICON_THEME` | `str` | `"light"` | `light`, `dark` |
+| `TUSK_TRAY_SHOW_LAST_ACTIVITY` | `bool` | `false` | `true`, `false` — opt-in (see §2.3 privacy note) |
+
+**Shell ordering is enforced, not assumed.** GTK/AppIndicator main loops must run on the
+main thread, so `tray` cannot run in a daemon thread. The shell loader moves `tray` to the
+end of the resolved shell list regardless of its position in `TUSK_SHELLS`, rather than
+relying on the user to order it correctly.
+
+### 22.4 Menu Specification
+
+Built by `TrayMenuBuilder` from a `StatusSnapshot` + injected `TrayMenuActions` callables.
+
+Status is conveyed by the icon and tooltip, not a menu line: pystray rebuilds
+the whole menu on any change, which collapses an open submenu, so the volatile
+status (which flips on every `LISTENING`↔`REACTING`) is kept out of the menu.
+
+| Item | Enabled | Action |
+|---|---|---|
+| `Mode: <mode>` | disabled | Info line; single extensible line |
+| `Last: <detail>` | disabled | Last command/reply; shown only when `TUSK_TRAY_SHOW_LAST_ACTIVITY=true` (hidden by default) |
+| `Mic: <device>` | disabled | Active input device label |
+| `Models ▸` | submenu | One disabled child per slot: `slot: provider/model` |
+| `Pause` / `Resume` | enabled | `PipelineControl.pause()` / `.resume()`; label flips on status |
+| `Open logs` | enabled | Opens the runtime log location |
+| `Restart` | enabled | Graceful restart of the assistant |
+| `Exit` | enabled | Graceful shutdown callback — stops every shell, then terminates |
+
+### 22.5 Tray Backend and Host Prerequisites
+
+- **Backend abstraction:** `TrayBackend` ABC (`shells/tray/interfaces/tray_backend.py`) with
+  `run()`, `stop()`, `set_icon(name)`, `set_tooltip(text)`, `set_menu(items)`. v1 ships
+  `AppIndicatorTrayBackend` (`pystray` + AppIndicator/GTK). Future macOS/Windows/Qt backends
+  are new classes behind the same ABC.
+- **Protocol:** StatusNotifierItem over D-Bus (already forwarded into the container). GNOME on
+  Wayland has no legacy XEmbed tray — the icon appears only when the host has the
+  **"AppIndicator and KStatusNotifierItem Support"** GNOME Shell extension enabled. This is a
+  host prerequisite TUSK cannot satisfy from inside Docker.
+- **Dependencies:** `requirements.txt` adds the pure-Python `pystray` and `Pillow`. PyGObject
+  (`gi`) is supplied by the distro rather than built from source: the Dockerfile installs the GI
+  stack via apt (`python3-gi`, `python3-gi-cairo`, `gir1.2-gtk-3.0`,
+  `gir1.2-ayatanaappindicator3-0.1`) and exposes the system `dist-packages` to the image's
+  same-ABI Python with `PYTHONPATH=/usr/lib/python3/dist-packages` (avoids the fragile pip
+  PyGObject build on slim images). `PYSTRAY_BACKEND=appindicator` pins the backend.
+- **Headless/tests:** the tray library import is guarded (`try/except ImportError`) exactly as
+  `AudioCapture` guards `sounddevice`; on failure the shell runs no-op. `TrayStatusSink`,
+  `StatusIconResolver`, and `TrayMenuBuilder` are pure/logic-only so they unit-test without any
+  GUI library; `conftest.py` stubs `pystray` and `gi`.
+
+### 22.6 Latency Note
+
+Status calls are synchronous in-process method calls beside the hot path (not inside any
+STT/LLM/network call), costing < 1 ms. **Hard requirement:** `StatusSink.publish` must enqueue
+onto the GUI thread (e.g. `GLib.idle_add`) and return immediately, so a slow redraw can never
+stall the audio or kernel threads (see §21).
+
+---
+
+## 23. Removed Runtime Behavior
 
 The active runtime no longer uses:
 
