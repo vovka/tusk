@@ -191,7 +191,6 @@ This is a **status-and-control surface, not a full GUI**: it indicates state and
 ### Out of Scope (v1)
 
 - Other operating systems (Windows, macOS) — future extensions
-- Text-to-speech / voice responses — future core module
 - Full GUI / visual control surface for TUSK itself (beyond the status tray indicator above)
 - Smart home or IoT integration — future extensions
 - Mobile platforms

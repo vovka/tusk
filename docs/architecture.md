@@ -28,9 +28,9 @@ only through `kernel.submit(text)` at runtime and shared ABCs at design time.
 
 > Source: [`docs/diagrams/architecture.svg`](diagrams/architecture.svg)
 >
-> Note: the diagram predates the optional `tray` shell. The tray status indicator and its
-> `StatusReporter → StatusSink` / `PipelineControl` wiring are described textually below and in
-> §22 of the specification; the diagram will be refreshed in a follow-up.
+> The diagram includes the optional `tray` shell, the shared `Status` layer
+> (`StatusReporter → StatusSink`), and the TTS provider. The `PipelineControl` pause/resume
+> wiring and the full status flow are described textually below and in §22 of the specification.
 
 ---
 
@@ -138,7 +138,8 @@ sequenceDiagram
 
 ```
 tusk/
-├── main.py                              # Startup wiring — builds and connects all layers
+├── main.py                              # Startup wiring — builds the kernel, delegates shells to ShellLoader
+├── shell_loader.py                      # ShellLoader — loads shells, orders tray last, injects deps
 ├── requirements.txt
 ├── .env.example
 ├── tusk/
@@ -252,17 +253,24 @@ tusk/
 │   │   │   │   └── status_sink.py       # StatusSink ABC — what the tray implements
 │   │   │   ├── status_reporter_hub.py   # StatusReporterHub — holds state, builds + publishes snapshots
 │   │   │   └── null_status_sink.py      # NullStatusSink — no-op sink (default when no tray)
-│   │   └── stt/
+│   │   ├── stt/
+│   │   │   └── interfaces/
+│   │   │       └── stt_engine.py        # STTEngine ABC — transcribe(audio_frames, sample_rate)
+│   │   └── tts/
 │   │       └── interfaces/
-│   │           └── stt_engine.py        # STTEngine ABC — transcribe(audio_frames, sample_rate)
+│   │           └── tts_engine.py        # TTSEngine ABC — synthesize(text) → WAV bytes
 │   └── providers/                       # Swappable implementations behind shared ABCs
 │       ├── llm/
 │       │   ├── groq_llm.py              # GroqLLM — Groq cloud API with structured output
 │       │   ├── open_router_llm.py       # OpenRouterLLM — OpenRouter via OpenAI client
 │       │   └── configurable_llm_factory.py # Parses "provider/model" strings
-│       └── stt/
-│           ├── groq_stt.py              # GroqSTT — Groq cloud Whisper-large-v3-turbo
-│           └── whisper_stt.py           # WhisperSTT — local OpenAI Whisper model
+│       ├── stt/
+│       │   ├── groq_stt.py              # GroqSTT — Groq cloud Whisper-large-v3-turbo
+│       │   └── whisper_stt.py           # WhisperSTT — local OpenAI Whisper model
+│       └── tts/
+│           ├── groq_tts.py              # GroqTTS — Groq Orpheus WAV synthesis, chunked
+│           ├── text_chunker.py          # TextChunker — splits text under Orpheus 200-char cap
+│           └── wav_concatenator.py      # WavConcatenator — merges clip WAVs into one
 ├── shells/
 │   ├── voice/                           # Six-stage composable voice pipeline
 │   │   ├── README.md                    # Voice shell architecture (see that file)
@@ -279,6 +287,7 @@ tusk/
 │   │       ├── audio_capture.py         # AudioCapture — sounddevice PulseAudio stream
 │   │       ├── utterance_detector.py    # UtteranceDetector — WebRTC VAD boundary detection
 │   │       ├── transcriber.py           # Transcriber — wraps STTEngine
+│   │       ├── speech_playback.py       # SpeechPlayback — plays synthesized WAV replies
 │   │       ├── sanitizer.py             # Sanitizer — hallucination / ghost-phrase filter
 │   │       ├── transcription_buffer.py  # TranscriptionBuffer — rolling window + state tracking
 │   │       ├── gatekeeper.py            # LLMGatekeeper — primary classify + recovery
@@ -990,7 +999,8 @@ Shells are dynamically loaded from `shell.json` manifests by `main.py`.
 ### VoiceShell — `shells/voice/voice_shell.py`
 
 Builds a `VoicePipeline` from the six stages and drives it in a loop, passing
-`kernel.submit` as the callback. Logs the reply if present. See
+`kernel.submit` as the callback. Logs the reply and, when a `TTSEngine` is injected
+(`TUSK_TTS=on`, default), speaks it via `SpeechPlayback`. See
 `shells/voice/README.md` for full pipeline details.
 
 ### CLIShell — `shells/cli/cli_shell.py`
@@ -1062,6 +1072,31 @@ errors, rate limit, timeout.
 - **Headers:** `HTTP-Referer: https://github.com/vovka/tusk`, `X-Title: TUSK`
 - **Structured output:** Falls back to plain `complete()` (no schema enforcement)
 - **label:** `"openrouter/<model>"`
+
+---
+
+## TTS Provider Specification
+
+Spoken replies are optional, controlled by `TUSK_TTS` (`on` by default; `off`/`0`/`false`
+disables). When disabled, no `TTSEngine` is injected and `VoiceShell` only logs replies.
+
+### GroqTTS — `tusk/providers/tts/groq_tts.py`
+
+- **Model:** `canopylabs/orpheus-v1-english`, voice `daniel`, `response_format="wav"`
+- **Chunking:** Orpheus caps `input` at 200 chars, so `TextChunker` splits long replies on word
+  boundaries; each chunk is synthesized separately.
+- **Concatenation:** `WavConcatenator` merges the per-chunk WAV clips into one. Orpheus streams
+  clips with a placeholder frame count in the header, so the writer's channels/width/rate are
+  copied individually (never `setparams`) and the output size is derived from the bytes actually
+  written — otherwise the placeholder count overflows the uint32 WAV size field.
+
+### SpeechPlayback — `shells/voice/stages/speech_playback.py`
+
+Plays the synthesized WAV. `VoiceShell._speak` catches playback/synthesis errors and logs them
+under `ERROR` so a TTS failure never interrupts the voice loop.
+
+> ⚠️ Latency: TTS runs on the consumer thread after a reply is produced, off the STT →
+> gatekeeper → agent hot path, so it does not affect command latency.
 
 ---
 
@@ -1163,10 +1198,11 @@ main()
       → KernelAPI(CommandMode(agent, log), llm_registry, log, DictationGate(...), reporter)
       → ToolRuntime(...).register_tools(kernel)    # attaches DictationRouter + tools
   → reporter.set_models(...)                       # initial model labels from LLMRegistry
-  → _load_shells(config, kernel_api)               # loads shell modules; reorders "tray" last
+  → ShellLoader(config, kernel, log, reporter).start()   # loads shell modules; reorders "tray" last
       # Voice shell builds its own six-stage pipeline and exposes PipelineControl:
       → LLMGatekeeper(llm_registry.get("gatekeeper"), log)
-      → VoiceShell(config, log, stt_engine, gatekeeper, reporter)
+      → tts_engine = GroqTTS(...) if config.tts_enabled else None   # spoken replies
+      → VoiceShell(config, log, stt_engine, gatekeeper, tts_engine, reporter)
           → VoicePipeline(detector, transcriber, sanitizer, buffer, gatekeeper, reporter)
       # Tray shell (when "tray" in TUSK_SHELLS, forced last by the loader):
       → TrayShell(reporter, pipeline_control, shutdown_event, config)
@@ -1176,10 +1212,10 @@ main()
     so a GUI-loop crash degrades to headless instead of returning and killing daemons.
 ```
 
-The tray is wired only here in `main.py` (the wiring layer, which is allowed to know about
-shells). The kernel and pipeline depend solely on the `StatusReporter` / `PipelineControl`
-abstractions and never import `shells.tray`. When no tray shell is loaded, the
-`NullStatusSink` stays in place and status reporting is a no-op.
+The tray is wired only in `ShellLoader` (the wiring layer, which is allowed to know about
+shells; `main.py` builds the kernel and hands off to it). The kernel and pipeline depend solely
+on the `StatusReporter` / `PipelineControl` abstractions and never import `shells.tray`. When no
+tray shell is loaded, the `NullStatusSink` stays in place and status reporting is a no-op.
 
 ---
 
