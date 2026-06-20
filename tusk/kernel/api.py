@@ -1,8 +1,7 @@
 from collections.abc import Callable
-from threading import Lock
 
+from tusk.kernel.submit_status_reporter import SubmitStatusReporter
 from tusk.shared.schemas.app_mode import AppMode
-from tusk.shared.schemas.app_status import AppStatus
 from tusk.shared.schemas.kernel_response import KernelResponse
 
 __all__ = ["KernelAPI"]
@@ -20,8 +19,8 @@ class KernelAPI:
         self._llm_registry = llm_registry
         self._log = log
         self._reporter = reporter
+        self._submit_reporter = SubmitStatusReporter(reporter) if reporter is not None else None
         self._init_state()
-        self._init_status_reporting()
 
     def _init_state(self) -> None:
         self._dictation_mode = None
@@ -33,16 +32,11 @@ class KernelAPI:
         self._on_coding_started: Callable[[], None] | None = None
         self._on_coding_stopped: Callable[[], None] | None = None
 
-    def _init_status_reporting(self) -> None:
-        self._status_lock = Lock()
-        self._active_submissions = 0
-        self._restore_status = AppStatus.LISTENING
-
     def submit(self, text: str) -> KernelResponse:
         self._log_input(text)
-        if self._reporter is None:
+        if self._submit_reporter is None:
             return self._route(text)
-        return self._submit_reported(text)
+        return self._submit_reporter.run(text, self._route)
 
     def _log_input(self, text: str) -> None:
         if self._log is not None:
@@ -54,26 +48,6 @@ class KernelAPI:
         if self._dictation_mode is not None:
             return self._dictation_mode.process_text(text)
         return self._command_mode.process_command(text)
-
-    def _submit_reported(self, text: str) -> KernelResponse:
-        self._begin_reported_submit(text)
-        try:
-            return self._route(text)
-        finally:
-            self._end_reported_submit()
-
-    def _begin_reported_submit(self, text: str) -> None:
-        with self._status_lock:
-            if self._active_submissions == 0:
-                self._restore_status = self._reporter.status
-            self._active_submissions += 1
-            self._reporter.set_status(AppStatus.REACTING, text)
-
-    def _end_reported_submit(self) -> None:
-        with self._status_lock:
-            self._active_submissions -= 1
-            if self._active_submissions == 0:
-                self._reporter.set_status(self._restore_status)
 
     def _report_mode(self, mode: AppMode) -> None:
         if self._reporter is not None:
