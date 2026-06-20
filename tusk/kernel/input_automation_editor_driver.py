@@ -1,14 +1,22 @@
+import time
+from collections.abc import Callable
+
 from tusk.kernel.clipboard_guard import ClipboardGuard
 from tusk.kernel.interfaces.editor_driver import EditorDriver
 from tusk.shared.schemas.buffer_selection import BufferSelection
 
 __all__ = ["InputAutomationEditorDriver"]
 
+# xdotool returns before the target app consumes the paste, so the clipboard
+# must stay put until then or the guard restores stale text and nothing pastes.
+_PASTE_SETTLE_SECONDS = 0.2
+
 
 class InputAutomationEditorDriver(EditorDriver):
-    def __init__(self, tool_registry: object, desktop_source: str) -> None:
+    def __init__(self, tool_registry: object, desktop_source: str, sleep: Callable[[float], None] = time.sleep) -> None:
         self._registry = tool_registry
         self._source = desktop_source
+        self._sleep = sleep
 
     def read_buffer(self) -> str:
         with ClipboardGuard(self._registry, self._source):
@@ -30,6 +38,7 @@ class InputAutomationEditorDriver(EditorDriver):
         with ClipboardGuard(self._registry, self._source):
             self._exec("write_clipboard", {"text": text})
             self._press("<ctrl>v")
+            self._sleep(_PASTE_SETTLE_SECONDS)
 
     def type_text(self, text: str) -> None:
         self._exec("type_text", {"text": text})
