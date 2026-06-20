@@ -92,12 +92,20 @@ class VoiceShell:
     def _speak(self, reply: str) -> None:
         if self._tts is None:
             return
-        # ponytail: the mic hears this playback and the gatekeeper drops it as
-        # ambient — add mute-during-playback if it ever loops.
         try:
-            self._playback.play(self._tts.synthesize(reply))
+            self._play_muted(self._tts.synthesize(reply))
         except Exception as exc:
             self._log.log("ERROR", f"tts failed: {exc}")
+
+    def _play_muted(self, audio: object) -> None:
+        # Mute capture during playback so the mic never hears TUSK's own voice
+        # (coding mode forwards every utterance, so an echo would loop forever).
+        resume = self._pause_gate.is_set()
+        self._pause_gate.clear()
+        try:
+            self._playback.play(audio)
+        finally:
+            if resume: self._pause_gate.set()
 
 
 def _missing_stt_engine() -> object:

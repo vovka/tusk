@@ -27,6 +27,17 @@ def test_voice_shell_stays_silent_without_tts_engine() -> None:
     assert played == []
 
 
+def test_voice_shell_mutes_mic_during_playback() -> None:
+    gate_while_playing: list[bool] = []
+    log = types.SimpleNamespace(log=lambda *args: None)
+    pipeline = types.SimpleNamespace(run=lambda submit: iter([KernelResponse(True, "coding updated")]))
+    shell = VoiceShell(None, log, pipeline=pipeline, tts_engine=_tts([]))
+    shell._playback = types.SimpleNamespace(play=lambda wav: gate_while_playing.append(shell._pause_gate.is_set()))
+    shell.start(lambda text: None)
+    assert gate_while_playing == [False]
+    assert shell._pause_gate.is_set()
+
+
 def _shell(tts_engine: object | None, playback: object, responses: list[KernelResponse], logs: list | None = None) -> VoiceShell:
     log = types.SimpleNamespace(log=lambda *args: logs.append(args) if logs is not None else None)
     pipeline = types.SimpleNamespace(run=lambda submit: iter(responses))
