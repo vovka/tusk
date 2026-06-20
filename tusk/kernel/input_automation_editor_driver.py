@@ -7,9 +7,9 @@ from tusk.shared.schemas.buffer_selection import BufferSelection
 
 __all__ = ["InputAutomationEditorDriver"]
 
-# xdotool returns before the target app consumes the paste, so the clipboard
-# must stay put until then or the guard restores stale text and nothing pastes.
-_PASTE_SETTLE_SECONDS = 0.2
+# xdotool returns before the target app consumes a copy/paste keystroke, so the
+# clipboard must settle before we read or restore it, or we lose the round-trip.
+_CLIPBOARD_SETTLE_SECONDS = 0.2
 
 
 class InputAutomationEditorDriver(EditorDriver):
@@ -22,6 +22,7 @@ class InputAutomationEditorDriver(EditorDriver):
         with ClipboardGuard(self._registry, self._source):
             self._press("<ctrl>a")
             self._press("<ctrl>c")
+            self._sleep(_CLIPBOARD_SETTLE_SECONDS)
             return self._read_clipboard()
 
     def goto_line(self, line_number: int) -> None:
@@ -38,7 +39,7 @@ class InputAutomationEditorDriver(EditorDriver):
         with ClipboardGuard(self._registry, self._source):
             self._exec("write_clipboard", {"text": text})
             self._press("<ctrl>v")
-            self._sleep(_PASTE_SETTLE_SECONDS)
+            self._sleep(_CLIPBOARD_SETTLE_SECONDS)
 
     def type_text(self, text: str) -> None:
         self._exec("type_text", {"text": text})
@@ -62,4 +63,7 @@ class InputAutomationEditorDriver(EditorDriver):
         self._exec("press_keys", {"keys": keys})
 
     def _exec(self, name: str, arguments: dict) -> object:
-        return self._registry.get(f"{self._source}.{name}").execute(arguments)
+        result = self._registry.get(f"{self._source}.{name}").execute(arguments)
+        if not result.success:
+            raise RuntimeError(f"{self._source}.{name} failed: {result.message}")
+        return result

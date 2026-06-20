@@ -1,5 +1,7 @@
 import types
 
+import pytest
+
 from tusk.kernel.input_automation_editor_driver import InputAutomationEditorDriver
 from tusk.shared.schemas.buffer_selection import BufferSelection
 from tusk.shared.schemas.tool_result import ToolResult
@@ -32,6 +34,23 @@ def test_read_buffer_select_all_copy_then_restores_clipboard() -> None:
     assert ("press_keys", {"keys": "<ctrl>a"}) in calls
     assert ("press_keys", {"keys": "<ctrl>c"}) in calls
     assert calls[-1] == ("write_clipboard", {"text": "held"})
+
+
+def test_read_buffer_settles_after_copy_before_reading_clipboard() -> None:
+    calls: list[tuple] = []
+    driver = InputAutomationEditorDriver(_registry(calls), "gnome", sleep=lambda seconds: calls.append(("sleep", seconds)))
+    driver.read_buffer()
+    copy_idx = calls.index(("press_keys", {"keys": "<ctrl>c"}))
+    sleep_idx = next(index for index, call in enumerate(calls) if call[0] == "sleep")
+    read_idx = next(index for index, call in enumerate(calls) if call[0] == "read_clipboard" and index > copy_idx)
+    assert copy_idx < sleep_idx < read_idx
+
+
+def test_driver_raises_when_a_gnome_tool_fails() -> None:
+    registry = types.SimpleNamespace(get=lambda name: types.SimpleNamespace(execute=lambda args: ToolResult(False, "xdotool missing", None)))
+    driver = InputAutomationEditorDriver(registry, "gnome", sleep=lambda seconds: None)
+    with pytest.raises(RuntimeError):
+        driver.press_keys("<ctrl>a")
 
 
 def test_select_range_spans_rows_with_shift() -> None:
