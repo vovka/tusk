@@ -28,6 +28,9 @@ services:
       - ~/.local/share/applications:/home-apps:ro
       - /var/lib/snapd/desktop/applications:/snap-apps:ro
       - /tmp/tusk:/tmp/tusk
+      # Codex backend reads/refreshes OAuth tokens here (HOME=/tmp -> ~/.codex).
+      # Read-write so token refresh persists; needs the codex binary in vendor/.
+      - ~/.codex:/tmp/.codex
       - .:/app
     devices:
       - /dev/snd:/dev/snd
