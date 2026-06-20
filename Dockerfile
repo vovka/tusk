@@ -46,4 +46,6 @@ RUN if [ -f /opt/codex-vendor/codex ]; then \
 
 COPY . .
 
+# Prepare a container-local codex home before launching (no-op for the tusk backend).
+ENTRYPOINT ["/app/docker/codex-entrypoint.sh"]
 CMD ["python", "main.py"]

@@ -18,6 +18,8 @@ services:
       PYTHONUNBUFFERED: "1"
       DBUS_SESSION_BUS_ADDRESS: unix:path=/run/user/1000/bus
       SHOW_LOGS: ${SHOW_LOGS:-}
+      # Container-local codex home; entrypoint writes config.toml + copies auth here.
+      CODEX_HOME: /tmp/.codex
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix
       - ${XAUTHORITY:-~/.Xauthority}:/root/.Xauthority:ro
@@ -28,9 +30,9 @@ services:
       - ~/.local/share/applications:/home-apps:ro
       - /var/lib/snapd/desktop/applications:/snap-apps:ro
       - /tmp/tusk:/tmp/tusk
-      # Codex backend reads/refreshes OAuth tokens here (HOME=/tmp -> ~/.codex).
-      # Read-write so token refresh persists; needs the codex binary in vendor/.
-      - ~/.codex:/tmp/.codex
+      # Codex backend: host OAuth tokens, copied into the container-local CODEX_HOME
+      # by the entrypoint (keeps the host's ~/.codex/config.toml untouched).
+      - ~/.codex:/host-codex:ro
       - .:/app
     devices:
       - /dev/snd:/dev/snd
