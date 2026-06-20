@@ -2,7 +2,13 @@ from tusk.shared.schemas.tool_result import ToolResult
 
 __all__ = ["MCPToolProxy"]
 
-_INTERNAL_TOOL_NAMES = {"dictation.start_dictation", "dictation.stop_dictation"}
+_INTERNAL_TOOL_NAMES = {
+    "dictation.start_dictation",
+    "dictation.stop_dictation",
+    "coding.start_coding_session",
+    "coding.process_intent",
+    "coding.stop_coding_session",
+}
 _SEQUENCE_TOOL_NAMES = {
     "gnome.close_window",
     "gnome.focus_window",
