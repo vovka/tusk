@@ -19,6 +19,14 @@ def test_dictation_lifecycle_tools_are_hidden_from_planner() -> None:
     assert registry.planner_tool_names() == {"dictation.process_segment"}
 
 
+def test_coding_lifecycle_tools_are_hidden_from_planner() -> None:
+    registry = ToolRegistry()
+    registry.register(MCPToolProxy("coding", _schema("start_coding_session"), _client(), lambda coro: None))
+    registry.register(MCPToolProxy("coding", _schema("process_intent"), _client(), lambda coro: None))
+    registry.register(MCPToolProxy("coding", _schema("stop_coding_session"), _client(), lambda coro: None))
+    assert registry.planner_tool_names() == set()
+
+
 def test_non_lifecycle_adapter_tools_remain_planner_visible() -> None:
     proxy = MCPToolProxy("gnome", _schema("type_text"), _client(), lambda coro: None)
     assert proxy.planner_visible is True

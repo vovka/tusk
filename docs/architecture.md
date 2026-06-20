@@ -214,22 +214,22 @@ tusk/
 │   │   ├── coding_gate_prompt.py        # Coding-specific prompt for CodingGate
 │   │   ├── coding_mode.py               # AdapterCodingMode — active coding state
 │   │   ├── coding_router.py             # CodingRouter — intent → edit ops → editor
-│   │   ├── coding_state.py              # CodingState — session id + driver + strategy names
+│   │   ├── coding_state.py              # CodingState — adapter name + session id + desktop source
 │   │   ├── command_mode.py              # CommandMode — routes submitted text to agent
 │   │   ├── dictation_gate.py            # DictationGate — LLM-based stop classification
 │   │   ├── dictation_gate_prompt.py     # Dictation-specific prompt for DictationGate
 │   │   ├── dictation_mode.py            # AdapterDictationMode — active dictation state
 │   │   ├── dictation_router.py          # DictationRouter — routes segments and edits
 │   │   ├── dictation_state.py           # DictationState — session id + adapter names
-│   │   ├── fallback_edit_strategy.py    # FallbackEditStrategy — primary → full-replace on failure
-│   │   ├── full_replace_edit_strategy.py # FullReplaceEditStrategy — select-all + paste buffer
+│   │   ├── fallback_edit_strategy.py    # FallbackEditStrategy — design only, not yet implemented
+│   │   ├── full_replace_edit_strategy.py # FullReplaceEditStrategy — select-all + paste buffer (wired strategy)
 │   │   ├── input_automation_editor_driver.py # InputAutomationEditorDriver — drives editor via gnome.*
 │   │   ├── internal_tools.py            # Re-exports tool classes
-│   │   ├── line_anchored_edit_strategy.py # LineAnchoredEditStrategy — goto-line + paste region (default)
+│   │   ├── line_anchored_edit_strategy.py # LineAnchoredEditStrategy — goto-line + paste region (ships; not wired)
 │   │   ├── llm_conversation_summarizer.py # LLM-based history compaction
 │   │   ├── main_agent.py                # MainAgent — entry point for a conversation turn
 │   │   ├── model_failure_reply_builder.py # Human-readable failure messages
-│   │   ├── raw_key_edit_strategy.py     # RawKeyEditStrategy — arrows/Home/End/Delete + type
+│   │   ├── raw_key_edit_strategy.py     # RawKeyEditStrategy — design only, not yet implemented
 │   │   ├── registered_tool.py           # RegisteredTool — frozen entry in ToolRegistry
 │   │   ├── repeated_tool_call_guard.py  # Detects repeated identical tool calls
 │   │   ├── sliding_window_history.py    # SlidingWindowHistory — max-20 with LLM compaction
@@ -522,9 +522,11 @@ def apply(self, edit: EditOperation, driver: EditorDriver) -> None
 ```
 
 Maps a single `EditOperation` onto a sequence of `EditorDriver` calls. Depends only on
-the `EditOperation` schema and the `EditorDriver` ABC. Implementations:
-`LineAnchoredEditStrategy` (default), `FullReplaceEditStrategy` (fallback / resync),
-`RawKeyEditStrategy`, and the composing `FallbackEditStrategy`.
+the `EditOperation` schema and the `EditorDriver` ABC. `FullReplaceEditStrategy`
+(re-pastes `full_buffer`) is the one wired in `ToolRuntime` — drift-proof under the
+fire-and-forget input-automation driver. `LineAnchoredEditStrategy` (paste only the
+changed region) ships but is not wired; `RawKeyEditStrategy` and `FallbackEditStrategy`
+are design options (see specification §17.0).
 
 ### StatusReporter — `tusk/shared/status/interfaces/status_reporter.py`
 
@@ -666,8 +668,9 @@ Produced by the coding adapter and converted from the JSON-RPC `data` payload in
 | `adapter_name` | `str` | MCP adapter name (`"coding"`) |
 | `session_id` | `str` | Adapter session id |
 | `desktop_source` | `str` | Input-automation source (e.g. `"gnome"`) |
-| `driver_name` | `str` | Selected `EditorDriver` (`"input_automation"` / `"vscode"`) |
-| `strategy_name` | `str` | Selected edit strategy (`"line_anchored"` / `"full_replace"` / `"raw_key"`) |
+
+The driver and strategy are wired in `ToolRuntime` (single driver, `FullReplaceEditStrategy`),
+not selected per-session — `CodingState` carries no `driver_name` / `strategy_name`.
 
 ### BufferModel — `adapters/coding/buffer_model.py`
 
@@ -1136,7 +1139,7 @@ back to `LLMGatekeeper`. The stop phrase itself is dropped (not typed).
 ### AdapterCodingMode — `tusk/kernel/coding_mode.py`
 
 Active when `start_coding` has been executed. Holds a `CodingState` (session ID, adapter
-name, desktop source, selected driver, selected strategy). Structurally a sibling of
+name, desktop source). Structurally a sibling of
 `AdapterDictationMode` — the difference is that spoken intent is converted into structured
 code edits rather than inserted verbatim.
 
@@ -1144,7 +1147,7 @@ code edits rather than inserted verbatim.
 calls `coding.process_intent` (MCP), which runs the coding LLM over the intent plus the
 adapter's authoritative `BufferModel` and returns one or more `EditOperation`s. The router
 converts each into a typed `EditOperation` and applies it via the injected
-`EditApplicationStrategy` + `EditorDriver` (e.g. `LineAnchoredEditStrategy` over
+`EditApplicationStrategy` + `EditorDriver` (`FullReplaceEditStrategy` over
 `InputAutomationEditorDriver`, which composes `gnome.*` key/clipboard tools).
 
 **stop():** Calls `CodingRouter.stop()` which calls `coding.stop_coding_session` (MCP) and

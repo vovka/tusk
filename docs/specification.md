@@ -63,13 +63,15 @@ Legacy fallback env vars (used when per-agent vars are absent):
 | `VAD_AGGRESSIVENESS` | `int` | `2` | `0`, `1`, `2`, or `3` |
 | `FOLLOW_UP_TIMEOUT_SECONDS` | `float` | `30` | Positive float (seconds) |
 | `MAX_FOLLOW_UP_TIMEOUT_SECONDS` | `float` | `120` | Positive float (seconds); follow-up window ceiling |
-| `TUSK_SHELLS` | `list[str]` | `["voice"]` | Comma-separated: `voice`, `cli`, `tray`. The shell loader automatically orders `tray` **last** (it owns the blocking GUI loop), so position in the env var does not matter |
+| `TUSK_SHELLS` | `list[str]` | `["voice"]` | Comma-separated: `voice`, `cli`, `tray`, `emulator` (scripted-transcript shell). The shell loader automatically orders `tray` **last** (it owns the blocking GUI loop), so position in the env var does not matter |
 | `TUSK_ADAPTER_ENV_CACHE_DIR` | `str` | `".tusk_runtime/adapters"` | Directory for managed adapter venvs |
 | `TUSK_CONVERSATION_LOG_DIR` | `str` | `".tusk_runtime/conversations"` | Directory for daily conversation logs (parsed but not active) |
 | `TUSK_TRAY_ICON_THEME` | `str` | `"light"` | `light`, `dark` — icon asset set used by the tray shell |
 | `TUSK_TRAY_SHOW_LAST_ACTIVITY` | `bool` | `false` | `true`, `false` — opt-in: show the last command/reply line in the tray menu (off by default; the transcript may contain sensitive speech) |
-| `TUSK_CODING_EDITOR_DRIVER` | `str` | `"input_automation"` | `input_automation` (any editor via `gnome.*`) or `vscode` (future plugin driver) |
-| `TUSK_CODING_EDIT_STRATEGY` | `str` | `"line_anchored"` | `line_anchored`, `full_replace`, or `raw_key` |
+| `TUSK_CODING_EDITOR_DRIVER` | `str` | `"input_automation"` | Design option, not yet wired — only `input_automation` (any editor via `gnome.*`) is active |
+| `TUSK_CODING_EDIT_STRATEGY` | `str` | `"full_replace"` | Selection not yet wired — `full_replace` is the active strategy (see §17.0) |
+| `TUSK_TRANSCRIPT` | `str` | `""` | Path to the transcript replayed by the `emulator` shell |
+| `TUSK_UTTERANCE_PAUSE` | `float` | `3` | Seconds the `emulator` shell waits between utterances |
 
 ### 2.4 LLM Slot Format and Provider Selection
 
@@ -756,11 +758,22 @@ Coding mode is the pair-coding sibling of dictation mode (§15). Spoken intent i
 into structured code edits and applied to the focused editor through a swappable
 `EditorDriver` and `EditApplicationStrategy`. TUSK never writes files on disk.
 
+### 17.0 Implementation status (as built)
+
+The rest of §17 describes the full design. As currently implemented and wired
+(`tusk/kernel/tool_runtime.py`):
+
+- **One editor driver:** `InputAutomationEditorDriver` (editor-agnostic `gnome.*` automation). `TUSK_CODING_EDITOR_DRIVER` and `VSCodeEditorDriver` are design contracts, not yet wired.
+- **One edit strategy — `FullReplaceEditStrategy`:** every edit re-pastes `EditOperation.full_buffer` (select-all → paste). It is the wired strategy because the input-automation driver is fire-and-forget with no feedback channel, so a full-buffer repaint of the authoritative `BufferModel` is drift-proof; `LineAnchoredEditStrategy` silently mis-applies on line drift or focus loss (verified against gedit 46: line-anchored dropped the function body, full-replace reproduced the buffer verbatim). `line_anchored` / `raw_key` / `FallbackEditStrategy` and `TUSK_CODING_EDIT_STRATEGY` selection are design options, not yet wired.
+- **`CodingState`** carries `(adapter_name, session_id, desktop_source)` only.
+- **Adapter lifecycle tools** (`coding.start_coding_session` / `process_intent` / `stop_coding_session`) are internal plumbing the kernel calls directly. They are hidden from the agent planner via `_INTERNAL_TOOL_NAMES` (like dictation's lifecycle tools); the planner's only coding entry point is the kernel tool `start_coding`.
+- **Driving coding mode without voice:** the `emulator` shell (`TUSK_SHELLS=emulator`) replays a scripted transcript into `KernelAPI.submit`, standing in for the STT + gatekeeper front end. It reads `TUSK_TRANSCRIPT` (path) and `TUSK_UTTERANCE_PAUSE` (seconds between utterances). Everything downstream — agent, GNOME launcher, coding adapter, editor automation — runs for real. See `demos/coding_session.txt`.
+
 ### 17.1 StartCodingTool — `tusk/kernel/start_coding_tool.py`
 
 ```
 name = "start_coding"
-description = "Start adapter-driven pair-coding mode"
+description = "Enter pair-coding mode: TUSK applies the user's spoken code edits to the focused editor."
 planner_visible = True
 ```
 
@@ -769,7 +782,7 @@ planner_visible = True
 2. Read the buffer once via `driver.read_buffer()` (select-all → copy → `read_clipboard`).
 3. Call `ToolRegistry.get("coding.start_coding_session").execute({"initial_buffer": buffer})`
 4. If not found: return `ToolResult(False, "coding adapter is not available")`
-5. Build `CodingState("coding", data["session_id"], desktop_source, driver_name, strategy_name)`
+5. Build `CodingState("coding", data["session_id"], desktop_source)`
 6. Call `controller.start_coding(state)`
 7. Return `ToolResult(True, "Coding started.", data)`
 
@@ -861,11 +874,11 @@ extension itself is out of scope; only the driver contract is fixed so it is swa
 
 ### 17.6 EditApplicationStrategy — `tusk/kernel/interfaces/edit_application_strategy.py`
 
-`apply(edit, driver)` maps one `EditOperation` onto driver calls. Selected by
-`TUSK_CODING_EDIT_STRATEGY`.
+`apply(edit, driver)` maps one `EditOperation` onto driver calls. `TUSK_CODING_EDIT_STRATEGY`
+selection is not yet wired; `FullReplaceEditStrategy` is the one wired strategy (see §17.0).
 
-- **LineAnchoredEditStrategy** (`line_anchored`, default): `insert` → `goto_line` + anchor + `paste(new_text)`; `replace` → `select_range` + `paste(new_text)`; `delete` → `select_range` + `press_keys("Delete")`. Pastes only the changed region.
-- **FullReplaceEditStrategy** (`full_replace`): `driver.replace_buffer(edit.full_buffer)`. The fallback and the resync / recovery path.
+- **FullReplaceEditStrategy** (`full_replace`, **wired**): `driver.replace_buffer(edit.full_buffer)` — select-all + paste the authoritative buffer. Drift-proof for the fire-and-forget input-automation driver; also the resync / recovery path.
+- **LineAnchoredEditStrategy** (`line_anchored`, design option): `insert` → `goto_line` + anchor + `paste(new_text)`; `replace` → `select_range` + `paste(new_text)`; `delete` → `select_range` + `press_keys("Delete")`. Pastes only the changed region, but silently mis-applies under input automation when line numbers drift.
 - **RawKeyEditStrategy** (`raw_key`): arrows / Home / End / Delete / BackSpace + `type_text` at positions; no clipboard. **Trade-off:** typing character-by-character is slow for multi-line edits and is the most likely to trigger editor autocomplete / IntelliSense popups that swallow or corrupt simulated keystrokes. It is intended only for small, single-line edits; larger edits should use `line_anchored` or `full_replace`.
 - **FallbackEditStrategy** (`tusk/kernel/fallback_edit_strategy.py`): composes `(primary, fallback)`; on a `RuntimeError` from the primary it re-applies via `FullReplaceEditStrategy`. **Feedback limitation:** the input-automation driver is fire-and-forget GUI automation (`xdotool` via `gnome.*`) with no channel to observe the editor, so a mis-applied line-anchored edit (line drift, focus loss) does **not** raise — automatic fallback is therefore only effective for drivers with a bidirectional feedback channel (the future `VSCodeEditorDriver`). Under input automation, recovery is user-initiated: the user asks TUSK to resync, which runs `FullReplaceEditStrategy` to repaint the authoritative buffer (see §17.7).
 

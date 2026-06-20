@@ -1,0 +1,13 @@
+# Emulated voice session for TUSK pair-coding mode.
+# Each non-comment line stands in for one spoken utterance — voice input is
+# the only mocked piece; the kernel, agent, GNOME launcher, and editor are real.
+#
+# Run (host launcher must be listening, xhost must allow the container):
+#   TUSK_SHELLS=emulator TUSK_TRANSCRIPT=demos/coding_session.txt \
+#     TUSK_UTTERANCE_PAUSE=5 docker compose run --rm tusk python main.py
+
+Open gedit.
+Start pair-coding mode.
+Write a JavaScript function named helloWorld that takes one string parameter called message.
+Inside the function body, log the message parameter to the console.
+Give the message parameter a default value of the string hello world.
