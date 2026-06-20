@@ -1,3 +1,4 @@
+import json
 import subprocess
 from types import SimpleNamespace
 
@@ -22,8 +23,13 @@ def request(**overrides: object) -> AgentRequest:
     return AgentRequest("secret prompt", "command", **overrides)
 
 
-def completed(stdout: str = '{"reply":"Done."}') -> subprocess.CompletedProcess:
-    return subprocess.CompletedProcess(["codex"], 0, stdout, "")
+def completed(stdout: str = "") -> subprocess.CompletedProcess:
+    return subprocess.CompletedProcess(["codex"], 0, stdout or _stream('{"reply":"Done."}'), "")
+
+
+def _stream(payload: str) -> str:
+    agent = {"type": "item.completed", "item": {"type": "agent_message", "text": payload}}
+    return json.dumps(agent)
 
 
 def run_broken_tusk_backend(log_printer: RecordingLogPrinter) -> None:

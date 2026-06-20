@@ -1,9 +1,16 @@
+import json
 import subprocess
 from types import SimpleNamespace
 from unittest.mock import Mock
 
 from tusk.kernel.agent_backends.agent_request import AgentRequest
 from tusk.kernel.agent_backends.codex_exec_agent_backend import CodexExecAgentBackend
+
+
+def stream(payload: str) -> str:
+    """Wrap a schema payload in a realistic `codex exec --json` JSONL stream."""
+    agent = {"type": "item.completed", "item": {"type": "agent_message", "text": payload}}
+    return "\n".join(['{"type":"turn.started"}', json.dumps(agent), '{"type":"turn.completed"}'])
 
 
 def config(**overrides: object) -> SimpleNamespace:
@@ -21,8 +28,8 @@ def backend(**overrides: object) -> CodexExecAgentBackend:
     return CodexExecAgentBackend(config(**overrides), Mock())
 
 
-def completed(command: list[str], stdout: str = '{"reply":"Done."}') -> subprocess.CompletedProcess:
-    return subprocess.CompletedProcess(command, 0, stdout, "")
+def completed(command: list[str], stdout: str = "") -> subprocess.CompletedProcess:
+    return subprocess.CompletedProcess(command, 0, stdout or stream('{"reply":"Done."}'), "")
 
 
 def request(**overrides: object) -> AgentRequest:
@@ -72,7 +79,7 @@ def test_codex_exec_backend_preserves_zero_timeout(monkeypatch) -> None:
 
 
 def test_codex_exec_backend_uses_config_defaults_and_parsed_status(monkeypatch) -> None:
-    monkeypatch.setattr(subprocess, "run", lambda command, **kwargs: completed(command, '{"status":"failed","reply":"No"}'))
+    monkeypatch.setattr(subprocess, "run", lambda command, **kwargs: completed(command, stream('{"status":"failed","reply":"No"}')))
     result = backend(codex_exec_workdir="/tmp/default", codex_exec_sandbox_mode="", codex_exec_extra_args=None).run(
         AgentRequest("prompt", "command")
     )
@@ -106,4 +113,20 @@ def test_codex_exec_backend_handles_invalid_json(monkeypatch) -> None:
     result = backend().run(AgentRequest("prompt", "command"))
     assert result.status == "failed"
     assert "Invalid JSON" in result.reply
+
+
+REAL_STREAM = "\n".join([
+    '{"type":"thread.started","thread_id":"t"}',
+    '{"type":"item.completed","item":{"type":"command_execution","command":"ls"}}',
+    '{"type":"item.completed","item":{"type":"agent_message","text":'
+    + json.dumps('{"status":"success","reply":"Wrote poem.txt","final_text":"Wrote poem.txt"}') + '}}',
+    '{"type":"turn.completed","usage":{}}',
+])
+
+
+def test_codex_exec_backend_parses_real_jsonl_event_stream(monkeypatch) -> None:
+    monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: completed(["codex"], REAL_STREAM))
+    result = backend().run(AgentRequest("prompt", "command"))
+    assert result.status == "success"
+    assert result.reply == "Wrote poem.txt"
 

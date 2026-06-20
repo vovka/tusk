@@ -1,4 +1,3 @@
-import json
 import os
 import subprocess
 from pathlib import Path
@@ -6,6 +5,7 @@ from pathlib import Path
 from tusk.kernel.agent_backends.agent_backend import AgentBackend
 from tusk.kernel.agent_backends.backend_run_logger import BackendRunLogger
 from tusk.kernel.agent_backends.codex_exec_command_builder import CodexExecCommandBuilder
+from tusk.kernel.agent_backends.codex_result_parser import CodexResultParser
 from tusk.kernel.agent_backends.agent_request import AgentRequest
 from tusk.kernel.agent_backends.agent_result import AgentResult
 from tusk.shared.logging.interfaces.log_printer import LogPrinter
@@ -20,6 +20,7 @@ class CodexExecAgentBackend(AgentBackend):
             raise ValueError("log_printer cannot be None")
         self._config = config
         self._command_builder = CodexExecCommandBuilder(config)
+        self._parser = CodexResultParser()
         self._log_printer = log_printer
         self._run_logger = BackendRunLogger(log_printer, self.name)
 
@@ -62,9 +63,8 @@ class CodexExecAgentBackend(AgentBackend):
         return self._parsed(request, completed.stdout)
 
     def _parsed(self, request: AgentRequest, output: str) -> AgentResult:
-        try:
-            parsed = json.loads(output)
-        except json.JSONDecodeError:
+        parsed = self._parser.parse(output)
+        if parsed is None:
             self._run_logger.schema(request, False, "invalid_json")
             return self._failure(request, "Invalid JSON from codex exec", "failed")
         self._run_logger.schema(request, True, "json_parsed")

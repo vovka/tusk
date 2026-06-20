@@ -56,11 +56,11 @@ def test_config_default_codex_exec_schema_path_exists(monkeypatch) -> None:
     assert Path(path).exists()
 
 
-def test_config_default_codex_exec_schema_allows_backend_reply_fields(monkeypatch) -> None:
+def test_config_default_codex_exec_schema_is_openai_strict_compliant(monkeypatch) -> None:
     monkeypatch.setenv("GROQ_API_KEY", "test-key")
     path = ConfigFactory().build().codex_exec_output_schema_path
     schema = json.loads(Path(path).read_text())
     properties = schema["properties"]
-    assert schema["required"] == ["status"]
-    assert "reply" in properties
-    assert "final_text" in properties
+    assert schema["additionalProperties"] is False
+    assert set(schema["required"]) == set(properties)
+    assert {"status", "reply", "final_text"} <= set(properties)
