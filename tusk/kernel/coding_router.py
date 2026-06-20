@@ -17,7 +17,14 @@ class CodingRouter:
         self._log.log("CODING", f"intent={text!r}")
         if not result.success or result.data is None:
             return KernelResponse(False, result.message)
-        self._apply_all(result.data.get("operations", []))
+        return self._apply(result)
+
+    def _apply(self, result: object) -> KernelResponse:
+        try:
+            self._apply_all(result.data.get("operations", []))
+        except RuntimeError as exc:
+            self._log.log("CODING", f"apply failed: {exc}")
+            return KernelResponse(False, "I couldn't apply that edit.")
         return KernelResponse(True, result.message)
 
     def stop(self, state: object) -> KernelResponse:
