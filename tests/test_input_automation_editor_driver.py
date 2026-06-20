@@ -17,6 +17,16 @@ def test_paste_writes_clipboard_and_restores_it() -> None:
     assert calls[-1] == ("write_clipboard", {"text": "held"})
 
 
+def test_paste_settles_before_restoring_clipboard() -> None:
+    calls: list[tuple] = []
+    driver = InputAutomationEditorDriver(_registry(calls), "gnome", sleep=lambda seconds: calls.append(("sleep", seconds)))
+    driver.paste("code")
+    paste_idx = calls.index(("press_keys", {"keys": "<ctrl>v"}))
+    sleep_idx = next(index for index, call in enumerate(calls) if call[0] == "sleep")
+    assert paste_idx < sleep_idx < len(calls) - 1
+    assert calls[-1] == ("write_clipboard", {"text": "held"})
+
+
 def test_read_buffer_select_all_copy_then_restores_clipboard() -> None:
     calls = _run(lambda driver: driver.read_buffer())
     assert ("press_keys", {"keys": "<ctrl>a"}) in calls
