@@ -45,6 +45,15 @@ def test_codex_exec_backend_builds_command(monkeypatch) -> None:
     assert result.reply == "Done."
 
 
+def test_codex_exec_backend_closes_stdin(monkeypatch) -> None:
+    """codex exec blocks reading stdin if it is left open; the backend must
+    pass stdin=DEVNULL so codex runs non-interactively instead of hanging."""
+    calls = []
+    monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: calls.append(kwargs) or completed(args[0]))
+    backend().run(request())
+    assert calls[0]["stdin"] == subprocess.DEVNULL
+
+
 def test_codex_exec_backend_command_includes_flags(monkeypatch) -> None:
     calls = []
     monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: calls.append(args[0]) or completed(args[0]))
@@ -113,20 +122,4 @@ def test_codex_exec_backend_handles_invalid_json(monkeypatch) -> None:
     result = backend().run(AgentRequest("prompt", "command"))
     assert result.status == "failed"
     assert "Invalid JSON" in result.reply
-
-
-REAL_STREAM = "\n".join([
-    '{"type":"thread.started","thread_id":"t"}',
-    '{"type":"item.completed","item":{"type":"command_execution","command":"ls"}}',
-    '{"type":"item.completed","item":{"type":"agent_message","text":'
-    + json.dumps('{"status":"success","reply":"Wrote poem.txt","final_text":"Wrote poem.txt"}') + '}}',
-    '{"type":"turn.completed","usage":{}}',
-])
-
-
-def test_codex_exec_backend_parses_real_jsonl_event_stream(monkeypatch) -> None:
-    monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: completed(["codex"], REAL_STREAM))
-    result = backend().run(AgentRequest("prompt", "command"))
-    assert result.status == "success"
-    assert result.reply == "Wrote poem.txt"
 

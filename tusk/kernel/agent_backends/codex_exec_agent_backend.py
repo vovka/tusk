@@ -53,7 +53,7 @@ class CodexExecAgentBackend(AgentBackend):
         request_env = getattr(request, "environment", None) or {}
         return subprocess.run(
             self._command_builder.build(request.user_text), cwd=self._cwd(request), timeout=self._timeout(request),
-            env={**os.environ, **request_env}, capture_output=True, text=True,
+            env={**os.environ, **request_env}, capture_output=True, text=True, stdin=subprocess.DEVNULL,
         )
 
     def _completed(self, request: AgentRequest, completed: subprocess.CompletedProcess) -> AgentResult:
