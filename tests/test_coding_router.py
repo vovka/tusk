@@ -13,6 +13,12 @@ def test_process_applies_each_operation_via_strategy() -> None:
     assert applied == [EditOperation("replace", 1, 1, "def renamed():", "def renamed():")]
 
 
+def test_process_replies_silently_on_success() -> None:
+    router = CodingRouter(_registry([], True), types.SimpleNamespace(), object(), _strategy([]), _log())
+    result = router.process(_state(), "rename the function")
+    assert result.reply == ""
+
+
 def test_process_reports_failure_when_apply_raises() -> None:
     def boom(edit: object, driver: object) -> None:
         raise RuntimeError("xdotool missing")

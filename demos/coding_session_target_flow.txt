@@ -1,0 +1,24 @@
+# E2E verification of the full-buffer planner rewrite against the user's
+# exact desired pair-coding flow. Voice input is replayed by the emulator
+# shell; the editor is the editor_emulator adapter — no X11 needed.
+#
+# Run:
+#   docker compose run --rm --no-deps \
+#     -v /home/vovka/dev/tusk/brave-thompson-fq92m7/demos/editor_emulator:/app/adapters/editor_emulator:ro \
+#     -e TUSK_SHELLS=emulator \
+#     -e TUSK_TRANSCRIPT=demos/coding_session_target_flow.txt \
+#     -e TUSK_UTTERANCE_PAUSE=2 \
+#     tusk python main.py
+#
+# The emulated editor buffer is snapshotted to .tusk_runtime/editor_emulator_buffer.txt
+#
+# "Open gedit." establishes a focused window so the conversation agent
+# doesn't ask which window to target — the user's real flow assumes their
+# editor is already open before saying "let's start pair coding."
+
+Open gedit.
+Let's start pair coding.
+Let's use JavaScript, create a blank function.
+Name this function the hello world.
+Go to the line seven and insert console log test.
+Introduce an argument to the function, and let's console log this argument.

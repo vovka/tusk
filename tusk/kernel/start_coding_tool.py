@@ -17,6 +17,8 @@ class StartCodingTool:
         self._driver = driver
 
     def execute(self, parameters: dict) -> ToolResult:
+        if self._controller.coding_active:
+            return ToolResult(True, "Already in pair-coding mode.")
         try:
             result = self._start_session()
         except KeyError:

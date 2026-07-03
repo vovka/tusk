@@ -1,0 +1,17 @@
+# Fully containerized e2e session for TUSK pair-coding mode.
+# Voice input is replayed by the emulator shell; the editor is the
+# editor_emulator adapter (bind-mounted into adapters/), so no X11 is needed.
+#
+# Run:
+#   docker compose run --rm --no-deps \
+#     -v ./demos/editor_emulator:/app/adapters/editor_emulator:ro \
+#     -e TUSK_SHELLS=emulator \
+#     -e TUSK_TRANSCRIPT=demos/coding_session_emulated.txt \
+#     tusk python main.py
+#
+# The emulated editor buffer is snapshotted to .tusk_runtime/editor_emulator_buffer.txt
+
+Start pair-coding mode.
+Write a JavaScript function named helloWorld that takes one string parameter called message.
+Inside the function body, log the message parameter to the console.
+Give the message parameter a default value of the string hello world.

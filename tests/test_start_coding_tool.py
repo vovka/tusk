@@ -27,6 +27,18 @@ def test_execute_reports_when_adapter_missing() -> None:
     assert result == ToolResult(False, "coding adapter is not available")
 
 
+def test_execute_is_noop_when_already_coding() -> None:
+    calls: list[dict] = []
+    tool = StartCodingTool(_registry(True, calls), _active_controller(), _manager(), _driver())
+    result = tool.execute({})
+    assert result.success is True
+    assert calls == []
+
+
+def _active_controller() -> object:
+    return types.SimpleNamespace(coding_active=True)
+
+
 def _registry(success: bool, calls: list | None = None) -> object:
     def execute(args: dict) -> ToolResult:
         if calls is not None:
@@ -44,7 +56,10 @@ def _missing_registry() -> object:
 
 
 def _controller(states: list) -> object:
-    return types.SimpleNamespace(start_coding=lambda state: states.append(state) or KernelResponse(True, "Coding started."))
+    return types.SimpleNamespace(
+        coding_active=False,
+        start_coding=lambda state: states.append(state) or KernelResponse(True, "Coding started."),
+    )
 
 
 def _manager() -> object:
