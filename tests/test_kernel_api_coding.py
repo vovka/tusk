@@ -33,6 +33,13 @@ def test_request_coding_stop_is_noop_when_not_coding() -> None:
     assert api.request_coding_stop() == KernelResponse(False, "")
 
 
+def test_coding_active_reflects_mode_state() -> None:
+    api = KernelAPI(_command_mode(), types.SimpleNamespace())
+    assert api.coding_active is False
+    api._coding_mode = _coding_mode([])
+    assert api.coding_active is True
+
+
 def test_start_and_stop_coding_fire_callbacks() -> None:
     called: list[str] = []
     api = KernelAPI(_command_mode(), types.SimpleNamespace())

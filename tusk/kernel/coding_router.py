@@ -25,7 +25,7 @@ class CodingRouter:
         except RuntimeError as exc:
             self._log.log("CODING", f"apply failed: {exc}")
             return KernelResponse(False, "I couldn't apply that edit.")
-        return KernelResponse(True, result.message)
+        return KernelResponse(True, "")
 
     def stop(self, state: object) -> KernelResponse:
         self._registry.get(f"{state.adapter_name}.stop_coding_session").execute({"session_id": state.session_id})

@@ -96,6 +96,10 @@ class KernelAPI:
     def attach_coding_router(self, router: object) -> None:
         self._coding_router = router
 
+    @property
+    def coding_active(self) -> bool:
+        return self._coding_mode is not None
+
     def start_coding(self, state: object) -> KernelResponse:
         from tusk.kernel.coding_mode import AdapterCodingMode
 
