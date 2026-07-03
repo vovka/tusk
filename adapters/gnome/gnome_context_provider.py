@@ -48,7 +48,8 @@ class GnomeContextProvider:
         return result.stdout.strip()
 
     def _parse_window_line(self, line: str) -> WindowInfo:
-        parts = line.split(None, 8)
+        # wmctrl -l -G: id desktop x y w h hostname title — title starts at column 7
+        parts = line.split(None, 7)
         return WindowInfo(*self._window_values(parts))
 
     def _resolve_active_app(self, active_title: str, windows: list[WindowInfo]) -> str:
@@ -65,7 +66,7 @@ class GnomeContextProvider:
         return int(parts[index]) if len(parts) > index else 0
 
     def _title(self, parts: list[str]) -> str:
-        return parts[8] if len(parts) > 8 else ""
+        return parts[7] if len(parts) > 7 else ""
 
     def _window_values(self, parts: list[str]) -> tuple[object, ...]:
         geometry = self._geometry(parts)
