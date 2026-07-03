@@ -16,10 +16,9 @@ model_reasoning_effort = "${CODEX_REASONING_EFFORT:-low}"
 [projects."/app"]
 trust_level = "trusted"
 
-[mcp_servers.gnome]
-command = "python3"
-args = ["/app/adapters/gnome/server.py"]
-env = { PYTHONPATH = "/app/adapters/gnome", DISPLAY = "${DISPLAY}", XAUTHORITY = "${XAUTHORITY}" }
 EOF
+# MCP servers come from the same adapters/*/adapter.json manifests TUSK loads,
+# so codex always sees the same adapter set as the kernel.
+python3 /app/tools/codex_mcp_config_generator.py /app/adapters >> "$CODEX_HOME/config.toml"
 
 exec "$@"
