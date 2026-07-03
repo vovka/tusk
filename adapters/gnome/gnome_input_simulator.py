@@ -41,6 +41,15 @@ class GnomeInputSimulator:
             raise RuntimeError(f"failed to press keys: {keys}{suffix}")
 
     def type_text(self, text: str) -> None:
+        # GTK4 apps drop Return events embedded in an xdotool type stream;
+        # newlines must go through explicit key presses.
+        for index, segment in enumerate(text.split("\n")):
+            if index:
+                self.press_keys("Return")
+            if segment:
+                self._type_segment(segment)
+
+    def _type_segment(self, text: str) -> None:
         result = subprocess.run(
             ["xdotool", "type", "--delay", "0", "--", text],
             check=False,
