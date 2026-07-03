@@ -25,6 +25,11 @@ https://github.com/user-attachments/assets/ff5d81a0-2a9c-4eb4-beff-795700454733
 The agent request is intentionally compact — no full desktop snapshot or complete tool schema set is sent on each
 request. The planner selects only the tools needed per task, keeping each LLM call focused and low-latency.
 
+Steps 4–6 are one **agent backend**. Set `AGENT_BACKEND=codex_exec` to hand each command to an
+external `codex exec` process instead of the built-in pipeline — it drives the same MCP adapters,
+so desktop actions are unchanged. Add `AGENT_BACKEND_FALLBACK=tusk` to fall back to the built-in
+pipeline when codex fails. See [docs/architecture.md § Agent Backends](docs/architecture.md#agent-backends).
+
 **Supported actions:**
 
 - **Window management** — launch, close, focus, maximize, minimize, move/resize windows
@@ -153,6 +158,13 @@ All settings are configured via environment variables:
 | `MAX_FOLLOW_UP_TIMEOUT_SECONDS` | `120` | Maximum seconds for the adaptive follow-up window |
 | `TUSK_SHELLS` | `voice` | Comma-separated shells to start (`voice`, `cli`) |
 | `TUSK_ADAPTER_ENV_CACHE_DIR` | `.tusk_runtime/adapters` | Cache for managed adapter environments |
+| `AGENT_BACKEND` | `tusk` | Agent backend per command: `tusk` (built-in pipeline) or `codex_exec` |
+| `AGENT_BACKEND_FALLBACK` | `""` | If `tusk`, retry a failed `codex_exec` turn through the built-in pipeline |
+| `CODEX_EXEC_MODEL` | `""` | `--model` passed to `codex exec` (empty → codex default) |
+| `CODEX_EXEC_SANDBOX_MODE` | `read-only` | `--sandbox` mode for `codex exec` |
+
+> See [docs/architecture.md § Agent Backends](docs/architecture.md#agent-backends) for the
+> full backend diagram and the remaining `CODEX_EXEC_*` variables.
 
 ### Example: use a smaller/faster Whisper model
 

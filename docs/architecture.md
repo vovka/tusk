@@ -5,7 +5,9 @@
 TUSK is an always-listening desktop AI voice assistant for Linux/GNOME. It captures
 microphone audio continuously, detects speech boundaries, transcribes speech to text,
 filters ambient noise and hallucinations, passes confirmed commands to a conversation
-agent, and executes desktop actions via hot-pluggable MCP adapters.
+agent, and executes desktop actions via hot-pluggable MCP adapters. The agent step itself is
+pluggable: an `AgentBackend` runs either TUSK's own planner/executor pipeline or an external
+`codex exec` process (see [Agent Backends](#agent-backends)).
 
 The system is split into five layers: **Shells** (voice, CLI, tray, future), a thin **Kernel**
 (agent loop + tool dispatch), a **Shared** layer (ABCs, schemas, LLM access — depended on
@@ -179,6 +181,19 @@ tusk/
 │   │   │   ├── tool_sequence_executor.py        # Executes compiled sequence plans
 │   │   │   ├── tool_sequence_plan_validator.py  # Pre-execution sequence validation
 │   │   │   └── tool_sequence_recorder.py        # Records sequence execution events
+│   │   ├── agent_backends/              # Swappable agent backends behind CommandMode
+│   │   │   ├── agent_backend.py         # AgentBackend ABC — run(AgentRequest) → AgentResult
+│   │   │   ├── agent_backend_factory.py # Selects backend from AGENT_BACKEND (+ fallback)
+│   │   │   ├── agent_request.py         # AgentRequest — user_text, mode, session, context
+│   │   │   ├── agent_result.py          # AgentResult — success, reply, status, metadata
+│   │   │   ├── tusk_agent_backend.py    # TuskAgentBackend — wraps the in-process pipeline
+│   │   │   ├── codex_exec_agent_backend.py   # CodexExecAgentBackend — shells out to codex exec
+│   │   │   ├── codex_exec_command_builder.py # Builds the `codex exec --json` argv
+│   │   │   ├── codex_prompt_builder.py  # Builds codex prompt + desktop-assistant context
+│   │   │   ├── codex_result_parser.py   # Parses codex's final agent_message JSON event
+│   │   │   ├── codex_agent_result.schema.json  # --output-schema for codex structured output
+│   │   │   ├── fallback_agent_backend.py # FallbackAgentBackend — codex → tusk on failure
+│   │   │   └── backend_run_logger.py    # Structured start/end/failure backend logging
 │   │   ├── interfaces/                  # Kernel ABCs
 │   │   │   ├── conversation_history.py  # ConversationHistory ABC
 │   │   │   ├── conversation_summarizer.py # ConversationSummarizer ABC
@@ -336,6 +351,10 @@ tusk/
 │       ├── server.py                    # DictationServer — MCP server for dictation sessions
 │       ├── dictation_refiner.py         # DictationRefiner — LLM cleanup (unused; reserved for future proofreading)
 │       └── dictation_tool_schema_catalog.py # start_dictation, process_segment, stop_dictation
+├── tools/
+│   └── codex_mcp_config_generator.py    # Emits codex config.toml mcp_servers from adapter manifests
+├── docker/
+│   └── codex-entrypoint.sh              # Builds codex CODEX_HOME + config.toml, then execs
 └── tests/
     ├── test_pipeline.py
     ├── test_voice_shell.py
@@ -700,6 +719,69 @@ stdin → CLIShell.start(api)
 ```
 
 `submit(text)` bypasses STT, hallucination filtering, and gatekeeping entirely.
+
+---
+
+## Agent Backends
+
+`CommandMode` never talks to the agent pipeline directly — it submits an `AgentRequest` to an
+`AgentBackend` (`tusk/kernel/agent_backends/`). `AgentBackendFactory` picks the implementation
+from `AGENT_BACKEND`. Both backends return an `AgentResult` and both drive the same
+gnome/dictation MCP tools, so the choice is invisible to the shells.
+
+```mermaid
+flowchart TD
+    CM[CommandMode] -->|AgentRequest| SEL{AGENT_BACKEND}
+    SEL -->|tusk default| TUSK[TuskAgentBackend]
+    SEL -->|codex_exec| CODEX[CodexExecAgentBackend]
+
+    TUSK --> ORC[AgentRuntime loop<br/>conversation → planner → executor]
+    ORC --> REG[ToolRegistry → MCPToolProxy]
+
+    CODEX --> PROC[codex exec --json<br/>subprocess]
+    PROC --> CFG[config.toml generated from<br/>adapters/*/adapter.json]
+
+    REG --> AK[[gnome / dictation adapters<br/>kernel-managed instances]]
+    CFG --> AC[[gnome / dictation adapters<br/>codex-spawned instances]]
+    AK -. same adapter code .- AC
+
+    CODEX -. status = failed .-> FALL[FallbackAgentBackend]
+    FALL -. retry .-> TUSK
+
+    ORC -->|AgentResult| CM
+    PROC -->|AgentResult| CM
+```
+
+- **`tusk`** (default) — `TuskAgentBackend` wraps `MainAgent`, running the in-process
+  conversation → planner → executor loop documented under [Agent Structure](#agent-structure).
+- **`codex_exec`** — `CodexExecAgentBackend` shells out to `codex exec --json`
+  (`CodexExecCommandBuilder` builds argv, `CodexPromptBuilder` adds the desktop-assistant
+  context), then parses the final `agent_message` event (`CodexResultParser`) against
+  `codex_agent_result.schema.json`. Codex reaches the desktop through its **own** adapter
+  instances: `docker/codex-entrypoint.sh` runs `tools/codex_mcp_config_generator.py`, which
+  emits `config.toml` `[mcp_servers.*]` sections from the same `adapters/*/adapter.json`
+  manifests the kernel loads — so codex sees an identical tool set, not a hardcoded subset.
+- **Fallback** — with `AGENT_BACKEND_FALLBACK=tusk`, `FallbackAgentBackend` wraps codex; a
+  `status="failed"` result is retried through the tusk backend, and the codex failure is
+  attached to the result metadata.
+
+Only one backend handles a given turn. The conversation/planner/executor pipeline runs under
+`codex_exec` **only** via the fallback path.
+
+### Configuration
+
+| Env Var | Default | Description |
+|---|---|---|
+| `AGENT_BACKEND` | `tusk` | Backend for every turn: `tusk` or `codex_exec` |
+| `AGENT_BACKEND_FALLBACK` | `""` | If `tusk`, retry failed `codex_exec` turns through the tusk backend |
+| `CODEX_EXEC_BINARY` | `codex` | codex CLI binary |
+| `CODEX_EXEC_MODEL` | `""` | `--model` for `codex exec` (empty → codex default) |
+| `CODEX_EXEC_SANDBOX_MODE` | `read-only` | `--sandbox` mode |
+| `CODEX_EXEC_TIMEOUT_SECONDS` | `60` | Subprocess timeout |
+| `CODEX_EXEC_WORKDIR` | `""` | Working directory for the codex process |
+| `CODEX_EXEC_EXTRA_ARGS` | `""` | Extra CLI args (shell-split) |
+| `CODEX_EXEC_OUTPUT_SCHEMA_PATH` | *(bundled)* | `--output-schema` JSON Schema path |
+| `CODEX_EXEC_LOG_RAW_EVENTS` | `false` | Log full codex stdout/stderr |
 
 ---
 
