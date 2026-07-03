@@ -19,7 +19,21 @@ def test_codex_prompt_builder_skips_empty_request_fields() -> None:
 
     prompt = CodexPromptBuilder().build(request)
 
-    assert prompt == "## User command\nsay hi\n\n## Mode\nagent"
+    assert "## Available tools" not in prompt
+    assert "## Working directory" not in prompt
+    assert "## User command\nsay hi" in prompt
+    assert "## Mode\nagent" in prompt
+
+
+def test_codex_prompt_builder_defaults_system_context_to_desktop_guidance() -> None:
+    """Without guidance codex treats commands as terminal tasks (launched gedit
+    in its own container shell instead of the gnome MCP tools)."""
+    prompt = CodexPromptBuilder().build(AgentRequest("open gedit", "command"))
+
+    assert prompt.startswith("## System context\n")
+    assert "gnome MCP tools" in prompt
+    assert "launch_application" in prompt
+    assert "## User command\nopen gedit" in prompt
 
 
 def _full_request() -> AgentRequest:

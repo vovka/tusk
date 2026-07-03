@@ -58,10 +58,20 @@ def test_codex_exec_backend_command_includes_flags(monkeypatch) -> None:
     calls = []
     monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: calls.append(args[0]) or completed(args[0]))
     backend(codex_exec_model="gpt-5.5", codex_exec_extra_args="--foo 'bar baz'").run(request())
-    assert calls[0] == [
+    assert calls[0][:-1] == [
         "codex", "exec", "--json", "--output-schema", "/tmp/schema.json", "--model", "gpt-5.5",
-        "--sandbox", "read-only", "--foo", "bar baz", "secret prompt",
+        "--sandbox", "read-only", "--foo", "bar baz",
     ]
+    assert "## User command\nsecret prompt" in calls[0][-1]
+
+
+def test_codex_exec_backend_sends_desktop_guidance_in_prompt(monkeypatch) -> None:
+    """Regression: raw user text alone let codex launch GUI apps in its own
+    container shell instead of the gnome MCP tools (gedit poem incident)."""
+    calls = []
+    monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: calls.append(args[0]) or completed(args[0]))
+    backend().run(request())
+    assert "gnome MCP tools" in calls[0][-1]
 
 
 def test_codex_exec_backend_uses_request_overrides(monkeypatch) -> None:

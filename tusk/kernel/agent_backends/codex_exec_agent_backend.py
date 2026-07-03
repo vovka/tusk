@@ -5,6 +5,7 @@ from pathlib import Path
 from tusk.kernel.agent_backends.agent_backend import AgentBackend
 from tusk.kernel.agent_backends.backend_run_logger import BackendRunLogger
 from tusk.kernel.agent_backends.codex_exec_command_builder import CodexExecCommandBuilder
+from tusk.kernel.agent_backends.codex_prompt_builder import CodexPromptBuilder
 from tusk.kernel.agent_backends.codex_result_parser import CodexResultParser
 from tusk.kernel.agent_backends.agent_request import AgentRequest
 from tusk.kernel.agent_backends.agent_result import AgentResult
@@ -20,6 +21,7 @@ class CodexExecAgentBackend(AgentBackend):
             raise ValueError("log_printer cannot be None")
         self._config = config
         self._command_builder = CodexExecCommandBuilder(config)
+        self._prompt_builder = CodexPromptBuilder()
         self._parser = CodexResultParser()
         self._log_printer = log_printer
         self._run_logger = BackendRunLogger(log_printer, self.name)
@@ -52,7 +54,8 @@ class CodexExecAgentBackend(AgentBackend):
     def _execute(self, request: AgentRequest) -> subprocess.CompletedProcess:
         request_env = getattr(request, "environment", None) or {}
         return subprocess.run(
-            self._command_builder.build(request.user_text), cwd=self._cwd(request), timeout=self._timeout(request),
+            self._command_builder.build(self._prompt_builder.build(request)),
+            cwd=self._cwd(request), timeout=self._timeout(request),
             env={**os.environ, **request_env}, capture_output=True, text=True, stdin=subprocess.DEVNULL,
         )
 
@@ -89,14 +92,10 @@ class CodexExecAgentBackend(AgentBackend):
         return {**(request.metadata or {}), "backend": self.name, "mode": request.mode}
 
     def _status(self, parsed: object) -> str:
-        if not isinstance(parsed, dict):
-            return "success"
-        return str(parsed.get("status", "success"))
+        return str(parsed.get("status", "success")) if isinstance(parsed, dict) else "success"
 
     def _reply(self, parsed: object) -> str:
-        if not isinstance(parsed, dict):
-            return str(parsed)
-        return str(parsed.get("reply") or parsed.get("final_text") or "")
+        return str(parsed.get("reply") or parsed.get("final_text") or "") if isinstance(parsed, dict) else str(parsed)
 
     def _cwd(self, request: AgentRequest) -> str | None:
         configured = str(getattr(self._config, "codex_exec_workdir", "")).strip()

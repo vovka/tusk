@@ -2,6 +2,15 @@ from tusk.kernel.agent_backends.agent_request import AgentRequest
 
 __all__ = ["CodexPromptBuilder"]
 
+DEFAULT_SYSTEM_CONTEXT = (
+    "You are the action backend of TUSK, a voice assistant controlling the user's Linux/GNOME desktop.\n"
+    "You run in a headless container: your own shell cannot open or see the user's GUI applications.\n"
+    "Perform every desktop action (launch, focus, type, clipboard, mouse) through the gnome MCP tools only.\n"
+    "Ground yourself with get_desktop_context or list_windows before acting.\n"
+    "Open applications with launch_application and confirm focus via get_active_window before type_text.\n"
+    "Your reply is spoken aloud: answer in one short sentence."
+)
+
 
 class CodexPromptBuilder:
     def build(self, request: AgentRequest) -> str:
@@ -10,9 +19,9 @@ class CodexPromptBuilder:
 
     def _fields(self, request: AgentRequest) -> list[tuple[str, object]]:
         return [
+            ("System context", request.context.get("system_context") or DEFAULT_SYSTEM_CONTEXT),
             ("User command", request.user_text),
             ("Mode", request.mode),
-            ("System context", request.context.get("system_context")),
             ("Available tools", request.context.get("available_tools")),
             ("Working directory", request.working_directory),
             ("Safety policy", request.context.get("safety_policy")),
