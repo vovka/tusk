@@ -1,3 +1,5 @@
+from dataclasses import asdict
+
 __all__ = ["GnomeContextTools"]
 
 
@@ -6,7 +8,10 @@ class GnomeContextTools:
         self._context = context_provider
 
     def get_desktop_context(self, arguments: dict) -> dict:
-        return {"success": True, "message": "context", "data": self._context.get_context_dict()}
+        # MCP clients only ever see `message`; `data` reaches the kernel's MCPToolResult.
+        context = self._context.get_context()
+        message = f"{self._fallback_message(context)}\n{self._window_list(context.open_windows)}"
+        return {"success": True, "message": message, "data": asdict(context)}
 
     def get_active_window(self, arguments: dict) -> dict:
         context = self._context.get_context()
