@@ -16,9 +16,15 @@ from tusk.shared.logging.interfaces.log_printer import LogPrinter
 
 
 class AgentRuntime:
-    def __init__(self, session_store: AgentSessionStore, log_printer: LogPrinter) -> None:
+    def __init__(
+        self,
+        session_store: AgentSessionStore,
+        log_printer: LogPrinter,
+        interrupt_token: object | None = None,
+    ) -> None:
         self._store = session_store
         self._log = log_printer
+        self._token = interrupt_token
         self._failure = ModelFailureReplyBuilder()
         self._history = RuntimeMessageHistoryBuilder(session_store)
         self._results = RuntimeResultFactory(session_store)
@@ -57,10 +63,19 @@ class AgentRuntime:
         repeat = RepeatedToolCallGuard()
         guards = RuntimeTurnGuards()
         for step in range(1, profile.max_steps + 1):
+            if self._interrupted():
+                return self._cancelled(session_id)
             result = self._step(session_id, profile, tools, messages, executor, repeat, guards, step)
             if result is not None:
                 return result
         return self._failed(session_id, "max steps reached")
+
+    def _interrupted(self) -> bool:
+        return self._token is not None and self._token.is_interrupted
+
+    def _cancelled(self, session_id: str) -> AgentResult:
+        result = self._results.cancelled(session_id)
+        return self._results.persist(session_id, result, result.reply_text())
 
     def _step(
         self, session_id: str, profile: AgentProfile, tools: list[dict[str, object]],

@@ -9,10 +9,16 @@ __all__ = ["ToolSequenceExecutor"]
 
 
 class ToolSequenceExecutor:
-    def __init__(self, registry: ToolRegistry, session_store: object) -> None:
+    def __init__(
+        self,
+        registry: ToolRegistry,
+        session_store: object,
+        interrupt_token: object | None = None,
+    ) -> None:
         self._registry = registry
         self._validator = ToolSequencePlanValidator(registry)
         self._record = ToolSequenceRecorder(session_store)
+        self._token = interrupt_token
 
     def execute(self, session_id: str, parameters: dict[str, object], allowed: set[str]) -> ToolResult:
         message = self._validator.validate(parameters, allowed)
@@ -37,6 +43,8 @@ class ToolSequenceExecutor:
         completed: list[str] = []
         step_results: dict[str, object] = {}
         for step in plan.steps:
+            if self._interrupted():
+                return self._cancelled(session_id, plan, completed, step_results)
             result = self._step(session_id, step)
             step_results[step.step_id] = self._step_data(result)
             if not result.success:
@@ -49,6 +57,14 @@ class ToolSequenceExecutor:
         result = self._registry.get(step.tool_name).execute(step.args)
         self._record.result(session_id, step.step_id, step.tool_name, result)
         return result
+
+    def _interrupted(self) -> bool:
+        return self._token is not None and self._token.is_interrupted
+
+    def _cancelled(self, session_id: str, plan: ToolSequencePlan, completed: list[str], results: dict[str, object]) -> ToolResult:
+        summary = "sequence cancelled by user"
+        self._record.finished(session_id, "cancelled", summary)
+        return ToolResult(False, summary, self._payload("cancelled", plan, completed, "", results))
 
     def _done(self, session_id: str, plan: ToolSequencePlan, completed: list[str], results: dict[str, object]) -> ToolResult:
         summary = self._summary(plan, "completed")
