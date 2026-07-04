@@ -52,16 +52,25 @@ class CommandWorker:
             self._busy.set()
             try:
                 self._execute(text)
+            except Exception as exc:
+                self._log.log("ERROR", f"command failed: {exc}")
             finally:
                 self._busy.clear()
 
     def _execute(self, text: str) -> None:
         self._token.clear()
         response = self._submit(text)
-        reply = getattr(response, "reply", "")
+        reply = self._reply_for(response)
         if reply:
             self._log.log("TUSK", reply)
             self._speak(reply)
+
+    def _reply_for(self, response: object) -> str:
+        # an interrupt during the run means the user wants silence: confirm briefly, never read a stale reply
+        if self._token.is_interrupted:
+            self._token.clear()
+            return "Stopped."
+        return getattr(response, "reply", "")
 
     def _speak(self, reply: str) -> None:
         if self._tts is None:
