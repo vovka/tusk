@@ -8,11 +8,11 @@ __all__ = ["LLMProxy"]
 
 
 class LLMProxy(LLMProvider):
-    def __init__(self, initial_provider: LLMProvider, log_printer: LogPrinter | None = None, slot_name: str = "", retry_runner: LLMRetryRunner | None = None, enabled_log_groups: frozenset[str] = frozenset(), preview_chars: int = 120) -> None:
+    def __init__(self, initial_provider: LLMProvider, log_printer: LogPrinter | None = None, slot_name: str = "", retry_runner: LLMRetryRunner | None = None, enabled_log_groups: frozenset[str] = frozenset(), preview_chars: int = 120, interrupt_token: object | None = None) -> None:
         self._inner = initial_provider
         self._log = log_printer
         self._slot = slot_name or initial_provider.label
-        self._retry = retry_runner or LLMRetryRunner()
+        self._retry = retry_runner or LLMRetryRunner(interrupt_token=interrupt_token)
         self._payload_logger = LLMPayloadLogger(log_printer, self._slot, enabled_log_groups, preview_chars)
         self._provider_logs_wait = self._bind(initial_provider)
 
