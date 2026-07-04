@@ -1,4 +1,5 @@
 import time
+from collections.abc import Callable
 
 from shells.voice.buffered_utterance import BufferedUtterance
 from shells.voice.gate_dispatch import GateDispatch
@@ -24,16 +25,21 @@ class LLMGatekeeper(Gatekeeper):
         formatter: RecentContextFormatter | None = None,
         time_source: object = time.monotonic,
         follow_up_window_seconds: float = 30.0,
+        is_busy: Callable[[], bool] | None = None,
+        current_speech_text: Callable[[], str | None] | None = None,
     ) -> None:
         self._llm = llm_provider
         self._log = log_printer
         self._formatter = formatter or RecentContextFormatter()
         self._time = time_source
         self._window = follow_up_window_seconds
+        self._is_busy = is_busy
+        self._current_speech_text = current_speech_text
         self._last_forwarded_at: float | None = None
 
     def evaluate(self, utterance: Utterance, recent: list[Utterance]) -> GateResult:
-        prompt = build_command_gate_prompt(self._formatter.format(recent) if self._within_follow_up_window() else "")
+        context = self._formatter.format(recent) if self._within_follow_up_window() else ""
+        prompt = build_command_gate_prompt(context, self._busy(), self._speaking())
         return self._parsed_primary(self._complete(prompt, utterance.text, "command_gatekeeper", PRIMARY_SCHEMA))
 
     def process(
@@ -44,8 +50,20 @@ class LLMGatekeeper(Gatekeeper):
     ) -> GateDispatch:
         current = to_utterance(utterance)
         primary = self.evaluate(current, recent)
+        if self._interrupt_requested(primary):
+            return GateDispatch("interrupt")
         dispatch = self._command_dispatch(primary, current)
         return dispatch or self._recovery_dispatch(current, recent, primary, candidates or [])
+
+    def _interrupt_requested(self, result: GateResult) -> bool:
+        # honored only while busy: an idle "stop" keeps its normal classification path
+        return result.metadata.get("classification") == "interrupt" and self._busy()
+
+    def _busy(self) -> bool:
+        return self._is_busy is not None and self._is_busy()
+
+    def _speaking(self) -> str | None:
+        return self._current_speech_text() if self._current_speech_text is not None else None
 
     def _command_dispatch(self, result: GateResult, utterance: Utterance) -> GateDispatch | None:
         if result.metadata.get("classification") != "command":

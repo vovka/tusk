@@ -21,6 +21,7 @@ class VoicePipeline:
         recovery_window_seconds: float = 60.0,
         recovery_candidate_limit: int = 6,
         reporter: object | None = None,
+        on_interrupt: Callable[[], None] | None = None,
     ) -> None:
         self._detector = detector
         self._transcriber = transcriber
@@ -30,6 +31,7 @@ class VoicePipeline:
         self._recovery_window = recovery_window_seconds
         self._recovery_limit = recovery_candidate_limit
         self._reporter = reporter
+        self._on_interrupt = on_interrupt
 
     def run(self, submit: Callable[[str], KernelResponse]) -> Iterator[KernelResponse]:
         self._report(AppStatus.LISTENING)
@@ -96,6 +98,8 @@ class VoicePipeline:
         current_id: str,
         submit: Callable[[str], KernelResponse],
     ) -> KernelResponse | None:
+        if result.action == "interrupt":
+            return self._interrupt(current_id)
         if result.action == "drop" or result.text is None:
             self._buffer.mark_dropped(current_id)
             return None
@@ -105,3 +109,9 @@ class VoicePipeline:
             return self._submit(result.text, submit)
         self._buffer.mark_forwarded(current_id)
         return self._submit(result.text, submit)
+
+    def _interrupt(self, current_id: str) -> None:
+        self._buffer.mark_consumed(current_id)
+        if self._on_interrupt is not None:
+            self._on_interrupt()
+        return None
