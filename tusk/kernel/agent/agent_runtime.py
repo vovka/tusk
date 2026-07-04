@@ -9,8 +9,10 @@ from tusk.kernel.agent.agent_result import AgentResult
 from tusk.kernel.agent.agent_run_request import AgentRunRequest
 from tusk.kernel.agent.agent_session_store import AgentSessionStore
 from tusk.kernel.agent.runtime_message_history_builder import RuntimeMessageHistoryBuilder
+from tusk.kernel.agent.runtime_cancellation import RuntimeCancellation
 from tusk.kernel.agent.runtime_result_factory import RuntimeResultFactory
 from tusk.kernel.agent.runtime_step_recorder import RuntimeStepRecorder
+from tusk.kernel.agent.runtime_turn_runner import RuntimeTurnRunner
 from tusk.kernel.agent.runtime_turn_guards import RuntimeTurnGuards
 from tusk.shared.interrupt import InterruptToken as Token
 from tusk.shared.logging.interfaces.log_printer import LogPrinter
@@ -20,10 +22,11 @@ class AgentRuntime:
     def __init__(self, session_store: AgentSessionStore, log_printer: LogPrinter, interrupt_token: Token | None = None) -> None:
         self._store = session_store
         self._log = log_printer
-        self._token = interrupt_token
         self._failure = ModelFailureReplyBuilder()
         self._history = RuntimeMessageHistoryBuilder(session_store)
         self._results = RuntimeResultFactory(session_store)
+        self._cancel = RuntimeCancellation(self._results, interrupt_token)
+        self._turns = RuntimeTurnRunner(self._cancel)
         self._record = RuntimeStepRecorder(session_store)
 
     def run(
@@ -52,10 +55,7 @@ class AgentRuntime:
         repeat = RepeatedToolCallGuard()
         guards = RuntimeTurnGuards()
         for step in range(1, profile.max_steps + 1):
-            cancelled = self._cancelled(session_id)
-            if cancelled is not None:
-                return cancelled
-            result = self._step(session_id, profile, tools, messages, executor, repeat, guards, step)
+            result = self._turns.run(session_id, profile, tools, messages, executor, repeat, guards, step, self._step)
             if result is not None:
                 return result
         return self._failed(session_id, "max steps reached")
@@ -103,10 +103,4 @@ class AgentRuntime:
 
     def _failed(self, session_id: str, reason: str) -> AgentResult:
         result = self._results.failed(session_id, reason)
-        return self._results.persist(session_id, result, result.reply_text())
-
-    def _cancelled(self, session_id: str) -> AgentResult | None:
-        if self._token is None or not self._token.is_interrupted:
-            return None
-        result = self._results.cancelled(session_id)
         return self._results.persist(session_id, result, result.reply_text())

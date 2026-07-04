@@ -36,6 +36,15 @@ def test_sequence_executor_aborts_before_next_step_when_interrupted() -> None:
     assert result.data["status"] == "cancelled"
 
 
+def test_sequence_executor_cancels_interrupted_step_exception() -> None:
+    token = InterruptToken()
+    registry = ToolRegistry()
+    registry.register(make_registry_tool("gnome.type_text", "typed", sequence_callable=True, execute=_raise_interrupt(token)))
+    result = _executor(registry, token).execute("s1", _plan("hello"), {"gnome.type_text"})
+    assert result.success is False
+    assert result.data["status"] == "cancelled"
+
+
 def _executor(registry: ToolRegistry, token: InterruptToken | None = None) -> ToolSequenceExecutor:
     store = FileAgentSessionStore(tempfile.mkdtemp(prefix="tusk-sequence-exec-"))
     return ToolSequenceExecutor(registry, store, token)
@@ -72,3 +81,11 @@ def _append_interrupt(seen: list[dict[str, object]], arguments: dict[str, object
 
 def _fail(arguments: dict[str, object]) -> ToolResult:
     return ToolResult(False, f"failed: {arguments['text']}")
+
+
+def _raise_interrupt(token: InterruptToken) -> object:
+    def execute(arguments: dict[str, object]) -> ToolResult:
+        token.interrupt()
+        raise RuntimeError("interrupted")
+
+    return execute

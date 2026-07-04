@@ -1,4 +1,5 @@
 import subprocess
+import threading
 import time
 
 from tusk.shared.interrupt import InterruptToken
@@ -21,14 +22,21 @@ class SpeechPlayback:
 
     def play(self, wav_bytes: bytes) -> None:
         process = subprocess.Popen(["paplay"], stdin=subprocess.PIPE)
-        self._write(process, wav_bytes)
+        self._start_writer(process, wav_bytes)
         self._wait(process)
+
+    def _start_writer(self, process: object, wav_bytes: bytes) -> None:
+        thread = threading.Thread(target=self._write, args=(process, wav_bytes), daemon=True)
+        thread.start()
 
     def _write(self, process: object, wav_bytes: bytes) -> None:
         if process.stdin is None:
             return
-        process.stdin.write(wav_bytes)
-        process.stdin.close()
+        try:
+            process.stdin.write(wav_bytes)
+            process.stdin.close()
+        except (OSError, ValueError):
+            return
 
     def _wait(self, process: object) -> None:
         deadline = time.monotonic() + self._timeout
@@ -42,5 +50,17 @@ class SpeechPlayback:
         return self._token is not None and self._token.is_interrupted
 
     def _terminate(self, process: object) -> None:
-        process.terminate()
-        process.wait(timeout=1.0)
+        try:
+            process.terminate()
+            process.wait(timeout=1.0)
+        except subprocess.TimeoutExpired:
+            self._kill(process)
+        except OSError:
+            return
+
+    def _kill(self, process: object) -> None:
+        try:
+            process.kill()
+            process.wait()
+        except OSError:
+            return

@@ -17,10 +17,26 @@ def test_agent_runtime_cancels_before_next_llm_step() -> None:
     assert history.stored[-1] == ("assistant", "Stopped.")
 
 
+def test_agent_runtime_cancels_after_interrupted_llm_failure() -> None:
+    token = InterruptToken()
+    history = HistoryRecorder()
+    reply = make_agent(_failing_llm(token), history, interrupt_token=token).process_command("test")
+    assert reply == "Stopped."
+    assert history.stored[-1] == ("assistant", "Stopped.")
+
+
 def _llm(calls: list[str]) -> object:
     def complete_tool_call(*args: object) -> ToolCall:
         calls.append("llm")
         return ToolCall("gnome.type_text", {"text": "hello"}, "c1")
+
+    return type("LLM", (), {"label": "conversation", "complete_tool_call": complete_tool_call})()
+
+
+def _failing_llm(token: InterruptToken) -> object:
+    def complete_tool_call(*args: object) -> ToolCall:
+        token.interrupt()
+        raise RuntimeError("interrupted")
 
     return type("LLM", (), {"label": "conversation", "complete_tool_call": complete_tool_call})()
 

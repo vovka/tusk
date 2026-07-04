@@ -2,6 +2,7 @@ import queue
 import threading
 from collections.abc import Callable
 
+from shells.voice.queued_command import QueuedCommand
 from tusk.shared.interrupt import InterruptToken
 from tusk.shared.schemas.kernel_response import KernelResponse
 
@@ -14,7 +15,7 @@ class CommandWorker:
         self._playback = playback
         self._log = log
         self._token = interrupt_token
-        self._queue: queue.Queue[str] = queue.Queue()
+        self._queue: queue.Queue[QueuedCommand] = queue.Queue()
         self._lock = threading.Lock()
         self._busy = False
         self._speech_text: str | None = None
@@ -37,7 +38,10 @@ class CommandWorker:
         self._thread.start()
 
     def enqueue(self, text: str) -> None:
-        self._queue.put(text)
+        clear_later = self.is_busy
+        if not clear_later:
+            self._token.clear()
+        self._queue.put(QueuedCommand(text, clear_later))
 
     def flush(self) -> None:
         while self._drop_one():
@@ -53,18 +57,26 @@ class CommandWorker:
 
     def _run(self, submit: Callable[[str], KernelResponse]) -> None:
         while True:
-            text = self._queue.get()
-            self._handle(text, submit)
+            command = self._queue.get()
+            self._handle(command, submit)
             self._queue.task_done()
 
-    def _handle(self, text: str, submit: Callable[[str], KernelResponse]) -> None:
-        self._token.clear()
+    def _handle(self, command: QueuedCommand, submit: Callable[[str], KernelResponse]) -> None:
         self._set_busy(True)
         try:
-            self._reply(submit(text).reply)
+            if not self._ready(command):
+                return
+            self._reply(submit(command.text).reply)
+        except Exception as exc:
+            self._log.log("ERROR", f"command execution failed: {exc}")
         finally:
             self._set_speech(None)
             self._set_busy(False)
+
+    def _ready(self, command: QueuedCommand) -> bool:
+        if command.clear_before_run:
+            self._token.clear()
+        return not self._token.is_interrupted
 
     def _reply(self, reply: str) -> None:
         if not reply:

@@ -2,9 +2,7 @@ from tusk.kernel.agent.tool_sequence_plan_validator import ToolSequencePlanValid
 from tusk.kernel.agent.tool_sequence_recorder import ToolSequenceRecorder
 from tusk.kernel.tool_registry import ToolRegistry
 from tusk.shared.interrupt import InterruptToken
-from tusk.shared.schemas.tool_result import ToolResult
-from tusk.shared.schemas.tool_sequence_plan import ToolSequencePlan
-from tusk.shared.schemas.tool_sequence_step import ToolSequenceStep
+from tusk.shared.schemas import ToolResult, ToolSequencePlan, ToolSequenceStep
 
 __all__ = ["ToolSequenceExecutor"]
 
@@ -50,12 +48,22 @@ class ToolSequenceExecutor:
     ) -> ToolResult | None:
         if self._interrupted():
             return self._cancelled(session_id, plan, completed, results)
-        result = self._step(session_id, step)
+        result = self._step_result(session_id, step)
+        if result is None:
+            return self._cancelled(session_id, plan, completed, results)
         results[step.step_id] = self._step_data(result)
         if result.success:
             completed.append(step.step_id)
             return None
         return self._failed(session_id, plan, completed, step.step_id, results, result.message)
+
+    def _step_result(self, session_id: str, step: ToolSequenceStep) -> ToolResult | None:
+        try:
+            return self._step(session_id, step)
+        except Exception:
+            if self._interrupted():
+                return None
+            raise
 
     def _step(self, session_id: str, step: ToolSequenceStep) -> ToolResult:
         self._record.requested(session_id, step.step_id, step.tool_name, step.args)
@@ -97,8 +105,7 @@ class ToolSequenceExecutor:
         return data
 
     def _summary(self, plan: ToolSequencePlan, outcome: str) -> str:
-        goal = plan.goal or "sequence"
-        return f"{goal} {outcome}"
+        return f"{plan.goal or 'sequence'} {outcome}"
 
     def _interrupted(self) -> bool:
         return self._token is not None and self._token.is_interrupted

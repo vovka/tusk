@@ -42,14 +42,15 @@ def test_current_speech_text_is_set_only_while_speaking() -> None:
     assert worker.current_speech_text is None
 
 
-def test_interrupt_token_clears_when_job_starts() -> None:
-    token = InterruptToken()
-    observed: list[bool] = []
-    token.interrupt()
-    worker = CommandWorker(None, _playback([]), _log(), token)
-    worker.start(lambda text: observed.append(token.is_interrupted) or KernelResponse(True, ""))
-    worker.enqueue("next")
-    assert _eventually(lambda: observed == [False])
+def test_worker_survives_submit_failure() -> None:
+    logs: list[tuple[str, str]] = []
+    seen: list[str] = []
+    worker = CommandWorker(None, _playback([]), _log(logs), InterruptToken())
+    worker.start(_flaky_submit(seen))
+    worker.enqueue("bad")
+    worker.enqueue("good")
+    assert _eventually(lambda: seen == ["bad", "good"])
+    assert any(tag == "ERROR" for tag, message in logs)
 
 
 def _blocking_submit(started: threading.Event, release: threading.Event, seen: list[str]) -> object:
@@ -57,6 +58,16 @@ def _blocking_submit(started: threading.Event, release: threading.Event, seen: l
         started.set()
         release.wait(timeout=1.0)
         seen.append(text)
+        return KernelResponse(True, "")
+
+    return submit
+
+
+def _flaky_submit(seen: list[str]) -> object:
+    def submit(text: str) -> KernelResponse:
+        seen.append(text)
+        if text == "bad":
+            raise RuntimeError("boom")
         return KernelResponse(True, "")
 
     return submit
@@ -83,5 +94,10 @@ def _current_text(box: dict[str, CommandWorker] | None) -> str | None:
     return None if box is None else box["worker"].current_speech_text
 
 
-def _log() -> object:
-    return types.SimpleNamespace(log=lambda *args: None)
+def _log(entries: list[tuple[str, str]] | None = None) -> object:
+    return types.SimpleNamespace(log=lambda tag, message, *args: _capture(entries, tag, message))
+
+
+def _capture(entries: list[tuple[str, str]] | None, tag: str, message: str) -> None:
+    if entries is not None:
+        entries.append((tag, message))
