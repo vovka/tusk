@@ -22,7 +22,7 @@ _REFERENCE_CUES = frozenset({"that", "those", "this", "these", "previous", "last
 
 PRIMARY_SCHEMA = {
     "type": "object",
-    "properties": {"classification": {"type": "string", "enum": ["command", "conversation", "ambient"]}, "cleaned_text": {"type": "string"}, "reason": {"type": "string"}},
+    "properties": {"classification": {"type": "string", "enum": ["command", "conversation", "ambient", "interrupt"]}, "cleaned_text": {"type": "string"}, "reason": {"type": "string"}},
     "required": ["classification", "cleaned_text", "reason"],
     "additionalProperties": False,
 }
