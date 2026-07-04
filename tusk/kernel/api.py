@@ -14,11 +14,13 @@ class KernelAPI:
         llm_registry: object,
         log: object | None = None,
         reporter: object | None = None,
+        interrupt_token: object | None = None,
     ) -> None:
         self._command_mode = command_mode
         self._llm_registry = llm_registry
         self._log = log
         self._reporter = reporter
+        self._interrupt_token = interrupt_token
         self._submit_reporter = SubmitStatusReporter(reporter) if reporter is not None else None
         self._init_state()
 
@@ -31,6 +33,14 @@ class KernelAPI:
         self._on_dictation_stopped: Callable[[], None] | None = None
         self._on_coding_started: Callable[[], None] | None = None
         self._on_coding_stopped: Callable[[], None] | None = None
+
+    def request_interrupt(self) -> None:
+        if self._interrupt_token is not None:
+            self._interrupt_token.interrupt()
+
+    @property
+    def interrupt_token(self) -> object | None:
+        return self._interrupt_token
 
     def submit(self, text: str) -> KernelResponse:
         self._log_input(text)
