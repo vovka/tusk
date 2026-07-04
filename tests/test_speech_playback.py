@@ -7,17 +7,28 @@ from tusk.shared.interrupt import InterruptToken
 
 
 class _FakeProcess:
-    def __init__(self, polls_to_finish: int) -> None:
+    def __init__(self, polls_to_finish: int, fail_writes: bool = False) -> None:
         self._polls_left = polls_to_finish
+        self._fail_writes = fail_writes
         self.terminated = False
+        self.closed = False
         self.written = b""
         self.stdin = self
 
     def write(self, data: bytes) -> None:
+        if self._fail_writes:
+            raise OSError("broken pipe")
         self.written += data
 
     def close(self) -> None:
-        pass
+        self.closed = True
+
+    def __enter__(self) -> "_FakeProcess":
+        return self
+
+    def __exit__(self, exc_type: object, exc: object, tb: object) -> bool:
+        self.close()
+        return False
 
     def wait(self, timeout: float) -> int:
         if self.terminated:
@@ -67,6 +78,12 @@ def test_playback_terminates_when_token_interrupted(monkeypatch) -> None:
     token.interrupt()
     SpeechPlayback(token, poll_seconds=0.01).play(b"WAVDATA")
     assert process.terminated
+
+
+def test_feed_closes_stdin_when_write_fails() -> None:
+    process = _FakeProcess(polls_to_finish=1, fail_writes=True)
+    playback_module._feed(process, b"WAVDATA")
+    assert process.closed
 
 
 def _await_written(process: _FakeProcess) -> None:

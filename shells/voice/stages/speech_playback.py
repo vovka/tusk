@@ -32,7 +32,7 @@ class SpeechPlayback:
 
 def _feed(process: subprocess.Popen, wav_bytes: bytes) -> None:
     try:
-        process.stdin.write(wav_bytes)
-        process.stdin.close()
+        with process.stdin:
+            process.stdin.write(wav_bytes)
     except OSError:
         pass
