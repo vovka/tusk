@@ -32,6 +32,16 @@ def test_section_contains_command_script_and_env(tmp_path: Path) -> None:
     assert 'DISPLAY = ":1"' in output
 
 
+def test_section_auto_approves_tool_calls(tmp_path: Path) -> None:
+    """codex mcp-server elicits per-tool-call approval otherwise and, with no
+    interactive answer channel, the turn hangs until the inactivity timeout."""
+    _write_adapter(tmp_path, "gnome")
+
+    output = CodexMcpConfigGenerator(tmp_path, {}).generate()
+
+    assert 'default_tools_approval_mode = "approve"' in output
+
+
 def test_skips_non_stdio_adapters(tmp_path: Path) -> None:
     _write_adapter(tmp_path, "gnome")
     _write_adapter(tmp_path, "web", transport="http")

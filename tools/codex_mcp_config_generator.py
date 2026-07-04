@@ -35,6 +35,9 @@ class CodexMcpConfigGenerator:
             f'command = "python3"\n'
             f"args = [{json.dumps(str(script))}]\n"
             f"env = {{ {env_items} }}\n"
+            # codex mcp-server has no interactive approval channel; without this
+            # every tool call elicits an approval that nothing can answer.
+            f'default_tools_approval_mode = "approve"\n'
         )
 
 
