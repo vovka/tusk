@@ -27,6 +27,8 @@ class CodexMcpConfigGenerator:
     def _script(self, manifest: dict) -> str:
         return manifest["entry"].split()[-1]
 
+    # default_tools_approval_mode: codex mcp-server has no interactive approval
+    # channel; without it every tool call elicits an approval nothing can answer.
     def _toml(self, name: str, script: Path) -> str:
         env = {"PYTHONPATH": str(script.parent), **self._server_env}
         env_items = ", ".join(f"{key} = {json.dumps(value)}" for key, value in env.items())
@@ -35,8 +37,6 @@ class CodexMcpConfigGenerator:
             f'command = "python3"\n'
             f"args = [{json.dumps(str(script))}]\n"
             f"env = {{ {env_items} }}\n"
-            # codex mcp-server has no interactive approval channel; without this
-            # every tool call elicits an approval that nothing can answer.
             f'default_tools_approval_mode = "approve"\n'
         )
 
