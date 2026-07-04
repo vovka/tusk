@@ -189,6 +189,11 @@ tusk/
 │   │   │   ├── tusk_agent_backend.py    # TuskAgentBackend — wraps the in-process pipeline
 │   │   │   ├── codex_exec_agent_backend.py   # CodexExecAgentBackend — shells out to codex exec
 │   │   │   ├── codex_exec_command_builder.py # Builds the `codex exec --json` argv
+│   │   │   ├── codex_mcp_agent_backend.py    # CodexMcpAgentBackend — persistent codex mcp-server
+│   │   │   ├── codex_mcp_call_builder.py     # Builds codex / codex-reply tool-call arguments
+│   │   │   ├── codex_mcp_client.py           # JSON-RPC session over MCPStdioTransport
+│   │   │   ├── codex_mcp_response_reader.py  # Id-correlated reads; skips codex/event notifications
+│   │   │   ├── codex_mcp_result_mapper.py    # Maps tool payloads to AgentResult (threadId→session)
 │   │   │   ├── codex_prompt_builder.py  # Builds codex prompt + desktop-assistant context
 │   │   │   ├── codex_result_parser.py   # Parses codex's final agent_message JSON event
 │   │   │   ├── codex_agent_result.schema.json  # --output-schema for codex structured output
@@ -734,22 +739,27 @@ flowchart TD
     CM[CommandMode] -->|AgentRequest| SEL{AGENT_BACKEND}
     SEL -->|tusk default| TUSK[TuskAgentBackend]
     SEL -->|codex_exec| CODEX[CodexExecAgentBackend]
+    SEL -->|codex_mcp| MCPB[CodexMcpAgentBackend]
 
     TUSK --> ORC[AgentRuntime loop<br/>conversation → planner → executor]
     ORC --> REG[ToolRegistry → MCPToolProxy]
 
-    CODEX --> PROC[codex exec --json<br/>subprocess]
+    CODEX --> PROC[codex exec --json<br/>subprocess per turn]
+    MCPB --> SRV[codex mcp-server<br/>persistent stdio session<br/>codex / codex-reply tools]
     PROC --> CFG[config.toml generated from<br/>adapters/*/adapter.json]
+    SRV --> CFG
 
     REG --> AK[[gnome / dictation adapters<br/>kernel-managed instances]]
     CFG --> AC[[gnome / dictation adapters<br/>codex-spawned instances]]
     AK -. same adapter code .- AC
 
     CODEX -. status = failed .-> FALL[FallbackAgentBackend]
+    MCPB -. status = failed .-> FALL
     FALL -. retry .-> TUSK
 
     ORC -->|AgentResult| CM
     PROC -->|AgentResult| CM
+    SRV -->|AgentResult<br/>session_id = threadId| CM
 ```
 
 - **`tusk`** (default) — `TuskAgentBackend` wraps `MainAgent`, running the in-process
@@ -761,27 +771,37 @@ flowchart TD
   instances: `docker/codex-entrypoint.sh` runs `tools/codex_mcp_config_generator.py`, which
   emits `config.toml` `[mcp_servers.*]` sections from the same `adapters/*/adapter.json`
   manifests the kernel loads — so codex sees an identical tool set, not a hardcoded subset.
-- **Fallback** — with `AGENT_BACKEND_FALLBACK=tusk`, `FallbackAgentBackend` wraps codex; a
-  `status="failed"` result is retried through the tusk backend, and the codex failure is
-  attached to the result metadata.
+- **`codex_mcp`** — `CodexMcpAgentBackend` keeps one persistent `codex mcp-server` child
+  (spawned lazily on the first turn, reused across turns; `CodexMcpClient` over the shared
+  `MCPStdioTransport`). Each turn calls the `codex` MCP tool — or `codex-reply` when the
+  request carries a session — with `approval-policy: "never"` and the same prompt/config as
+  `codex_exec`. The returned codex `threadId` becomes `AgentResult.session_id`, which
+  `CommandMode` feeds back on the next turn, so the conversation stays on one codex thread.
+  A failed `codex-reply` (stale thread, restarted server) recovers once on a fresh thread.
+  `CODEX_EXEC_TIMEOUT_SECONDS` acts as an **inactivity** timeout here (codex's progress
+  events reset it); `CODEX_EXEC_EXTRA_ARGS`, `..._OUTPUT_SCHEMA_PATH` and
+  `..._LOG_RAW_EVENTS` do not apply.
+- **Fallback** — with `AGENT_BACKEND_FALLBACK=tusk`, `FallbackAgentBackend` wraps either
+  codex backend; a `status="failed"` result is retried through the tusk backend, and the
+  codex failure is attached to the result metadata.
 
 Only one backend handles a given turn. The conversation/planner/executor pipeline runs under
-`codex_exec` **only** via the fallback path.
+the codex backends **only** via the fallback path.
 
 ### Configuration
 
 | Env Var | Default | Description |
 |---|---|---|
-| `AGENT_BACKEND` | `tusk` | Backend for every turn: `tusk` or `codex_exec` |
-| `AGENT_BACKEND_FALLBACK` | `""` | If `tusk`, retry failed `codex_exec` turns through the tusk backend |
-| `CODEX_EXEC_BINARY` | `codex` | codex CLI binary |
-| `CODEX_EXEC_MODEL` | `""` | `--model` for `codex exec` (empty → codex default) |
-| `CODEX_EXEC_SANDBOX_MODE` | `read-only` | `--sandbox` mode |
-| `CODEX_EXEC_TIMEOUT_SECONDS` | `60` | Subprocess timeout |
-| `CODEX_EXEC_WORKDIR` | `""` | Working directory for the codex process |
-| `CODEX_EXEC_EXTRA_ARGS` | `""` | Extra CLI args (shell-split) |
-| `CODEX_EXEC_OUTPUT_SCHEMA_PATH` | *(bundled)* | `--output-schema` JSON Schema path |
-| `CODEX_EXEC_LOG_RAW_EVENTS` | `false` | Log full codex stdout/stderr |
+| `AGENT_BACKEND` | `tusk` | Backend for every turn: `tusk`, `codex_exec`, or `codex_mcp` |
+| `AGENT_BACKEND_FALLBACK` | `""` | If `tusk`, retry failed codex turns through the tusk backend |
+| `CODEX_EXEC_BINARY` | `codex` | codex CLI binary (both codex backends) |
+| `CODEX_EXEC_MODEL` | `""` | Model override (empty → codex default; both backends) |
+| `CODEX_EXEC_SANDBOX_MODE` | `read-only` | Sandbox mode (both backends) |
+| `CODEX_EXEC_TIMEOUT_SECONDS` | `60` | Subprocess timeout; inactivity timeout under `codex_mcp` |
+| `CODEX_EXEC_WORKDIR` | `""` | Working directory for the codex process (both backends) |
+| `CODEX_EXEC_EXTRA_ARGS` | `""` | Extra CLI args, shell-split (`codex_exec` only) |
+| `CODEX_EXEC_OUTPUT_SCHEMA_PATH` | *(bundled)* | `--output-schema` JSON Schema path (`codex_exec` only) |
+| `CODEX_EXEC_LOG_RAW_EVENTS` | `false` | Log full codex stdout/stderr (`codex_exec` only) |
 
 ---
 
