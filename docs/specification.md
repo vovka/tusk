@@ -221,7 +221,7 @@ The schema used for `complete_structured` is selected based on the system prompt
 **Command schema:**
 ```json
 {
-  "classification": "command|conversation|ambient",
+  "classification": "command|conversation|ambient|interrupt",
   "cleaned_text": "string",
   "reason": "string"
 }
@@ -249,6 +249,10 @@ The schema used for `complete_structured` is selected based on the system prompt
 9. Set `is_directed_at_tusk = classification in ("command", "conversation")`
 10. On any parse failure → return `GateResult(False, "", 0.0)`
 
+`interrupt` is not forwarded as a command. `LLMGatekeeper.process()` maps it to
+`GateDispatch("interrupt")` only when TUSK is busy or speaking; otherwise it behaves like
+ambient speech.
+
 ### 7.3 Fallback Chain
 
 1. Try `llm.complete_structured(system_prompt, utterance.text, schema_name, schema, 512)`
@@ -257,7 +261,7 @@ The schema used for `complete_structured` is selected based on the system prompt
 
 ### 7.4 Conversation-Aware Gatekeeper Prompt
 
-In command mode, `CommandMode` builds the gatekeeper prompt dynamically:
+The voice gatekeeper builds its prompt dynamically before text reaches `CommandMode`:
 
 **When outside the follow-up window** (no recent interaction or timeout expired):
 Standard static prompt — wake-word or obvious imperative detection only. Behavior is
@@ -272,6 +276,10 @@ each truncated to 150 characters. This allows contextual follow-ups without a wa
 The gatekeeper tracks `_last_forwarded_at` internally. When it forwarded a message
 within `follow_up_window_seconds` (default 30 s), recent context is included in the
 classification prompt so conversational follow-ups work without a wake word.
+
+When `CommandWorker.is_busy` or `current_speech_text` is set, the prompt includes that
+state so the same schema can classify stop/cancel intent as `interrupt` and self-echo as
+`ambient`.
 
 **Latency impact:** No additional LLM calls. Context is formatted via string operations
 (< 1 ms). The gatekeeper prompt grows by ~200–400 tokens when context is included.
@@ -436,6 +444,21 @@ Shared by all three profiles (conversation, planner, executor).
 | `text` | Full reply text (optional) |
 | `payload` | Structured data (planner uses `selected_tool_names`, `execution_mode`, `planned_steps`, `plan_text`) |
 
+### 11.3 Interrupt Cancellation
+
+```mermaid
+flowchart LR
+    token[InterruptToken] --> turn[RuntimeTurnRunner]
+    turn --> before[check before step]
+    turn --> after[check after step]
+    before --> cancelled[AgentResult: cancelled / Stopped.]
+    after --> cancelled
+```
+
+`RuntimeCancellation` persists a cancelled result when the token is set. The runtime checks
+before and after each step so interrupted LLM/tool exceptions cannot be reported as normal
+model failures.
+
 
 ## 12. Tool Registry Specification
 
@@ -509,53 +532,58 @@ string listing each planner-visible tool's `name`, `description`, `input_schema`
 
 The voice pipeline is a six-stage chain. Each stage either passes its result forward or
 drops it. The pipeline is owned entirely by the voice shell — the kernel only sees
-`kernel.submit(text)` calls.
+`kernel.submit(text)` calls from `CommandWorker`.
 
 ### 13.1 Main Loop
 
-```python
-def _handle_utterance(utterance, submit):
-    transcribed = transcriber.process(utterance)
-    sanitized   = sanitizer.process(transcribed)      # None → drop
-    if sanitized is None: return None
-    buffered    = buffer.process(sanitized)            # BufferedUtterance
-    recent      = buffer.recent(7)[:-1]
-    candidates  = buffer.recoverable(recovery_candidate_limit, recovery_window_seconds)
-    dispatch    = gatekeeper.process(buffered, recent, candidates)
-    return _dispatch(dispatch, buffered.id, submit)
+```mermaid
+flowchart LR
+    capture[Capture thread] --> queue[Utterance queue]
+    queue --> consume[Consumer thread]
+    consume --> gate[Gatekeeper]
+    gate --> dispatch[PipelineDispatcher]
+    dispatch -- forward --> worker[CommandWorker]
+    worker --> kernel[KernelAPI.submit]
+    dispatch -- interrupt --> token[InterruptToken]
+    dispatch -- interrupt --> flush[worker.flush]
+    dispatch -- drop --> buffer[mark dropped/consumed]
 ```
 
 ### 13.2 Dispatch
 
-```python
-def _dispatch(result, current_id, submit):
-    if result.action == "drop" or result.text is None:
-        buffer.mark_dropped(current_id)
-        return None
-    if result.action == "forward_recovered":
-        buffer.mark_recovered(result.recovered_id)
-        buffer.mark_consumed(current_id)
-        return submit(result.text)
-    buffer.mark_forwarded(current_id)
-    return submit(result.text)
-```
+| `GateDispatch.action` | Pipeline effect |
+|---|---|
+| `forward_current` / `forward_clarification` | mark current forwarded; enqueue text |
+| `forward_recovered` | mark recovered prior entry and consume current; enqueue prior text |
+| `interrupt` | `KernelAPI.request_interrupt()`, flush queued commands, consume current |
+| `drop` / no text | mark current dropped |
 
 `GateDispatch.action` values: `forward_current`, `forward_recovered`,
-`forward_clarification`, `drop`.
+`forward_clarification`, `interrupt`, `drop`.
 
 ### 13.3 Gatekeeper Decision Logic
 
-Primary call classifies the utterance as `command`, `conversation`, or `ambient`.
+Primary call classifies the utterance as `command`, `conversation`, `ambient`, or `interrupt`.
 
 - **command** → `forward_current`
 - **conversation + wake word** → `forward_current`
+- **interrupt while busy/speaking** → `interrupt`
 - **anything else** → triggers recovery call over recent `dropped` candidates:
   - `recover` (single candidate identified) → `forward_recovered`
   - `ambiguous` → `forward_clarification`
   - `none` → `drop`
 - **ambient** → `drop`
 
-### 13.4 CLI Path
+### 13.4 CommandWorker
+
+`CommandWorker` owns the blocking work after a gate decision: `kernel.submit`, reply
+logging, optional TTS synthesis, and `SpeechPlayback`. `enqueue()` clears stale interrupts
+for idle work; if a command is queued while another is busy, the clear is deferred until
+that queued command starts so the running command can still be cancelled. `SpeechPlayback`
+writes WAV bytes to `paplay` on a daemon writer thread while the caller polls the interrupt
+token and terminates/kills `paplay` on stop or timeout.
+
+### 13.5 CLI Path
 
 ```python
 KernelAPI.submit(text)  # bypasses STT, sanitizer, buffer, and gatekeeper entirely
@@ -571,23 +599,9 @@ KernelAPI.submit(text)  # bypasses STT, sanitizer, buffer, and gatekeeper entire
 
 **Dependencies:** `Agent`, `LogPrinter`
 
-**handle(text):** Routes submitted text to the agent. The follow-up window is now
-tracked internally by `LLMGatekeeper`, not by `CommandMode`.
-
-**Base prompt excerpt:**
-```
-You are the gatekeeper for a voice assistant named TUSK.
-Classify each utterance as command, conversation, or ambient.
-Treat obvious desktop commands as command even without a wake word.
-Return strict JSON only: {"classification":"command|conversation|ambient","cleaned_text":"...","reason":"..."}.
-For command or conversation, remove wake words like 'tusk', 'task', 'hey tusk'.
-```
-
-**handle_gate_result:**
-1. If `gate_result.is_directed_at_tusk` is False: log "discarded", return `KernelResponse(False, "")`
-2. Call `agent.process_command(gate_result.cleaned_command)`
-3. Call `interaction_clock.record_interaction()`
-4. Return `KernelResponse(True, reply)`
+`CommandMode.process_command(text)` routes submitted text to `MainAgent` and wraps the
+reply in `KernelResponse(True, reply)`. Voice-only filtering, follow-up context, and
+interrupt detection live in `LLMGatekeeper`/`PipelineDispatcher`, before `CommandMode`.
 
 ### 14.2 AdapterDictationMode — `tusk/kernel/dictation_mode.py`
 
@@ -906,31 +920,23 @@ selection is not yet wired; `FullReplaceEditStrategy` is the one wired strategy 
 ```
 
 The module is loaded via `importlib.util.spec_from_file_location` and the class is
-instantiated. `VoiceShell` receives `(config, log)`; `CLIShell` receives no arguments.
+instantiated. `ShellLoader` injects concrete dependencies for voice/tray shells.
 
 ### 18.2 VoiceShell — `shells/voice/voice_shell.py`
 
-```python
-def start(self, submit: object) -> None:
-    for result in self._pipeline.run(submit):
-        if not self._running:
-            return
-        if result.reply:
-            log.log("TUSK", result.reply)
-```
-
-The pipeline handles STT, sanitization, buffering, and gatekeeper internally.
-`submit` is `kernel.submit`.
+`VoiceShell.start(submit)` builds/runs `VoicePipeline`. `CommandWorker` owns
+`submit(text)`, reply logging, optional TTS synthesis, and playback; `VoiceShell` only
+controls explicit pause/resume.
 
 ### 18.3 CLIShell — `shells/cli/cli_shell.py`
 
 ```python
-def start(self, api: object) -> None:
+def start(self, submit: object) -> None:
     while True:
         text = input("tusk> ")
         if text.strip().lower() in {"exit", "quit"}:
             return
-        result = api.submit_text(text)
+        result = submit(text)
         if result.reply:
             print(result.reply)
 ```
@@ -939,9 +945,9 @@ def start(self, api: object) -> None:
 
 ```python
 for shell in shells[:-1]:
-    threading.Thread(target=shell.start, args=(kernel_api,), daemon=True).start()
+    threading.Thread(target=shell.start, args=(kernel.submit,), daemon=True).start()
 if shells:
-    shells[-1].start(kernel_api)   # last shell blocks the main thread
+    shells[-1].start(kernel.submit)   # last shell blocks the main thread
 ```
 
 ---
@@ -972,6 +978,9 @@ NOT retried:
     "invalid_request_error"
     "tool_use_failed"
 ```
+
+When constructed with `InterruptToken`, the runner raises `RuntimeError("interrupted")`
+before the next attempt or retry sleep if the token is set.
 
 ### 19.3 GroqLLM — `tusk/shared/llm/providers/groq_llm.py`
 
@@ -1036,19 +1045,24 @@ NOT retried:
 | `Sanitizer` | — | Returns `None`; utterance discarded silently |
 | `LLMGatekeeper` | JSON parse error | Returns `GateResult(False, "", 0.0)` |
 | `LLMGatekeeper` | Both LLM calls fail | Returns `GateResult(False, "", 0.0)` |
+| `PlaybackGate` | Parse/fallback failure while TUSK speaks | Logs error; drops utterance |
+| `CommandWorker` | `submit(text)` or TTS raises | Logs error; keeps worker thread alive |
 | `MainAgent` | LLM failure | Returns `ModelFailureReplyBuilder` string; loop continues |
 
 | `AgentRuntime` | LLM failure | `ModelFailureReplyBuilder` → `done(status="failed")` |
+| `AgentRuntime` | Interrupt token set | Persists cancelled result; user reply is `Stopped.` |
 | `AgentRuntime` | Max steps (8/16) | Returns `AgentResult(status="failed")` |
 | `AgentRuntime` | Repeated tool call | Returns `AgentResult(status="failed")` |
 | `PlannerResultValidator` | Invalid planner output | Validates `planned_steps`; promotes to sequence when eligible; fails if no valid steps |
 | `PlannerStepPlanValidator` | Malformed `planned_steps` | Rejects forbidden synthetic tools, validates step structure and args |
 | `ToolSequencePlanValidator` | Invalid sequence plan | Rejects non-`sequence_callable` tools, enforces max 8 steps |
 | `ToolSequenceExecutor` | Step failure | Aborts remaining steps; returns partial result |
+| `ToolSequenceExecutor` | Step raises after interrupt | Returns cancelled sequence result |
 | `MCPToolProxy` | Adapter error | Returns `ToolResult(False, error_message)` |
 | `AdapterManager` | Adapter startup fails | Logs error; continues without that adapter |
 | `VoicePipeline._handle_utterance` | Any from above | Stage returns `None`; utterance dropped |
 | `LLMRetryRunner` | Retryable error | Retries up to 3 times with linear backoff |
+| `LLMRetryRunner` | Interrupt token set | Raises `RuntimeError("interrupted")` before retry/sleep |
 | `LLMRetryRunner` | Non-retryable | Re-raises immediately |
 | `TrayShell` | Tray library `ImportError` | Logs once; shell runs in no-op mode (no icon); rest of TUSK unaffected |
 | `StatusReporterHub` | `StatusSink.publish` raises | Caught in `_emit`; logged; never propagates to the producer (protects the hot path) |
@@ -1066,6 +1080,7 @@ Target end-to-end latency from end of speech to action start: ≤ 1.5 seconds.
 | STT transcription | GroqSTT (Whisper-large-v3-turbo) | ~200–500 ms (network + cloud) |
 | Sanitizer | `Sanitizer.process()` | < 1 ms (string ops) |
 | Gatekeeper LLM call | GroqLLM (llama-3.1-8b-instant) | ~100–300 ms |
+| Pipeline dispatch / enqueue | `PipelineDispatcher` → `CommandWorker.enqueue` | < 1 ms |
 | Conversation agent LLM call | GroqLLM (gpt-oss-120b) | ~300–600 ms |
 | Planner LLM call | GroqLLM (gpt-oss-20b, structured) | ~200–500 ms |
 | Execution agent LLM call | GroqLLM (gpt-oss-120b) | ~300–600 ms |
@@ -1073,6 +1088,7 @@ Target end-to-end latency from end of speech to action start: ≤ 1.5 seconds.
 | Context formatting | `RecentContextFormatter` | < 1 ms (string ops) |
 | Status notification | `StatusReporterHub.set_status` → `StatusSink.publish` | < 1 ms (attribute set + dataclass build; off the hot path) |
 | Tray UI redraw | `TrayStatusSink` → GUI idle callback | Off-thread (GLib idle); never blocks audio/kernel threads |
+| Voice interrupt dispatch | gatekeeper `interrupt` → token set + queue flush | < 1 ms after classification |
 
 **Total (typical path, no replan):** STT + gatekeeper + agent + planner + executor
 = ~1.1–2.5 seconds. Replanning adds one additional planner + executor round.
@@ -1145,7 +1161,8 @@ producer → StatusReporter.set_status/set_mode/set_models/set_mic_device
 Emit points:
 
 - **Voice pipeline** (`shells/voice/pipeline.py`): `LISTENING` before waiting on utterances;
-  `REACTING` immediately before `submit(...)`, back to `LISTENING` after.
+  `REACTING` immediately before `CommandWorker.enqueue(...)`, back to `LISTENING` after
+  dispatch.
 - **KernelAPI** (`tusk/kernel/api.py`): `submit` emits `REACTING` on entry and the prior
   status on exit (single choke point; no agent-runtime hook). `start_dictation` /
   `stop_dictation` emit `set_mode(DICTATION)` / `set_mode(DEFAULT)`.

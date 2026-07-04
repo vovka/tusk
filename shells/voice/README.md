@@ -1,12 +1,12 @@
 # Voice Shell
 
 The voice shell is a composable six-stage pipeline that converts raw microphone audio into
-a text command delivered to the kernel via `kernel.submit(text)`. Each stage has a single
-responsibility and passes its result forward or drops it. A developer can omit any stage by
-simply not wiring it into `VoicePipeline`.
+a text command delivered to `CommandWorker`, which calls `kernel.submit(text)` off the
+capture path. Each stage has one responsibility and passes its result forward or drops it.
 
 Capture and VAD run on a producer thread feeding a queue (sub-millisecond handoff); STT,
-gatekeeper, and agent run on the consumer, so speech during an agent run is queued, not lost.
+gatekeeper, and dispatch run on the consumer; agent/TTS work runs on `CommandWorker`, so
+speech during an agent run is still captured and classified.
 
 ---
 
@@ -45,16 +45,20 @@ Microphone
 │ Gatekeeper  │  primary LLM classify
 └──────┬──────┘
        │
-       ├─ command ──────────────────────────────────── kernel.submit(text)
+       ├─ command ─────────────────────────────── CommandWorker.enqueue(text)
        │
-       ├─ conversation + wake word ─────────────────── kernel.submit(text)
+       ├─ conversation + wake word ────────────── CommandWorker.enqueue(text)
        │
        ├─ ambiguous → recovery LLM call over dropped candidates
-       │       ├─ recover ──────────── kernel.submit(prior text)
-       │       ├─ ambiguous ─────────── kernel.submit(current text)
+       │       ├─ recover ──────────── CommandWorker.enqueue(prior text)
+       │       ├─ ambiguous ─────────── CommandWorker.enqueue(current text)
        │       └─ none ───────────────────────────────── DROP
        │
+       ├─ interrupt ─────────── request_interrupt() + flush queued commands
+       │
        └─ ambient ────────────────────────────────────── DROP
+
+CommandWorker ── kernel.submit(text) ── reply ── optional TTS/SpeechPlayback
 ```
 
 **Drop points:**
@@ -106,9 +110,9 @@ ABC (`interfaces/transcription_buffer.py`).
 
 ### Gatekeeper (`stages/gatekeeper.py`)
 
-Cheap LLM call that classifies each utterance as `command`, `conversation`, or `ambient`.
-Only `command` and `conversation` are forwarded to the kernel; `ambient` is silently dropped.
-Implements `Gatekeeper` ABC (`interfaces/gatekeeper.py`).
+Cheap LLM call that classifies each utterance as `command`, `conversation`, `ambient`, or
+`interrupt`. Commands/conversations are enqueued; interrupts set the shared interrupt token;
+ambient speech is dropped. Implements `Gatekeeper` ABC (`interfaces/gatekeeper.py`).
 
 **Follow-up window** — the gatekeeper tracks `_last_forwarded_at` internally. When it
 forwarded something recently (within `follow_up_window_seconds`, default 30 s), it includes
@@ -124,8 +128,8 @@ text to the kernel instead of the current correction phrase.
 
 ## Assembly
 
-`VoiceShell` builds the pipeline in `_build_pipeline` and passes `kernel.submit` as the
-callback. `VoicePipeline.run()` drives the loop:
+`VoiceShell` builds the pipeline in `_build_pipeline`; `CommandWorker.start(submit)` owns
+the kernel callback. `VoicePipeline.run()` drives the capture/dispatch loop:
 
 ```python
 for utterance in detector.stream_utterances():
@@ -136,10 +140,11 @@ for utterance in detector.stream_utterances():
     recent      = buffer.recent(7)[:-1]                      # context window
     candidates  = buffer.recoverable(limit, window)          # dropped, age-bounded
     dispatch    = gatekeeper.process(buffered, recent, candidates)  # GateDispatch
-    # pipeline marks buffer states and calls submit() based on dispatch.action
+    # PipelineDispatcher marks buffer state, enqueues commands, or requests interrupt
 ```
 
-`GateDispatch.action` values: `forward_current`, `forward_recovered`, `forward_clarification`, `drop`.
+`GateDispatch.action` values: `forward_current`, `forward_recovered`, `forward_clarification`,
+`interrupt`, `drop`.
 
 Stages are injected into `VoicePipeline` as plain objects. Any stage can be replaced with
 a test double or an alternative implementation without touching the others.
@@ -159,10 +164,15 @@ a test double or an alternative implementation without touching the others.
 
 ```
 shells/voice/
-├── pipeline.py              # VoicePipeline — assembles stages, dispatches GateDispatch
-├── voice_shell.py           # VoiceShell — entry point, builds pipeline, calls submit()
+├── command_worker.py        # CommandWorker — async submit/TTS worker
+├── pipeline.py              # VoicePipeline — captures and consumes utterances
+├── pipeline_dispatcher.py   # PipelineDispatcher — queue/drop/interrupt dispatch
+├── playback_gate.py         # PlaybackGate — stop-vs-echo classifier while speaking
+├── queued_command.py        # QueuedCommand — deferred interrupt-clear state
+├── voice_shell.py           # VoiceShell — entry point, builds pipeline, pause/resume
 ├── buffered_utterance.py    # BufferedUtterance — Utterance + id + gate_state
 ├── gate_dispatch.py         # GateDispatch — action + text + recovered_id
+├── gatekeeper_slot.py       # GatekeeperSlot — swaps active mode gatekeeper
 ├── recovery_decision.py     # RecoveryDecision — action + candidate_id + reason
 ├── interfaces/
 │   ├── gatekeeper.py        # Gatekeeper ABC
@@ -171,6 +181,7 @@ shells/voice/
     ├── audio_capture.py         # AudioCapture — raw PCM from microphone
     ├── utterance_detector.py    # UtteranceDetector — VAD + boundary buffering
     ├── transcriber.py           # Transcriber — wraps STTEngine
+    ├── speech_playback.py       # SpeechPlayback — interruptible paplay wrapper
     ├── sanitizer.py             # Sanitizer — hallucination filter
     ├── transcription_buffer.py  # TranscriptionBuffer — rolling window + state tracking
     ├── gatekeeper.py            # LLMGatekeeper — primary classify + recovery
