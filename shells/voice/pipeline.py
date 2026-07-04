@@ -2,7 +2,7 @@ import queue
 import threading
 from collections.abc import Callable, Iterator
 
-from shells.voice.gate_dispatch import GateDispatch
+from shells.voice.pipeline_dispatcher import PipelineDispatcher
 from tusk.shared.schemas.app_status import AppStatus
 from tusk.shared.schemas.kernel_response import KernelResponse
 from tusk.shared.schemas.utterance import Utterance
@@ -21,6 +21,8 @@ class VoicePipeline:
         recovery_window_seconds: float = 60.0,
         recovery_candidate_limit: int = 6,
         reporter: object | None = None,
+        command_worker: object | None = None,
+        request_interrupt: Callable[[], None] | None = None,
     ) -> None:
         self._detector = detector
         self._transcriber = transcriber
@@ -30,37 +32,34 @@ class VoicePipeline:
         self._recovery_window = recovery_window_seconds
         self._recovery_limit = recovery_candidate_limit
         self._reporter = reporter
+        self._worker = command_worker
+        self._dispatcher = PipelineDispatcher(buffer, command_worker, reporter, request_interrupt)
 
     def run(self, submit: Callable[[str], KernelResponse]) -> Iterator[KernelResponse]:
         self._report(AppStatus.LISTENING)
+        self._worker.start(submit)
         stop = threading.Event()
         utterances: queue.Queue[Utterance | Exception | None] = queue.Queue()
         threading.Thread(target=self._capture_into, args=(utterances, stop), daemon=True).start()
         try:
-            yield from self._consume(utterances, submit)
+            self._consume(utterances)
         finally:
             stop.set()
+        return iter(())
 
     def _consume(
         self,
         utterances: "queue.Queue[Utterance | Exception | None]",
-        submit: Callable[[str], KernelResponse],
-    ) -> Iterator[KernelResponse]:
+    ) -> None:
         while (item := utterances.get()) is not None:
             if isinstance(item, Exception):
                 raise item
-            result = self._handle_utterance(item, submit)
-            if result is not None:
-                yield result
+            self._handle_utterance(item)
             self._report(AppStatus.LISTENING)
 
     def _report(self, status: AppStatus, detail: str = "") -> None:
         if self._reporter is not None:
             self._reporter.set_status(status, detail)
-
-    def _submit(self, text: str, submit: Callable[[str], KernelResponse]) -> KernelResponse:
-        self._report(AppStatus.REACTING, text)
-        return submit(text)
 
     def _capture_into(self, utterances: "queue.Queue[Utterance | Exception | None]", stop: threading.Event) -> None:
         # ponytail: capture+VAD stay real-time on this thread; STT and the agent run on
@@ -77,8 +76,7 @@ class VoicePipeline:
     def _handle_utterance(
         self,
         utterance: Utterance,
-        submit: Callable[[str], KernelResponse],
-    ) -> KernelResponse | None:
+    ) -> None:
         transcribed = self._transcriber.process(utterance)
         sanitized = self._sanitizer.process(transcribed)
         if sanitized is None:
@@ -88,20 +86,4 @@ class VoicePipeline:
             return None
         recent = self._buffer.recent(7)[:-1]
         candidates = self._buffer.recoverable(self._recovery_limit, self._recovery_window)
-        return self._dispatch(self._gatekeeper.process(buffered, recent, candidates), buffered.id, submit)
-
-    def _dispatch(
-        self,
-        result: GateDispatch,
-        current_id: str,
-        submit: Callable[[str], KernelResponse],
-    ) -> KernelResponse | None:
-        if result.action == "drop" or result.text is None:
-            self._buffer.mark_dropped(current_id)
-            return None
-        if result.action == "forward_recovered":
-            self._buffer.mark_recovered(result.recovered_id)
-            self._buffer.mark_consumed(current_id)
-            return self._submit(result.text, submit)
-        self._buffer.mark_forwarded(current_id)
-        return self._submit(result.text, submit)
+        self._dispatcher.dispatch(self._gatekeeper.process(buffered, recent, candidates), buffered.id)

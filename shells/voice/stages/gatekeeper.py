@@ -1,10 +1,12 @@
 import time
+from collections.abc import Callable
 
 from shells.voice.buffered_utterance import BufferedUtterance
 from shells.voice.gate_dispatch import GateDispatch
 from shells.voice.interfaces.gatekeeper import Gatekeeper
 from shells.voice.recovery_decision import RecoveryDecision
 from shells.voice.stages.command_gate_prompt import build_command_gate_prompt
+from shells.voice.stages.gatekeeper_completion import GatekeeperCompletion
 from shells.voice.stages.gatekeeper_parser import parse_gate_result, parse_recovery_decision
 from shells.voice.stages.gatekeeper_support import PRIMARY_SCHEMA, RECOVERY_SCHEMA, fallback_dispatch, has_wake_word, log_gate_result, log_recovery, normalize_recovery, recovered_dispatch, recovery_worthwhile, to_utterance
 from shells.voice.stages.recent_context_formatter import RecentContextFormatter
@@ -18,28 +20,27 @@ __all__ = ["LLMGatekeeper"]
 
 class LLMGatekeeper(Gatekeeper):
     def __init__(
-        self,
-        llm_provider: LLMProvider,
-        log_printer: LogPrinter,
-        formatter: RecentContextFormatter | None = None,
-        time_source: object = time.monotonic,
-        follow_up_window_seconds: float = 30.0,
+        self, llm_provider: LLMProvider, log_printer: LogPrinter, formatter: RecentContextFormatter | None = None,
+        time_source: object = time.monotonic, follow_up_window_seconds: float = 30.0,
+        is_busy: Callable[[], bool] | None = None, current_speech_text: Callable[[], str | None] | None = None,
     ) -> None:
         self._llm = llm_provider
         self._log = log_printer
+        self._completion = GatekeeperCompletion(llm_provider, log_printer)
         self._formatter = formatter or RecentContextFormatter()
         self._time = time_source
         self._window = follow_up_window_seconds
         self._last_forwarded_at: float | None = None
+        self._is_busy = is_busy or (lambda: False)
+        self._speech = current_speech_text or (lambda: None)
 
     def evaluate(self, utterance: Utterance, recent: list[Utterance]) -> GateResult:
-        prompt = build_command_gate_prompt(self._formatter.format(recent) if self._within_follow_up_window() else "")
-        return self._parsed_primary(self._complete(prompt, utterance.text, "command_gatekeeper", PRIMARY_SCHEMA))
+        prompt = build_command_gate_prompt(self._recent(recent), self._is_busy(), self._speech())
+        raw = self._completion.complete(prompt, utterance.text, "command_gatekeeper", PRIMARY_SCHEMA)
+        return self._parsed_primary(raw)
 
     def process(
-        self,
-        utterance: Utterance | BufferedUtterance,
-        recent: list[Utterance],
+        self, utterance: Utterance | BufferedUtterance, recent: list[Utterance],
         candidates: list[BufferedUtterance] | None = None,
     ) -> GateDispatch:
         current = to_utterance(utterance)
@@ -48,7 +49,10 @@ class LLMGatekeeper(Gatekeeper):
         return dispatch or self._recovery_dispatch(current, recent, primary, candidates or [])
 
     def _command_dispatch(self, result: GateResult, utterance: Utterance) -> GateDispatch | None:
-        if result.metadata.get("classification") != "command":
+        kind = result.metadata.get("classification")
+        if kind == "interrupt" and self._interrupt_active():
+            return GateDispatch("interrupt")
+        if kind != "command":
             return None
         return self._forward(GateDispatch("forward_current", result.cleaned_command or utterance.text))
 
@@ -71,7 +75,7 @@ class LLMGatekeeper(Gatekeeper):
         if not recovery_worthwhile(utterance, primary, candidates):
             return RecoveryDecision("none")
         prompt = build_recovery_gate_prompt(self._formatter.format(recent), candidates)
-        raw = self._complete(prompt, utterance.text, "command_gate_recovery", RECOVERY_SCHEMA)
+        raw = self._completion.complete(prompt, utterance.text, "command_gate_recovery", RECOVERY_SCHEMA)
         return self._parsed_recovery(raw, candidates)
 
     def _parsed_primary(self, raw: str) -> GateResult:
@@ -95,20 +99,15 @@ class LLMGatekeeper(Gatekeeper):
             self._log.log("ERROR", f"gate recovery parse error: {exc}")
             return RecoveryDecision("none", reason="parse error")
 
-    def _complete(self, prompt: str, text: str, name: str, schema: dict) -> str:
-        try:
-            return self._llm.complete_structured(prompt, text, name, schema, 512)
-        except Exception as exc:
-            self._log.log("GATEKEEPER", f"{name} structured output failed: {exc}", "gatekeeper")
-        try:
-            return self._llm.complete(prompt, text, 256)
-        except Exception as exc:
-            self._log.log("ERROR", f"{name} fallback completion failed: {exc}")
-            return ""
-
     def _forward(self, dispatch: GateDispatch) -> GateDispatch:
         self._last_forwarded_at = self._time()
         return dispatch
 
     def _within_follow_up_window(self) -> bool:
         return self._last_forwarded_at is not None and self._time() - self._last_forwarded_at <= self._window
+
+    def _recent(self, recent: list[Utterance]) -> str:
+        return self._formatter.format(recent) if self._within_follow_up_window() else ""
+
+    def _interrupt_active(self) -> bool:
+        return self._is_busy() or self._speech() is not None

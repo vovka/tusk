@@ -6,6 +6,7 @@ from tusk.kernel.agent_profiles import build_agent_profiles
 from tusk.shared.schemas.tool_result import ToolResult
 from tusk.kernel.tool_registry import ToolRegistry
 from tusk.kernel.agent import AgentOrchestrator, FileAgentSessionStore
+from tusk.shared.interrupt import InterruptToken
 
 __all__ = ["HistoryRecorder", "make_agent", "make_registry_tool"]
 
@@ -29,6 +30,7 @@ def make_agent(
     planner_llm: object | None = None,
     executor_llm: object | None = None,
     default_llm: object | None = None,
+    interrupt_token: InterruptToken | None = None,
 ) -> MainAgent:
     history = history or types.SimpleNamespace(append=lambda message: None, get_messages=lambda: [])
     log = log or types.SimpleNamespace(log=lambda *args: None)
@@ -36,7 +38,7 @@ def make_agent(
     store = FileAgentSessionStore(tempfile.mkdtemp(prefix="tusk-agent-tests-"))
     llms = _llm_map(llm, planner_llm, executor_llm, default_llm)
     profiles = build_agent_profiles(types.SimpleNamespace(get=lambda name: llms[name]))
-    return MainAgent(AgentOrchestrator(profiles, registry, store, log), history)
+    return MainAgent(AgentOrchestrator(profiles, registry, store, log, interrupt_token), history)
 
 
 def _llm_map(llm: object, planner: object | None, executor: object | None, default: object | None) -> dict[str, object]:

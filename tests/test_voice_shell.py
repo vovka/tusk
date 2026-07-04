@@ -5,11 +5,11 @@ from tusk.shared.schemas.kernel_response import KernelResponse
 
 
 def test_voice_shell_logs_reply_from_submitter(monkeypatch) -> None:
-    logged: list[tuple] = []
+    submitted: list[str] = []
     monkeypatch.setattr(voice_shell, "VoicePipeline", lambda *args: _pipeline())
-    shell = voice_shell.VoiceShell(_config(), types.SimpleNamespace(log=lambda *args: logged.append(args)))
-    shell.start(lambda text: KernelResponse(True, f"Hello from TUSK: {text}"))
-    assert logged == [("TUSK", "Hello from TUSK: open Firefox")]
+    shell = voice_shell.VoiceShell(_config(), types.SimpleNamespace(log=lambda *args: None))
+    shell.start(lambda text: submitted.append(text) or KernelResponse(True, "done"))
+    assert submitted == ["open Firefox"]
 
 
 def _config() -> object:

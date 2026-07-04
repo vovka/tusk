@@ -16,6 +16,7 @@ from tusk.kernel.agent.planner_request_enricher import PlannerRequestEnricher
 from tusk.kernel.agent.planner_result_validator import PlannerResultValidator
 from tusk.kernel.agent.planner_runtime_tool_resolver import PlannerRuntimeToolResolver
 from tusk.kernel.agent.tool_sequence_executor import ToolSequenceExecutor
+from tusk.shared.interrupt import InterruptToken
 from tusk.shared.logging.interfaces.log_printer import LogPrinter
 
 __all__ = ["AgentOrchestrator"]
@@ -28,14 +29,17 @@ class AgentOrchestrator:
         tool_registry: ToolRegistry,
         session_store: AgentSessionStore,
         log_printer: LogPrinter,
+        interrupt_token: InterruptToken | None = None,
     ) -> None:
         self._profiles = profiles
         self._registry = tool_registry
         self._log = log_printer
-        self._init_components(session_store, log_printer, tool_registry)
+        self._init_components(session_store, log_printer, tool_registry, interrupt_token)
 
-    def _init_components(self, store: AgentSessionStore, log: LogPrinter, registry: ToolRegistry) -> None:
-        self._runtime = AgentRuntime(store, log)
+    def _init_components(
+        self, store: AgentSessionStore, log: LogPrinter, registry: ToolRegistry, token: InterruptToken | None
+    ) -> None:
+        self._runtime = AgentRuntime(store, log, token)
         self._guard = AgentRunGuard()
         self._children = AgentChildRunner(store)
         self._executor_tools = ExecutorToolGuard()
@@ -44,7 +48,7 @@ class AgentOrchestrator:
         self._planner_results = PlannerResultValidator(log)
         self._resolved_tools = PlannerRuntimeToolResolver(store)
         self._tools = AgentToolsetBuilder(registry)
-        self._dispatcher = OrchestratorToolDispatcher(registry, self._catalog, ToolSequenceExecutor(registry, store))
+        self._dispatcher = OrchestratorToolDispatcher(registry, self._catalog, ToolSequenceExecutor(registry, store, token))
 
     def run(self, request: AgentRunRequest) -> AgentResult:
         return self._run(request, ())

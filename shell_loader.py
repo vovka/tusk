@@ -3,10 +3,13 @@ import json
 import threading
 from pathlib import Path
 
+from shells.voice.command_worker import CommandWorker
 from shells.voice.gatekeeper_slot import GatekeeperSlot
+from shells.voice.playback_gate import PlaybackGate
 from shells.voice.stages.coding_gatekeeper import CodingGatekeeper
 from shells.voice.stages.dictation_gatekeeper import DictationGatekeeper
 from shells.voice.stages.gatekeeper import LLMGatekeeper
+from shells.voice.stages.speech_playback import SpeechPlayback
 from tusk.kernel.coding_gate import CodingGate
 from tusk.kernel.dictation_gate import DictationGate
 from tusk.providers.stt import GroqSTT
@@ -52,34 +55,46 @@ class ShellLoader:
     def _build_voice(self, shell_class: object) -> object:
         stt_engine = GroqSTT(self._config.groq_api_key)
         tts_engine = GroqTTS(self._config.groq_api_key) if self._config.tts_enabled else None
+        worker = self._worker(tts_engine)
         shell = shell_class(
-            self._config, self._log, stt_engine=stt_engine, gatekeeper=self._gatekeeper(),
-            tts_engine=tts_engine, reporter=self._reporter,
+            self._config, self._log, stt_engine=stt_engine, gatekeeper=self._gatekeeper(worker),
+            tts_engine=tts_engine, reporter=self._reporter, command_worker=worker,
+            request_interrupt=self._kernel.request_interrupt, interrupt_token=self._kernel.interrupt_token,
         )
         self._control = shell
         return shell
 
-    def _gatekeeper(self) -> GatekeeperSlot:
+    def _worker(self, tts_engine: object | None) -> CommandWorker:
+        playback = SpeechPlayback(self._kernel.interrupt_token)
+        return CommandWorker(tts_engine, playback, self._log, self._kernel.interrupt_token)
+
+    def _gatekeeper(self, worker: CommandWorker) -> GatekeeperSlot:
         gk_llm = self._kernel.get_llm_registry().get("gatekeeper")
-        llm_gk = LLMGatekeeper(gk_llm, self._log, follow_up_window_seconds=self._config.follow_up_timeout_seconds)
+        llm_gk = LLMGatekeeper(
+            gk_llm, self._log, follow_up_window_seconds=self._config.follow_up_timeout_seconds,
+            is_busy=lambda: worker.is_busy, current_speech_text=lambda: worker.current_speech_text,
+        )
         slot = GatekeeperSlot(llm_gk)
-        self._wire_dictation(slot, llm_gk, gk_llm)
-        self._wire_coding(slot, llm_gk, gk_llm)
+        self._wire_dictation(slot, llm_gk, gk_llm, worker)
+        self._wire_coding(slot, llm_gk, gk_llm, worker)
         return slot
 
-    def _wire_dictation(self, slot: GatekeeperSlot, llm_gk: LLMGatekeeper, gk_llm: object) -> None:
+    def _wire_dictation(self, slot: GatekeeperSlot, llm_gk: LLMGatekeeper, gk_llm: object, worker: CommandWorker) -> None:
         gate = DictationGate(gk_llm, self._log)
         self._kernel.set_dictation_callbacks(
-            on_start=lambda: slot.swap(DictationGatekeeper(gate, self._kernel.request_dictation_stop, self._log)),
+            on_start=lambda: slot.swap(self._playback_gate(DictationGatekeeper(gate, self._kernel.request_dictation_stop, self._log), gk_llm, worker)),
             on_stop=lambda: slot.swap(llm_gk),
         )
 
-    def _wire_coding(self, slot: GatekeeperSlot, llm_gk: LLMGatekeeper, gk_llm: object) -> None:
+    def _wire_coding(self, slot: GatekeeperSlot, llm_gk: LLMGatekeeper, gk_llm: object, worker: CommandWorker) -> None:
         gate = CodingGate(gk_llm, self._log)
         self._kernel.set_coding_callbacks(
-            on_start=lambda: slot.swap(CodingGatekeeper(gate, self._kernel.request_coding_stop, self._log)),
+            on_start=lambda: slot.swap(self._playback_gate(CodingGatekeeper(gate, self._kernel.request_coding_stop, self._log), gk_llm, worker)),
             on_stop=lambda: slot.swap(llm_gk),
         )
+
+    def _playback_gate(self, inner: object, gk_llm: object, worker: CommandWorker) -> PlaybackGate:
+        return PlaybackGate(inner, gk_llm, self._log, lambda: worker.current_speech_text)
 
     def _load_class(self, name: str) -> object:
         manifest = json.loads((Path("shells") / name / "shell.json").read_text())

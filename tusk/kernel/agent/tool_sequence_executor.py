@@ -1,6 +1,7 @@
 from tusk.kernel.agent.tool_sequence_plan_validator import ToolSequencePlanValidator
 from tusk.kernel.agent.tool_sequence_recorder import ToolSequenceRecorder
 from tusk.kernel.tool_registry import ToolRegistry
+from tusk.shared.interrupt import InterruptToken
 from tusk.shared.schemas.tool_result import ToolResult
 from tusk.shared.schemas.tool_sequence_plan import ToolSequencePlan
 from tusk.shared.schemas.tool_sequence_step import ToolSequenceStep
@@ -9,8 +10,9 @@ __all__ = ["ToolSequenceExecutor"]
 
 
 class ToolSequenceExecutor:
-    def __init__(self, registry: ToolRegistry, session_store: object) -> None:
+    def __init__(self, registry: ToolRegistry, session_store: object, interrupt_token: InterruptToken | None = None) -> None:
         self._registry = registry
+        self._token = interrupt_token
         self._validator = ToolSequencePlanValidator(registry)
         self._record = ToolSequenceRecorder(session_store)
 
@@ -37,12 +39,23 @@ class ToolSequenceExecutor:
         completed: list[str] = []
         step_results: dict[str, object] = {}
         for step in plan.steps:
-            result = self._step(session_id, step)
-            step_results[step.step_id] = self._step_data(result)
-            if not result.success:
-                return self._failed(session_id, plan, completed, step.step_id, step_results, result.message)
-            completed.append(step.step_id)
+            failure = self._run_step(session_id, plan, step, completed, step_results)
+            if failure is not None:
+                return failure
         return self._done(session_id, plan, completed, step_results)
+
+    def _run_step(
+        self, session_id: str, plan: ToolSequencePlan, step: ToolSequenceStep,
+        completed: list[str], results: dict[str, object],
+    ) -> ToolResult | None:
+        if self._interrupted():
+            return self._cancelled(session_id, plan, completed, results)
+        result = self._step(session_id, step)
+        results[step.step_id] = self._step_data(result)
+        if result.success:
+            completed.append(step.step_id)
+            return None
+        return self._failed(session_id, plan, completed, step.step_id, results, result.message)
 
     def _step(self, session_id: str, step: ToolSequenceStep) -> ToolResult:
         self._record.requested(session_id, step.step_id, step.tool_name, step.args)
@@ -57,13 +70,8 @@ class ToolSequenceExecutor:
         return ToolResult(True, summary, payload)
 
     def _failed(
-        self,
-        session_id: str,
-        plan: ToolSequencePlan,
-        completed: list[str],
-        failed_step_id: str,
-        results: dict[str, object],
-        message: str,
+        self, session_id: str, plan: ToolSequencePlan, completed: list[str],
+        failed_step_id: str, results: dict[str, object], message: str,
     ) -> ToolResult:
         summary = f"sequence failed at {failed_step_id}: {message}"
         self._record.finished(session_id, "failed", summary)
@@ -71,12 +79,8 @@ class ToolSequenceExecutor:
         return ToolResult(False, summary, payload)
 
     def _payload(
-        self,
-        status: str,
-        plan: ToolSequencePlan,
-        completed: list[str],
-        failed_step_id: str,
-        results: dict[str, object],
+        self, status: str, plan: ToolSequencePlan, completed: list[str],
+        failed_step_id: str, results: dict[str, object],
     ) -> dict[str, object]:
         return {
             "status": status,
@@ -95,3 +99,12 @@ class ToolSequenceExecutor:
     def _summary(self, plan: ToolSequencePlan, outcome: str) -> str:
         goal = plan.goal or "sequence"
         return f"{goal} {outcome}"
+
+    def _interrupted(self) -> bool:
+        return self._token is not None and self._token.is_interrupted
+
+    def _cancelled(
+        self, session_id: str, plan: ToolSequencePlan, completed: list[str], results: dict[str, object]
+    ) -> ToolResult:
+        self._record.finished(session_id, "cancelled", "sequence cancelled")
+        return ToolResult(False, "sequence cancelled", self._payload("cancelled", plan, completed, "", results))

@@ -12,23 +12,22 @@ from tusk.kernel.agent.runtime_message_history_builder import RuntimeMessageHist
 from tusk.kernel.agent.runtime_result_factory import RuntimeResultFactory
 from tusk.kernel.agent.runtime_step_recorder import RuntimeStepRecorder
 from tusk.kernel.agent.runtime_turn_guards import RuntimeTurnGuards
+from tusk.shared.interrupt import InterruptToken as Token
 from tusk.shared.logging.interfaces.log_printer import LogPrinter
 
 
 class AgentRuntime:
-    def __init__(self, session_store: AgentSessionStore, log_printer: LogPrinter) -> None:
+    def __init__(self, session_store: AgentSessionStore, log_printer: LogPrinter, interrupt_token: Token | None = None) -> None:
         self._store = session_store
         self._log = log_printer
+        self._token = interrupt_token
         self._failure = ModelFailureReplyBuilder()
         self._history = RuntimeMessageHistoryBuilder(session_store)
         self._results = RuntimeResultFactory(session_store)
         self._record = RuntimeStepRecorder(session_store)
 
     def run(
-        self,
-        request: AgentRunRequest,
-        profile: AgentProfile,
-        tools: list[dict[str, object]],
+        self, request: AgentRunRequest, profile: AgentProfile, tools: list[dict[str, object]],
         executor: Callable[[ToolCall, str], ToolResult],
     ) -> AgentResult:
         session_id = self._session_id(request, profile)
@@ -47,16 +46,15 @@ class AgentRuntime:
         self._store.start_session(session_id, profile.profile_id, request.parent_session_id, request.parent_call_id, request.metadata)
 
     def _loop(
-        self,
-        session_id: str,
-        profile: AgentProfile,
-        tools: list[dict[str, object]],
-        messages: list[dict[str, str]],
-        executor: Callable[[ToolCall, str], ToolResult],
+        self, session_id: str, profile: AgentProfile, tools: list[dict[str, object]],
+        messages: list[dict[str, str]], executor: Callable[[ToolCall, str], ToolResult],
     ) -> AgentResult:
         repeat = RepeatedToolCallGuard()
         guards = RuntimeTurnGuards()
         for step in range(1, profile.max_steps + 1):
+            cancelled = self._cancelled(session_id)
+            if cancelled is not None:
+                return cancelled
             result = self._step(session_id, profile, tools, messages, executor, repeat, guards, step)
             if result is not None:
                 return result
@@ -79,12 +77,8 @@ class AgentRuntime:
         return None
 
     def _guard_result(
-        self,
-        session_id: str,
-        profile_id: str,
-        tool_call: ToolCall,
-        repeat: RepeatedToolCallGuard,
-        guards: RuntimeTurnGuards,
+        self, session_id: str, profile_id: str, tool_call: ToolCall,
+        repeat: RepeatedToolCallGuard, guards: RuntimeTurnGuards,
     ) -> AgentResult | None:
         if tool_call.tool_name == "done":
             return self._finish(session_id, tool_call.parameters)
@@ -109,4 +103,10 @@ class AgentRuntime:
 
     def _failed(self, session_id: str, reason: str) -> AgentResult:
         result = self._results.failed(session_id, reason)
+        return self._results.persist(session_id, result, result.reply_text())
+
+    def _cancelled(self, session_id: str) -> AgentResult | None:
+        if self._token is None or not self._token.is_interrupted:
+            return None
+        result = self._results.cancelled(session_id)
         return self._results.persist(session_id, result, result.reply_text())
