@@ -2,13 +2,15 @@ import types
 
 import shell_loader
 from shell_loader import ShellLoader
+from tusk.shared.interrupt import InterruptToken
 
 
 def _loader(shells: list[str], log: object | None = None, tts_enabled: bool = False) -> ShellLoader:
     config = types.SimpleNamespace(
         shells=shells, groq_api_key="k", follow_up_timeout_seconds=30, tts_enabled=tts_enabled,
     )
-    kernel = types.SimpleNamespace(submit=lambda text: None)
+    token = InterruptToken()
+    kernel = types.SimpleNamespace(submit=lambda text: None, interrupt_token=token, request_interrupt=token.interrupt)
     return ShellLoader(config, kernel, log or types.SimpleNamespace(log=lambda *a: None), reporter=object())
 
 
@@ -32,7 +34,7 @@ def test_start_logs_ready_and_runs_last_shell_on_main_thread() -> None:
 def test_tray_receives_voice_shell_as_pipeline_control(monkeypatch) -> None:
     monkeypatch.setattr(shell_loader, "GroqSTT", lambda key: object())
     loader = _loader(["voice", "tray"])
-    loader._gatekeeper = lambda: None
+    loader._gatekeeper = lambda worker: None
     loader._load_class = lambda name: _voice_class() if name == "voice" else _tray_class()
     shells = [loader._build(name) for name in loader._ordered_names()]
     assert shells[1].control is shells[0]
@@ -43,13 +45,16 @@ def test_voice_shell_receives_tts_engine_when_enabled(monkeypatch) -> None:
     sentinel = object()
     monkeypatch.setattr(shell_loader, "GroqTTS", lambda key: sentinel)
     loader = _loader(["voice"], tts_enabled=True)
-    loader._gatekeeper = lambda: None
+    loader._gatekeeper = lambda worker: None
     loader._load_class = lambda name: _voice_class()
     assert loader._build("voice").tts_engine is sentinel
 
 
 def _voice_class() -> object:
-    def make(config, log, stt_engine=None, gatekeeper=None, tts_engine=None, reporter=None):
+    def make(
+        config, log, stt_engine=None, gatekeeper=None, tts_engine=None, reporter=None,
+        command_worker=None, request_interrupt=None, interrupt_token=None,
+    ):
         return types.SimpleNamespace(kind="voice", tts_engine=tts_engine)
     return make
 

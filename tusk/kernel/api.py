@@ -1,6 +1,7 @@
 from collections.abc import Callable
 
 from tusk.kernel.submit_status_reporter import SubmitStatusReporter
+from tusk.shared.interrupt import InterruptToken
 from tusk.shared.schemas.app_mode import AppMode
 from tusk.shared.schemas.kernel_response import KernelResponse
 
@@ -14,11 +15,13 @@ class KernelAPI:
         llm_registry: object,
         log: object | None = None,
         reporter: object | None = None,
+        interrupt_token: InterruptToken | None = None,
     ) -> None:
         self._command_mode = command_mode
         self._llm_registry = llm_registry
         self._log = log
         self._reporter = reporter
+        self._interrupt_token = interrupt_token or InterruptToken()
         self._submit_reporter = SubmitStatusReporter(reporter) if reporter is not None else None
         self._init_state()
 
@@ -38,6 +41,13 @@ class KernelAPI:
             return self._route(text)
         return self._submit_reporter.run(text, self._route)
 
+    @property
+    def interrupt_token(self) -> InterruptToken:
+        return self._interrupt_token
+
+    def request_interrupt(self) -> None:
+        self._interrupt_token.interrupt()
+
     def _log_input(self, text: str) -> None:
         if self._log is not None:
             self._log.log("KERNELINPUT", f"text={text!r}", "kernel-input")
@@ -53,9 +63,7 @@ class KernelAPI:
         if self._reporter is not None:
             self._reporter.set_mode(mode)
 
-    def set_dictation_callbacks(
-        self, on_start: Callable[[], None], on_stop: Callable[[], None]
-    ) -> None:
+    def set_dictation_callbacks(self, on_start: Callable[[], None], on_stop: Callable[[], None]) -> None:
         self._on_dictation_started = on_start
         self._on_dictation_stopped = on_stop
 
@@ -82,9 +90,7 @@ class KernelAPI:
             self._on_dictation_stopped()
         self._report_mode(AppMode.DEFAULT)
 
-    def set_coding_callbacks(
-        self, on_start: Callable[[], None], on_stop: Callable[[], None]
-    ) -> None:
+    def set_coding_callbacks(self, on_start: Callable[[], None], on_stop: Callable[[], None]) -> None:
         self._on_coding_started = on_start
         self._on_coding_stopped = on_stop
 

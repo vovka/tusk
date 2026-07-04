@@ -69,7 +69,8 @@ def test_switch_model_does_not_report_on_failure() -> None:
 
 def _pipeline(hub: StatusReporterHub) -> VoicePipeline:
     detector = types.SimpleNamespace(stream_utterances=lambda: iter([Utterance("", b"a", 1.0)]))
-    return VoicePipeline(detector, _transcriber(), _passthrough(), _buffer(), _gatekeeper(), reporter=hub)
+    worker = types.SimpleNamespace(start=lambda submit: None, enqueue=lambda text: None, flush=lambda: None)
+    return VoicePipeline(detector, _transcriber(), _passthrough(), _buffer(), _gatekeeper(), reporter=hub, command_worker=worker)
 
 
 def _transcriber() -> object:

@@ -1,47 +1,42 @@
+import threading
 import types
 
-from shells.voice.voice_shell import VoiceShell
+from shells.voice.command_worker import CommandWorker
+from tusk.shared.interrupt import InterruptToken
 from tusk.shared.schemas.kernel_response import KernelResponse
 
 
-def test_voice_shell_speaks_replies() -> None:
+def test_command_worker_speaks_replies() -> None:
     spoken: list[str] = []
     played: list[bytes] = []
-    shell = _shell(_tts(spoken), _playback(played), [KernelResponse(True, "hello there")])
-    shell.start(lambda text: None)
+    worker = _worker(_tts(spoken), _playback(played))
+    worker.start(lambda text: KernelResponse(True, "hello there"))
+    worker.enqueue("hello")
+    assert _eventually(lambda: played == [b"WAVDATA"])
     assert spoken == ["hello there"]
-    assert played == [b"WAVDATA"]
 
 
-def test_voice_shell_survives_tts_failures() -> None:
+def test_command_worker_survives_tts_failures() -> None:
     logs: list[tuple] = []
-    shell = _shell(_broken_tts(), _playback([]), [KernelResponse(True, "hello")], logs)
-    shell.start(lambda text: None)
+    worker = _worker(_broken_tts(), _playback([]), logs)
+    worker.start(lambda text: KernelResponse(True, "hello"))
+    worker.enqueue("hello")
+    assert _eventually(lambda: any(entry[0] == "ERROR" for entry in logs))
     assert any(entry[0] == "ERROR" for entry in logs)
 
 
-def test_voice_shell_stays_silent_without_tts_engine() -> None:
+def test_command_worker_stays_silent_without_tts_engine() -> None:
     played: list[bytes] = []
-    shell = _shell(None, _playback(played), [KernelResponse(True, "hello")])
-    shell.start(lambda text: None)
+    worker = _worker(None, _playback(played))
+    worker.start(lambda text: KernelResponse(True, "hello"))
+    worker.enqueue("hello")
+    assert _eventually(lambda: worker.is_busy is False)
     assert played == []
 
 
-def test_voice_shell_mutes_mic_during_playback() -> None:
-    gate_while_playing: list[bool] = []
-    log = types.SimpleNamespace(log=lambda *args: None)
-    pipeline = types.SimpleNamespace(run=lambda submit: iter([KernelResponse(True, "coding updated")]))
-    shell = VoiceShell(None, log, pipeline=pipeline, tts_engine=_tts([]))
-    shell._playback = types.SimpleNamespace(play=lambda wav: gate_while_playing.append(shell._pause_gate.is_set()))
-    shell.start(lambda text: None)
-    assert gate_while_playing == [False]
-    assert shell._pause_gate.is_set()
-
-
-def _shell(tts_engine: object | None, playback: object, responses: list[KernelResponse], logs: list | None = None) -> VoiceShell:
+def _worker(tts_engine: object | None, playback: object, logs: list | None = None) -> CommandWorker:
     log = types.SimpleNamespace(log=lambda *args: logs.append(args) if logs is not None else None)
-    pipeline = types.SimpleNamespace(run=lambda submit: iter(responses))
-    return VoiceShell(None, log, pipeline=pipeline, tts_engine=tts_engine, playback=playback)
+    return CommandWorker(tts_engine, playback, log, InterruptToken())
 
 
 def _tts(spoken: list[str]) -> object:
@@ -57,3 +52,12 @@ def _broken_tts() -> object:
 
 def _playback(played: list[bytes]) -> object:
     return types.SimpleNamespace(play=lambda wav_bytes: played.append(wav_bytes))
+
+
+def _eventually(condition: object) -> bool:
+    pause = threading.Event()
+    for _ in range(20):
+        if condition():
+            return True
+        pause.wait(timeout=0.05)
+    return False

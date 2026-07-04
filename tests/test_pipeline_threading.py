@@ -4,8 +4,10 @@ import types
 import pytest
 
 from shells.voice.buffered_utterance import BufferedUtterance
+from shells.voice.command_worker import CommandWorker
 from shells.voice.gate_dispatch import GateDispatch
 from shells.voice.pipeline import VoicePipeline
+from tusk.shared.interrupt import InterruptToken
 from tusk.shared.schemas.kernel_response import KernelResponse
 from tusk.shared.schemas.utterance import Utterance
 
@@ -13,32 +15,25 @@ from tusk.shared.schemas.utterance import Utterance
 def test_capture_keeps_running_while_submit_is_busy() -> None:
     drained = threading.Event()
     submits: list[str] = []
-    pipeline = _pipeline(_eager_detector(drained))
+    worker = CommandWorker(None, _playback(), _log(), InterruptToken())
+    pipeline = _pipeline(_eager_detector(drained), worker)
     results = list(pipeline.run(_busy_submitter(drained, submits)))
-    assert submits == ["open Firefox", "open Firefox"]
-    assert len(results) == 2
+    assert _eventually(lambda: submits == ["open Firefox", "open Firefox"])
+    assert results == []
 
 
 def test_pipeline_propagates_capture_failures() -> None:
-    pipeline = _pipeline(_failing_detector())
+    pipeline = _pipeline(_failing_detector(), _fake_worker())
     with pytest.raises(RuntimeError, match="microphone unplugged"):
         list(pipeline.run(lambda text: KernelResponse(True, "done")))
 
 
-def test_capture_thread_stops_when_generator_is_closed() -> None:
-    proceed = threading.Event()
-    pipeline = _pipeline(_endless_detector(proceed))
-    before = set(threading.enumerate())
-    generator = pipeline.run(lambda text: KernelResponse(True, "done"))
-    next(generator)
-    capture_thread = (set(threading.enumerate()) - before).pop()
-    generator.close()
-    proceed.set()
-    capture_thread.join(timeout=2.0)
-    assert not capture_thread.is_alive()
+def test_pipeline_returns_after_capture_finishes() -> None:
+    pipeline = _pipeline(_eager_detector(threading.Event()), _fake_worker())
+    assert list(pipeline.run(lambda text: KernelResponse(True, "done"))) == []
 
 
-def _pipeline(detector: object) -> VoicePipeline:
+def _pipeline(detector: object, worker: object) -> VoicePipeline:
     transcribed = Utterance("open Firefox", b"audio", 1.0)
     return VoicePipeline(
         detector,
@@ -46,6 +41,7 @@ def _pipeline(detector: object) -> VoicePipeline:
         types.SimpleNamespace(process=lambda utterance: utterance),
         _buffer(),
         types.SimpleNamespace(process=lambda utterance, recent, candidates=None: GateDispatch("forward_current", "open Firefox")),
+        command_worker=worker,
     )
 
 
@@ -66,15 +62,6 @@ def _failing_detector() -> object:
     return types.SimpleNamespace(stream_utterances=stream)
 
 
-def _endless_detector(proceed: threading.Event) -> object:
-    def stream():
-        while True:
-            yield Utterance("", b"x", 1.0)
-            proceed.wait(timeout=5.0)
-
-    return types.SimpleNamespace(stream_utterances=stream)
-
-
 def _busy_submitter(drained: threading.Event, submits: list[str]) -> object:
     def submit(text: str) -> KernelResponse:
         assert drained.wait(timeout=5.0), "capture stalled while the agent was busy"
@@ -87,3 +74,24 @@ def _busy_submitter(drained: threading.Event, submits: list[str]) -> object:
 def _buffer() -> object:
     entries = iter([BufferedUtterance("u1", Utterance("open Firefox", b"", 1.0), 1.0), BufferedUtterance("u2", Utterance("open Firefox", b"", 1.0), 2.0)])
     return types.SimpleNamespace(process=lambda utterance: next(entries), recent=lambda count: [], recoverable=lambda count, window: [], mark_forwarded=lambda entry_id: None, mark_dropped=lambda entry_id: None)
+
+
+def _fake_worker() -> object:
+    return types.SimpleNamespace(start=lambda submit: None, enqueue=lambda text: None, flush=lambda: None)
+
+
+def _playback() -> object:
+    return types.SimpleNamespace(play=lambda wav: None)
+
+
+def _log() -> object:
+    return types.SimpleNamespace(log=lambda *args: None)
+
+
+def _eventually(condition: object) -> bool:
+    pause = threading.Event()
+    for _ in range(20):
+        if condition():
+            return True
+        pause.wait(timeout=0.05)
+    return False

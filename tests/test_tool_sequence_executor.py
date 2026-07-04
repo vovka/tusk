@@ -4,6 +4,7 @@ from tests.kernel_api_support import make_registry_tool
 from tusk.kernel.agent.file_agent_session_store import FileAgentSessionStore
 from tusk.kernel.agent.tool_sequence_executor import ToolSequenceExecutor
 from tusk.kernel.tool_registry import ToolRegistry
+from tusk.shared.interrupt import InterruptToken
 from tusk.shared.schemas.tool_result import ToolResult
 
 
@@ -25,14 +26,39 @@ def test_sequence_executor_aborts_on_failed_step() -> None:
     assert result.data["failed_step_id"] == "s1"
 
 
-def _executor(registry: ToolRegistry) -> ToolSequenceExecutor:
+def test_sequence_executor_aborts_before_next_step_when_interrupted() -> None:
+    token = InterruptToken()
+    seen: list[dict[str, object]] = []
+    registry = ToolRegistry()
+    registry.register(make_registry_tool("gnome.type_text", "typed", sequence_callable=True, execute=_record_interrupt(seen, token)))
+    result = _executor(registry, token).execute("s1", _two_step_plan(), {"gnome.type_text"})
+    assert seen == [{"text": "one"}]
+    assert result.data["status"] == "cancelled"
+
+
+def test_sequence_executor_cancels_interrupted_step_exception() -> None:
+    token = InterruptToken()
+    registry = ToolRegistry()
+    registry.register(make_registry_tool("gnome.type_text", "typed", sequence_callable=True, execute=_raise_interrupt(token)))
+    result = _executor(registry, token).execute("s1", _plan("hello"), {"gnome.type_text"})
+    assert result.success is False
+    assert result.data["status"] == "cancelled"
+
+
+def _executor(registry: ToolRegistry, token: InterruptToken | None = None) -> ToolSequenceExecutor:
     store = FileAgentSessionStore(tempfile.mkdtemp(prefix="tusk-sequence-exec-"))
-    return ToolSequenceExecutor(registry, store)
+    return ToolSequenceExecutor(registry, store, token)
 
 
 def _plan(text: str) -> dict[str, object]:
     step = {"id": "s1", "tool_name": "gnome.type_text", "args": {"text": text}}
     return {"goal": "Type text", "steps": [step]}
+
+
+def _two_step_plan() -> dict[str, object]:
+    first = {"id": "s1", "tool_name": "gnome.type_text", "args": {"text": "one"}}
+    second = {"id": "s2", "tool_name": "gnome.type_text", "args": {"text": "two"}}
+    return {"goal": "Type text", "steps": [first, second]}
 
 
 def _record(seen: list[dict[str, object]]) -> object:
@@ -44,5 +70,22 @@ def _append(seen: list[dict[str, object]], arguments: dict[str, object]) -> Tool
     return ToolResult(True, "typed", {"echo": dict(arguments)})
 
 
+def _record_interrupt(seen: list[dict[str, object]], token: InterruptToken) -> object:
+    return lambda arguments: _append_interrupt(seen, arguments, token)
+
+
+def _append_interrupt(seen: list[dict[str, object]], arguments: dict[str, object], token: InterruptToken) -> ToolResult:
+    token.interrupt()
+    return _append(seen, arguments)
+
+
 def _fail(arguments: dict[str, object]) -> ToolResult:
     return ToolResult(False, f"failed: {arguments['text']}")
+
+
+def _raise_interrupt(token: InterruptToken) -> object:
+    def execute(arguments: dict[str, object]) -> ToolResult:
+        token.interrupt()
+        raise RuntimeError("interrupted")
+
+    return execute

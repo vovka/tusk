@@ -5,7 +5,9 @@
 TUSK is an always-listening desktop AI voice assistant for Linux/GNOME. It captures
 microphone audio continuously, detects speech boundaries, transcribes speech to text,
 filters ambient noise and hallucinations, passes confirmed commands to a conversation
-agent, and executes desktop actions via hot-pluggable MCP adapters.
+agent, and executes desktop actions via hot-pluggable MCP adapters. Voice commands run
+on a worker thread so capture continues while the agent, TTS, or tools are busy; spoken
+stop/cancel intent sets a shared interrupt token instead of muting the microphone.
 
 The system is split into five layers: **Shells** (voice, CLI, tray, future), a thin **Kernel**
 (agent loop + tool dispatch), a **Shared** layer (ABCs, schemas, LLM access — depended on
@@ -31,6 +33,33 @@ only through `kernel.submit(text)` at runtime and shared ABCs at design time.
 > The diagram includes the optional `tray` shell, the shared `Status` layer
 > (`StatusReporter → StatusSink`), and the TTS provider. The `PipelineControl` pause/resume
 > wiring and the full status flow are described textually below and in §22 of the specification.
+
+---
+
+## Voice Interrupt Flow
+
+```mermaid
+flowchart TD
+    mic[Mic + VAD] --> stt[STT]
+    stt --> gate[GatekeeperSlot]
+    gate -- command/recovery --> dispatch[PipelineDispatcher]
+    dispatch --> worker[CommandWorker queue]
+    worker --> submit[KernelAPI.submit]
+    submit --> agent[AgentRuntime / tools]
+    worker --> tts[TTS + SpeechPlayback]
+
+    gate -- interrupt --> stop[request_interrupt]
+    stop --> token[InterruptToken]
+    stop --> flush[flush queued commands]
+    token -. checked by .-> agent
+    token -. checked by .-> llm[LLMRetryRunner]
+    token -. checked by .-> sequence[ToolSequenceExecutor]
+    token -. checked by .-> tts
+
+    tts -- currently speaking --> playback_gate[PlaybackGate]
+    playback_gate -- echo/noise --> drop[drop]
+    playback_gate -- stop intent --> stop
+```
 
 ---
 
@@ -169,8 +198,10 @@ tusk/
 │   │   │   ├── planner_sequence_promoter.py     # Promotes normal → sequence mode
 │   │   │   ├── planner_step_plan_validator.py   # Validates planned_steps structure
 │   │   │   ├── runtime_message_history_builder.py # Builds message history for runtime
+│   │   │   ├── runtime_cancellation.py      # Converts InterruptToken into cancelled AgentResult
 │   │   │   ├── runtime_result_factory.py        # Creates AgentResult instances
 │   │   │   ├── runtime_step_recorder.py         # Records step results as messages
+│   │   │   ├── runtime_turn_runner.py           # Checks cancellation before/after a runtime step
 │   │   │   ├── runtime_turn_guards.py           # Composes profile-specific constraints
 │   │   │   ├── session_event_formatter.py       # Formats session events
 │   │   │   ├── session_event_reader.py          # Reads session events
@@ -185,7 +216,7 @@ tusk/
 │   │   │   ├── pipeline_control.py      # PipelineControl ABC — pause/resume mic capture
 │   │   │   ├── editor_driver.py         # EditorDriver ABC — read/navigate/edit the editor buffer
 │   │   │   ├── edit_application_strategy.py # EditApplicationStrategy ABC — apply(edit, driver)
-│   │   │   └── pipeline_mode.py         # PipelineMode ABC — gatekeeper prompt + handler
+│   │   │   └── pipeline_mode.py         # PipelineMode ABC — legacy mode-control interface
 │   │   ├── adapter_manager.py           # AdapterManager — MCP adapter lifecycle
 │   │   ├── agent_profiles.py            # build_agent_profiles() — 4 profiles
 │   │   ├── api.py                       # KernelAPI — submit(text) public entry point
@@ -223,6 +254,8 @@ tusk/
 │   │   │   ├── config.py                # Config — frozen dataclass, all runtime settings
 │   │   │   ├── config_factory.py        # ConfigFactory — reads env vars, builds Config
 │   │   │   └── startup_options.py       # StartupOptions — CLI args (verbosity, log groups)
+│   │   ├── interrupt/
+│   │   │   └── interrupt_token.py       # InterruptToken — shared cancellation flag
 │   │   ├── llm/
 │   │   │   ├── interfaces/
 │   │   │   │   ├── llm_provider.py      # LLMProvider ABC — complete, complete_tool_call, etc.
@@ -292,8 +325,12 @@ tusk/
 ├── shells/
 │   ├── voice/                           # Six-stage composable voice pipeline
 │   │   ├── README.md                    # Voice shell architecture (see that file)
-│   │   ├── pipeline.py                  # VoicePipeline — assembles stages, dispatches GateDispatch
-│   │   ├── voice_shell.py               # VoiceShell — entry point, calls kernel.submit()
+│   │   ├── command_worker.py            # CommandWorker — async submit/TTS worker
+│   │   ├── pipeline.py                  # VoicePipeline — captures/consumes utterances
+│   │   ├── pipeline_dispatcher.py       # PipelineDispatcher — maps GateDispatch to queue/interrupt/drop
+│   │   ├── playback_gate.py             # PlaybackGate — stop-vs-echo classifier while TUSK speaks
+│   │   ├── queued_command.py            # QueuedCommand — remembers deferred interrupt clearing
+│   │   ├── voice_shell.py               # VoiceShell — entry point; owns pause/resume only
 │   │   ├── buffered_utterance.py        # BufferedUtterance — Utterance + id + gate_state
 │   │   ├── gate_dispatch.py             # GateDispatch — action + text + recovered_id
 │   │   ├── gatekeeper_slot.py           # GatekeeperSlot — mutable proxy; swapped at dictation start/stop
@@ -305,7 +342,7 @@ tusk/
 │   │       ├── audio_capture.py         # AudioCapture — sounddevice PulseAudio stream
 │   │       ├── utterance_detector.py    # UtteranceDetector — WebRTC VAD boundary detection
 │   │       ├── transcriber.py           # Transcriber — wraps STTEngine
-│   │       ├── speech_playback.py       # SpeechPlayback — plays synthesized WAV replies
+│   │       ├── speech_playback.py       # SpeechPlayback — interruptible paplay wrapper
 │   │       ├── sanitizer.py             # Sanitizer — hallucination / ghost-phrase filter
 │   │       ├── transcription_buffer.py  # TranscriptionBuffer — rolling window + state tracking
 │   │       ├── gatekeeper.py            # LLMGatekeeper — primary classify + recovery
@@ -429,9 +466,9 @@ def process(self, utterance: Utterance | BufferedUtterance,
 ```
 
 `process` returns a `GateDispatch` (action + optional text + recovered_id). Actions:
-`forward_current`, `forward_recovered`, `forward_clarification`, `drop`. The follow-up
-window is tracked internally via `_last_forwarded_at`. Recovery is a second LLM call
-triggered when the primary classification is not `command`.
+`forward_current`, `forward_recovered`, `forward_clarification`, `interrupt`, `drop`.
+The follow-up window is tracked internally via `_last_forwarded_at`. Recovery is a second
+LLM call triggered when the primary classification is not `command` or `interrupt`.
 
 ### TranscriptionBuffer — `shells/voice/interfaces/transcription_buffer.py`
 
@@ -467,11 +504,16 @@ def summarize(self, messages: list[ChatMessage]) -> str
 
 ```python
 @property def gatekeeper_prompt(self) -> str
-def handle_command(self, text: str) -> KernelResponse
+def handle_utterance(
+    self,
+    gate_result: GateResult,
+    utterance: Utterance,
+    controller: PipelineController,
+) -> None
 ```
 
-Used by `CommandMode`, `DictationMode`, and `CodingMode` to route submitted text inside
-the kernel.
+Legacy mode-control ABC. Current voice dispatch uses `LLMGatekeeper` +
+`PipelineDispatcher` before `CommandMode.process_command(text)`.
 
 ### EditorDriver — `tusk/kernel/interfaces/editor_driver.py`
 
@@ -777,9 +819,14 @@ AudioCapture.stream_frames()
     → Sanitizer.process(transcribed)           # hallucination / ghost-phrase filter → DROP
     → TranscriptionBuffer.process(sanitized)   # append to rolling window
     → GatekeeperSlot.process(buffered, recent)  # delegates to active inner gatekeeper
-        # command mode:   LLMGatekeeper — LLM 3-way classify → DROP (ambient)
+        # command mode:   LLMGatekeeper — command/conversation/ambient/interrupt
         # dictation mode: DictationGatekeeper — forward all; LLM stop detection → DROP (stop phrase)
         # coding mode:    CodingGatekeeper — forward all; LLM stop-coding detection → DROP (stop phrase)
+    → PipelineDispatcher
+        # forward_* → CommandWorker.enqueue(command_text)
+        # interrupt → KernelAPI.request_interrupt(); worker.flush()
+        # drop      → buffer.mark_dropped(current_id)
+    → CommandWorker thread
     → KernelAPI.submit(command_text)
         → CommandMode.process_command(text)
             → MainAgent.process_command(command)
@@ -989,10 +1036,12 @@ planner profile.
 
 ### CommandMode — `tusk/kernel/command_mode.py`
 
-Handles the normal voice command flow. The gatekeeper prompt is built dynamically:
+Handles submitted command text after shell-specific filtering. Voice prompt construction
+lives in `shells/voice/stages/command_gate_prompt.py` and is applied before
+`CommandMode.process_command(text)`:
 
 **Outside the follow-up window:** Standard static prompt. Wake-word or obvious imperative
-detection. Returns `{"classification": "command|conversation|ambient", "cleaned_text": ..., "reason": ...}`.
+detection. Returns `{"classification": "command|conversation|ambient|interrupt", "cleaned_text": ..., "reason": ...}`.
 
 **Within the follow-up window:** Standard prompt extended with:
 ```
@@ -1004,8 +1053,8 @@ Recent context:
 ```
 The last 6 non-summary user messages from `SlidingWindowHistory` are included.
 
-`handle_gate_result`: discards `is_directed_at_tusk=False`; calls `kernel.submit(text)`
-which routes the command to the agent.
+`process_command(text)` calls `MainAgent.process_command(text)` and wraps the reply in
+`KernelResponse(True, reply)`.
 
 ### AdapterDictationMode — `tusk/kernel/dictation_mode.py`
 
@@ -1171,14 +1220,13 @@ Shells are dynamically loaded from `shell.json` manifests by `main.py`.
 
 ### VoiceShell — `shells/voice/voice_shell.py`
 
-Builds a `VoicePipeline` from the six stages and drives it in a loop, passing
-`kernel.submit` as the callback. Logs the reply and, when a `TTSEngine` is injected
-(`TUSK_TTS=on`, default), speaks it via `SpeechPlayback`. See
-`shells/voice/README.md` for full pipeline details.
+Builds/runs `VoicePipeline` with injected STT, gatekeeper, `CommandWorker`, reporter, and
+interrupt token. `CommandWorker` owns `kernel.submit`, reply logging, TTS, and playback.
+See `shells/voice/README.md` for full pipeline details.
 
 ### CLIShell — `shells/cli/cli_shell.py`
 
-REPL loop: `input("tusk> ")` → `KernelAPI.submit_text(text)` → print reply. Exits on
+REPL loop: `input("tusk> ")` → injected `submit(text)` → print reply. Exits on
 `"exit"` or `"quit"`. Takes no constructor arguments.
 
 ### TrayShell — `shells/tray/tray_shell.py`
@@ -1251,7 +1299,7 @@ errors, rate limit, timeout.
 ## TTS Provider Specification
 
 Spoken replies are optional, controlled by `TUSK_TTS` (`on` by default; `off`/`0`/`false`
-disables). When disabled, no `TTSEngine` is injected and `VoiceShell` only logs replies.
+disables). When disabled, no `TTSEngine` is injected and `CommandWorker` only logs replies.
 
 ### GroqTTS — `tusk/providers/tts/groq_tts.py`
 
@@ -1265,11 +1313,12 @@ disables). When disabled, no `TTSEngine` is injected and `VoiceShell` only logs 
 
 ### SpeechPlayback — `shells/voice/stages/speech_playback.py`
 
-Plays the synthesized WAV. `VoiceShell._speak` catches playback/synthesis errors and logs them
-under `ERROR` so a TTS failure never interrupts the voice loop.
+Plays synthesized WAV via `paplay`. Audio bytes are written on a daemon writer thread while
+the caller polls `InterruptToken`; stop/cancel intent terminates playback. `CommandWorker`
+catches playback/synthesis errors and logs them under `ERROR`.
 
-> ⚠️ Latency: TTS runs on the consumer thread after a reply is produced, off the STT →
-> gatekeeper → agent hot path, so it does not affect command latency.
+> ⚠️ Latency: TTS runs on the command worker after a reply is produced, off the capture/STT
+> path, so speech can still be captured and classified while TUSK is speaking.
 
 ---
 
@@ -1312,7 +1361,7 @@ Used when the system prompt does not contain `"metadata_stop"`:
 
 ```json
 {
-  "classification": "command|conversation|ambient",
+  "classification": "command|conversation|ambient|interrupt",
   "cleaned_text": "string",
   "reason": "string"
 }
@@ -1358,9 +1407,10 @@ main()
   → StartupOptions.from_sources(sys.argv)
   → Config.from_env()                          # reads all TUSK_* env vars
   → _build_log(options)                        # ColorLogPrinter with log groups
+  → InterruptToken()
   → StatusReporterHub(NullStatusSink())        # default sink; real sink attached by tray later
-  → _build_kernel(config, log, reporter)
-      → _build_llm_registry(config, log)       # 4 LLMProxy slots
+  → _build_kernel(config, log, reporter, token)
+      → _build_llm_registry(config, log, token) # LLMProxy slots share interrupt token
       → ToolRegistry()
       → _build_adapter_manager(config, log, registry)
           → AdapterManager.start_all()         # discovers + connects adapters
@@ -1368,15 +1418,17 @@ main()
       → SlidingWindowHistory(20, LLMConversationSummarizer(...))
       → ToolRuntime(registry, llm_registry, adapter_manager, log)
       → _build_agent(config, log, llm_registry, tool_registry, history)
-      → KernelAPI(CommandMode(agent, log), llm_registry, log, DictationGate(...), reporter)
+      → KernelAPI(CommandMode(agent, log), llm_registry, log, reporter, token)
       → ToolRuntime(...).register_tools(kernel)    # attaches DictationRouter + tools
   → reporter.set_models(...)                       # initial model labels from LLMRegistry
   → ShellLoader(config, kernel, log, reporter).start()   # loads shell modules; reorders "tray" last
       # Voice shell builds its own six-stage pipeline and exposes PipelineControl:
-      → LLMGatekeeper(llm_registry.get("gatekeeper"), log)
       → tts_engine = GroqTTS(...) if config.tts_enabled else None   # spoken replies
-      → VoiceShell(config, log, stt_engine, gatekeeper, tts_engine, reporter)
-          → VoicePipeline(detector, transcriber, sanitizer, buffer, gatekeeper, reporter)
+      → CommandWorker(tts_engine, SpeechPlayback(token), log, token)
+      → gk_llm = kernel.get_llm_registry().get("gatekeeper")
+      → LLMGatekeeper(gk_llm, log, worker.is_busy, worker.current_speech_text)
+      → VoiceShell(..., gatekeeper, worker, kernel.request_interrupt, token)
+          → VoicePipeline(..., gatekeeper, reporter, worker, request_interrupt)
       # Tray shell (when "tray" in TUSK_SHELLS, forced last by the loader):
       → TrayShell(reporter, pipeline_control, shutdown_event, config)
           → reporter.attach_sink(TrayStatusSink(...))   # late-binds the real sink
