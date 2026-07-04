@@ -7,7 +7,10 @@ microphone audio continuously, detects speech boundaries, transcribes speech to 
 filters ambient noise and hallucinations, passes confirmed commands to a conversation
 agent, and executes desktop actions via hot-pluggable MCP adapters. The agent step itself is
 pluggable: an `AgentBackend` runs either TUSK's own planner/executor pipeline or an external
-`codex exec` process (see [Agent Backends](#agent-backends)).
+`codex exec` process (see [Agent Backends](#agent-backends)). Execution and speech
+run on a background `CommandWorker` thread so listening never blocks; a shared
+`InterruptToken` lets the user cancel any running task or spoken reply by voice, in any
+wording (see Voice Interrupt Flow below).
 
 The system is split into five layers: **Shells** (voice, CLI, tray, future), a thin **Kernel**
 (agent loop + tool dispatch), a **Shared** layer (ABCs, schemas, LLM access — depended on
@@ -136,6 +139,32 @@ sequenceDiagram
 
 ---
 
+## Voice Interrupt Flow
+
+Semantic stop while TUSK is busy — no fixed phrases, one shared `InterruptToken`, checked
+cooperatively at step boundaries and polled during playback. Details:
+[`docs/features/voice-interrupt.md`](features/voice-interrupt.md).
+
+```mermaid
+flowchart LR
+    GK{"gatekeeper LLM<br/>busy/speaking-aware prompt"}
+    GK -- command --> Q["CommandWorker<br/>queue + thread"]
+    GK -- "echo of spoken text" --> Drop((drop))
+    GK -- interrupt --> INT["request_interrupt()<br/>+ worker.flush()"]
+    Q --> Submit["kernel.submit<br/>agent run"] --> TTS[TTS] --> Play[SpeechPlayback]
+    INT -. sets .-> Token((InterruptToken))
+    Token -. "checked at each<br/>step and retry" .-> Submit
+    Token -. "polled 100 ms<br/>kills paplay" .-> Play
+```
+
+Interrupt is honored only while the worker is busy (an idle "stop" is a normal command).
+Cancellation is step-boundary: in-flight LLM/tool calls finish and their results are
+discarded; the runtime replies "Stopped." Playback stop is near-instant. While TUSK
+speaks in forward-all modes (dictation/coding), `PlaybackGate` restricts the mode gate to
+interrupt-or-drop so TUSK's own voice is never typed into the editor.
+
+---
+
 ## Directory Structure
 
 ```
@@ -243,6 +272,8 @@ tusk/
 │   │   │   ├── config.py                # Config — frozen dataclass, all runtime settings
 │   │   │   ├── config_factory.py        # ConfigFactory — reads env vars, builds Config
 │   │   │   └── startup_options.py       # StartupOptions — CLI args (verbosity, log groups)
+│   │   ├── interrupt/
+│   │   │   └── interrupt_token.py       # InterruptToken — shared cooperative-cancellation flag
 │   │   ├── llm/
 │   │   │   ├── interfaces/
 │   │   │   │   ├── llm_provider.py      # LLMProvider ABC — complete, complete_tool_call, etc.
@@ -313,7 +344,9 @@ tusk/
 │   ├── voice/                           # Six-stage composable voice pipeline
 │   │   ├── README.md                    # Voice shell architecture (see that file)
 │   │   ├── pipeline.py                  # VoicePipeline — assembles stages, dispatches GateDispatch
-│   │   ├── voice_shell.py               # VoiceShell — entry point, calls kernel.submit()
+│   │   ├── voice_shell.py               # VoiceShell — entry point; forwards to CommandWorker
+│   │   ├── command_worker.py            # CommandWorker — background submit + TTS + playback thread
+│   │   ├── playback_gate.py             # PlaybackGate — interrupt-or-drop while TUSK speaks (forward-all modes)
 │   │   ├── buffered_utterance.py        # BufferedUtterance — Utterance + id + gate_state
 │   │   ├── gate_dispatch.py             # GateDispatch — action + text + recovered_id
 │   │   ├── gatekeeper_slot.py           # GatekeeperSlot — mutable proxy; swapped at dictation start/stop
@@ -328,7 +361,9 @@ tusk/
 │   │       ├── speech_playback.py       # SpeechPlayback — plays synthesized WAV replies
 │   │       ├── sanitizer.py             # Sanitizer — hallucination / ghost-phrase filter
 │   │       ├── transcription_buffer.py  # TranscriptionBuffer — rolling window + state tracking
-│   │       ├── gatekeeper.py            # LLMGatekeeper — primary classify + recovery
+│   │       ├── gatekeeper.py            # LLMGatekeeper — primary classify + recovery; busy/speaking-aware
+│   │       ├── gate_llm_client.py       # GateLLMClient — gatekeeper LLM call/parse plumbing
+│   │       ├── speech_stop_gate.py      # SpeechStopGate — yes/no LLM stop classifier for PlaybackGate
 │   │       ├── coding_gatekeeper.py     # CodingGatekeeper — forwards all text; LLM stop-coding detection
 │   │       ├── dictation_gatekeeper.py  # DictationGatekeeper — forwards all text; LLM stop detection
 │   │       ├── gatekeeper_parser.py     # JSON parsing for gate and recovery LLM responses
@@ -385,6 +420,7 @@ tusk/
 │   └── codex_mcp_config_generator.py    # Emits codex config.toml mcp_servers from adapter manifests
 ├── docker/
 │   └── codex-entrypoint.sh              # Builds codex CODEX_HOME + config.toml, then execs
+├── e2e/                                 # Voice-interrupt e2e harness — real LLM/kernel, scripted audio edges
 └── tests/
     ├── test_pipeline.py
     ├── test_voice_shell.py
@@ -453,9 +489,10 @@ def process(self, utterance: Utterance | BufferedUtterance,
 ```
 
 `process` returns a `GateDispatch` (action + optional text + recovered_id). Actions:
-`forward_current`, `forward_recovered`, `forward_clarification`, `drop`. The follow-up
-window is tracked internally via `_last_forwarded_at`. Recovery is a second LLM call
-triggered when the primary classification is not `command`.
+`forward_current`, `forward_recovered`, `forward_clarification`, `drop`, `interrupt`
+(stop intent while the worker is busy — the pipeline fires the interrupt callback instead
+of forwarding). The follow-up window is tracked internally via `_last_forwarded_at`.
+Recovery is a second LLM call triggered when the primary classification is not `command`.
 
 ### TranscriptionBuffer — `shells/voice/interfaces/transcription_buffer.py`
 
@@ -597,7 +634,8 @@ cross component boundaries.
 | `confidence` | `float` | Gatekeeper confidence |
 | `metadata` | `dict[str, str]` | Mode-specific signals; includes `classification` key |
 
-The `classification` key in `metadata` holds `"command"`, `"conversation"`, or `"ambient"`.
+The `classification` key in `metadata` holds `"command"`, `"conversation"`, `"ambient"`,
+or `"interrupt"` (only honored while the `CommandWorker` is busy).
 
 ### ToolCall — `tusk/shared/schemas/tool_call.py`
 
@@ -801,10 +839,12 @@ AudioCapture.stream_frames()
     → Sanitizer.process(transcribed)           # hallucination / ghost-phrase filter → DROP
     → TranscriptionBuffer.process(sanitized)   # append to rolling window
     → GatekeeperSlot.process(buffered, recent)  # delegates to active inner gatekeeper
-        # command mode:   LLMGatekeeper — LLM 3-way classify → DROP (ambient)
+        # command mode:   LLMGatekeeper — LLM classify (busy/speaking-aware) → DROP (ambient) / INTERRUPT
         # dictation mode: DictationGatekeeper — forward all; LLM stop detection → DROP (stop phrase)
         # coding mode:    CodingGatekeeper — forward all; LLM stop-coding detection → DROP (stop phrase)
-    → KernelAPI.submit(command_text)
+        # while TUSK speaks: forward-all modes wrapped in PlaybackGate → INTERRUPT or DROP only
+    → CommandWorker.enqueue(command_text)        # worker thread — listening never blocks
+      → KernelAPI.submit(command_text)
         → CommandMode.process_command(text)
             → MainAgent.process_command(command)
                 → AgentOrchestrator.run(profile="conversation")
@@ -820,6 +860,13 @@ AudioCapture.stream_frames()
     → GateDispatch(action="forward_recovered", text=prior_text, recovered_id)
     → buffer.mark_recovered(recovered_id); buffer.mark_consumed(current_id)
     → KernelAPI.submit(prior_text)
+
+# Interrupt path (gatekeeper returns "interrupt" while the worker is busy):
+    → kernel.request_interrupt()      # sets the shared InterruptToken
+    → worker.flush()                  # queued commands dropped
+    → buffer.mark_consumed(current_id)
+    # AgentRuntime cancels at the next step boundary → reply "Stopped."
+    # SpeechPlayback polls the token every 100 ms → paplay terminated mid-word
 ```
 
 ### CLI Shell Path
@@ -993,6 +1040,7 @@ Shared across all profiles. Each run is independent:
 1. `RuntimeMessageHistoryBuilder` loads prior messages from `SessionStore` for this session.
 2. Appends the user instruction to messages and session store.
 3. Loops up to `profile.max_steps`:
+   - If the `InterruptToken` is set → returns `AgentResult(status="cancelled")` immediately.
    - Calls `profile.llm_provider.complete_tool_call(system_prompt, messages, tools)`.
    - `RepeatedToolCallGuard` aborts on duplicate identical call.
    - `RuntimeTurnGuards` enforces profile-specific constraints.
@@ -1273,10 +1321,11 @@ Shells are dynamically loaded from `shell.json` manifests by `main.py`.
 
 ### VoiceShell — `shells/voice/voice_shell.py`
 
-Builds a `VoicePipeline` from the six stages and drives it in a loop, passing
-`kernel.submit` as the callback. Logs the reply and, when a `TTSEngine` is injected
-(`TUSK_TTS=on`, default), speaks it via `SpeechPlayback`. See
-`shells/voice/README.md` for full pipeline details.
+Builds a `VoicePipeline` from the six stages and drives it in a loop. The forward target
+is `CommandWorker.enqueue` (wired by `ShellLoader`): the worker thread runs
+`kernel.submit`, logs the reply, and — when a `TTSEngine` is injected (`TUSK_TTS=on`,
+default) — speaks it via `SpeechPlayback`. Listening continues while the worker executes,
+which is what makes voice interrupts possible. See `shells/voice/README.md`.
 
 ### CLIShell — `shells/cli/cli_shell.py`
 
@@ -1329,7 +1378,9 @@ Slots: `gatekeeper`, `conversation_agent`, `planner_agent`, `executor_agent`,
 
 Retries on network and rate-limit errors. Does **not** retry `invalid_request_error` or
 `tool_use_failed` errors. Retried error classes: HTTP 429, 500, 502, 503, 504, connection
-errors, rate limit, timeout.
+errors, rate limit, timeout. When the injected `InterruptToken` is set, pending retries
+are abandoned immediately (an interrupt must not wait out backoff). The gatekeeper and
+utility LLM slots get no token — they must stay usable while an interrupt is pending.
 
 ### GroqLLM — `tusk/shared/llm/providers/groq_llm.py`
 
@@ -1367,11 +1418,13 @@ disables). When disabled, no `TTSEngine` is injected and `VoiceShell` only logs 
 
 ### SpeechPlayback — `shells/voice/stages/speech_playback.py`
 
-Plays the synthesized WAV. `VoiceShell._speak` catches playback/synthesis errors and logs them
-under `ERROR` so a TTS failure never interrupts the voice loop.
+Plays the synthesized WAV via `paplay` (`Popen`; a daemon thread feeds stdin and closes it
+via `with` even on write errors). Polls the `InterruptToken` every 100 ms and terminates
+the process on interrupt — speech cuts off mid-word. `CommandWorker._speak` catches
+playback/synthesis errors and logs them under `ERROR` so a TTS failure never kills the worker.
 
-> ⚠️ Latency: TTS runs on the consumer thread after a reply is produced, off the STT →
-> gatekeeper → agent hot path, so it does not affect command latency.
+> ⚠️ Latency: TTS + playback run on the `CommandWorker` thread, off the STT →
+> gatekeeper hot path entirely, so they do not affect command latency.
 
 ---
 
@@ -1461,24 +1514,28 @@ main()
   → Config.from_env()                          # reads all TUSK_* env vars
   → _build_log(options)                        # ColorLogPrinter with log groups
   → StatusReporterHub(NullStatusSink())        # default sink; real sink attached by tray later
-  → _build_kernel(config, log, reporter)
-      → _build_llm_registry(config, log)       # 4 LLMProxy slots
+  → _build_kernel(config, log, options, reporter, InterruptToken())
+      → _build_llm_registry(config, log, options, token)   # agent slots get the token;
+                                                           # gatekeeper/utility slots do NOT
       → ToolRegistry()
       → _build_adapter_manager(config, log, registry)
           → AdapterManager.start_all()         # discovers + connects adapters
           → AdapterManager.start_watcher()     # file-system hot-plug
       → SlidingWindowHistory(20, LLMConversationSummarizer(...))
       → ToolRuntime(registry, llm_registry, adapter_manager, log)
-      → _build_agent(config, log, llm_registry, tool_registry, history)
-      → KernelAPI(CommandMode(agent, log), llm_registry, log, DictationGate(...), reporter)
+      → _build_agent(config, log, llm_registry, tool_registry, history, token)
+      → KernelAPI(CommandMode(agent, log), llm_registry, log, reporter, token)
       → ToolRuntime(...).register_tools(kernel)    # attaches DictationRouter + tools
   → reporter.set_models(...)                       # initial model labels from LLMRegistry
   → ShellLoader(config, kernel, log, reporter).start()   # loads shell modules; reorders "tray" last
       # Voice shell builds its own six-stage pipeline and exposes PipelineControl:
-      → LLMGatekeeper(llm_registry.get("gatekeeper"), log)
-      → tts_engine = GroqTTS(...) if config.tts_enabled else None   # spoken replies
-      → VoiceShell(config, log, stt_engine, gatekeeper, tts_engine, reporter)
-          → VoicePipeline(detector, transcriber, sanitizer, buffer, gatekeeper, reporter)
+      → worker = CommandWorker(kernel.submit, tts_engine, SpeechPlayback(token), log, token)
+      → LLMGatekeeper(llm_registry.get("gatekeeper"), log,
+                      is_busy=worker.is_busy, current_speech_text=worker.current_speech_text)
+      → VoiceShell(config, log, stt_engine, gatekeeper, worker=worker, reporter=reporter,
+                   on_interrupt=kernel.request_interrupt + worker.flush)
+          → VoicePipeline(detector, transcriber, sanitizer, buffer, gatekeeper, reporter,
+                          on_interrupt=...)
       # Tray shell (when "tray" in TUSK_SHELLS, forced last by the loader):
       → TrayShell(reporter, pipeline_control, shutdown_event, config)
           → reporter.attach_sink(TrayStatusSink(...))   # late-binds the real sink
@@ -1546,6 +1603,9 @@ tray shell is loaded, the `NullStatusSink` stays in place and status reporting i
 | `AgentRuntime` | LLM failure | `ModelFailureReplyBuilder` → `done(status="failed")` |
 | `AgentRuntime` | Max steps reached | Returns `AgentResult(status="failed")` |
 | `AgentRuntime` | Repeated tool call | Returns `AgentResult(status="failed")` |
+| `AgentRuntime` | `InterruptToken` set | Returns `AgentResult(status="cancelled")` at the next step boundary → "Stopped." |
+| `ToolSequenceExecutor` | `InterruptToken` set | Aborts remaining steps; `ToolResult(False, "sequence cancelled by user")` |
+| `CommandWorker` | Any from `kernel.submit` | Logged under `ERROR`; worker thread keeps processing the queue |
 | `PlannerResultValidator` | Invalid planner output | Validates `planned_steps` against tool schemas; promotes to sequence when eligible; fails if no valid steps remain |
 | `PlannerStepPlanValidator` | Malformed `planned_steps` | Rejects forbidden synthetic tools, validates step structure and args against schemas |
 | `ToolSequencePlanValidator` | Invalid sequence plan | Pre-execution: rejects non-`sequence_callable` tools, forbidden tools, max 8 steps |
