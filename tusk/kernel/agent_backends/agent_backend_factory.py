@@ -1,5 +1,6 @@
 from tusk.kernel.agent_backends.agent_backend import AgentBackend
 from tusk.kernel.agent_backends.codex_exec_agent_backend import CodexExecAgentBackend
+from tusk.kernel.agent_backends.codex_mcp_agent_backend import CodexMcpAgentBackend
 from tusk.kernel.agent_backends.fallback_agent_backend import FallbackAgentBackend
 from tusk.kernel.agent_backends.tusk_agent_backend import TuskAgentBackend
 from tusk.kernel.interfaces.agent import Agent
@@ -25,11 +26,12 @@ class AgentBackendFactory:
         if backend_name == "tusk":
             return self._selected(TuskAgentBackend(self._agent, self._log_printer))
         if backend_name == "codex_exec":
-            return self._selected(self._codex_exec_backend())
+            return self._selected(self._with_fallback(CodexExecAgentBackend(self._config, self._log_printer)))
+        if backend_name == "codex_mcp":
+            return self._selected(self._with_fallback(CodexMcpAgentBackend(self._config, self._log_printer)))
         raise ValueError(f"Unknown agent backend '{backend_name}'")
 
-    def _codex_exec_backend(self) -> AgentBackend:
-        backend = CodexExecAgentBackend(self._config, self._log_printer)
+    def _with_fallback(self, backend: AgentBackend) -> AgentBackend:
         if self._fallback_name() != "tusk":
             return backend
         return FallbackAgentBackend(backend, TuskAgentBackend(self._agent, self._log_printer))

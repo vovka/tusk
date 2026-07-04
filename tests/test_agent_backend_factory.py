@@ -9,6 +9,7 @@ from tusk.kernel.agent_backends.agent_backend_factory import AgentBackendFactory
 from tusk.kernel.agent_backends.agent_request import AgentRequest
 from tusk.kernel.agent_backends.agent_result import AgentResult
 from tusk.kernel.agent_backends.codex_exec_agent_backend import CodexExecAgentBackend
+from tusk.kernel.agent_backends.codex_mcp_agent_backend import CodexMcpAgentBackend
 from tusk.kernel.agent_backends.fallback_agent_backend import FallbackAgentBackend
 from tusk.kernel.agent_backends.tusk_agent_backend import TuskAgentBackend
 
@@ -36,6 +37,21 @@ def test_agent_backend_factory_wraps_codex_exec_when_fallback_enabled() -> None:
 
 def test_agent_backend_factory_does_not_wrap_codex_exec_when_fallback_disabled() -> None:
     instance, _ = factory("codex_exec", "")
+    assert not isinstance(instance.create(), FallbackAgentBackend)
+
+
+def test_agent_backend_factory_selects_codex_mcp_backend() -> None:
+    instance, _ = factory("codex_mcp")
+    assert isinstance(instance.create(), CodexMcpAgentBackend)
+
+
+def test_agent_backend_factory_wraps_codex_mcp_when_fallback_enabled() -> None:
+    instance, _ = factory("codex_mcp", "tusk")
+    assert isinstance(instance.create(), FallbackAgentBackend)
+
+
+def test_agent_backend_factory_does_not_wrap_codex_mcp_when_fallback_disabled() -> None:
+    instance, _ = factory("codex_mcp", "")
     assert not isinstance(instance.create(), FallbackAgentBackend)
 
 
