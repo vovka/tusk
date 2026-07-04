@@ -9,12 +9,8 @@ __all__ = ["KernelAPI"]
 
 class KernelAPI:
     def __init__(
-        self,
-        command_mode: object,
-        llm_registry: object,
-        log: object | None = None,
-        reporter: object | None = None,
-        interrupt_token: object | None = None,
+        self, command_mode: object, llm_registry: object, log: object | None = None,
+        reporter: object | None = None, interrupt_token: object | None = None,
     ) -> None:
         self._command_mode = command_mode
         self._llm_registry = llm_registry

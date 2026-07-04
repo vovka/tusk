@@ -17,10 +17,7 @@ from tusk.shared.logging.interfaces.log_printer import LogPrinter
 
 class AgentRuntime:
     def __init__(
-        self,
-        session_store: AgentSessionStore,
-        log_printer: LogPrinter,
-        interrupt_token: object | None = None,
+        self, session_store: AgentSessionStore, log_printer: LogPrinter, interrupt_token: object | None = None,
     ) -> None:
         self._store = session_store
         self._log = log_printer
@@ -31,11 +28,8 @@ class AgentRuntime:
         self._record = RuntimeStepRecorder(session_store)
 
     def run(
-        self,
-        request: AgentRunRequest,
-        profile: AgentProfile,
-        tools: list[dict[str, object]],
-        executor: Callable[[ToolCall, str], ToolResult],
+        self, request: AgentRunRequest, profile: AgentProfile,
+        tools: list[dict[str, object]], executor: Callable[[ToolCall, str], ToolResult],
     ) -> AgentResult:
         session_id = self._session_id(request, profile)
         messages = self._history.build(session_id, request)
@@ -53,12 +47,8 @@ class AgentRuntime:
         self._store.start_session(session_id, profile.profile_id, request.parent_session_id, request.parent_call_id, request.metadata)
 
     def _loop(
-        self,
-        session_id: str,
-        profile: AgentProfile,
-        tools: list[dict[str, object]],
-        messages: list[dict[str, str]],
-        executor: Callable[[ToolCall, str], ToolResult],
+        self, session_id: str, profile: AgentProfile, tools: list[dict[str, object]],
+        messages: list[dict[str, str]], executor: Callable[[ToolCall, str], ToolResult],
     ) -> AgentResult:
         repeat = RepeatedToolCallGuard()
         guards = RuntimeTurnGuards()
@@ -94,12 +84,8 @@ class AgentRuntime:
         return None
 
     def _guard_result(
-        self,
-        session_id: str,
-        profile_id: str,
-        tool_call: ToolCall,
-        repeat: RepeatedToolCallGuard,
-        guards: RuntimeTurnGuards,
+        self, session_id: str, profile_id: str, tool_call: ToolCall,
+        repeat: RepeatedToolCallGuard, guards: RuntimeTurnGuards,
     ) -> AgentResult | None:
         if tool_call.tool_name == "done":
             return self._finish(session_id, tool_call.parameters)

@@ -26,8 +26,7 @@ def test_commands_run_sequentially_in_order() -> None:
 
 
 def test_flush_drops_queued_commands() -> None:
-    release = threading.Event()
-    started = threading.Event()
+    release, started = threading.Event(), threading.Event()
     submits: list[str] = []
     worker = _worker(_blocking_submit(release, submits, started))
     worker.enqueue("running")
@@ -35,8 +34,7 @@ def test_flush_drops_queued_commands() -> None:
     worker.enqueue("queued")
     worker.flush()
     release.set()
-    _await(lambda: submits == ["running"])
-    time.sleep(0.05)
+    _await(lambda: submits == ["running"] and not worker.is_busy)
     assert submits == ["running"]
 
 

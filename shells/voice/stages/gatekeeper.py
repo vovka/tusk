@@ -6,8 +6,8 @@ from shells.voice.gate_dispatch import GateDispatch
 from shells.voice.interfaces.gatekeeper import Gatekeeper
 from shells.voice.recovery_decision import RecoveryDecision
 from shells.voice.stages.command_gate_prompt import build_command_gate_prompt
-from shells.voice.stages.gatekeeper_parser import parse_gate_result, parse_recovery_decision
-from shells.voice.stages.gatekeeper_support import PRIMARY_SCHEMA, RECOVERY_SCHEMA, fallback_dispatch, has_wake_word, log_gate_result, log_recovery, normalize_recovery, recovered_dispatch, recovery_worthwhile, to_utterance
+from shells.voice.stages.gate_llm_client import GateLLMClient
+from shells.voice.stages.gatekeeper_support import fallback_dispatch, has_wake_word, recovered_dispatch, recovery_worthwhile, to_utterance
 from shells.voice.stages.recent_context_formatter import RecentContextFormatter
 from shells.voice.stages.recovery_gate_prompt import build_recovery_gate_prompt
 from tusk.shared.llm.interfaces.llm_provider import LLMProvider
@@ -28,8 +28,7 @@ class LLMGatekeeper(Gatekeeper):
         is_busy: Callable[[], bool] | None = None,
         current_speech_text: Callable[[], str | None] | None = None,
     ) -> None:
-        self._llm = llm_provider
-        self._log = log_printer
+        self._client = GateLLMClient(llm_provider, log_printer)
         self._formatter = formatter or RecentContextFormatter()
         self._time = time_source
         self._window = follow_up_window_seconds
@@ -40,7 +39,7 @@ class LLMGatekeeper(Gatekeeper):
     def evaluate(self, utterance: Utterance, recent: list[Utterance]) -> GateResult:
         context = self._formatter.format(recent) if self._within_follow_up_window() else ""
         prompt = build_command_gate_prompt(context, self._busy(), self._speaking())
-        return self._parsed_primary(self._complete(prompt, utterance.text, "command_gatekeeper", PRIMARY_SCHEMA))
+        return self._client.primary(prompt, utterance.text)
 
     def process(
         self,
@@ -89,40 +88,7 @@ class LLMGatekeeper(Gatekeeper):
         if not recovery_worthwhile(utterance, primary, candidates):
             return RecoveryDecision("none")
         prompt = build_recovery_gate_prompt(self._formatter.format(recent), candidates)
-        raw = self._complete(prompt, utterance.text, "command_gate_recovery", RECOVERY_SCHEMA)
-        return self._parsed_recovery(raw, candidates)
-
-    def _parsed_primary(self, raw: str) -> GateResult:
-        if not raw:
-            return GateResult(False, "", 0.0)
-        try:
-            result, reason = parse_gate_result(raw)
-            log_gate_result(self._log, result, reason)
-            return result
-        except Exception as exc:
-            self._log.log("ERROR", f"gatekeeper parse error: {exc}")
-            return GateResult(False, "", 0.0)
-
-    def _parsed_recovery(self, raw: str, candidates: list[BufferedUtterance]) -> RecoveryDecision:
-        try:
-            decision = parse_recovery_decision(raw) if raw else RecoveryDecision("none")
-            item = normalize_recovery(decision, candidates)
-            log_recovery(self._log, item)
-            return item
-        except Exception as exc:
-            self._log.log("ERROR", f"gate recovery parse error: {exc}")
-            return RecoveryDecision("none", reason="parse error")
-
-    def _complete(self, prompt: str, text: str, name: str, schema: dict) -> str:
-        try:
-            return self._llm.complete_structured(prompt, text, name, schema, 512)
-        except Exception as exc:
-            self._log.log("GATEKEEPER", f"{name} structured output failed: {exc}", "gatekeeper")
-        try:
-            return self._llm.complete(prompt, text, 256)
-        except Exception as exc:
-            self._log.log("ERROR", f"{name} fallback completion failed: {exc}")
-            return ""
+        return self._client.recovery(prompt, utterance.text, candidates)
 
     def _forward(self, dispatch: GateDispatch) -> GateDispatch:
         self._last_forwarded_at = self._time()
