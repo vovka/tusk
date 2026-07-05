@@ -6,10 +6,17 @@ __all__ = ["LLMRetryRunner"]
 
 
 class LLMRetryRunner:
-    def __init__(self, attempts: int = 3, sleeper: object | None = None, policy: LLMRetryPolicy | None = None) -> None:
+    def __init__(
+        self,
+        attempts: int = 3,
+        sleeper: object | None = None,
+        policy: LLMRetryPolicy | None = None,
+        interrupt_token: object | None = None,
+    ) -> None:
         self._attempts = attempts
         self._sleep = sleeper or time.sleep
         self._policy = policy or LLMRetryPolicy()
+        self._token = interrupt_token
 
     def run(self, operation: object, on_retry: object | None = None) -> str:
         last_error = None
@@ -22,6 +29,8 @@ class LLMRetryRunner:
         raise last_error
 
     def _retry(self, exc: Exception, attempt: int) -> bool:
+        if self._token is not None and self._token.is_interrupted:
+            return False
         return attempt < self._attempts and self._policy.should_retry(exc)
 
     def _handle_retry(self, exc: Exception, attempt: int, on_retry: object | None) -> None:

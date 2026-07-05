@@ -21,6 +21,9 @@ class RuntimeResultFactory:
     def failed(self, session_id: str, reason: str) -> AgentResult:
         return AgentResult("failed", session_id, reason, reason)
 
+    def cancelled(self, session_id: str) -> AgentResult:
+        return AgentResult("cancelled", session_id, "cancelled by user")
+
     def persist(self, session_id: str, result: AgentResult, reply: str) -> AgentResult:
         self._store.append_event(session_id, "session_finished", result.to_dict())
         self._store.append_event(session_id, "message_appended", {"role": "assistant", "content": reply})

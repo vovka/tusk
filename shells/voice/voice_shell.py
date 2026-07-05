@@ -5,7 +5,6 @@ from shells.voice.gate_dispatch import GateDispatch
 from shells.voice.pipeline import VoicePipeline
 from shells.voice.stages.audio_capture import AudioCapture
 from shells.voice.stages.sanitizer import Sanitizer
-from shells.voice.stages.speech_playback import SpeechPlayback
 from shells.voice.stages.transcriber import Transcriber
 from shells.voice.stages.transcription_buffer import TranscriptionBuffer
 from shells.voice.stages.utterance_detector import UtteranceDetector
@@ -22,21 +21,24 @@ class VoiceShell:
         stt_engine: object | None = None,
         gatekeeper: object | None = None,
         pipeline: object | None = None,
-        tts_engine: object | None = None,
-        playback: object | None = None,
+        worker: object | None = None,
         reporter: object | None = None,
+        on_interrupt: object | None = None,
     ) -> None:
         self._reporter = reporter
         self._pause_gate = threading.Event()
         self._pause_gate.set()
+        self._worker = worker
+        self._on_interrupt = on_interrupt
         self._pipeline = pipeline or self._build_pipeline(config, log_printer, stt_engine, gatekeeper)
         self._log = log_printer
-        self._tts = tts_engine
-        self._playback = playback or SpeechPlayback()
         self._running = True
 
     def start(self, submit: object) -> None:
-        for result in self._pipeline.run(submit):
+        if self._worker is not None:
+            self._worker.start()
+        target = self._worker.enqueue if self._worker is not None else submit
+        for result in self._pipeline.run(target):
             if not self._running:
                 return
             self._log_reply(result)
@@ -71,7 +73,7 @@ class VoiceShell:
             TranscriptionBuffer(log_printer),
             gatekeeper or _drop_all_gatekeeper(),
             settings[0],
-            settings[1], self._reporter,
+            settings[1], self._reporter, self._on_interrupt,
         )
 
     def _detector(self, config: object, log_printer: object) -> UtteranceDetector:
@@ -87,25 +89,6 @@ class VoiceShell:
         if not reply:
             return
         self._log.log("TUSK", reply)
-        self._speak(reply)
-
-    def _speak(self, reply: str) -> None:
-        if self._tts is None:
-            return
-        try:
-            self._play_muted(self._tts.synthesize(reply))
-        except Exception as exc:
-            self._log.log("ERROR", f"tts failed: {exc}")
-
-    def _play_muted(self, audio: object) -> None:
-        # Mute capture during playback so the mic never hears TUSK's own voice
-        # (coding mode forwards every utterance, so an echo would loop forever).
-        resume = self._pause_gate.is_set()
-        self._pause_gate.clear()
-        try:
-            self._playback.play(audio)
-        finally:
-            if resume: self._pause_gate.set()
 
 
 def _missing_stt_engine() -> object:

@@ -21,6 +21,7 @@ class VoicePipeline:
         recovery_window_seconds: float = 60.0,
         recovery_candidate_limit: int = 6,
         reporter: object | None = None,
+        on_interrupt: Callable[[], None] | None = None,
     ) -> None:
         self._detector = detector
         self._transcriber = transcriber
@@ -30,6 +31,7 @@ class VoicePipeline:
         self._recovery_window = recovery_window_seconds
         self._recovery_limit = recovery_candidate_limit
         self._reporter = reporter
+        self._on_interrupt = on_interrupt
 
     def run(self, submit: Callable[[str], KernelResponse]) -> Iterator[KernelResponse]:
         self._report(AppStatus.LISTENING)
@@ -42,9 +44,7 @@ class VoicePipeline:
             stop.set()
 
     def _consume(
-        self,
-        utterances: "queue.Queue[Utterance | Exception | None]",
-        submit: Callable[[str], KernelResponse],
+        self, utterances: "queue.Queue[Utterance | Exception | None]", submit: Callable[[str], KernelResponse],
     ) -> Iterator[KernelResponse]:
         while (item := utterances.get()) is not None:
             if isinstance(item, Exception):
@@ -74,11 +74,7 @@ class VoicePipeline:
         except Exception as exc:
             utterances.put(exc)
 
-    def _handle_utterance(
-        self,
-        utterance: Utterance,
-        submit: Callable[[str], KernelResponse],
-    ) -> KernelResponse | None:
+    def _handle_utterance(self, utterance: Utterance, submit: Callable[[str], KernelResponse]) -> KernelResponse | None:
         transcribed = self._transcriber.process(utterance)
         sanitized = self._sanitizer.process(transcribed)
         if sanitized is None:
@@ -90,18 +86,24 @@ class VoicePipeline:
         candidates = self._buffer.recoverable(self._recovery_limit, self._recovery_window)
         return self._dispatch(self._gatekeeper.process(buffered, recent, candidates), buffered.id, submit)
 
-    def _dispatch(
-        self,
-        result: GateDispatch,
-        current_id: str,
-        submit: Callable[[str], KernelResponse],
-    ) -> KernelResponse | None:
+    def _dispatch(self, result: GateDispatch, current_id: str, submit: Callable[[str], KernelResponse]) -> KernelResponse | None:
+        if result.action == "interrupt":
+            return self._interrupt(current_id)
         if result.action == "drop" or result.text is None:
             self._buffer.mark_dropped(current_id)
             return None
+        self._mark_accepted(result, current_id)
+        return self._submit(result.text, submit)
+
+    def _mark_accepted(self, result: GateDispatch, current_id: str) -> None:
         if result.action == "forward_recovered":
             self._buffer.mark_recovered(result.recovered_id)
             self._buffer.mark_consumed(current_id)
-            return self._submit(result.text, submit)
+            return
         self._buffer.mark_forwarded(current_id)
-        return self._submit(result.text, submit)
+
+    def _interrupt(self, current_id: str) -> None:
+        self._buffer.mark_consumed(current_id)
+        if self._on_interrupt is not None:
+            self._on_interrupt()
+        return None
