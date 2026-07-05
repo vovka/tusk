@@ -21,7 +21,7 @@ class MainAgent(AgentBackend):
     def process_command(self, command: str) -> str:
         result = self._orchestrator.run(AgentRunRequest(command, "conversation", self._session_id))
         self._session_id = result.session_id
-        reply = result.reply_text()
+        reply = "Stopped." if result.status == "cancelled" else result.reply_text()
         self._remember(command, reply)
         return reply
 

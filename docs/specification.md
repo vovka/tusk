@@ -42,6 +42,7 @@ immutable (`frozen=True`) for the lifetime of the process.
 | `PLANNER_AGENT_LLM` | `LLMSlotConfig` | falls back to `PLANNER_LLM` | Planner profile model |
 | `EXECUTOR_AGENT_LLM` | `LLMSlotConfig` | falls back to `AGENT_LLM` | Executor profile model |
 | `DEFAULT_AGENT_LLM` | `LLMSlotConfig` | falls back to `AGENT_LLM` | Default profile model |
+| `CODING_AGENT_LLM` | `LLMSlotConfig` | falls back to `AGENT_LLM` | Coding agent model — turns intent + buffer into edit operations |
 | `UTILITY_LLM` | `LLMSlotConfig` | `groq/llama-3.3-70b-versatile` | Model for summaries and text cleanup |
 
 Legacy fallback env vars (used when per-agent vars are absent):
@@ -62,11 +63,15 @@ Legacy fallback env vars (used when per-agent vars are absent):
 | `VAD_AGGRESSIVENESS` | `int` | `2` | `0`, `1`, `2`, or `3` |
 | `FOLLOW_UP_TIMEOUT_SECONDS` | `float` | `30` | Positive float (seconds) |
 | `MAX_FOLLOW_UP_TIMEOUT_SECONDS` | `float` | `120` | Positive float (seconds); follow-up window ceiling |
-| `TUSK_SHELLS` | `list[str]` | `["voice"]` | Comma-separated: `voice`, `cli`, `tray`. The shell loader automatically orders `tray` **last** (it owns the blocking GUI loop), so position in the env var does not matter |
+| `TUSK_SHELLS` | `list[str]` | `["voice"]` | Comma-separated: `voice`, `cli`, `tray`, `emulator` (scripted-transcript shell). The shell loader automatically orders `tray` **last** (it owns the blocking GUI loop), so position in the env var does not matter |
 | `TUSK_ADAPTER_ENV_CACHE_DIR` | `str` | `".tusk_runtime/adapters"` | Directory for managed adapter venvs |
 | `TUSK_CONVERSATION_LOG_DIR` | `str` | `".tusk_runtime/conversations"` | Directory for daily conversation logs (parsed but not active) |
 | `TUSK_TRAY_ICON_THEME` | `str` | `"light"` | `light`, `dark` — icon asset set used by the tray shell |
 | `TUSK_TRAY_SHOW_LAST_ACTIVITY` | `bool` | `false` | `true`, `false` — opt-in: show the last command/reply line in the tray menu (off by default; the transcript may contain sensitive speech) |
+| `TUSK_CODING_EDITOR_DRIVER` | `str` | `"input_automation"` | Design option, not yet wired — only `input_automation` (any editor via `gnome.*`) is active |
+| `TUSK_CODING_EDIT_STRATEGY` | `str` | `"full_replace"` | Selection not yet wired — `full_replace` is the active strategy (see §17.0) |
+| `TUSK_TRANSCRIPT` | `str` | `""` | Path to the transcript replayed by the `emulator` shell |
+| `TUSK_UTTERANCE_PAUSE` | `float` | `3` | Seconds the `emulator` shell waits between utterances |
 
 ### 2.4 LLM Slot Format and Provider Selection
 
@@ -80,6 +85,7 @@ Provider selection in main.py:
     "planner_agent"     → PLANNER_AGENT_LLM (fallback: PLANNER_LLM)
     "executor_agent"    → EXECUTOR_AGENT_LLM (fallback: AGENT_LLM)
     "default_agent"     → DEFAULT_AGENT_LLM (fallback: AGENT_LLM)
+    "coding_agent"      → CODING_AGENT_LLM (fallback: AGENT_LLM)
     "utility"           → UTILITY_LLM
 
 Supported providers: "groq" (GroqLLM), "openrouter" (OpenRouterLLM)
@@ -215,11 +221,14 @@ The schema used for `complete_structured` is selected based on the system prompt
 **Command schema:**
 ```json
 {
-  "classification": "command|conversation|ambient",
+  "classification": "command|conversation|ambient|interrupt",
   "cleaned_text": "string",
   "reason": "string"
 }
 ```
+
+`interrupt` is honored only while the `CommandWorker` is busy (see §25); when idle it is
+never produced because the busy clause is absent from the prompt.
 
 **Dictation schema:**
 ```json
@@ -269,6 +278,19 @@ classification prompt so conversational follow-ups work without a wake word.
 
 **Latency impact:** No additional LLM calls. Context is formatted via string operations
 (< 1 ms). The gatekeeper prompt grows by ~200–400 tokens when context is included.
+
+### 7.5 Busy/Speaking-Aware Prompt (Interrupt)
+
+`command_gate_prompt.build_command_gate_prompt(context, busy, speaking)` appends up to
+two clauses to the same single classification call — no extra LLM calls:
+
+| Condition | Clause appended | Effect |
+|---|---|---|
+| `worker.is_busy` | stop/cancel/abort intent **in any wording** → classify as `interrupt` | semantic stop, no fixed phrases |
+| `worker.current_speech_text` is set | "TUSK is currently saying aloud: '<reply>'" — echoes of it → `ambient` | semantic echo defense (no mic muting) |
+
+`LLMGatekeeper` receives `is_busy` and `current_speech_text` callables via constructor
+injection (wired in `ShellLoader` from the `CommandWorker`).
 
 ---
 
@@ -430,6 +452,10 @@ Shared by all three profiles (conversation, planner, executor).
 | `text` | Full reply text (optional) |
 | `payload` | Structured data (planner uses `selected_tool_names`, `execution_mode`, `planned_steps`, `plan_text`) |
 
+A run can also terminate without `done`: when the `InterruptToken` is set, the loop
+returns `AgentResult(status="cancelled", reply="cancelled by user")` at the next step
+boundary (see §25). `MainAgent` maps `cancelled` to the reply "Stopped.".
+
 
 ## 12. Tool Registry Specification
 
@@ -503,7 +529,9 @@ string listing each planner-visible tool's `name`, `description`, `input_schema`
 
 The voice pipeline is a six-stage chain. Each stage either passes its result forward or
 drops it. The pipeline is owned entirely by the voice shell — the kernel only sees
-`kernel.submit(text)` calls.
+`kernel.submit(text)` calls. The forward target is `CommandWorker.enqueue` (the worker
+thread calls `kernel.submit` and speaks the reply), so the listening loop never blocks
+on execution or playback (see §25).
 
 ### 13.1 Main Loop
 
@@ -523,6 +551,10 @@ def _handle_utterance(utterance, submit):
 
 ```python
 def _dispatch(result, current_id, submit):
+    if result.action == "interrupt":            # must precede drop: interrupt has text=None
+        buffer.mark_consumed(current_id)
+        on_interrupt()                          # kernel.request_interrupt() + worker.flush()
+        return None
     if result.action == "drop" or result.text is None:
         buffer.mark_dropped(current_id)
         return None
@@ -535,12 +567,14 @@ def _dispatch(result, current_id, submit):
 ```
 
 `GateDispatch.action` values: `forward_current`, `forward_recovered`,
-`forward_clarification`, `drop`.
+`forward_clarification`, `drop`, `interrupt`.
 
 ### 13.3 Gatekeeper Decision Logic
 
-Primary call classifies the utterance as `command`, `conversation`, or `ambient`.
+Primary call classifies the utterance as `command`, `conversation`, `ambient`, or
+(while busy) `interrupt`.
 
+- **interrupt + worker busy** → `interrupt` dispatch (idle `interrupt` falls through to the normal path)
 - **command** → `forward_current`
 - **conversation + wake word** → `forward_current`
 - **anything else** → triggers recovery call over recent `dropped` candidates:
@@ -746,9 +780,148 @@ Bridges `MCPToolSchema` → `RegisteredTool` interface.
 
 ---
 
-## 17. Shell Specification
+## 17. Coding Specification
 
-### 17.1 Shell Discovery
+Coding mode is the pair-coding sibling of dictation mode (§15). Spoken intent is converted
+into structured code edits and applied to the focused editor through a swappable
+`EditorDriver` and `EditApplicationStrategy`. TUSK never writes files on disk.
+
+### 17.0 Implementation status (as built)
+
+The rest of §17 describes the full design. As currently implemented and wired
+(`tusk/kernel/tool_runtime.py`):
+
+- **One editor driver:** `InputAutomationEditorDriver` (editor-agnostic `gnome.*` automation). `TUSK_CODING_EDITOR_DRIVER` and `VSCodeEditorDriver` are design contracts, not yet wired.
+- **One edit strategy — `FullReplaceEditStrategy`:** every edit re-pastes `EditOperation.full_buffer` (select-all → paste). It is the wired strategy because the input-automation driver is fire-and-forget with no feedback channel, so a full-buffer repaint of the authoritative `BufferModel` is drift-proof; `LineAnchoredEditStrategy` silently mis-applies on line drift or focus loss (verified against gedit 46: line-anchored dropped the function body, full-replace reproduced the buffer verbatim). `line_anchored` / `raw_key` / `FallbackEditStrategy` and `TUSK_CODING_EDIT_STRATEGY` selection are design options, not yet wired.
+- **`CodingState`** carries `(adapter_name, session_id, desktop_source)` only.
+- **Adapter lifecycle tools** (`coding.start_coding_session` / `process_intent` / `stop_coding_session`) are internal plumbing the kernel calls directly. They are hidden from the agent planner via `_INTERNAL_TOOL_NAMES` (like dictation's lifecycle tools); the planner's only coding entry point is the kernel tool `start_coding`.
+- **Driving coding mode without voice:** the `emulator` shell (`TUSK_SHELLS=emulator`) replays a scripted transcript into `KernelAPI.submit`, standing in for the STT + gatekeeper front end. It reads `TUSK_TRANSCRIPT` (path) and `TUSK_UTTERANCE_PAUSE` (seconds between utterances). Everything downstream — agent, GNOME launcher, coding adapter, editor automation — runs for real. See `demos/coding_session.txt`.
+
+### 17.1 StartCodingTool — `tusk/kernel/start_coding_tool.py`
+
+```
+name = "start_coding"
+description = "Enter pair-coding mode: TUSK applies the user's spoken code edits to the focused editor."
+planner_visible = True
+```
+
+**execute():**
+1. Resolve the desktop source (`adapter_manager.primary_desktop_source()`, e.g. `"gnome"`) and build the configured `EditorDriver`.
+2. Read the buffer once via `driver.read_buffer()` (select-all → copy → `read_clipboard`).
+3. Call `ToolRegistry.get("coding.start_coding_session").execute({"initial_buffer": buffer})`
+4. If not found: return `ToolResult(False, "coding adapter is not available")`
+5. Build `CodingState("coding", data["session_id"], desktop_source)`
+6. Call `controller.start_coding(state)`
+7. Return `ToolResult(True, "Coding started.", data)`
+
+### 17.2 CodingRouter — `tusk/kernel/coding_router.py`
+
+**process(state, text):**
+1. Call `ToolRegistry.get("coding.process_intent").execute({"session_id": ..., "intent": text})`
+2. Convert each entry in `data.operations` into a typed `EditOperation`
+3. For each op: `self._strategy.apply(op, self._driver)`
+4. Return `KernelResponse(True/False, message)`
+
+**stop(state):**
+1. Call `ToolRegistry.get("coding.stop_coding_session").execute({"session_id": ...})`
+2. Call `controller.stop_coding()` — sets `_coding_mode = None`
+3. Return `KernelResponse(True, "Coding stopped.")`
+
+### 17.3 CodingServer — `adapters/coding/server.py`
+
+MCP server managing coding sessions. Holds an authoritative `BufferModel` per session
+and runs the coding LLM via `CodingEditPlanner`.
+
+**Tools:**
+
+| Tool | Input | Output |
+|---|---|---|
+| `start_coding_session` | `initial_buffer` | `{"session_id": "<uuid>"}` in `data` |
+| `process_intent` | `session_id`, `intent` | `{"operations": [EditOperation...], "should_stop": false}` in `data` |
+| `stop_coding_session` | `session_id` | Success confirmation |
+
+**Intent logic:**
+- `CodingEditPlanner` calls the coding LLM (`coding_agent` slot) with the intent plus the current `BufferModel.to_text()`, using `complete_structured` against the `EditOperation` JSON schema.
+- Each returned op is applied to the stored model via `BufferModel.with_edit(op)` so the adapter model stays in lockstep with what the driver will type.
+- Each op carries `full_buffer` (the model after the op) to support full-replace / resync.
+
+### 17.4 CodingGate — `tusk/kernel/coding_gate.py`
+
+Called by `CodingGatekeeper` (`shells/voice/stages/coding_gatekeeper.py`) on every
+utterance while coding mode is active. Stop detection happens at the voice pipeline
+level — the intent never reaches `KernelAPI` when a stop is detected.
+
+**should_stop(text) → bool:**
+1. Call `LLMProvider.complete_structured(CODING_GATE_PROMPT, text, "coding_gatekeeper", schema, 128)`
+2. On failure, fall back to `LLMProvider.complete(CODING_GATE_PROMPT, text, 128)`
+3. On second failure, return `False` (treat as a coding instruction)
+4. Parse JSON response; extract `directed` (bool) and `metadata_stop` (str | null)
+5. Return `True` only when `directed=true` AND `metadata_stop` is a non-empty string
+
+**Structured output schema:**
+```json
+{
+  "directed": bool,
+  "cleaned_command": "string",
+  "metadata_stop": "string | null"
+}
+```
+
+**Prompt source:** `tusk/kernel/coding_gate_prompt.py` (`CODING_GATE_PROMPT`) — instructs the
+model that the only command to detect is a request to stop coding; all other speech is a
+literal coding instruction.
+
+### 17.5 EditorDriver — `tusk/kernel/interfaces/editor_driver.py`
+
+Abstracts the editor backend. Selected by `TUSK_CODING_EDITOR_DRIVER`.
+
+**InputAutomationEditorDriver — `tusk/kernel/input_automation_editor_driver.py`** (default,
+editor-agnostic). DI: `(tool_registry, desktop_source)`. Reuses existing `gnome.*` tools —
+no new GNOME primitives:
+- `read_buffer()` → snapshot clipboard via `{source}.read_clipboard`, then `press_keys("<ctrl>a")`, `press_keys("<ctrl>c")`, `{source}.read_clipboard` → `data["text"]`, then restore the snapshot via `{source}.write_clipboard`
+- `goto_line(n)` → `press_keys("<ctrl>g")`, `{source}.type_text(str(n))`, `press_keys("Return")`
+- `select_range(selection)` → `goto_line(selection.start_line)`, `Home`, then shift+Down / shift+End to span the range
+- `paste(text)` → snapshot clipboard, `{source}.write_clipboard(text)`, `press_keys("<ctrl>v")`, then restore the snapshot
+- `type_text(text)` → `{source}.type_text`
+- `press_keys(keys)` → `{source}.press_keys`
+- `replace_buffer(text)` → `press_keys("<ctrl>a")`, `paste(text)`
+
+**Clipboard preservation:** because this driver uses the system clipboard for both reading
+(`Ctrl+C`) and writing (`Ctrl+V`), every operation that touches the clipboard first reads
+and stashes the user's current clipboard contents and restores them once the operation
+completes (`ClipboardGuard`, a small context manager wrapping `read_clipboard` /
+`write_clipboard`). This prevents coding mode from silently destroying clipboard data the
+user was holding. The `VSCodeEditorDriver` avoids the clipboard entirely and so needs no
+such guard.
+
+**VSCodeEditorDriver — `tusk/kernel/vscode_editor_driver.py`** (future, contract only).
+Same ABC over a VS Code extension exposing `getBuffer()`, `gotoLine(n)`, `applyEdit(range, text)`,
+`replaceAll(text)` (stdio MCP adapter or localhost socket). `read_buffer()` calls `getBuffer()`
+directly — no clipboard round-trip — and edits map to `TextEditor.edit(...)` ranges. The
+extension itself is out of scope; only the driver contract is fixed so it is swappable.
+
+### 17.6 EditApplicationStrategy — `tusk/kernel/interfaces/edit_application_strategy.py`
+
+`apply(edit, driver)` maps one `EditOperation` onto driver calls. `TUSK_CODING_EDIT_STRATEGY`
+selection is not yet wired; `FullReplaceEditStrategy` is the one wired strategy (see §17.0).
+
+- **FullReplaceEditStrategy** (`full_replace`, **wired**): `driver.replace_buffer(edit.full_buffer)` — select-all + paste the authoritative buffer. Drift-proof for the fire-and-forget input-automation driver; also the resync / recovery path.
+- **LineAnchoredEditStrategy** (`line_anchored`, design option): `insert` → `goto_line` + anchor + `paste(new_text)`; `replace` → `select_range` + `paste(new_text)`; `delete` → `select_range` + `press_keys("Delete")`. Pastes only the changed region, but silently mis-applies under input automation when line numbers drift.
+- **RawKeyEditStrategy** (`raw_key`): arrows / Home / End / Delete / BackSpace + `type_text` at positions; no clipboard. **Trade-off:** typing character-by-character is slow for multi-line edits and is the most likely to trigger editor autocomplete / IntelliSense popups that swallow or corrupt simulated keystrokes. It is intended only for small, single-line edits; larger edits should use `line_anchored` or `full_replace`.
+- **FallbackEditStrategy** (`tusk/kernel/fallback_edit_strategy.py`): composes `(primary, fallback)`; on a `RuntimeError` from the primary it re-applies via `FullReplaceEditStrategy`. **Feedback limitation:** the input-automation driver is fire-and-forget GUI automation (`xdotool` via `gnome.*`) with no channel to observe the editor, so a mis-applied line-anchored edit (line drift, focus loss) does **not** raise — automatic fallback is therefore only effective for drivers with a bidirectional feedback channel (the future `VSCodeEditorDriver`). Under input automation, recovery is user-initiated: the user asks TUSK to resync, which runs `FullReplaceEditStrategy` to repaint the authoritative buffer (see §17.7).
+
+### 17.7 Buffer Ownership
+
+- The buffer is read exactly once at session start (`StartCodingTool` → `driver.read_buffer()`), seeding the adapter `BufferModel`.
+- The adapter is the authoritative model; every `process_intent` applies ops to it.
+- The router applies the same ops to the editor via the strategy/driver — model and editor stay in lockstep because all changes flow through TUSK.
+- **Limitation:** the model assumes the user makes no manual edits during a session. Manual edits are not detected and cause drift. Because the input-automation driver has no feedback channel (§17.6), drift cannot be detected automatically under that driver; `FullReplaceEditStrategy` (re-pasting `full_buffer`) is the deterministic resync, triggered by the user asking TUSK to resync. Feedback-capable drivers (future `VSCodeEditorDriver`) can read the buffer back and trigger resync automatically.
+
+---
+
+## 18. Shell Specification
+
+### 18.1 Shell Discovery
 
 `main.py` reads `shells/{name}/shell.json` for each name in `config.shells`:
 
@@ -761,23 +934,28 @@ Bridges `MCPToolSchema` → `RegisteredTool` interface.
 ```
 
 The module is loaded via `importlib.util.spec_from_file_location` and the class is
-instantiated. `VoiceShell` receives `(config, log)`; `CLIShell` receives no arguments.
+instantiated. `VoiceShell` is built by `ShellLoader._build_voice` with the STT engine,
+busy-aware gatekeeper, `CommandWorker`, and interrupt callback injected; `CLIShell`
+receives no arguments.
 
-### 17.2 VoiceShell — `shells/voice/voice_shell.py`
+### 18.2 VoiceShell — `shells/voice/voice_shell.py`
 
 ```python
 def start(self, submit: object) -> None:
-    for result in self._pipeline.run(submit):
+    if self._worker is not None:
+        self._worker.start()
+    target = self._worker.enqueue if self._worker is not None else submit
+    for result in self._pipeline.run(target):
         if not self._running:
             return
-        if result.reply:
-            log.log("TUSK", result.reply)
+        self._log_reply(result)
 ```
 
-The pipeline handles STT, sanitization, buffering, and gatekeeper internally.
-`submit` is `kernel.submit`.
+The pipeline handles STT, sanitization, buffering, and gatekeeper internally. With a
+`CommandWorker` injected (normal wiring), the forward target is `worker.enqueue` and the
+worker logs/speaks replies; without one it falls back to direct `kernel.submit`.
 
-### 17.3 CLIShell — `shells/cli/cli_shell.py`
+### 18.3 CLIShell — `shells/cli/cli_shell.py`
 
 ```python
 def start(self, api: object) -> None:
@@ -790,7 +968,7 @@ def start(self, api: object) -> None:
             print(result.reply)
 ```
 
-### 17.4 Threading Model
+### 18.4 Threading Model
 
 ```python
 for shell in shells[:-1]:
@@ -801,9 +979,9 @@ if shells:
 
 ---
 
-## 18. LLM Provider Specification
+## 19. LLM Provider Specification
 
-### 18.1 LLMProxy — `tusk/shared/llm/llm_proxy.py`
+### 19.1 LLMProxy — `tusk/shared/llm/llm_proxy.py`
 
 All LLM calls from the kernel go through `LLMProxy`.
 
@@ -812,7 +990,7 @@ All LLM calls from the kernel go through `LLMProxy`.
 - **Retry:** `LLMRetryRunner.run(operation, on_retry)` wraps every call
 - **Swap:** `swap(new_provider)` replaces `_inner` atomically; no new proxy needed
 
-### 18.2 LLMRetryRunner — `tusk/shared/llm/llm_retry_runner.py`
+### 19.2 LLMRetryRunner — `tusk/shared/llm/llm_retry_runner.py`
 
 ```
 attempts = 3
@@ -826,9 +1004,14 @@ Retried errors (LLMRetryPolicy.should_retry):
 NOT retried:
     "invalid_request_error"
     "tool_use_failed"
+
+Interrupt: when the injected InterruptToken is set, pending retries are
+abandoned immediately (returns failure instead of sleeping out backoff).
+Gatekeeper and utility slots get no token — they must stay usable while
+an interrupt is pending.
 ```
 
-### 18.3 GroqLLM — `tusk/shared/llm/providers/groq_llm.py`
+### 19.3 GroqLLM — `tusk/shared/llm/providers/groq_llm.py`
 
 - **Client:** `groq.Groq(api_key=..., timeout=30.0)`
 - **complete / complete_messages:** `chat.completions.create(model, messages, max_tokens=1024)`
@@ -839,7 +1022,7 @@ NOT retried:
   `{"type": "json_object"}` for others
 - **label:** `"groq/<model>"`
 
-### 18.4 OpenRouterLLM — `tusk/shared/llm/providers/open_router_llm.py`
+### 19.4 OpenRouterLLM — `tusk/shared/llm/providers/open_router_llm.py`
 
 - **Client:** `openai.OpenAI(base_url="https://openrouter.ai/api/v1", timeout=15.0)`
 - **Headers:** `HTTP-Referer: https://github.com/vovka/tusk`, `X-Title: TUSK`
@@ -848,7 +1031,7 @@ NOT retried:
 
 ---
 
-## 19. Data Flow Invariants
+## 20. Data Flow Invariants
 
 1. **All inter-component data is immutable.** Every schema type is a frozen dataclass.
 
@@ -871,9 +1054,17 @@ NOT retried:
 7. **Tools are the only place platform-specific execution logic lives.** `Pipeline`,
    `MainAgent`, and `CommandMode` contain no platform-specific code.
 
+8. **In coding mode, the editor buffer is read exactly once at session start.** After
+   that the adapter's `BufferModel` is authoritative; every editor mutation has a matching
+   model mutation (`BufferModel.with_edit`). TUSK never reads from or writes to disk.
+
+9. **`EditOperation` crosses the adapter→router boundary as a typed object.** `CodingRouter`
+   converts the JSON-RPC `data` payload into `EditOperation` instances before any strategy
+   runs — no raw dicts pass beyond the router.
+
 ---
 
-## 20. Error Handling Contracts
+## 21. Error Handling Contracts
 
 | Component | Exception | Behaviour |
 |---|---|---|
@@ -888,6 +1079,10 @@ NOT retried:
 | `AgentRuntime` | LLM failure | `ModelFailureReplyBuilder` → `done(status="failed")` |
 | `AgentRuntime` | Max steps (8/16) | Returns `AgentResult(status="failed")` |
 | `AgentRuntime` | Repeated tool call | Returns `AgentResult(status="failed")` |
+| `AgentRuntime` | `InterruptToken` set | Returns `AgentResult(status="cancelled")` at next step boundary |
+| `ToolSequenceExecutor` | `InterruptToken` set | Aborts remaining steps; `ToolResult(False, "sequence cancelled by user")` |
+| `CommandWorker` | Any from `kernel.submit` | Logged under `ERROR`; worker thread keeps processing |
+| `SpeechPlayback._feed` | `OSError` on write | stdin closed (`with`); playback wait unaffected |
 | `PlannerResultValidator` | Invalid planner output | Validates `planned_steps`; promotes to sequence when eligible; fails if no valid steps |
 | `PlannerStepPlanValidator` | Malformed `planned_steps` | Rejects forbidden synthetic tools, validates step structure and args |
 | `ToolSequencePlanValidator` | Invalid sequence plan | Rejects non-`sequence_callable` tools, enforces max 8 steps |
@@ -903,7 +1098,7 @@ NOT retried:
 
 ---
 
-## 21. Latency Budget
+## 22. Latency Budget
 
 Target end-to-end latency from end of speech to action start: ≤ 1.5 seconds.
 
@@ -927,6 +1122,30 @@ Target end-to-end latency from end of speech to action start: ≤ 1.5 seconds.
 **Dictation mode additional latency:**
 - Raw text insert: ~10–30 ms (xdotool type via gnome adapter)
 - LLM segment refinement: ~200–500 ms (runs in `process_segment`, refines before typing)
+
+**Coding mode additional latency** (active only in coding mode):
+
+| Stage | Implementation | Expected Latency |
+|---|---|---|
+| Buffer read at session start | select-all + copy + `read_clipboard` | ~30–80 ms (one-time, off the per-utterance path) |
+| Coding edit-planning LLM call | `coding_agent` provider, structured | ~400–900 ms (dominant; carries the buffer as context) |
+| Clipboard write per edit | `write_clipboard` + Ctrl+V | ~10–30 ms per edit |
+| Line-anchored navigation | Ctrl+G + selection key presses | ~10–40 ms per edit |
+| Full-replace fallback | select-all + paste | ~20–60 ms (scales with buffer size) |
+
+The coding LLM call dominates and is heavier than the dictation refinement call because it
+carries the buffer as context. Per-edit clipboard round-trips and input simulation add
+tens of ms each and multiply when one intent yields several ops. The buffer read is a
+one-time cost at session start, off the per-utterance hot path.
+
+**Voice interrupt latency** (see §25):
+
+| Path | Mechanism | Stop latency after utterance end |
+|---|---|---|
+| Idle | no busy clause; unchanged single gatekeeper call | n/a — normal path |
+| During speech playback | gatekeeper classifies → token set → 100 ms playback poll → `terminate()` | ~0.4–1.0 s (STT + gatekeeper + poll) |
+| During agent run | token checked at each step boundary; in-flight LLM/tool call finishes first | ~1.5–3.5 s (bounded by the in-flight call) |
+| Speaker bleed while TUSK talks | extra VAD segments → extra STT + gatekeeper calls, classified `ambient` | cost only, no misfires; PulseAudio `module-echo-cancel` is the optional env-level fix |
 
 ---
 
@@ -1070,3 +1289,84 @@ The active runtime no longer uses:
 
 `tusk/kernel/tool_call_parser.py` is still present only as a legacy helper. It is not
 used by the native tool-calling runtime.
+
+---
+
+## 24. Coding — Out of Scope
+
+Deferred for the coding feature (see brief §10):
+
+- **Multi-file editing** — the design targets a single focused buffer; cross-file refactors are unaddressed.
+- **Manual-edit conflict detection** — manual edits mid-session are not detected; periodic re-read + diff reconciliation is future work.
+- **Syntax / language awareness** — the coding agent is language-agnostic; no parser/LSP integration.
+- **Undo integration** — TUSK edits are not mapped to editor undo grouping.
+- **Autocomplete / IntelliSense interference** — completion popups may capture simulated keystrokes; the VS Code-extension driver is the intended mitigation.
+- **Multi-op line drift** — when one intent yields several edits, later edits must account for line numbers shifted by earlier ones, or fall back to full-buffer replace.
+
+---
+
+## 25. Voice Interrupt Specification
+
+Semantic stop, in any wording, while TUSK executes a task or reads a reply aloud.
+Feature doc with flow diagram: [`docs/features/voice-interrupt.md`](features/voice-interrupt.md).
+
+### 25.1 Interrupt Lifecycle
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant GK as Gatekeeper
+    participant W as CommandWorker
+    participant K as AgentRuntime
+    participant P as SpeechPlayback
+    U->>GK: "forget it, that's wrong"
+    Note over GK: worker busy → "interrupt"
+    GK->>K: request_interrupt() — token set
+    GK->>W: flush() — queued commands dropped
+    K-->>W: run cancels at next step boundary
+    Note over W: token set after submit →<br/>clear it, force reply "Stopped."<br/>(stale replies never spoken)
+    W->>P: speak "Stopped." (audible: token already cleared)
+    Note over W: ready for next command
+```
+
+### 25.2 InterruptToken — `tusk/shared/interrupt/interrupt_token.py`
+
+`threading.Event` wrapper: `interrupt()`, `is_interrupted`, `clear()`. One instance is
+created in `main.py` and injected everywhere. Checkpoints:
+
+| Component | Check |
+|---|---|
+| `AgentRuntime._loop` | top of each step → `AgentResult(status="cancelled")` |
+| `ToolSequenceExecutor` | between sequence steps → abort with partial result |
+| `LLMRetryRunner` | before each retry → abandon backoff (agent slots only) |
+| `SpeechPlayback` | 100 ms poll → `terminate()` the `paplay` process |
+
+Cancellation is cooperative and step-boundary: in-flight LLM/tool calls finish and their
+results are discarded; already-executed desktop actions are not rolled back.
+
+### 25.3 CommandWorker — `shells/voice/command_worker.py`
+
+Daemon thread + `queue.Queue[str]`. Contract:
+
+| Member | Behavior |
+|---|---|
+| `enqueue(text)` | returns immediately; commands run sequentially in order |
+| `flush()` | drops queued (not yet started) commands |
+| `is_busy` | true while executing or queue non-empty — enables the gatekeeper busy clause |
+| `current_speech_text` | the reply text while it is being spoken, else `None` — enables the echo clause |
+| token handling | cleared at job start; if set after `submit` returns → cleared again and reply forced to "Stopped." |
+| errors | submit exceptions logged under `ERROR`; the worker thread never dies |
+
+### 25.4 PlaybackGate — `shells/voice/playback_gate.py`
+
+Wraps the forward-all mode gates (dictation/coding) while `current_speech_text` is set:
+`SpeechStopGate` (yes/no LLM classifier, spoken text as context) decides
+`interrupt`-or-`drop`; nothing else is forwarded, so TUSK's own voice is never typed
+into the editor. Command mode needs no wrapper — the busy/speaking-aware prompt (§7.5)
+covers it in the same single gatekeeper call.
+
+### 25.5 Out of Scope
+
+Hard-killing in-flight HTTP calls; token coverage of coding-driver internals (own stop
+flow exists); CLI shell interruption; undo of executed desktop actions; acoustic echo
+cancellation (optional PulseAudio `module-echo-cancel`).

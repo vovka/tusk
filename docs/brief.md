@@ -152,6 +152,33 @@ TUSK is **AI-first**. The core of the application is an AI agent, not a command 
 - **Hot-swappable models:** LLMs are swapped at runtime via voice command. "Tusk, use Sonnet for sub-agents" or "Tusk, switch main agent to local Llama" — the system reconfigures without restart.
 - **Master Prompt:** Each agent operates under a configurable master prompt (system prompt) that defines its behavior, safety constraints, and personality. The master prompt is where dangerous action safeguards are defined (see §6.5).
 
+### 3.6 Coding Mode (Pair Coding)
+
+TUSK can act as a hands-free pair programmer. Instead of typing code, the user explains in natural language what code they want and what it should do, and TUSK writes and edits the code **live inside the user's running editor** (VS Code first, any editor over time). This is a dedicated **coding mode**, structurally a sibling of dictation mode: once entered, spoken intent is treated as instructions to mutate the code, not as general desktop commands.
+
+**The editor's visible buffer is the deliverable — TUSK never writes files on disk.** It drives the editor through the same channel a human uses: simulated keyboard input and the clipboard. At session start TUSK reads the buffer once (select-all → copy → read clipboard) and from then on owns an authoritative in-memory model of the buffer. The assumption is that the user makes no manual edits during a session — the buffer mutates only through TUSK, which applies every change to its model and to the editor in lockstep.
+
+The same two-tier split applies:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  CODING MODE (active after "start coding")               │
+│                                                          │
+│  TIER 1: GATEKEEPER (coding-scoped)                      │
+│    "Is this a request to stop coding?"                   │
+│        ├─ Yes → exit coding mode                         │
+│        └─ No  → forward as a coding instruction          │
+│                                                          │
+│  TIER 2: CODING AGENT (smart LLM)                        │
+│    Inputs:  spoken intent + owned buffer model           │
+│    Output:  structured edit operations                   │
+│        → editor driver (input automation / future plugin)│
+│        → editor buffer mutated (the deliverable)         │
+└─────────────────────────────────────────────────────────┘
+```
+
+How edits reach the editor is pluggable. A swappable **editor driver** abstracts the editor backend — the v1 driver is editor-agnostic input automation (reusing the GNOME desktop extension's keyboard and clipboard actions, no plugin required), while a deeper VS Code-extension driver is designed behind the same interface for later. A swappable **edit-application strategy** abstracts *how* a change is applied — line-anchored clipboard edits (default), full-buffer replace (also the resync/recovery path), or raw key navigation.
+
 ---
 
 ## 4. Target Users
@@ -185,6 +212,7 @@ TUSK is **AI-first**. The core of the application is an AI agent, not a command 
 |---|---|
 | **Linux/GNOME Desktop** | **Context provider:** active window, window list/positions/sizes, workspace layout, screen geometry, running applications. **Action executor:** open/close/resize/move/focus windows; launch applications; keyboard key presses; semantic mouse control. First reference extension — not part of the core. |
 | **System Tray Indicator** | Status-only tray icon (StatusNotifierItem / AppIndicator) showing whether TUSK is running, listening, reacting, or paused. Click menu exposes the current interaction mode, the models in use, the active mic device, and quick actions (Pause/Resume, Open logs, Restart, Exit). Ships as the `tray` shell extension; the core stays unaware of it and reports status only through an abstraction. |
+| **Coding Mode** | Pair-coding via voice: spoken intent + owned buffer model → structured edits typed into the focused editor. Ships with the editor-agnostic input-automation driver (reuses the GNOME extension's keyboard/clipboard actions). A VS Code-extension driver is designed behind the same interface but not shipped in v1. |
 
 This is a **status-and-control surface, not a full GUI**: it indicates state and offers a few lifecycle actions. A richer visual interface for TUSK itself remains future work.
 
@@ -308,6 +336,7 @@ These are unresolved decisions to revisit as development progresses:
 7. **Dangerous action list** — what specific operations belong in the dangerous action registry? How granular should it be?
 8. **Metrics and telemetry** — what to measure and how (recognition accuracy, gatekeeper precision/recall, command latency breakdown per tier, context freshness, agent response time).
 9. **Conversation context** — *Partially resolved: the main agent maintains a sliding-window conversation history within a session (max 20 messages, with LLM-based summarization on compaction). The gatekeeper also receives recent context within an adaptive follow-up window (30–120 seconds, scaling with interaction frequency). Cross-session memory remains an open question.*
+10. **Coding mode** — several questions remain for pair coding: (a) **multi-file editing** — the v1 design targets a single focused buffer; cross-file refactors are unaddressed. (b) **Manual-edit conflict detection** — the model assumes the user makes no manual edits mid-session; detecting and reconciling user edits (e.g. periodic re-read + diff) is future work. (c) **Syntax / language awareness** — the coding agent is language-agnostic with no parser/LSP integration. (d) **Undo integration** — TUSK edits are not mapped to editor undo grouping. (e) **Autocomplete / IntelliSense interference** — completion popups may capture simulated keystrokes; the VS Code-extension driver is the intended mitigation. (f) **Multi-op line drift** — when one intent yields several edits, later edits must account for line numbers shifted by earlier ones, or fall back to full-buffer replace.
 
 10. **Tray pause semantics** — *Resolved: "Pause" mutes microphone capture entirely (capture is suspended at the voice shell, so no audio is transcribed or processed), rather than dropping commands later in the pipeline. This is the most privacy-friendly meaning and saves CPU/network. Resume restarts capture.*
 

@@ -56,6 +56,15 @@ def test_conversation_prompt_requires_completion_check_after_child() -> None:
     assert "fail twice" in prompt or "fails twice" in prompt
 
 
+def test_conversation_prompt_treats_mode_switches_as_actionable() -> None:
+    profiles = build_agent_profiles(_mock_registry())
+    prompt = profiles["conversation"].system_prompt.lower()
+    assert "pair-programming" in prompt
+    assert "dictation" in prompt
+    assert "are actionable" in prompt
+    assert "never answer them with done" in prompt
+
+
 def test_executor_prompt_prefers_clipboard_for_large_text() -> None:
     profiles = build_agent_profiles(_mock_registry())
     prompt = profiles["executor"].system_prompt

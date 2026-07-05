@@ -29,6 +29,7 @@ def make_agent(
     planner_llm: object | None = None,
     executor_llm: object | None = None,
     default_llm: object | None = None,
+    interrupt_token: object | None = None,
 ) -> MainAgent:
     history = history or types.SimpleNamespace(append=lambda message: None, get_messages=lambda: [])
     log = log or types.SimpleNamespace(log=lambda *args: None)
@@ -36,7 +37,7 @@ def make_agent(
     store = FileAgentSessionStore(tempfile.mkdtemp(prefix="tusk-agent-tests-"))
     llms = _llm_map(llm, planner_llm, executor_llm, default_llm)
     profiles = build_agent_profiles(types.SimpleNamespace(get=lambda name: llms[name]))
-    return MainAgent(AgentOrchestrator(profiles, registry, store, log), history)
+    return MainAgent(AgentOrchestrator(profiles, registry, store, log, interrupt_token), history)
 
 
 def _llm_map(llm: object, planner: object | None, executor: object | None, default: object | None) -> dict[str, object]:

@@ -12,6 +12,7 @@ class RecordingOrchestrator:
     def run(self, request: Any) -> Any:
         self.requests.append(request)
         return types.SimpleNamespace(
+            status="done",
             session_id="result-session",
             reply_text=lambda: "Done.",
         )

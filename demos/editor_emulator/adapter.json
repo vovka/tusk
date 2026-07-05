@@ -1,0 +1,8 @@
+{
+  "name": "editor_emulator",
+  "version": "1.0.0",
+  "description": "Emulated text editor: in-memory buffer standing in for gedit/X11 during e2e runs",
+  "transport": "stdio",
+  "entry": "python server.py",
+  "provides_context": true
+}
