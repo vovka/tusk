@@ -35,6 +35,17 @@ RUN printf 'pcm.default pulse\nctl.default pulse\n' > /etc/asound.conf
 ENV PYTHONPATH=/usr/lib/python3/dist-packages
 ENV PYSTRAY_BACKEND=appindicator
 
+# Optional Codex agent backend: drop a static (musl) codex binary at vendor/codex
+# to bake it in. A glibc-linked build will NOT run here (bookworm ships glibc
+# 2.36); build with `cargo build --release --target x86_64-unknown-linux-musl`.
+# Absent -> only the default "tusk" backend is available.
+COPY vendor/ /opt/codex-vendor/
+RUN if [ -f /opt/codex-vendor/codex ]; then \
+        install -m 0755 /opt/codex-vendor/codex /usr/local/bin/codex; \
+    fi
+
 COPY . .
 
+# Prepare a container-local codex home before launching (no-op for the tusk backend).
+ENTRYPOINT ["/app/docker/codex-entrypoint.sh"]
 CMD ["python", "main.py"]

@@ -29,6 +29,8 @@ class GnomeServer:
     def serve(self) -> None:
         for line in sys.stdin:
             request = json.loads(line)
+            if "id" not in request:
+                continue
             self._write(request["id"], self._payload(request))
 
     def _call(self, name: str, arguments: dict) -> dict:
@@ -44,12 +46,16 @@ class GnomeServer:
         method = request.get("method")
         params = request.get("params", {})
         if method == "initialize":
-            return {"protocolVersion": "2024-11-05", "capabilities": {"tools": {}}}
+            return self._initialize_result()
         if method == "tools/list":
             return {"tools": list(self._router.schemas().values())}
         if method == "tools/call":
             return self._call(params["name"], params.get("arguments", {}))
         return {}
+
+    def _initialize_result(self) -> dict:
+        info = {"name": "gnome", "version": "1.0.0"}
+        return {"protocolVersion": "2024-11-05", "capabilities": {"tools": {}}, "serverInfo": info}
 
     def _tool_search_applications(self, arguments: dict) -> dict:
         return self._router._handlers["search_applications"](arguments)

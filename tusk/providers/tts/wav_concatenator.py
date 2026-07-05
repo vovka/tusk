@@ -23,6 +23,7 @@ class WavConcatenator:
             writer.setnchannels(reader.getnchannels())
             writer.setsampwidth(reader.getsampwidth())
             writer.setframerate(reader.getframerate())
+            writer.setcomptype(reader.getcomptype(), reader.getcompname())
         return writer
 
     def _frames(self, clip: bytes) -> bytes:

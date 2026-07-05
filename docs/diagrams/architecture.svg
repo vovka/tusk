@@ -115,8 +115,16 @@
 
 <g class="c-coral">
   <rect x="50" y="346" width="180" height="50" rx="8" stroke-width="0.5"/>
-  <text class="th" x="140" y="364" text-anchor="middle" dominant-baseline="central">Agent</text>
-  <text class="ts" x="140" y="382" text-anchor="middle" dominant-baseline="central">agentic loop</text>
+  <text class="th" x="140" y="364" text-anchor="middle" dominant-baseline="central">Agent backend</text>
+  <text class="ts" x="140" y="382" text-anchor="middle" dominant-baseline="central">tusk / codex · fallback</text>
+</g>
+<line x1="140" y1="396" x2="140" y2="410" class="arr" marker-end="url(#arrow)"/>
+<text class="ts" x="150" y="407" opacity="0.5">tusk</text>
+
+<g class="c-coral">
+  <rect x="50" y="412" width="180" height="50" rx="8" stroke-width="0.5"/>
+  <text class="th" x="140" y="430" text-anchor="middle" dominant-baseline="central">Agent</text>
+  <text class="ts" x="140" y="448" text-anchor="middle" dominant-baseline="central">agentic loop</text>
 </g>
 
 <g class="c-teal">
@@ -124,7 +132,7 @@
   <text class="th" x="345" y="308" text-anchor="middle" dominant-baseline="central">Tool registry</text>
   <text class="ts" x="345" y="326" text-anchor="middle" dominant-baseline="central">schema + dispatch</text>
 </g>
-<line x1="230" y1="370" x2="258" y2="340" class="arr" marker-end="url(#arrow)"/>
+<path d="M230 437 L244 437 L244 315 L258 315" fill="none" class="arr" marker-end="url(#arrow)"/>
 
 <g class="c-amber">
   <rect x="260" y="356" width="170" height="50" rx="8" stroke-width="0.5"/>
@@ -182,6 +190,17 @@
   <text class="ts" x="744" y="606" text-anchor="middle" dominant-baseline="central">future</text>
 </g>
 
+<!-- Codex CLI agent backend (external process) -->
+<path d="M50 384 H40 V585 H48" fill="none" class="arr" marker-end="url(#arrow)"/>
+<text class="ts" x="48" y="536" opacity="0.45">codex exec</text>
+<g class="c-gray">
+  <rect x="50" y="560" width="180" height="50" rx="8" stroke-width="0.5"/>
+  <text class="th" x="140" y="578" text-anchor="middle" dominant-baseline="central">Codex CLI</text>
+  <text class="ts" x="140" y="596" text-anchor="middle" dominant-baseline="central">external agent process</text>
+</g>
+<line x1="140" y1="610" x2="140" y2="690" class="arr" marker-end="url(#arrow)"/>
+<text class="ts" x="148" y="652" opacity="0.45">MCP</text>
+
 <!-- ===== ADAPTERS ===== -->
 <text class="ts" x="40" y="664" opacity="0.4">Adapters (MCP servers, hot-pluggable)</text>
 
@@ -211,7 +230,7 @@
 
 <!-- Config tool to Config store -->
 <path d="M345 406 L345 430 L250 430 L250 690" fill="none" class="arr" marker-end="url(#arrow)"/>
-<text class="ts" x="210" y="450" opacity="0.4">persist</text>
+<text class="ts" x="258" y="452" opacity="0.4">persist</text>
 
 <!-- ===== PROVIDERS ===== -->
 <text class="ts" x="40" y="790" opacity="0.4">Providers (swappable implementations behind shared ABCs)</text>
