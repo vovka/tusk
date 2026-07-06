@@ -10,6 +10,16 @@ import subprocess
 _SOCKET_PATH = "/tmp/tusk/launch.sock"
 _BACKLOG = 5
 
+# Snap injects these to redirect toolkit/loader lookups into its own tree.
+# A host GUI app (e.g. gedit) that inherits them loads /snap libs built
+# against a different glibc and dies with a GLIBC_PRIVATE symbol error.
+_SNAP_ENV_LEAKS = (
+    "LD_LIBRARY_PATH", "LD_PRELOAD", "GTK_PATH", "GTK_EXE_PREFIX",
+    "GTK_IM_MODULE", "GTK_IM_MODULE_FILE", "GDK_PIXBUF_MODULE_FILE",
+    "GDK_PIXBUF_MODULEDIR", "GIO_MODULE_DIR", "GSETTINGS_SCHEMA_DIR",
+    "LOCPATH", "XDG_DATA_HOME",
+)
+
 
 def _handle(conn: socket.socket) -> None:
     with conn:
@@ -36,7 +46,14 @@ def _read(conn: socket.socket) -> str:
 
 
 def _launch(data: str) -> None:
-    subprocess.Popen(shlex.split(data))
+    subprocess.Popen(shlex.split(data), env=_host_env())
+
+
+def _host_env() -> dict:
+    env = dict(os.environ)
+    for var in _SNAP_ENV_LEAKS:
+        env.pop(var, None)
+    return env
 
 
 def _send(conn: socket.socket, message: str) -> None:
