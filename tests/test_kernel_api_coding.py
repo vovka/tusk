@@ -7,7 +7,7 @@ from tusk.shared.schemas.kernel_response import KernelResponse
 def test_submit_routes_text_to_coding_mode_when_active() -> None:
     actions: list[str] = []
     api = KernelAPI(_command_mode(), types.SimpleNamespace())
-    api._coding_mode = _coding_mode(actions)
+    api._coding._mode = _coding_mode(actions)
     result = api.submit("add a loop")
     assert result == KernelResponse(True, "updated")
     assert actions == ["process:add a loop"]
@@ -16,14 +16,14 @@ def test_submit_routes_text_to_coding_mode_when_active() -> None:
 def test_coding_mode_takes_precedence_over_command_mode() -> None:
     api = KernelAPI(_command_mode(), types.SimpleNamespace())
     assert api.submit("plain command") == KernelResponse(True, "plain command")
-    api._coding_mode = _coding_mode([])
+    api._coding._mode = _coding_mode([])
     assert api.submit("edit").reply == "updated"
 
 
 def test_request_coding_stop_calls_mode_stop() -> None:
     actions: list[str] = []
     api = KernelAPI(_command_mode(), types.SimpleNamespace())
-    api._coding_mode = _coding_mode(actions)
+    api._coding._mode = _coding_mode(actions)
     assert api.request_coding_stop() == KernelResponse(True, "stopped")
     assert "stop" in actions
 
@@ -36,7 +36,7 @@ def test_request_coding_stop_is_noop_when_not_coding() -> None:
 def test_coding_active_reflects_mode_state() -> None:
     api = KernelAPI(_command_mode(), types.SimpleNamespace())
     assert api.coding_active is False
-    api._coding_mode = _coding_mode([])
+    api._coding._mode = _coding_mode([])
     assert api.coding_active is True
 
 

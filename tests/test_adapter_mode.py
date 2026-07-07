@@ -1,21 +1,31 @@
 import types
 
-from tusk.kernel.coding_mode import AdapterCodingMode
+import pytest
+
+from tusk.kernel.adapter_mode import AdapterMode
 from tusk.kernel.coding_state import CodingState
 from tusk.shared.schemas.kernel_response import KernelResponse
 
 
-def test_process_text_delegates_to_router_with_state() -> None:
+@pytest.mark.parametrize("tag", ["DICTATION", "CODING"])
+def test_process_text_delegates_to_router_with_state(tag: str) -> None:
     seen: list[tuple[object, str]] = []
-    mode = AdapterCodingMode(_state(), _router(seen), _log())
+    mode = AdapterMode(_state(), _router(seen), _log(), tag)
     result = mode.process_text("add a guard clause")
     assert result == KernelResponse(True, "updated")
     assert seen == [(mode.state, "add a guard clause")]
 
 
 def test_stop_delegates_to_router() -> None:
-    mode = AdapterCodingMode(_state(), _stopping_router(), _log())
+    mode = AdapterMode(_state(), _stopping_router(), _log(), "CODING")
     assert mode.stop() == KernelResponse(True, "Coding stopped.")
+
+
+def test_logs_under_mode_tag() -> None:
+    logs: list[tuple] = []
+    log = types.SimpleNamespace(log=lambda *args: logs.append(args))
+    AdapterMode(_state(), _router([]), log, "DICTATION").process_text("x")
+    assert logs == [("DICTATION", "updated")]
 
 
 def _state() -> CodingState:

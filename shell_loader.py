@@ -85,19 +85,20 @@ class ShellLoader:
             is_busy=lambda: worker.is_busy, current_speech_text=lambda: worker.current_speech_text,
         )
         slot = GatekeeperSlot(llm_gk)
-        self._wire_dictation(slot, llm_gk, gk_llm, worker)
-        self._wire_coding(slot, llm_gk, gk_llm, worker)
+        self._wire_modes(slot, llm_gk, gk_llm, worker)
         return slot
 
-    def _wire_dictation(self, slot: GatekeeperSlot, llm_gk: LLMGatekeeper, gk_llm: object, worker: CommandWorker) -> None:
-        gate = ModeGate(gk_llm, "dictation", DICTATION_GATE_PROMPT, self._log)
-        make = lambda: self._guarded(StopGatekeeper(gate, self._kernel.request_dictation_stop), gk_llm, worker)
-        self._kernel.set_dictation_callbacks(on_start=lambda: slot.swap(make()), on_stop=lambda: slot.swap(llm_gk))
+    def _wire_modes(self, slot: GatekeeperSlot, llm_gk: LLMGatekeeper, gk_llm: object, worker: CommandWorker) -> None:
+        self._wire_mode(slot, llm_gk, gk_llm, worker, "dictation", DICTATION_GATE_PROMPT,
+                        self._kernel.set_dictation_callbacks, self._kernel.request_dictation_stop)
+        self._wire_mode(slot, llm_gk, gk_llm, worker, "coding", CODING_GATE_PROMPT,
+                        self._kernel.set_coding_callbacks, self._kernel.request_coding_stop)
 
-    def _wire_coding(self, slot: GatekeeperSlot, llm_gk: LLMGatekeeper, gk_llm: object, worker: CommandWorker) -> None:
-        gate = ModeGate(gk_llm, "coding", CODING_GATE_PROMPT, self._log)
-        make = lambda: self._guarded(StopGatekeeper(gate, self._kernel.request_coding_stop), gk_llm, worker)
-        self._kernel.set_coding_callbacks(on_start=lambda: slot.swap(make()), on_stop=lambda: slot.swap(llm_gk))
+    def _wire_mode(self, slot: GatekeeperSlot, llm_gk: LLMGatekeeper, gk_llm: object, worker: CommandWorker,
+                   name: str, prompt: str, set_callbacks: object, request_stop: object) -> None:
+        gate = ModeGate(gk_llm, name, prompt, self._log)
+        make = lambda: self._guarded(StopGatekeeper(gate, request_stop), gk_llm, worker)
+        set_callbacks(on_start=lambda: slot.swap(make()), on_stop=lambda: slot.swap(llm_gk))
 
     def _guarded(self, inner: object, gk_llm: object, worker: CommandWorker) -> PlaybackGate:
         # forward-all mode gates only ever see interrupt-or-drop while TUSK's own voice plays
