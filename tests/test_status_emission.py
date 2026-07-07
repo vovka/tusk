@@ -109,12 +109,13 @@ def _raise_value_error(*args: object) -> object:
     raise ValueError("bad slot")
 
 
-def test_concurrent_kernel_submits_restore_original_status_once() -> None:
+def test_concurrent_kernel_submits_are_serialized() -> None:
     hub, published = _hub()
     hub.set_status(AppStatus.LISTENING)
     _submit_concurrently(KernelAPI(_BlockingCommandMode(), types.SimpleNamespace(), None, hub))
     assert hub.status == AppStatus.LISTENING
-    assert [s.status for s in published].count(AppStatus.LISTENING) == 2
+    expected = [AppStatus.LISTENING, AppStatus.REACTING, AppStatus.LISTENING, AppStatus.REACTING, AppStatus.LISTENING]
+    assert [s.status for s in published] == expected
 
 
 def _submit_concurrently(api: KernelAPI) -> None:

@@ -1,3 +1,4 @@
+import threading
 from collections.abc import Callable
 
 from tusk.kernel.mode_slot import ModeSlot
@@ -19,6 +20,7 @@ class KernelAPI:
         self._reporter = reporter
         self._interrupt_token = interrupt_token
         self._submit_reporter = SubmitStatusReporter(reporter) if reporter is not None else None
+        self._submit_lock = threading.Lock()
         self._dictation = ModeSlot("DICTATION", "Dictation started.")
         self._coding = ModeSlot("CODING", "Coding started.")
 
@@ -31,10 +33,12 @@ class KernelAPI:
         return self._interrupt_token
 
     def submit(self, text: str) -> KernelResponse:
-        self._log_input(text)
-        if self._submit_reporter is None:
-            return self._route(text)
-        return self._submit_reporter.run(text, self._route)
+        # ponytail: one global lock — commands are serial by design (single user voice stream)
+        with self._submit_lock:
+            self._log_input(text)
+            if self._submit_reporter is None:
+                return self._route(text)
+            return self._submit_reporter.run(text, self._route)
 
     def _log_input(self, text: str) -> None:
         if self._log is not None:
