@@ -1,19 +1,10 @@
-try:
-    from gnome_application_tools import GnomeApplicationTools
-    from gnome_clipboard_tools import GnomeClipboardTools
-    from gnome_context_tools import GnomeContextTools
-    from gnome_input_tools import GnomeInputTools
-    from gnome_text_chunker import GnomeTextChunker
-    from gnome_tool_schema_catalog import GnomeToolSchemaCatalog
-    from gnome_window_tools import GnomeWindowTools
-except ImportError:  # pragma: no cover
-    from adapters.gnome.gnome_application_tools import GnomeApplicationTools
-    from adapters.gnome.gnome_clipboard_tools import GnomeClipboardTools
-    from adapters.gnome.gnome_context_tools import GnomeContextTools
-    from adapters.gnome.gnome_input_tools import GnomeInputTools
-    from adapters.gnome.gnome_text_chunker import GnomeTextChunker
-    from adapters.gnome.gnome_tool_schema_catalog import GnomeToolSchemaCatalog
-    from adapters.gnome.gnome_window_tools import GnomeWindowTools
+from adapters.gnome.gnome_application_tools import GnomeApplicationTools
+from adapters.gnome.gnome_clipboard_tools import GnomeClipboardTools
+from adapters.gnome.gnome_context_tools import GnomeContextTools
+from adapters.gnome.gnome_input_tools import GnomeInputTools
+from adapters.gnome.gnome_text_chunker import GnomeTextChunker
+from adapters.gnome.gnome_tool_schema_catalog import GnomeToolSchemaCatalog
+from adapters.gnome.gnome_window_tools import GnomeWindowTools
 
 __all__ = ["GnomeToolRouter"]
 

@@ -1,9 +1,6 @@
 from dataclasses import dataclass
 
-try:
-    from window_info import WindowInfo
-except ImportError:  # pragma: no cover
-    from adapters.gnome.window_info import WindowInfo
+from tusk.shared.schemas.window_info import WindowInfo
 
 __all__ = ["DesktopContext"]
 

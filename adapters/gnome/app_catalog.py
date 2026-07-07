@@ -4,10 +4,7 @@ import os
 import re
 from dataclasses import asdict
 
-try:
-    from app_entry import AppEntry
-except ImportError:  # pragma: no cover
-    from adapters.gnome.app_entry import AppEntry
+from tusk.shared.schemas.app_entry import AppEntry
 
 __all__ = ["AppCatalog"]
 
