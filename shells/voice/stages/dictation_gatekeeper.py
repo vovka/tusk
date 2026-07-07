@@ -14,9 +14,6 @@ class DictationGatekeeper(Gatekeeper):
         self._stop = stop_callback
         self._log = log
 
-    def evaluate(self, utterance: Utterance, recent: list[Utterance]) -> object:
-        return None
-
     def process(
         self,
         utterance: Utterance | BufferedUtterance,

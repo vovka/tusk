@@ -29,15 +29,6 @@ def test_non_stop_speech_during_playback_is_dropped() -> None:
     assert inner_calls == []
 
 
-def test_evaluate_delegates_to_inner() -> None:
-    inner = types.SimpleNamespace(
-        process=lambda utterance, recent, candidates=None: GateDispatch("drop"),
-        evaluate=lambda utterance, recent: "inner-result",
-    )
-    gate = PlaybackGate(inner, lambda: None, types.SimpleNamespace(should_stop=lambda text, speaking: False))
-    assert gate.evaluate(_utterance("hi"), []) == "inner-result"
-
-
 def _utterance(text: str) -> Utterance:
     return Utterance(text, b"", 1.0)
 
@@ -45,7 +36,6 @@ def _utterance(text: str) -> Utterance:
 def _gate(inner_calls: list[str], speaking: str | None, stop: bool) -> PlaybackGate:
     inner = types.SimpleNamespace(
         process=lambda utterance, recent, candidates=None: inner_calls.append(utterance.text) or GateDispatch("forward_current", utterance.text),
-        evaluate=lambda utterance, recent: None,
     )
     stop_gate = types.SimpleNamespace(should_stop=lambda text, speaking: stop)
     return PlaybackGate(inner, lambda: speaking, stop_gate)

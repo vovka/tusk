@@ -13,9 +13,6 @@ class GatekeeperSlot(Gatekeeper):
     def swap(self, gatekeeper: Gatekeeper) -> None:
         self._inner = gatekeeper
 
-    def evaluate(self, utterance: Utterance, recent: list[Utterance]) -> object:
-        return self._inner.evaluate(utterance, recent)
-
     def process(
         self,
         utterance: Utterance | BufferedUtterance,

@@ -21,9 +21,6 @@ class PlaybackGate(Gatekeeper):
         self._current_speech_text = current_speech_text
         self._stop_gate = stop_gate
 
-    def evaluate(self, utterance: Utterance, recent: list[Utterance]) -> object:
-        return self._inner.evaluate(utterance, recent)
-
     def process(
         self,
         utterance: Utterance | BufferedUtterance,
