@@ -2,8 +2,6 @@ import subprocess
 
 __all__ = ["GnomeInputSimulator"]
 
-_BUTTON_MAP = {"left": 1, "right": 3, "middle": 2}
-
 
 class GnomeInputSimulator:
     def press_keys(self, keys: str) -> None:

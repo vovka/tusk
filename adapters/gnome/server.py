@@ -57,15 +57,6 @@ class GnomeServer:
         info = {"name": "gnome", "version": "1.0.0"}
         return {"protocolVersion": "2024-11-05", "capabilities": {"tools": {}}, "serverInfo": info}
 
-    def _tool_search_applications(self, arguments: dict) -> dict:
-        return self._router._handlers["search_applications"](arguments)
-
-    def _tool_list_windows(self, arguments: dict) -> dict:
-        return self._router._handlers["list_windows"](arguments)
-
-    def _tool_get_active_window(self, arguments: dict) -> dict:
-        return self._router._handlers["get_active_window"](arguments)
-
     def _write(self, request_id: int, payload: dict) -> None:
         response = {"jsonrpc": "2.0", "id": request_id, "result": payload}
         sys.stdout.write(json.dumps(response) + "\n")
