@@ -32,7 +32,8 @@ class OpenRouterLLM(LLMProvider):
         self._logger = logger
 
     def complete(self, system_prompt: str, user_message: str, max_tokens: int = 256) -> str:
-        return self.complete_messages(system_prompt, [{"role": "user", "content": user_message}])
+        payload = _chat_payload(self._model, system_prompt, [{"role": "user", "content": user_message}], max_tokens)
+        return message_content(self._create(payload))
 
     def complete_messages(self, system_prompt: str, messages: list[dict]) -> str:
         return message_content(self._create(_chat_payload(self._model, system_prompt, messages)))
@@ -61,5 +62,5 @@ class OpenRouterLLM(LLMProvider):
         return self._client.chat.completions.create(**payload)
 
 
-def _chat_payload(model: str, system_prompt: str, messages: list[dict]) -> dict[str, object]:
-    return {"model": model, "max_tokens": 1024, "messages": [{"role": "system", "content": system_prompt}, *messages]}
+def _chat_payload(model: str, system_prompt: str, messages: list[dict], max_tokens: int = 1024) -> dict[str, object]:
+    return {"model": model, "max_tokens": max_tokens, "messages": [{"role": "system", "content": system_prompt}, *messages]}

@@ -31,7 +31,8 @@ class GroqLLM(LLMProvider):
         self._logger = logger
 
     def complete(self, system_prompt: str, user_message: str, max_tokens: int = 256) -> str:
-        return self.complete_messages(system_prompt, [{"role": "user", "content": user_message}])
+        payload = _chat_payload(self._model, system_prompt, [{"role": "user", "content": user_message}], max_tokens)
+        return message_content(self._create(payload))
 
     def complete_messages(self, system_prompt: str, messages: list[dict]) -> str:
         return message_content(self._create(_chat_payload(self._model, system_prompt, messages, 1024)))
