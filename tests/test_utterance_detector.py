@@ -14,6 +14,13 @@ def test_detector_logs_completed_utterance(monkeypatch) -> None:
     ]
 
 
+def test_utterance_duration_uses_configured_frame_length(monkeypatch) -> None:
+    monkeypatch.setattr(utterance_detector, "webrtcvad", types.SimpleNamespace(Vad=_FakeVad))
+    detector = utterance_detector.UtteranceDetector(_audio(), 16000, 2, _log([]), frame_duration_ms=20)
+    utterance = next(detector.stream_utterances())
+    assert utterance.duration_seconds == 5 * 0.020
+
+
 class _FakeVad:
     def __init__(self, aggressiveness: int) -> None:
         self._aggressiveness = aggressiveness

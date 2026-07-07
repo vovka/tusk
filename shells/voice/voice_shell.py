@@ -82,6 +82,7 @@ class VoiceShell:
             config.audio_sample_rate,
             config.vad_aggressiveness,
             log_printer,
+            frame_duration_ms=config.audio_frame_duration_ms,
         )
 
     def _log_reply(self, result: object) -> None:
