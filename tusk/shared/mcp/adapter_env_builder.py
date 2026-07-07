@@ -16,7 +16,7 @@ class AdapterEnvironmentBuilder:
         # adapters import tusk.shared (schemas, MCP server loop) from their own cwd
         env = os.environ.copy()
         existing = env.get("PYTHONPATH")
-        env["PYTHONPATH"] = f"{_REPO_ROOT}:{existing}" if existing else _REPO_ROOT
+        env["PYTHONPATH"] = f"{_REPO_ROOT}{os.pathsep}{existing}" if existing else _REPO_ROOT
         return env
 
     def build(self, path: Path, manifest: dict) -> dict:

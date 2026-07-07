@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 from tusk.shared.mcp import AdapterEnvironmentBuilder
@@ -8,7 +9,7 @@ _REPO_ROOT = str(Path(__file__).resolve().parents[1])
 def test_base_env_prepends_repo_root_to_pythonpath(monkeypatch) -> None:
     monkeypatch.setenv("PYTHONPATH", "/existing")
     env = AdapterEnvironmentBuilder(".tusk_runtime/adapters").base_env()
-    assert env["PYTHONPATH"] == f"{_REPO_ROOT}:/existing"
+    assert env["PYTHONPATH"] == f"{_REPO_ROOT}{os.pathsep}/existing"
 
 
 def test_base_env_sets_pythonpath_when_absent(monkeypatch) -> None:
