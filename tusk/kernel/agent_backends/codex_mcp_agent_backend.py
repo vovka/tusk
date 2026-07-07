@@ -18,7 +18,6 @@ class CodexMcpAgentBackend(AgentBackend):
     """Drives one persistent `codex mcp-server` process across turns."""
 
     def __init__(self, config: object, log_printer: LogPrinter) -> None:
-        self._require(config, log_printer)
         self._config = config
         self._prompt_builder = CodexPromptBuilder()
         self._call_builder = CodexMcpCallBuilder(config)
@@ -27,12 +26,6 @@ class CodexMcpAgentBackend(AgentBackend):
         self._lock = threading.Lock()
         self._client: CodexMcpClient | None = None
         atexit.register(self._reset_client)
-
-    def _require(self, config: object, log_printer: LogPrinter) -> None:
-        if config is None:
-            raise ValueError("config cannot be None")
-        if log_printer is None:
-            raise ValueError("log_printer cannot be None")
 
     @property
     def name(self) -> str:
@@ -43,8 +36,6 @@ class CodexMcpAgentBackend(AgentBackend):
         return False
 
     def run(self, request: AgentRequest) -> AgentResult:
-        if request is None:
-            raise ValueError("request cannot be None")
         started_at = self._run_logger.start(request)
         with self._lock:
             result = self._run_locked(request)
@@ -98,11 +89,10 @@ class CodexMcpAgentBackend(AgentBackend):
             pass
 
     def _command(self) -> list[str]:
-        binary = str(getattr(self._config, "codex_exec_binary", "codex")).strip() or "codex"
-        return [binary, "mcp-server"]
+        return [self._config.codex_exec_binary.strip() or "codex", "mcp-server"]
 
     def _server_cwd(self) -> str:
-        return str(getattr(self._config, "codex_exec_workdir", "")).strip() or "."
+        return self._config.codex_exec_workdir.strip() or "."
 
     def _timeout(self) -> float:
-        return float(getattr(self._config, "codex_exec_timeout_seconds", 60))
+        return float(self._config.codex_exec_timeout_seconds)

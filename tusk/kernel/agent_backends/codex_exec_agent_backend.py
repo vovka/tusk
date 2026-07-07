@@ -16,9 +16,6 @@ __all__ = ["CodexExecAgentBackend"]
 
 class CodexExecAgentBackend(AgentBackend):
     def __init__(self, config: object, log_printer: LogPrinter) -> None:
-        if config is None: raise ValueError("config cannot be None")
-        if log_printer is None:
-            raise ValueError("log_printer cannot be None")
         self._config = config
         self._command_builder = CodexExecCommandBuilder(config)
         self._prompt_builder = CodexPromptBuilder()
@@ -35,8 +32,6 @@ class CodexExecAgentBackend(AgentBackend):
         return False
 
     def run(self, request: AgentRequest) -> AgentResult:
-        if request is None:
-            raise ValueError("request cannot be None")
         started_at = self._run_logger.start(request)
         result = self._run_process(request)
         self._run_logger.end(request, started_at, result)
@@ -52,7 +47,7 @@ class CodexExecAgentBackend(AgentBackend):
         return self._completed(request, completed)
 
     def _execute(self, request: AgentRequest) -> subprocess.CompletedProcess:
-        request_env = getattr(request, "environment", None) or {}
+        request_env = request.environment or {}
         return subprocess.run(
             self._command_builder.build(self._prompt_builder.build(request)),
             cwd=self._cwd(request), timeout=self._timeout(request),
@@ -98,15 +93,13 @@ class CodexExecAgentBackend(AgentBackend):
         return str(parsed.get("reply") or parsed.get("final_text") or "") if isinstance(parsed, dict) else str(parsed)
 
     def _cwd(self, request: AgentRequest) -> str | None:
-        configured = str(getattr(self._config, "codex_exec_workdir", "")).strip()
-        directory = getattr(request, "working_directory", "") or configured
+        directory = request.working_directory or self._config.codex_exec_workdir.strip()
         return str(Path(directory)) if directory else None
 
-    def _timeout(self, request: AgentRequest) -> object:
-        timeout = getattr(request, "timeout_seconds", None)
-        if timeout is not None:
-            return timeout
-        return getattr(self._config, "codex_exec_timeout_seconds")
+    def _timeout(self, request: AgentRequest) -> float:
+        if request.timeout_seconds is not None:
+            return request.timeout_seconds
+        return self._config.codex_exec_timeout_seconds
 
     def _exit_message(self, completed: subprocess.CompletedProcess) -> str:
         summary = str(completed.stderr or "").strip()[:300]
@@ -114,6 +107,6 @@ class CodexExecAgentBackend(AgentBackend):
 
     def _log_completion(self, completed: subprocess.CompletedProcess) -> None:
         message = f"codex exec completed with exit code {completed.returncode}"
-        if getattr(self._config, "codex_exec_log_raw_events", False):
+        if self._config.codex_exec_log_raw_events:
             message = f"{message}; stdout={completed.stdout}; stderr={completed.stderr}"
         self._log_printer.log("codex_exec", message, "agent")

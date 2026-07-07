@@ -98,4 +98,4 @@ def _require_pipeline_inputs(stt_engine: object | None, gatekeeper: object | Non
 
 
 def _pipeline_settings(config: object) -> tuple[float, int]:
-    return getattr(config, "gate_recovery_window_seconds", 60.0), getattr(config, "gate_recovery_candidate_limit", 6)
+    return config.gate_recovery_window_seconds, config.gate_recovery_candidate_limit

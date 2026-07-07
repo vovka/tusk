@@ -26,7 +26,10 @@ def test_voice_shell_requires_gatekeeper() -> None:
 
 
 def _config() -> object:
-    return types.SimpleNamespace(audio_sample_rate=16000, audio_frame_duration_ms=30, vad_aggressiveness=2)
+    return types.SimpleNamespace(
+        audio_sample_rate=16000, audio_frame_duration_ms=30, vad_aggressiveness=2,
+        gate_recovery_window_seconds=60.0, gate_recovery_candidate_limit=6,
+    )
 
 
 def _log() -> object:
