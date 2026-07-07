@@ -36,7 +36,7 @@ class StepRecorder:
 
 
 def _child_result_message(tool_result: ToolResult) -> str | None:
-    child = tool_result.data.get("child_result") if tool_result.data else None
+    child = tool_result.data.get("child_result") if isinstance(tool_result.data, dict) else None
     if not isinstance(child, dict):
         return None
     return "\n".join(["[child-result]", *_child_result_lines(child)])
@@ -54,7 +54,7 @@ def _child_result_lines(child: dict[str, object]) -> list[str]:
 
 
 def _clipboard_message(tool_call: ToolCall, tool_result: ToolResult) -> str | None:
-    if tool_call.tool_name != "gnome.write_clipboard" or not tool_result.data:
+    if tool_call.tool_name != "gnome.write_clipboard" or not isinstance(tool_result.data, dict):
         return None
     text = tool_result.data.get("clipboard_text")
     return f"[clipboard-written]\n{text}" if isinstance(text, str) else None
