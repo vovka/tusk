@@ -2,7 +2,7 @@ import types
 
 from tests.kernel_api_support import make_registry_tool
 from tusk.kernel.agent.agent_result import AgentResult
-from tusk.kernel.agent.planner_result_validator import PlannerResultValidator
+from tusk.kernel.agent.planner.result_validator import ResultValidator
 from tusk.kernel.tool_registry import ToolRegistry
 
 
@@ -65,7 +65,7 @@ def _validated(
     log: object | None = None,
 ) -> AgentResult:
     result = AgentResult("done", "s1", "plan ready", payload=payload)
-    return PlannerResultValidator(log).validate("planner", result, registry)
+    return ResultValidator(log).validate("planner", result, registry)
 
 
 def _payload(names: list[str], mode: str, plan: dict[str, object]) -> dict[str, object]:

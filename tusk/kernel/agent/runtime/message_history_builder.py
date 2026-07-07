@@ -1,11 +1,11 @@
 from tusk.kernel.agent.agent_run_request import AgentRunRequest
-from tusk.kernel.agent.agent_session_store import AgentSessionStore
+from tusk.kernel.agent.session.store import Store
 
-__all__ = ["RuntimeMessageHistoryBuilder"]
+__all__ = ["MessageHistoryBuilder"]
 
 
-class RuntimeMessageHistoryBuilder:
-    def __init__(self, session_store: AgentSessionStore) -> None:
+class MessageHistoryBuilder:
+    def __init__(self, session_store: Store) -> None:
         self._store = session_store
 
     def build(self, session_id: str, request: AgentRunRequest) -> list[dict[str, str]]:

@@ -1,14 +1,14 @@
-from tusk.kernel.agent.tool_sequence_plan_validator import ToolSequencePlanValidator
-from tusk.kernel.agent.tool_sequence_recorder import ToolSequenceRecorder
+from tusk.kernel.agent.tool_sequence.plan_validator import PlanValidator
+from tusk.kernel.agent.tool_sequence.recorder import Recorder
 from tusk.kernel.tool_registry import ToolRegistry
 from tusk.shared.schemas.tool_result import ToolResult
 from tusk.shared.schemas.tool_sequence_plan import ToolSequencePlan
 from tusk.shared.schemas.tool_sequence_step import ToolSequenceStep
 
-__all__ = ["ToolSequenceExecutor"]
+__all__ = ["Executor"]
 
 
-class ToolSequenceExecutor:
+class Executor:
     def __init__(
         self,
         registry: ToolRegistry,
@@ -16,8 +16,8 @@ class ToolSequenceExecutor:
         interrupt_token: object | None = None,
     ) -> None:
         self._registry = registry
-        self._validator = ToolSequencePlanValidator(registry)
-        self._record = ToolSequenceRecorder(session_store)
+        self._validator = PlanValidator(registry)
+        self._record = Recorder(session_store)
         self._token = interrupt_token
 
     def execute(self, session_id: str, parameters: dict[str, object], allowed: set[str]) -> ToolResult:

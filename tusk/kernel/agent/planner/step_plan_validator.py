@@ -2,13 +2,13 @@ from tusk.kernel.agent.simple_schema_validator import SimpleSchemaValidator
 from tusk.kernel.tool_registry import ToolRegistry
 from tusk.shared.schemas.tool_sequence_plan import ToolSequencePlan
 
-__all__ = ["PlannerStepPlanValidator"]
+__all__ = ["StepPlanValidator"]
 
 _FORBIDDEN_TOOLS = {"done", "execute_tool_sequence", "list_available_tools", "run_agent"}
 _MAX_PLANNED_STEPS = 8
 
 
-class PlannerStepPlanValidator:
+class StepPlanValidator:
     def __init__(self, registry: ToolRegistry) -> None:
         self._registry = registry
         self._schemas = SimpleSchemaValidator()

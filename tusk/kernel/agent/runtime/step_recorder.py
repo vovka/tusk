@@ -1,13 +1,13 @@
 from tusk.shared.schemas.tool_call import ToolCall
 from tusk.shared.schemas.tool_result import ToolResult
 import json
-from tusk.kernel.agent.agent_session_store import AgentSessionStore
+from tusk.kernel.agent.session.store import Store
 
-__all__ = ["RuntimeStepRecorder"]
+__all__ = ["StepRecorder"]
 
 
-class RuntimeStepRecorder:
-    def __init__(self, session_store: AgentSessionStore) -> None:
+class StepRecorder:
+    def __init__(self, session_store: Store) -> None:
         self._store = session_store
 
     def append_message(self, session_id: str, role: str, content: str) -> None:

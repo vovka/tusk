@@ -4,10 +4,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from tusk.kernel.agent.agent_result import AgentResult
-from tusk.kernel.agent.agent_session_store import AgentSessionStore
-from tusk.kernel.agent.session_event_formatter import SessionEventFormatter
+from tusk.kernel.agent.session.store import Store
+from tusk.kernel.agent.session.event_formatter import EventFormatter
 
-__all__ = ["FileAgentSessionStore"]
+__all__ = ["FileStore"]
 
 
 def _read_events(path: Path) -> list[dict[str, object]]:
@@ -17,10 +17,10 @@ def _read_events(path: Path) -> list[dict[str, object]]:
     return [json.loads(line) for line in lines if line.strip()]
 
 
-class FileAgentSessionStore(AgentSessionStore):
+class FileStore(Store):
     def __init__(self, base_dir: str) -> None:
         self._base = Path(base_dir)
-        self._formatter = SessionEventFormatter()
+        self._formatter = EventFormatter()
 
     def create_session_id(self) -> str:
         return uuid.uuid4().hex

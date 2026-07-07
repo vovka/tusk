@@ -6,17 +6,17 @@ from tusk.kernel.tool_registry import ToolRegistry
 from tusk.kernel.agent.agent_child_runner import AgentChildRunner
 from tusk.kernel.agent.agent_profile import AgentProfile
 from tusk.kernel.agent.agent_result import AgentResult
-from tusk.kernel.agent.agent_run_guard import AgentRunGuard
+from tusk.kernel.agent.guards.agent_run_guard import AgentRunGuard
 from tusk.kernel.agent.agent_run_request import AgentRunRequest
 from tusk.kernel.agent.agent_runtime import AgentRuntime
-from tusk.kernel.agent.agent_session_store import AgentSessionStore
+from tusk.kernel.agent.session.store import Store
 from tusk.kernel.agent.agent_tool_catalog import AgentToolCatalog
 from tusk.kernel.agent.agent_toolset_builder import AgentToolsetBuilder
-from tusk.kernel.agent.executor_tool_guard import ExecutorToolGuard
+from tusk.kernel.agent.guards.executor_tool_guard import ExecutorToolGuard
 from tusk.kernel.agent.orchestrator_tool_dispatcher import OrchestratorToolDispatcher
-from tusk.kernel.agent.planner_result_validator import PlannerResultValidator
-from tusk.kernel.agent.planner_runtime_tool_resolver import PlannerRuntimeToolResolver
-from tusk.kernel.agent.tool_sequence_executor import ToolSequenceExecutor
+from tusk.kernel.agent.planner.result_validator import ResultValidator
+from tusk.kernel.agent.planner.runtime_tool_resolver import RuntimeToolResolver
+from tusk.kernel.agent.tool_sequence.executor import Executor
 from tusk.shared.logging.interfaces.log_printer import LogPrinter
 
 __all__ = ["AgentOrchestrator"]
@@ -27,7 +27,7 @@ class AgentOrchestrator:
         self,
         profiles: dict[str, AgentProfile],
         tool_registry: ToolRegistry,
-        session_store: AgentSessionStore,
+        session_store: Store,
         log_printer: LogPrinter,
         interrupt_token: object | None = None,
     ) -> None:
@@ -36,16 +36,16 @@ class AgentOrchestrator:
         self._log = log_printer
         self._init_components(session_store, log_printer, tool_registry, interrupt_token)
 
-    def _init_components(self, store: AgentSessionStore, log: LogPrinter, registry: ToolRegistry, token: object | None) -> None:
+    def _init_components(self, store: Store, log: LogPrinter, registry: ToolRegistry, token: object | None) -> None:
         self._runtime = AgentRuntime(store, log, token)
         self._guard = AgentRunGuard()
         self._children = AgentChildRunner(store)
         self._executor_tools = ExecutorToolGuard()
         self._catalog = AgentToolCatalog(registry)
-        self._planner_results = PlannerResultValidator(log)
-        self._resolved_tools = PlannerRuntimeToolResolver(store)
+        self._planner_results = ResultValidator(log)
+        self._resolved_tools = RuntimeToolResolver(store)
         self._tools = AgentToolsetBuilder(registry)
-        self._dispatcher = OrchestratorToolDispatcher(registry, self._catalog, ToolSequenceExecutor(registry, store, token))
+        self._dispatcher = OrchestratorToolDispatcher(registry, self._catalog, Executor(registry, store, token))
 
     def run(self, request: AgentRunRequest) -> AgentResult:
         return self._run(request, ())

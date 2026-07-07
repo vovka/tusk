@@ -1,8 +1,8 @@
 import tempfile
 
 from tests.kernel_api_support import make_registry_tool
-from tusk.kernel.agent.file_agent_session_store import FileAgentSessionStore
-from tusk.kernel.agent.tool_sequence_executor import ToolSequenceExecutor
+from tusk.kernel.agent.session.file_store import FileStore
+from tusk.kernel.agent.tool_sequence.executor import Executor
 from tusk.kernel.tool_registry import ToolRegistry
 from tusk.shared.schemas.tool_result import ToolResult
 
@@ -25,9 +25,9 @@ def test_sequence_executor_aborts_on_failed_step() -> None:
     assert result.data["failed_step_id"] == "s1"
 
 
-def _executor(registry: ToolRegistry) -> ToolSequenceExecutor:
-    store = FileAgentSessionStore(tempfile.mkdtemp(prefix="tusk-sequence-exec-"))
-    return ToolSequenceExecutor(registry, store)
+def _executor(registry: ToolRegistry) -> Executor:
+    store = FileStore(tempfile.mkdtemp(prefix="tusk-sequence-exec-"))
+    return Executor(registry, store)
 
 
 def _plan(text: str) -> dict[str, object]:
@@ -61,9 +61,9 @@ def test_sequence_executor_cancels_between_steps() -> None:
     assert len(seen) == 1
 
 
-def _cancellable_executor(registry: ToolRegistry, token: object) -> ToolSequenceExecutor:
-    store = FileAgentSessionStore(tempfile.mkdtemp(prefix="tusk-sequence-exec-"))
-    return ToolSequenceExecutor(registry, store, token)
+def _cancellable_executor(registry: ToolRegistry, token: object) -> Executor:
+    store = FileStore(tempfile.mkdtemp(prefix="tusk-sequence-exec-"))
+    return Executor(registry, store, token)
 
 
 def _two_step_plan() -> dict[str, object]:

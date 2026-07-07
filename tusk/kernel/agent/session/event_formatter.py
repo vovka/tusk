@@ -1,9 +1,9 @@
 from tusk.kernel.agent.agent_result import AgentResult
 
-__all__ = ["SessionEventFormatter"]
+__all__ = ["EventFormatter"]
 
 
-class SessionEventFormatter:
+class EventFormatter:
     def digest(self, events: list[dict[str, object]]) -> str:
         lines = [self._format_event(event) for event in events]
         return "\n".join(lines[-40:])

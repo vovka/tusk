@@ -1,15 +1,15 @@
 from tusk.kernel.agent.agent_result import AgentResult
-from tusk.kernel.agent.planner_sequence_promoter import PlannerSequencePromoter
-from tusk.kernel.agent.planner_step_plan_validator import PlannerStepPlanValidator
-from tusk.kernel.agent.tool_sequence_plan_validator import ToolSequencePlanValidator
+from tusk.kernel.agent.planner.sequence_promoter import SequencePromoter
+from tusk.kernel.agent.planner.step_plan_validator import StepPlanValidator
+from tusk.kernel.agent.tool_sequence.plan_validator import PlanValidator
 from tusk.kernel.tool_registry import ToolRegistry
 from tusk.shared.logging.interfaces.log_printer import LogPrinter
 from tusk.shared.schemas.tool_sequence_plan import ToolSequencePlan
 
-__all__ = ["PlannerResultValidator"]
+__all__ = ["ResultValidator"]
 
 
-class PlannerResultValidator:
+class ResultValidator:
     def __init__(self, log_printer: LogPrinter | None = None) -> None:
         self._log = log_printer
 
@@ -30,7 +30,7 @@ class PlannerResultValidator:
         registry = self._registry(allowed)
         if registry is None:
             return self._failed(result, "planner validation requires a tool registry")
-        message = PlannerStepPlanValidator(registry).validate(result.payload.get("planned_steps"))
+        message = StepPlanValidator(registry).validate(result.payload.get("planned_steps"))
         return self._failed(result, message) if message is not None else None
 
     def _validated(self, result: AgentResult, registry: ToolRegistry) -> AgentResult:
@@ -42,11 +42,11 @@ class PlannerResultValidator:
         return self._sequence_result(result, registry, plan)
 
     def _sequence_result(self, result: AgentResult, registry: ToolRegistry, plan: ToolSequencePlan) -> AgentResult:
-        message = ToolSequencePlanValidator(registry).validate(plan.to_dict(), set(plan.tool_names()))
+        message = PlanValidator(registry).validate(plan.to_dict(), set(plan.tool_names()))
         return self._failed(result, message) if message is not None else self._promoter(registry).materialize(result)
 
-    def _promoter(self, registry: ToolRegistry) -> PlannerSequencePromoter:
-        return PlannerSequencePromoter(registry, self._log)
+    def _promoter(self, registry: ToolRegistry) -> SequencePromoter:
+        return SequencePromoter(registry, self._log)
 
     def _mode(self, result: AgentResult) -> str:
         return str(result.payload.get("execution_mode", "normal"))

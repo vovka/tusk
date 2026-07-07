@@ -7,25 +7,25 @@ from tusk.shared.schemas.tool_result import ToolResult
 from tusk.kernel.agent.agent_profile import AgentProfile
 from tusk.kernel.agent.agent_result import AgentResult
 from tusk.kernel.agent.agent_run_request import AgentRunRequest
-from tusk.kernel.agent.agent_session_store import AgentSessionStore
-from tusk.kernel.agent.runtime_message_history_builder import RuntimeMessageHistoryBuilder
-from tusk.kernel.agent.runtime_result_factory import RuntimeResultFactory
-from tusk.kernel.agent.runtime_step_recorder import RuntimeStepRecorder
-from tusk.kernel.agent.runtime_turn_guards import RuntimeTurnGuards
+from tusk.kernel.agent.session.store import Store
+from tusk.kernel.agent.runtime.message_history_builder import MessageHistoryBuilder
+from tusk.kernel.agent.runtime.result_factory import ResultFactory
+from tusk.kernel.agent.runtime.step_recorder import StepRecorder
+from tusk.kernel.agent.runtime.turn_guards import TurnGuards
 from tusk.shared.logging.interfaces.log_printer import LogPrinter
 
 
 class AgentRuntime:
     def __init__(
-        self, session_store: AgentSessionStore, log_printer: LogPrinter, interrupt_token: object | None = None,
+        self, session_store: Store, log_printer: LogPrinter, interrupt_token: object | None = None,
     ) -> None:
         self._store = session_store
         self._log = log_printer
         self._token = interrupt_token
         self._failure = ModelFailureReplyBuilder()
-        self._history = RuntimeMessageHistoryBuilder(session_store)
-        self._results = RuntimeResultFactory(session_store)
-        self._record = RuntimeStepRecorder(session_store)
+        self._history = MessageHistoryBuilder(session_store)
+        self._results = ResultFactory(session_store)
+        self._record = StepRecorder(session_store)
 
     def run(
         self, request: AgentRunRequest, profile: AgentProfile,
@@ -51,7 +51,7 @@ class AgentRuntime:
         messages: list[dict[str, str]], executor: Callable[[ToolCall, str], ToolResult],
     ) -> AgentResult:
         repeat = RepeatedToolCallGuard()
-        guards = RuntimeTurnGuards()
+        guards = TurnGuards()
         for step in range(1, profile.max_steps + 1):
             if self._interrupted():
                 return self._cancelled(session_id)
@@ -70,7 +70,7 @@ class AgentRuntime:
     def _step(
         self, session_id: str, profile: AgentProfile, tools: list[dict[str, object]],
         messages: list[dict[str, str]], executor: Callable[[ToolCall, str], ToolResult],
-        repeat: RepeatedToolCallGuard, guards: RuntimeTurnGuards, step: int,
+        repeat: RepeatedToolCallGuard, guards: TurnGuards, step: int,
     ) -> AgentResult | None:
         tool_call = self._tool_call(profile, messages, tools)
         self._record.requested(session_id, step, tool_call)
@@ -85,7 +85,7 @@ class AgentRuntime:
 
     def _guard_result(
         self, session_id: str, profile_id: str, tool_call: ToolCall,
-        repeat: RepeatedToolCallGuard, guards: RuntimeTurnGuards,
+        repeat: RepeatedToolCallGuard, guards: TurnGuards,
     ) -> AgentResult | None:
         if tool_call.tool_name == "done":
             return self._finish(session_id, tool_call.parameters)

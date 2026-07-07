@@ -1,13 +1,13 @@
 from tusk.kernel.agent.agent_result import AgentResult
-from tusk.kernel.agent.tool_sequence_plan_validator import ToolSequencePlanValidator
+from tusk.kernel.agent.tool_sequence.plan_validator import PlanValidator
 from tusk.kernel.tool_registry import ToolRegistry
 from tusk.shared.logging.interfaces.log_printer import LogPrinter
 from tusk.shared.schemas.tool_sequence_plan import ToolSequencePlan
 
-__all__ = ["PlannerSequencePromoter"]
+__all__ = ["SequencePromoter"]
 
 
-class PlannerSequencePromoter:
+class SequencePromoter:
     def __init__(
         self,
         registry: ToolRegistry,
@@ -20,7 +20,7 @@ class PlannerSequencePromoter:
         plan = ToolSequencePlan.from_dict(result.payload.get("planned_steps"))
         if plan is None:
             return result
-        message = ToolSequencePlanValidator(self._registry).validate(plan.to_dict(), set(plan.tool_names()))
+        message = PlanValidator(self._registry).validate(plan.to_dict(), set(plan.tool_names()))
         if message is not None:
             return result
         self._write_log(result.session_id, plan)

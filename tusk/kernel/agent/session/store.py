@@ -2,10 +2,10 @@ from abc import ABC, abstractmethod
 
 from tusk.kernel.agent.agent_result import AgentResult
 
-__all__ = ["AgentSessionStore"]
+__all__ = ["Store"]
 
 
-class AgentSessionStore(ABC):
+class Store(ABC):
     @abstractmethod
     def create_session_id(self) -> str: ...
 
