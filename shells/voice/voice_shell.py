@@ -1,7 +1,5 @@
 import threading
-import types
 
-from shells.voice.gate_dispatch import GateDispatch
 from shells.voice.pipeline import VoicePipeline
 from shells.voice.stages.audio_capture import AudioCapture
 from shells.voice.stages.sanitizer import Sanitizer
@@ -65,15 +63,15 @@ class VoiceShell:
         stt_engine: object | None,
         gatekeeper: object | None,
     ) -> VoicePipeline:
+        _require_pipeline_inputs(stt_engine, gatekeeper)
         settings = _pipeline_settings(config)
         return VoicePipeline(
             self._detector(config, log_printer),
-            Transcriber(stt_engine or _missing_stt_engine(), config.audio_sample_rate, log_printer),
+            Transcriber(stt_engine, config.audio_sample_rate, log_printer),
             Sanitizer(log_printer),
             TranscriptionBuffer(log_printer),
-            gatekeeper or _drop_all_gatekeeper(),
-            settings[0],
-            settings[1], self._reporter, self._on_interrupt,
+            gatekeeper,
+            settings[0], settings[1], self._reporter, self._on_interrupt,
         )
 
     def _detector(self, config: object, log_printer: object) -> UtteranceDetector:
@@ -92,17 +90,12 @@ class VoiceShell:
         self._log.log("TUSK", reply)
 
 
-def _missing_stt_engine() -> object:
-    return types.SimpleNamespace(transcribe=_raise_missing_stt)
-
-
-def _drop_all_gatekeeper() -> object:
-    return types.SimpleNamespace(process=lambda utterance, recent, candidates=None: GateDispatch("drop"))
+def _require_pipeline_inputs(stt_engine: object | None, gatekeeper: object | None) -> None:
+    if stt_engine is None:
+        raise ValueError("voice shell requires an STT engine")
+    if gatekeeper is None:
+        raise ValueError("voice shell requires a gatekeeper")
 
 
 def _pipeline_settings(config: object) -> tuple[float, int]:
     return getattr(config, "gate_recovery_window_seconds", 60.0), getattr(config, "gate_recovery_candidate_limit", 6)
-
-
-def _raise_missing_stt(audio_frames: bytes, sample_rate: int) -> object:
-    raise RuntimeError("voice shell requires an STT engine")
