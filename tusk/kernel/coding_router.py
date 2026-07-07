@@ -22,7 +22,7 @@ class CodingRouter:
     def _apply(self, result: object) -> KernelResponse:
         try:
             self._apply_all(result.data.get("operations", []))
-        except RuntimeError as exc:
+        except (RuntimeError, KeyError, TypeError) as exc:
             self._log.log("CODING", f"apply failed: {exc}")
             return KernelResponse(False, "I couldn't apply that edit.")
         return KernelResponse(True, "")
