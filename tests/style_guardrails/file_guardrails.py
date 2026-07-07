@@ -2,6 +2,9 @@ from pathlib import Path
 
 
 class FileGuardrails:
+    def __init__(self, root: Path = Path(".")) -> None:
+        self._root = root
+
     def violations(self) -> list[str]:
         return [*self._size_violations(), *self._class_violations()]
 
@@ -15,7 +18,10 @@ class FileGuardrails:
         return [(str(path), self._code_lines(path)) for path in self._python_files()]
 
     def _python_files(self) -> list[Path]:
-        return sorted(Path(".").rglob("*.py"))
+        return [path for path in sorted(self._root.rglob("*.py")) if not self._hidden(path)]
+
+    def _hidden(self, path: Path) -> bool:
+        return any(part.startswith(".") for part in path.relative_to(self._root).parts)
 
     def _code_lines(self, path: Path) -> int:
         return len([line for line in path.read_text().splitlines() if self._is_code(line)])

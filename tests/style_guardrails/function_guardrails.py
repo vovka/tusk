@@ -3,14 +3,23 @@ from pathlib import Path
 
 
 class FunctionGuardrails:
+    def __init__(self, root: Path = Path(".")) -> None:
+        self._root = root
+
     def violations(self) -> list[str]:
         return [self._format(item) for item in self._oversized_functions()]
 
     def _oversized_functions(self) -> list[tuple[str, int, str, int]]:
         violations: list[tuple[str, int, str, int]] = []
-        for path in sorted(Path(".").rglob("*.py")):
+        for path in self._python_files():
             violations.extend(self._functions_in(path))
         return violations
+
+    def _python_files(self) -> list[Path]:
+        return [path for path in sorted(self._root.rglob("*.py")) if not self._hidden(path)]
+
+    def _hidden(self, path: Path) -> bool:
+        return any(part.startswith(".") for part in path.relative_to(self._root).parts)
 
     def _functions_in(self, path: Path) -> list[tuple[str, int, str, int]]:
         tree = ast.parse(path.read_text())
