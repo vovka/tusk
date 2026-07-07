@@ -1,11 +1,13 @@
 from tusk.shared.schemas.tool_result import ToolResult
 from tusk.shared.schemas.kernel_response import KernelResponse
+from tusk.kernel.tool_registry import ToolRegistry
+from tusk.shared.logging.interfaces.log_printer import LogPrinter
 
 __all__ = ["DictationRouter"]
 
 
 class DictationRouter:
-    def __init__(self, tool_registry: object, controller: object, log_printer: object) -> None:
+    def __init__(self, tool_registry: ToolRegistry, controller: object, log_printer: LogPrinter) -> None:
         self._registry = tool_registry
         self._controller = controller
         self._log = log_printer

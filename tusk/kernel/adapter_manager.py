@@ -3,6 +3,9 @@ import shlex
 from pathlib import Path
 
 from tusk.shared.mcp import AdapterEnvironmentBuilder, AdapterWatcher, MCPClient, MCPToolProxy
+from tusk.kernel.tool_registry import ToolRegistry
+from tusk.shared.logging.interfaces.log_printer import LogPrinter
+from tusk.shared.schemas.mcp_tool_schema import MCPToolSchema
 
 try:
     from watchdog.observers import Observer
@@ -13,7 +16,7 @@ __all__ = ["AdapterManager"]
 
 
 class AdapterManager:
-    def __init__(self, adapters_dir: str, tool_registry: object, log: object, cache_dir: str = ".tusk_runtime/adapters") -> None:
+    def __init__(self, adapters_dir: str, tool_registry: ToolRegistry, log: LogPrinter, cache_dir: str = ".tusk_runtime/adapters") -> None:
         self.adapters_dir = Path(adapters_dir)
         self.tool_registry = tool_registry
         self._log = log
@@ -89,7 +92,7 @@ class AdapterManager:
         if manifest.get("provides_context") and self._context_adapter is None:
             self._context_adapter = name
 
-    def _proxy(self, name: str, tool: object, client: MCPClient, flags: dict) -> MCPToolProxy:
+    def _proxy(self, name: str, tool: MCPToolSchema, client: MCPClient, flags: dict) -> MCPToolProxy:
         return MCPToolProxy(
             name, tool, client,
             planner_visible=flags.get("planner_visible", True),

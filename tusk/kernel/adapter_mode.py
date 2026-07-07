@@ -1,4 +1,5 @@
 from tusk.shared.schemas.kernel_response import KernelResponse
+from tusk.shared.logging.interfaces.log_printer import LogPrinter
 
 __all__ = ["AdapterMode"]
 
@@ -6,7 +7,7 @@ __all__ = ["AdapterMode"]
 class AdapterMode:
     """Routes mode text through an adapter-backed router (dictation, coding)."""
 
-    def __init__(self, state: object, router: object, log_printer: object, log_tag: str) -> None:
+    def __init__(self, state: object, router: object, log_printer: LogPrinter | None, log_tag: str) -> None:
         self._state = state
         self._router = router
         self._log = log_printer

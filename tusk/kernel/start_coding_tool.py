@@ -1,5 +1,8 @@
 from tusk.kernel.coding_state import CodingState
 from tusk.shared.schemas.tool_result import ToolResult
+from tusk.kernel.adapter_manager import AdapterManager
+from tusk.kernel.interfaces.editor_driver import EditorDriver
+from tusk.kernel.tool_registry import ToolRegistry
 
 __all__ = ["StartCodingTool"]
 
@@ -10,7 +13,7 @@ class StartCodingTool:
     description = "Enter pair-coding mode: TUSK applies the user's spoken code edits to the focused editor. Use to start coding, start a coding session, or begin pair programming."
     input_schema = {"type": "object", "properties": {}}
 
-    def __init__(self, tool_registry: object, controller: object, adapter_manager: object, driver: object) -> None:
+    def __init__(self, tool_registry: ToolRegistry, controller: object, adapter_manager: AdapterManager, driver: EditorDriver) -> None:
         self._registry = tool_registry
         self._controller = controller
         self._manager = adapter_manager

@@ -4,6 +4,7 @@ from collections.abc import Callable
 from tusk.kernel.clipboard_guard import ClipboardGuard
 from tusk.kernel.interfaces.editor_driver import EditorDriver
 from tusk.shared.schemas.buffer_selection import BufferSelection
+from tusk.kernel.tool_registry import ToolRegistry
 
 __all__ = ["InputAutomationEditorDriver"]
 
@@ -13,7 +14,7 @@ _CLIPBOARD_SETTLE_SECONDS = 0.2
 
 
 class InputAutomationEditorDriver(EditorDriver):
-    def __init__(self, tool_registry: object, desktop_source: str, sleep: Callable[[float], None] = time.sleep) -> None:
+    def __init__(self, tool_registry: ToolRegistry, desktop_source: str, sleep: Callable[[float], None] = time.sleep) -> None:
         self._registry = tool_registry
         self._source = desktop_source
         self._sleep = sleep

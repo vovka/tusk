@@ -1,14 +1,19 @@
+from tusk.kernel.adapter_manager import AdapterManager
 from tusk.kernel.full_replace_edit_strategy import FullReplaceEditStrategy
 from tusk.kernel.input_automation_editor_driver import InputAutomationEditorDriver
 from tusk.kernel.internal_tools import CodingRouter, DictationRouter, StartCodingTool, StartDictationTool, SwitchModelTool
 from tusk.kernel.line_anchored_edit_strategy import LineAnchoredEditStrategy
+from tusk.kernel.tool_registry import ToolRegistry
 from tusk.kernel.verified_edit_strategy import VerifiedEditStrategy
+from tusk.shared.llm.llm_registry import LLMRegistry
+from tusk.shared.logging.interfaces.log_printer import LogPrinter
+from tusk.shared.status.interfaces.status_reporter import StatusReporter
 
 __all__ = ["ToolRuntime"]
 
 
 class ToolRuntime:
-    def __init__(self, tool_registry: object, llm_registry: object, adapter_manager: object, log: object, reporter: object | None = None) -> None:
+    def __init__(self, tool_registry: ToolRegistry, llm_registry: LLMRegistry, adapter_manager: AdapterManager, log: LogPrinter, reporter: StatusReporter | None = None) -> None:
         self._registry = tool_registry
         self._llms = llm_registry
         self._manager = adapter_manager

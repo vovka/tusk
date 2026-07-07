@@ -9,6 +9,7 @@ from tusk.shared.interrupt import InterruptToken
 from tusk.shared.llm import LLMRegistry
 from tusk.shared.logging import ColorLogPrinter
 from tusk.shared.status import StatusReporterHub
+from tusk.kernel.interfaces.conversation_history import ConversationHistory
 
 
 def build_kernel(config: Config, log: ColorLogPrinter, llm_registry: LLMRegistry, reporter: StatusReporterHub, token: InterruptToken | None = None) -> KernelAPI:
@@ -26,7 +27,7 @@ def build_api(agent: MainAgent, config: Config, log: ColorLogPrinter, llm_regist
     return KernelAPI(CommandMode(backend, log), llm_registry, log, reporter, token)
 
 
-def build_agent(config: Config, log: ColorLogPrinter, llm_registry: LLMRegistry, tool_registry: ToolRegistry, history: object, token: InterruptToken | None = None) -> MainAgent:
+def build_agent(config: Config, log: ColorLogPrinter, llm_registry: LLMRegistry, tool_registry: ToolRegistry, history: ConversationHistory, token: InterruptToken | None = None) -> MainAgent:
     store = FileAgentSessionStore(config.agent_session_log_dir)
     profiles = build_agent_profiles(llm_registry)
     return MainAgent(AgentOrchestrator(profiles, tool_registry, store, log, token), history)

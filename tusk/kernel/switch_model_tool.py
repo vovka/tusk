@@ -1,4 +1,6 @@
 from tusk.shared.schemas.tool_result import ToolResult
+from tusk.shared.llm.llm_registry import LLMRegistry
+from tusk.shared.status.interfaces.status_reporter import StatusReporter
 
 __all__ = ["SwitchModelTool"]
 
@@ -17,7 +19,7 @@ class SwitchModelTool:
         "required": ["slot", "provider", "model"],
     }
 
-    def __init__(self, llm_registry: object, reporter: object | None = None) -> None:
+    def __init__(self, llm_registry: LLMRegistry, reporter: StatusReporter | None = None) -> None:
         self._registry = llm_registry
         self._reporter = reporter
 

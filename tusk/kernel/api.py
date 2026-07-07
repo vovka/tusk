@@ -5,14 +5,18 @@ from tusk.kernel.mode_slot import ModeSlot
 from tusk.kernel.submit_status_reporter import SubmitStatusReporter
 from tusk.shared.schemas.app_mode import AppMode
 from tusk.shared.schemas.kernel_response import KernelResponse
+from tusk.shared.interrupt.interrupt_token import InterruptToken
+from tusk.shared.llm.llm_registry import LLMRegistry
+from tusk.shared.logging.interfaces.log_printer import LogPrinter
+from tusk.shared.status.interfaces.status_reporter import StatusReporter
 
 __all__ = ["KernelAPI"]
 
 
 class KernelAPI:
     def __init__(
-        self, command_mode: object, llm_registry: object, log: object | None = None,
-        reporter: object | None = None, interrupt_token: object | None = None,
+        self, command_mode: object, llm_registry: LLMRegistry | None, log: LogPrinter | None = None,
+        reporter: StatusReporter | None = None, interrupt_token: InterruptToken | None = None,
     ) -> None:
         self._command_mode = command_mode
         self._llm_registry = llm_registry
@@ -92,5 +96,5 @@ class KernelAPI:
     def stop_coding(self) -> None:
         self._coding.stop()
 
-    def get_llm_registry(self) -> object:
+    def get_llm_registry(self) -> LLMRegistry | None:
         return self._llm_registry
