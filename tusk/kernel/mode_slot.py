@@ -29,7 +29,8 @@ class ModeSlot:
         self._router = router
 
     def process_text(self, text: str) -> KernelResponse:
-        assert self._mode is not None
+        if self._mode is None:
+            raise RuntimeError(f"{self._log_tag}: process_text called with no active mode")
         return self._mode.process_text(text)
 
     def request_stop(self) -> KernelResponse:

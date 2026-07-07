@@ -1,5 +1,7 @@
 import types
 
+import pytest
+
 from tusk.kernel.mode_slot import ModeSlot
 from tusk.shared.schemas.kernel_response import KernelResponse
 
@@ -31,6 +33,11 @@ def test_callbacks_fire_on_start_and_stop() -> None:
 
 def test_request_stop_without_active_mode_reports_unhandled() -> None:
     assert _slot().request_stop() == KernelResponse(False, "")
+
+
+def test_process_text_without_active_mode_raises_runtime_error() -> None:
+    with pytest.raises(RuntimeError):
+        _slot().process_text("hello")
 
 
 def test_started_mode_routes_through_attached_router() -> None:
