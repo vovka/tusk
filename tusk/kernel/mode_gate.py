@@ -1,10 +1,8 @@
-import json
-
-from tusk.kernel.coding_gate_prompt import CODING_GATE_PROMPT
 from tusk.shared.llm.interfaces.llm_provider import LLMProvider
+from tusk.shared.llm.llm_json import extract_json_payload
 from tusk.shared.logging.interfaces.log_printer import LogPrinter
 
-__all__ = ["CodingGate"]
+__all__ = ["ModeGate"]
 
 _SCHEMA = {
     "type": "object",
@@ -18,10 +16,16 @@ _SCHEMA = {
 }
 
 
-class CodingGate:
-    def __init__(self, llm: LLMProvider, log_printer: LogPrinter | None = None) -> None:
+class ModeGate:
+    """Stop classifier for a forward-all mode: one instance per mode, prompt injected."""
+
+    def __init__(self, llm: LLMProvider, mode_name: str, prompt: str, log_printer: LogPrinter | None = None) -> None:
         self._llm = llm
+        self._prompt = prompt
         self._log = log_printer
+        self._tag = f"{mode_name.upper()}GATE"
+        self._group = f"{mode_name}-gate"
+        self._schema_name = f"{mode_name}_gatekeeper"
 
     def should_stop(self, text: str) -> bool:
         data = self._parsed(self._complete(text))
@@ -30,43 +34,29 @@ class CodingGate:
 
     def _complete(self, text: str) -> str:
         try:
-            return self._llm.complete_structured(CODING_GATE_PROMPT, text, "coding_gatekeeper", _SCHEMA, 128)
+            return self._llm.complete_structured(self._prompt, text, self._schema_name, _SCHEMA, 128)
         except Exception as exc:
             self._log_error("structured output failed", exc)
         try:
-            return self._llm.complete(CODING_GATE_PROMPT, text, 128)
+            return self._llm.complete(self._prompt, text, 128)
         except Exception as exc:
             self._log_error("fallback completion failed", exc)
             return ""
 
     def _parsed(self, raw: str) -> dict[str, object]:
         try:
-            return _decoded(raw) if raw else {}
-        except Exception as exc:
+            return extract_json_payload(raw) if raw else {}
+        except ValueError as exc:
             self._log_error("parse error", exc)
             return {}
 
     def _log_error(self, message: str, exc: Exception) -> None:
         if self._log is not None:
-            self._log.log("CODINGGATE", f"{message}: {exc}", "coding-gate")
+            self._log.log(self._tag, f"{message}: {exc}", self._group)
 
     def _log_result(self, data: dict[str, object]) -> None:
         if self._log is not None:
-            self._log.log("CODINGGATE", f"directed={bool(data.get('directed'))} stop={data.get('metadata_stop')!r}", "coding-gate")
-
-
-def _decoded(raw: str) -> dict[str, object]:
-    return _unwrap(json.loads(_extract_json(raw)))
-
-
-def _extract_json(raw: str) -> str:
-    text = raw.strip()
-    return text.split("```")[1].lstrip("json").strip() if "```" in text else text
-
-
-def _unwrap(data: dict | list) -> dict[str, object]:
-    item = data[0] if isinstance(data, list) else data
-    return item["arguments"] if "arguments" in item else item
+            self._log.log(self._tag, f"directed={bool(data.get('directed'))} stop={data.get('metadata_stop')!r}", self._group)
 
 
 def _has_stop_reason(value: object) -> bool:
