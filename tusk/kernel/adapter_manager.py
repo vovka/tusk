@@ -69,7 +69,7 @@ class AdapterManager:
         client = MCPClient()
         command = shlex.split(manifest["entry"])
         try:
-            client.connect_stdio(command, str(path))
+            client.connect_stdio(command, str(path), env=self._env_builder.base_env())
             return client
         except Exception:
             env = self._env_builder.build(path, manifest)
