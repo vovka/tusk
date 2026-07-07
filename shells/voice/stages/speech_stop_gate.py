@@ -1,6 +1,5 @@
-import json
-
 from tusk.shared.llm.interfaces.llm_provider import LLMProvider
+from tusk.shared.llm.llm_json import extract_json_payload
 from tusk.shared.logging.interfaces.log_printer import LogPrinter
 
 __all__ = ["SpeechStopGate"]
@@ -44,8 +43,8 @@ class SpeechStopGate:
 
     def _parsed(self, raw: str) -> dict[str, object]:
         try:
-            return json.loads(raw.strip()) if raw else {}
-        except json.JSONDecodeError as exc:
+            return extract_json_payload(raw) if raw else {}
+        except ValueError as exc:
             self._log_error("parse error", exc)
             return {}
 
