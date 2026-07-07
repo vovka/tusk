@@ -39,7 +39,7 @@ def _pipeline(dispatch: GateDispatch, states: list[tuple[str, str]]) -> VoicePip
 
 def _buffer(states: list[tuple[str, str]]) -> object:
     candidate = BufferedUtterance("u0", Utterance("open Firefox", b"", 1.0), 0.0, "dropped")
-    return types.SimpleNamespace(process=_process, recent=lambda count: [], recoverable=lambda count, window: [candidate], mark_forwarded=lambda entry_id: states.append(("forwarded", entry_id)), mark_dropped=lambda entry_id: states.append(("dropped", entry_id)), mark_recovered=lambda entry_id: states.append(("recovered", entry_id)), mark_consumed=lambda entry_id: states.append(("consumed", entry_id)))
+    return types.SimpleNamespace(process=_process, recent=lambda count: [], recoverable=lambda count, window: [candidate], mark=lambda entry_id, state: states.append((state, entry_id)))
 
 
 def _process(utterance: Utterance) -> BufferedUtterance:

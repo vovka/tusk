@@ -3,6 +3,7 @@ import threading
 from collections.abc import Callable, Iterator
 
 from shells.voice.gate_dispatch import GateDispatch
+from shells.voice.gate_state import GateState
 from tusk.shared.schemas.app_status import AppStatus
 from tusk.shared.schemas.kernel_response import KernelResponse
 from tusk.shared.schemas.utterance import Utterance
@@ -90,20 +91,20 @@ class VoicePipeline:
         if result.action == "interrupt":
             return self._interrupt(current_id)
         if result.action == "drop" or result.text is None:
-            self._buffer.mark_dropped(current_id)
+            self._buffer.mark(current_id, GateState.DROPPED)
             return None
         self._mark_accepted(result, current_id)
         return self._submit(result.text, submit)
 
     def _mark_accepted(self, result: GateDispatch, current_id: str) -> None:
         if result.action == "forward_recovered":
-            self._buffer.mark_recovered(result.recovered_id)
-            self._buffer.mark_consumed(current_id)
+            self._buffer.mark(result.recovered_id, GateState.RECOVERED)
+            self._buffer.mark(current_id, GateState.CONSUMED)
             return
-        self._buffer.mark_forwarded(current_id)
+        self._buffer.mark(current_id, GateState.FORWARDED)
 
     def _interrupt(self, current_id: str) -> None:
-        self._buffer.mark_consumed(current_id)
+        self._buffer.mark(current_id, GateState.CONSUMED)
         if self._on_interrupt is not None:
             self._on_interrupt()
         return None

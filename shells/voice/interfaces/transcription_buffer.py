@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 
 from shells.voice.buffered_utterance import BufferedUtterance
+from shells.voice.gate_state import GateState
 from tusk.shared.schemas.utterance import Utterance
 
 __all__ = ["TranscriptionBuffer"]
@@ -20,17 +21,5 @@ class TranscriptionBuffer(ABC):
         ...
 
     @abstractmethod
-    def mark_consumed(self, entry_id: str) -> None:
-        ...
-
-    @abstractmethod
-    def mark_dropped(self, entry_id: str) -> None:
-        ...
-
-    @abstractmethod
-    def mark_forwarded(self, entry_id: str) -> None:
-        ...
-
-    @abstractmethod
-    def mark_recovered(self, entry_id: str) -> None:
+    def mark(self, entry_id: str, state: GateState) -> None:
         ...

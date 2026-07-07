@@ -86,4 +86,4 @@ def _busy_submitter(drained: threading.Event, submits: list[str]) -> object:
 
 def _buffer() -> object:
     entries = iter([BufferedUtterance("u1", Utterance("open Firefox", b"", 1.0), 1.0), BufferedUtterance("u2", Utterance("open Firefox", b"", 1.0), 2.0)])
-    return types.SimpleNamespace(process=lambda utterance: next(entries), recent=lambda count: [], recoverable=lambda count, window: [], mark_forwarded=lambda entry_id: None, mark_dropped=lambda entry_id: None)
+    return types.SimpleNamespace(process=lambda utterance: next(entries), recent=lambda count: [], recoverable=lambda count, window: [], mark=lambda entry_id, state: None)

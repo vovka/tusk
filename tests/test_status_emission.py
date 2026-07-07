@@ -82,7 +82,7 @@ def _passthrough() -> object:
 
 def _buffer() -> object:
     entry = BufferedUtterance("u1", Utterance("open Firefox", b"", 1.0), 1.0)
-    return types.SimpleNamespace(process=lambda u: entry, recent=lambda count: [], recoverable=lambda count, window: [], mark_forwarded=lambda entry_id: None)
+    return types.SimpleNamespace(process=lambda u: entry, recent=lambda count: [], recoverable=lambda count, window: [], mark=lambda entry_id, state: None)
 
 
 def _gatekeeper() -> object:
