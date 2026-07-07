@@ -1,7 +1,7 @@
 import types
 
-from tusk.kernel.coding_state import CodingState
-from tusk.kernel.start_coding_tool import StartCodingTool
+from tusk.kernel.modes.coding_state import CodingState
+from tusk.kernel.tools.start_coding_tool import StartCodingTool
 from tusk.shared.schemas.kernel_response import KernelResponse
 from tusk.shared.schemas.tool_result import ToolResult
 

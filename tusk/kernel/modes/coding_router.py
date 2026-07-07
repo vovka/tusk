@@ -2,7 +2,7 @@ from tusk.shared.schemas.edit_operation import EditOperation
 from tusk.shared.schemas.kernel_response import KernelResponse
 from tusk.kernel.interfaces.edit_application_strategy import EditApplicationStrategy
 from tusk.kernel.interfaces.editor_driver import EditorDriver
-from tusk.kernel.tool_registry import ToolRegistry
+from tusk.kernel.tools.tool_registry import ToolRegistry
 from tusk.shared.logging.interfaces.log_printer import LogPrinter
 
 __all__ = ["CodingRouter"]

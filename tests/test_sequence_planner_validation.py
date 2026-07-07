@@ -3,7 +3,7 @@ import types
 from tests.kernel_api_support import make_registry_tool
 from tusk.kernel.agent.agent_result import AgentResult
 from tusk.kernel.agent.planner.result_validator import ResultValidator
-from tusk.kernel.tool_registry import ToolRegistry
+from tusk.kernel.tools.tool_registry import ToolRegistry
 
 
 def test_planner_promotes_valid_plan_to_sequence() -> None:

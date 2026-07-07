@@ -1,4 +1,4 @@
-from tusk.kernel.tool_registry import ToolRegistry
+from tusk.kernel.tools.tool_registry import ToolRegistry
 from tusk.kernel.agent.agent_profile import AgentProfile
 from tusk.kernel.agent.agent_run_request import AgentRunRequest
 from tusk.kernel.agent.static_tool_schemas import (

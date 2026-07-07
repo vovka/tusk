@@ -2,7 +2,7 @@ from collections.abc import Callable
 
 from tusk.shared.schemas.tool_call import ToolCall
 from tusk.shared.schemas.tool_result import ToolResult
-from tusk.kernel.tool_registry import ToolRegistry
+from tusk.kernel.tools.tool_registry import ToolRegistry
 from tusk.kernel.agent.agent_tool_catalog import AgentToolCatalog
 from tusk.kernel.agent.simple_schema_validator import SimpleSchemaValidator
 from tusk.kernel.agent.tool_sequence.executor import Executor

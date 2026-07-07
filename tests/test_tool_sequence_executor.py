@@ -3,7 +3,7 @@ import tempfile
 from tests.kernel_api_support import make_registry_tool
 from tusk.kernel.agent.session.file_store import FileStore
 from tusk.kernel.agent.tool_sequence.executor import Executor
-from tusk.kernel.tool_registry import ToolRegistry
+from tusk.kernel.tools.tool_registry import ToolRegistry
 from tusk.shared.schemas.tool_result import ToolResult
 
 

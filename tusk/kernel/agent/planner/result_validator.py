@@ -2,7 +2,7 @@ from tusk.kernel.agent.agent_result import AgentResult
 from tusk.kernel.agent.planner.sequence_promoter import SequencePromoter
 from tusk.kernel.agent.planner.step_plan_validator import StepPlanValidator
 from tusk.kernel.agent.tool_sequence.plan_validator import PlanValidator
-from tusk.kernel.tool_registry import ToolRegistry
+from tusk.kernel.tools.tool_registry import ToolRegistry
 from tusk.shared.logging.interfaces.log_printer import LogPrinter
 from tusk.shared.schemas.tool_sequence_plan import ToolSequencePlan
 

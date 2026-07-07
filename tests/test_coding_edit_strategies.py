@@ -1,5 +1,5 @@
-from tusk.kernel.full_replace_edit_strategy import FullReplaceEditStrategy
-from tusk.kernel.line_anchored_edit_strategy import LineAnchoredEditStrategy
+from tusk.kernel.modes.full_replace_edit_strategy import FullReplaceEditStrategy
+from tusk.kernel.modes.line_anchored_edit_strategy import LineAnchoredEditStrategy
 from tusk.shared.schemas.buffer_selection import BufferSelection
 from tusk.shared.schemas.edit_operation import EditOperation
 

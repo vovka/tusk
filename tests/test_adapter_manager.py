@@ -3,7 +3,7 @@ import textwrap
 import types
 
 from tusk.kernel.adapter_manager import AdapterManager
-from tusk.kernel.tool_registry import ToolRegistry
+from tusk.kernel.tools.tool_registry import ToolRegistry
 
 _MANIFEST = {
     "name": "demo",

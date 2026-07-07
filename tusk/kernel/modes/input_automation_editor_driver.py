@@ -4,7 +4,7 @@ from collections.abc import Callable
 from tusk.kernel.clipboard_guard import ClipboardGuard
 from tusk.kernel.interfaces.editor_driver import EditorDriver
 from tusk.shared.schemas.buffer_selection import BufferSelection
-from tusk.kernel.tool_registry import ToolRegistry
+from tusk.kernel.tools.tool_registry import ToolRegistry
 
 __all__ = ["InputAutomationEditorDriver"]
 

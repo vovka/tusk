@@ -1,4 +1,4 @@
-from tusk.kernel.dictation_state import DictationState
+from tusk.kernel.modes.dictation_state import DictationState
 from tusk.shared.schemas.tool_result import ToolResult
 
 __all__ = ["StartDictationTool"]

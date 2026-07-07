@@ -2,7 +2,7 @@ import types
 
 import pytest
 
-from tusk.kernel.mode_slot import ModeSlot
+from tusk.kernel.modes.mode_slot import ModeSlot
 from tusk.shared.schemas.kernel_response import KernelResponse
 
 

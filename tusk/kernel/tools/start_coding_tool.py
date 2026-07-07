@@ -1,8 +1,8 @@
-from tusk.kernel.coding_state import CodingState
+from tusk.kernel.modes.coding_state import CodingState
 from tusk.shared.schemas.tool_result import ToolResult
 from tusk.kernel.adapter_manager import AdapterManager
 from tusk.kernel.interfaces.editor_driver import EditorDriver
-from tusk.kernel.tool_registry import ToolRegistry
+from tusk.kernel.tools.tool_registry import ToolRegistry
 
 __all__ = ["StartCodingTool"]
 

@@ -1,4 +1,4 @@
-from tusk.kernel.dictation_gate_prompt import DICTATION_GATE_PROMPT
+from tusk.kernel.modes.dictation_gate_prompt import DICTATION_GATE_PROMPT
 
 
 def test_dictation_gate_prompt_limits_commands_to_stop() -> None:

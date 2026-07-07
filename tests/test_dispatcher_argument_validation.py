@@ -1,8 +1,8 @@
 import types
 
 from tusk.kernel.agent.orchestrator_tool_dispatcher import OrchestratorToolDispatcher
-from tusk.kernel.registered_tool import RegisteredTool
-from tusk.kernel.tool_registry import ToolRegistry
+from tusk.kernel.tools.registered_tool import RegisteredTool
+from tusk.kernel.tools.tool_registry import ToolRegistry
 from tusk.shared.schemas.tool_call import ToolCall
 from tusk.shared.schemas.tool_result import ToolResult
 

@@ -1,6 +1,6 @@
 from collections.abc import Callable
 
-from tusk.kernel.adapter_mode import AdapterMode
+from tusk.kernel.modes.adapter_mode import AdapterMode
 from tusk.shared.schemas.kernel_response import KernelResponse
 
 __all__ = ["ModeSlot"]

@@ -2,7 +2,7 @@ from dataclasses import replace
 
 from tusk.shared.schemas.tool_call import ToolCall
 from tusk.shared.schemas.tool_result import ToolResult
-from tusk.kernel.tool_registry import ToolRegistry
+from tusk.kernel.tools.tool_registry import ToolRegistry
 from tusk.kernel.agent.agent_child_runner import AgentChildRunner
 from tusk.kernel.agent.agent_profile import AgentProfile
 from tusk.kernel.agent.agent_result import AgentResult

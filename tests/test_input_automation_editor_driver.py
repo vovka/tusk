@@ -2,7 +2,7 @@ import types
 
 import pytest
 
-from tusk.kernel.input_automation_editor_driver import InputAutomationEditorDriver
+from tusk.kernel.modes.input_automation_editor_driver import InputAutomationEditorDriver
 from tusk.shared.schemas.buffer_selection import BufferSelection
 from tusk.shared.schemas.tool_result import ToolResult
 

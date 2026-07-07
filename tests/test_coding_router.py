@@ -1,6 +1,6 @@
 import types
 
-from tusk.kernel.coding_router import CodingRouter
+from tusk.kernel.modes.coding_router import CodingRouter
 from tusk.shared.schemas.edit_operation import EditOperation
 from tusk.shared.schemas.tool_result import ToolResult
 

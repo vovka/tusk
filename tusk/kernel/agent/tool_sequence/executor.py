@@ -1,6 +1,6 @@
 from tusk.kernel.agent.tool_sequence.plan_validator import PlanValidator
 from tusk.kernel.agent.tool_sequence.recorder import Recorder
-from tusk.kernel.tool_registry import ToolRegistry
+from tusk.kernel.tools.tool_registry import ToolRegistry
 from tusk.shared.schemas.tool_result import ToolResult
 from tusk.shared.schemas.tool_sequence_plan import ToolSequencePlan
 from tusk.shared.schemas.tool_sequence_step import ToolSequenceStep

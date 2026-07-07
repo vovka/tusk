@@ -1,5 +1,5 @@
 from tusk.kernel.agent.simple_schema_validator import SimpleSchemaValidator
-from tusk.kernel.tool_registry import ToolRegistry
+from tusk.kernel.tools.tool_registry import ToolRegistry
 from tusk.shared.schemas.tool_sequence_plan import ToolSequencePlan
 
 __all__ = ["PlanValidator"]

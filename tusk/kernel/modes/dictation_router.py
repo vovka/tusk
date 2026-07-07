@@ -1,6 +1,6 @@
 from tusk.shared.schemas.tool_result import ToolResult
 from tusk.shared.schemas.kernel_response import KernelResponse
-from tusk.kernel.tool_registry import ToolRegistry
+from tusk.kernel.tools.tool_registry import ToolRegistry
 from tusk.shared.logging.interfaces.log_printer import LogPrinter
 
 __all__ = ["DictationRouter"]

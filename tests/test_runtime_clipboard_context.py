@@ -3,7 +3,7 @@ import types
 from tests.kernel_api_support import make_agent
 from tusk.shared.schemas.tool_call import ToolCall
 from tusk.shared.schemas.tool_result import ToolResult
-from tusk.kernel.tool_registry import ToolRegistry
+from tusk.kernel.tools.tool_registry import ToolRegistry
 
 
 def test_executor_sees_written_clipboard_text_in_context() -> None:

@@ -1,6 +1,6 @@
 import types
 
-from tusk.kernel.dictation_router import DictationRouter
+from tusk.kernel.modes.dictation_router import DictationRouter
 from tusk.shared.schemas.tool_result import ToolResult
 
 

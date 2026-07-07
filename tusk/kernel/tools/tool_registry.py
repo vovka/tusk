@@ -1,4 +1,4 @@
-from tusk.kernel.registered_tool import RegisteredTool
+from tusk.kernel.tools.registered_tool import RegisteredTool
 
 __all__ = ["ToolRegistry"]
 

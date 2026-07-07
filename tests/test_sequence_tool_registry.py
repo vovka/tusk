@@ -1,6 +1,6 @@
 from tests.kernel_api_support import make_registry_tool
 from tusk.kernel.agent.agent_tool_catalog import AgentToolCatalog
-from tusk.kernel.tool_registry import ToolRegistry
+from tusk.kernel.tools.tool_registry import ToolRegistry
 
 
 def test_registry_tracks_sequence_callable_tools() -> None:

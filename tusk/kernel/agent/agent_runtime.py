@@ -1,7 +1,7 @@
 from collections.abc import Callable
 
 from tusk.kernel.model_failure_reply_builder import ModelFailureReplyBuilder
-from tusk.kernel.repeated_tool_call_guard import RepeatedToolCallGuard
+from tusk.kernel.tools.repeated_tool_call_guard import RepeatedToolCallGuard
 from tusk.shared.schemas.tool_call import ToolCall
 from tusk.shared.schemas.tool_result import ToolResult
 from tusk.kernel.agent.agent_profile import AgentProfile

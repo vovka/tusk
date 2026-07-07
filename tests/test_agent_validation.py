@@ -6,7 +6,7 @@ from tusk.kernel.agent.guards.agent_run_guard import AgentRunGuard
 from tusk.kernel.agent.agent_run_request import AgentRunRequest
 from tusk.kernel.agent.guards.executor_tool_guard import ExecutorToolGuard
 from tusk.kernel.agent.planner.result_validator import ResultValidator
-from tusk.kernel.tool_registry import ToolRegistry
+from tusk.kernel.tools.tool_registry import ToolRegistry
 
 
 def test_guard_rejects_unknown_profile() -> None:

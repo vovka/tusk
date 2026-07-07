@@ -11,9 +11,9 @@ from shells.voice.stages.gatekeeper import LLMGatekeeper
 from shells.voice.stages.speech_playback import SpeechPlayback
 from shells.voice.stages.speech_stop_gate import SpeechStopGate
 from shells.voice.voice_shell import VoiceShell
-from tusk.kernel.coding_gate_prompt import CODING_GATE_PROMPT
-from tusk.kernel.dictation_gate_prompt import DICTATION_GATE_PROMPT
-from tusk.kernel.mode_gate import ModeGate
+from tusk.kernel.modes.coding_gate_prompt import CODING_GATE_PROMPT
+from tusk.kernel.modes.dictation_gate_prompt import DICTATION_GATE_PROMPT
+from tusk.kernel.modes.mode_gate import ModeGate
 from tusk.providers.stt import STTEngineFactory
 from tusk.providers.tts import GroqTTS
 

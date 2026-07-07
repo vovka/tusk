@@ -2,7 +2,7 @@ from tests.kernel_api_support import make_registry_tool
 from tusk.kernel.agent.agent_run_request import AgentRunRequest
 from tusk.kernel.agent.agent_toolset_builder import AgentToolsetBuilder
 from tusk.kernel.agent_profiles import build_agent_profiles
-from tusk.kernel.tool_registry import ToolRegistry
+from tusk.kernel.tools.tool_registry import ToolRegistry
 from tusk.shared.schemas.tool_sequence_plan import ToolSequencePlan
 
 

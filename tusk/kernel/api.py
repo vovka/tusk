@@ -1,7 +1,7 @@
 import threading
 from collections.abc import Callable
 
-from tusk.kernel.mode_slot import ModeSlot
+from tusk.kernel.modes.mode_slot import ModeSlot
 from tusk.kernel.submit_status_reporter import SubmitStatusReporter
 from tusk.shared.schemas.app_mode import AppMode
 from tusk.shared.schemas.kernel_response import KernelResponse

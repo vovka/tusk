@@ -2,7 +2,7 @@ import types
 
 from tests.kernel_api_support import make_agent, make_registry_tool
 from tusk.shared.schemas.tool_call import ToolCall
-from tusk.kernel.tool_registry import ToolRegistry
+from tusk.kernel.tools.tool_registry import ToolRegistry
 
 
 def test_conversation_stops_after_two_failed_executor_runs() -> None:

@@ -1,9 +1,9 @@
 import types
 
-from tusk.kernel.full_replace_edit_strategy import FullReplaceEditStrategy
-from tusk.kernel.line_anchored_edit_strategy import LineAnchoredEditStrategy
-from tusk.kernel.tool_runtime import ToolRuntime
-from tusk.kernel.verified_edit_strategy import VerifiedEditStrategy
+from tusk.kernel.modes.full_replace_edit_strategy import FullReplaceEditStrategy
+from tusk.kernel.modes.line_anchored_edit_strategy import LineAnchoredEditStrategy
+from tusk.kernel.modes.verified_edit_strategy import VerifiedEditStrategy
+from tusk.kernel.tools.tool_runtime import ToolRuntime
 
 
 def test_coding_router_is_wired_with_verified_line_anchored_strategy() -> None:
