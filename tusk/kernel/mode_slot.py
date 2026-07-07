@@ -9,9 +9,13 @@ __all__ = ["ModeSlot"]
 class ModeSlot:
     """Holds one switchable kernel mode (dictation, coding) and its wiring."""
 
-    def __init__(self, log_tag: str, start_reply: str) -> None:
+    def __init__(
+        self, log_tag: str, start_reply: str,
+        mode_factory: Callable[[object, object, object, str], object] = AdapterMode,
+    ) -> None:
         self._log_tag = log_tag
         self._start_reply = start_reply
+        self._mode_factory = mode_factory
         self._mode: object | None = None
         self._router: object | None = None
         self._on_started: Callable[[], None] | None = None
@@ -39,7 +43,7 @@ class ModeSlot:
         return self._mode.stop()
 
     def start(self, state: object, log: object) -> KernelResponse:
-        self._mode = AdapterMode(state, self._router, log, self._log_tag)
+        self._mode = self._mode_factory(state, self._router, log, self._log_tag)
         if self._on_started is not None:
             self._on_started()
         return KernelResponse(True, self._start_reply)

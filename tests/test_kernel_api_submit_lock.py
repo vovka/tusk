@@ -24,3 +24,10 @@ def _slow_command_mode(events: list[str]) -> object:
         return types.SimpleNamespace(handled=True, reply=text)
 
     return types.SimpleNamespace(process_command=process_command)
+
+
+def test_kernel_api_routes_through_injected_coding_slot() -> None:
+    sentinel = types.SimpleNamespace(handled=True, reply="from slot")
+    slot = types.SimpleNamespace(active=True, process_text=lambda text: sentinel)
+    api = KernelAPI(_slow_command_mode([]), llm_registry=None, coding_slot=slot)
+    assert api.submit("hello") is sentinel

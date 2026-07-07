@@ -17,6 +17,7 @@ class KernelAPI:
     def __init__(
         self, command_mode: object, llm_registry: LLMRegistry | None, log: LogPrinter | None = None,
         reporter: StatusReporter | None = None, interrupt_token: InterruptToken | None = None,
+        dictation_slot: ModeSlot | None = None, coding_slot: ModeSlot | None = None,
     ) -> None:
         self._command_mode = command_mode
         self._llm_registry = llm_registry
@@ -25,8 +26,8 @@ class KernelAPI:
         self._interrupt_token = interrupt_token
         self._submit_reporter = SubmitStatusReporter(reporter) if reporter is not None else None
         self._submit_lock = threading.Lock()
-        self._dictation = ModeSlot("DICTATION", "Dictation started.")
-        self._coding = ModeSlot("CODING", "Coding started.")
+        self._dictation = dictation_slot or ModeSlot("DICTATION", "Dictation started.")
+        self._coding = coding_slot or ModeSlot("CODING", "Coding started.")
 
     def request_interrupt(self) -> None:
         if self._interrupt_token is not None:
