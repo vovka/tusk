@@ -17,7 +17,12 @@ class MCPClient:
 
     def connect_stdio(self, command: list[str], cwd: str, env: dict | None = None) -> None:
         self._transport = MCPStdioTransport(self._normalize_command(command), cwd, env, self._timeout)
-        self._request("initialize", {"protocolVersion": "2024-11-05", "capabilities": {}})
+        try:
+            self._request("initialize", {"protocolVersion": "2024-11-05", "capabilities": {}})
+        except RuntimeError:
+            self._transport.stop()
+            self._transport = None
+            raise
 
     def connect_http(self, url: str) -> None:
         raise NotImplementedError(f"HTTP transport is not implemented: {url}")
