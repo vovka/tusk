@@ -13,7 +13,7 @@ from shells.voice.stages.speech_playback import SpeechPlayback
 from shells.voice.stages.speech_stop_gate import SpeechStopGate
 from tusk.kernel.coding_gate import CodingGate
 from tusk.kernel.dictation_gate import DictationGate
-from tusk.providers.stt import GroqSTT
+from tusk.providers.stt import STTEngineFactory
 from tusk.providers.tts import GroqTTS
 
 __all__ = ["ShellLoader"]
@@ -54,7 +54,7 @@ class ShellLoader:
         return shell_class()
 
     def _build_voice(self, shell_class: object) -> object:
-        stt_engine = GroqSTT(self._config.groq_api_key)
+        stt_engine = self._stt_engine()
         worker = self._build_worker()
         shell = shell_class(
             self._config, self._log, stt_engine=stt_engine, gatekeeper=self._gatekeeper(worker),
@@ -62,6 +62,10 @@ class ShellLoader:
         )
         self._control = shell
         return shell
+
+    def _stt_engine(self) -> object:
+        factory = STTEngineFactory(self._config.groq_api_key, self._config.whisper_model_size)
+        return factory.create(self._config.stt_engine)
 
     def _build_worker(self) -> CommandWorker:
         tts_engine = GroqTTS(self._config.groq_api_key) if self._config.tts_enabled else None

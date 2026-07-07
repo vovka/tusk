@@ -64,6 +64,7 @@ class ConfigFactory:
 
     def _audio_values(self) -> dict:
         return {
+            "stt_engine": os.environ.get("STT_ENGINE", "groq").strip().lower(),
             "whisper_model_size": os.environ.get("WHISPER_MODEL_SIZE", "base"),
             "audio_sample_rate": self._int("AUDIO_SAMPLE_RATE", "16000"),
             "audio_frame_duration_ms": self._int("AUDIO_FRAME_DURATION_MS", "30"),

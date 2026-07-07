@@ -15,6 +15,7 @@ class Config:
     executor_agent_llm: LLMSlotConfig
     default_agent_llm: LLMSlotConfig
     utility_llm: LLMSlotConfig
+    stt_engine: str
     whisper_model_size: str
     audio_sample_rate: int
     audio_frame_duration_ms: int
