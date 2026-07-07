@@ -819,7 +819,7 @@ classDiagram
   class Transcriber {
     process(utterance: Utterance) Utterance
   }
-  class TranscriptionBuffer {
+  class TranscriptionBufferImpl["TranscriptionBuffer (stages)"] {
     mark(entry_id: str, state: GateState) None
     process(utterance: Utterance) BufferedUtterance
     recent(count: int) list[Utterance]
@@ -878,10 +878,15 @@ classDiagram
   PlaybackGate --|> Gatekeeper
   LLMGatekeeper --|> Gatekeeper
   StopGatekeeper --|> Gatekeeper
-  TranscriptionBuffer --|> TranscriptionBuffer
+  TranscriptionBufferImpl --|> TranscriptionBuffer
   GateDispatch --> GateAction : action
   BufferedUtterance --> GateState : gate_state
 ```
+
+> Hand-edit after regeneration: pyreverse emits both the `TranscriptionBuffer`
+> interface and its stages implementation under the same name, which Mermaid
+> merges into one node (and a self-inheritance loop). The implementation block
+> is renamed to `TranscriptionBufferImpl["TranscriptionBuffer (stages)"]` here.
 
 ## Adapters
 

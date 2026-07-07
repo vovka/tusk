@@ -64,10 +64,12 @@ docker exec <container> fdp -Tsvg /path/to/full-class-graph.dot -o full-class-gr
 nested `subgraph cluster_*` blocks (top-level package, then subpackage) and
 sets the `fdp`-friendly graph attributes (`overlap`, `pack`, `packmode`,
 separation). The package→cluster mapping is the `RULES` list at the top of the
-script — each entry is `(top pattern, top name, color, [(sub pattern, sub
-name), ...])`; edit those if packages get reorganized. Any class whose fully
-qualified name doesn't match a sub-pattern falls into that package's `root`
-group (undecorated, no inner box) rather than being dropped.
+script — each entry is `(top pattern, cluster name, color, [sub-cluster
+names])`, where a class joins sub-cluster `S` when its qualified name contains
+`.S.`; edit those if packages get reorganized. Any class whose fully qualified
+name matches no sub-cluster falls into that package's `root` group
+(undecorated, no inner box) rather than being dropped. The embedded legend is
+kept as plain DOT in `full-class-graph-legend.gv` next to the script.
 
 ## Known rough edges (v2, unreviewed)
 
