@@ -2,6 +2,7 @@ import time
 from collections.abc import Callable
 
 from shells.voice.buffered_utterance import BufferedUtterance
+from shells.voice.gate_action import GateAction
 from shells.voice.gate_dispatch import GateDispatch
 from shells.voice.interfaces.gatekeeper import Gatekeeper
 from shells.voice.recovery_decision import RecoveryDecision
@@ -12,7 +13,7 @@ from shells.voice.stages.recent_context_formatter import RecentContextFormatter
 from shells.voice.stages.recovery_gate_prompt import build_recovery_gate_prompt
 from tusk.shared.llm.interfaces.llm_provider import LLMProvider
 from tusk.shared.logging.interfaces.log_printer import LogPrinter
-from tusk.shared.schemas import GateResult, Utterance
+from tusk.shared.schemas import GateClassification, GateResult, Utterance
 
 __all__ = ["LLMGatekeeper"]
 
@@ -50,13 +51,13 @@ class LLMGatekeeper(Gatekeeper):
         current = to_utterance(utterance)
         primary = self.evaluate(current, recent)
         if self._interrupt_requested(primary):
-            return GateDispatch("interrupt")
+            return GateDispatch(GateAction.INTERRUPT)
         dispatch = self._command_dispatch(primary, current)
         return dispatch or self._recovery_dispatch(current, recent, primary, candidates or [])
 
     def _interrupt_requested(self, result: GateResult) -> bool:
         # honored only while busy: an idle "stop" keeps its normal classification path
-        return result.metadata.get("classification") == "interrupt" and self._busy()
+        return result.classification == GateClassification.INTERRUPT and self._busy()
 
     def _busy(self) -> bool:
         return self._is_busy is not None and self._is_busy()
@@ -65,9 +66,9 @@ class LLMGatekeeper(Gatekeeper):
         return self._current_speech_text() if self._current_speech_text is not None else None
 
     def _command_dispatch(self, result: GateResult, utterance: Utterance) -> GateDispatch | None:
-        if result.metadata.get("classification") != "command":
+        if result.classification != GateClassification.COMMAND:
             return None
-        return self._forward(GateDispatch("forward_current", result.cleaned_command or utterance.text))
+        return self._forward(GateDispatch(GateAction.FORWARD_CURRENT, result.cleaned_command or utterance.text))
 
     def _recovery_dispatch(
         self,
@@ -80,9 +81,9 @@ class LLMGatekeeper(Gatekeeper):
         if recovery.action == "recover":
             return self._forward(recovered_dispatch(candidates, recovery))
         if recovery.action == "ambiguous":
-            return self._forward(GateDispatch("forward_clarification", utterance.text))
+            return self._forward(GateDispatch(GateAction.FORWARD_CLARIFICATION, utterance.text))
         dispatch = fallback_dispatch(primary, utterance, has_wake_word(utterance.text))
-        return self._forward(dispatch) if dispatch.action == "forward_current" else dispatch
+        return self._forward(dispatch) if dispatch.action == GateAction.FORWARD_CURRENT else dispatch
 
     def _recover(self, utterance: Utterance, recent: list[Utterance], primary: GateResult, candidates: list[BufferedUtterance]) -> RecoveryDecision:
         if not recovery_worthwhile(utterance, primary, candidates):

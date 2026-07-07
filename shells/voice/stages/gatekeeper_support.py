@@ -1,7 +1,9 @@
 from shells.voice.buffered_utterance import BufferedUtterance
+from shells.voice.gate_action import GateAction
 from shells.voice.gate_dispatch import GateDispatch
 from shells.voice.recovery_decision import RecoveryDecision
 from tusk.shared.logging.interfaces.log_printer import LogPrinter
+from tusk.shared.schemas.gate_classification import GateClassification
 from tusk.shared.schemas.gate_result import GateResult
 from tusk.shared.schemas.utterance import Utterance
 
@@ -40,13 +42,13 @@ def to_utterance(item: Utterance | BufferedUtterance) -> Utterance:
 
 def recovered_dispatch(candidates: list[BufferedUtterance], decision: RecoveryDecision) -> GateDispatch:
     item = next(candidate for candidate in candidates if candidate.id == decision.candidate_id)
-    return GateDispatch("forward_recovered", item.text, item.id)
+    return GateDispatch(GateAction.FORWARD_RECOVERED, item.text, item.id)
 
 
 def fallback_dispatch(result: GateResult, utterance: Utterance, wake_word: bool) -> GateDispatch:
-    if result.metadata.get("classification") == "conversation" and wake_word:
-        return GateDispatch("forward_current", result.cleaned_command or utterance.text)
-    return GateDispatch("drop")
+    if result.classification == GateClassification.CONVERSATION and wake_word:
+        return GateDispatch(GateAction.FORWARD_CURRENT, result.cleaned_command or utterance.text)
+    return GateDispatch(GateAction.DROP)
 
 
 def has_wake_word(text: str) -> bool:
@@ -59,14 +61,14 @@ def recovery_worthwhile(utterance: Utterance, primary: GateResult, candidates: l
     # Ceiling: a cue-less, wake-word-less correction classified ambient is dropped, not recovered.
     if not candidates:
         return False
-    if primary.metadata.get("classification") != "ambient" or has_wake_word(utterance.text):
+    if primary.classification != GateClassification.AMBIENT or has_wake_word(utterance.text):
         return True
     words = {part.strip(".,!?") for part in utterance.text.casefold().split()}
     return bool(words & _REFERENCE_CUES)
 
 
 def log_gate_result(log: LogPrinter, result: GateResult, reason: str) -> None:
-    kind = result.metadata.get("classification", "ambient")
+    kind = str(result.classification)
     text = result.cleaned_command
     log.log("GATEKEEPER", f"classification={kind} directed={result.is_directed_at_tusk} text={text!r} reason={reason!r}", "gatekeeper")
 

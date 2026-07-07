@@ -10,14 +10,14 @@ def test_gatekeeper_uses_structured_output() -> None:
     assert calls and calls[0][2] == "command_gatekeeper"
     assert result.is_directed_at_tusk
     assert result.cleaned_command == "open Firefox"
-    assert result.metadata["classification"] == "command"
+    assert result.classification == "command"
 
 
 def test_gatekeeper_treats_conversation_as_directed() -> None:
     llm = types.SimpleNamespace(label="gate", complete_structured=lambda *a: _conversation())
     result = LLMGatekeeper(llm, _log()).evaluate(_utterance("Tusk, how are you?"), [])
     assert result.is_directed_at_tusk
-    assert result.metadata["classification"] == "conversation"
+    assert result.classification == "conversation"
 
 
 def test_gatekeeper_forwards_wake_word_conversation() -> None:
@@ -39,7 +39,7 @@ def test_gatekeeper_handles_wrapped_fenced_json() -> None:
     llm = types.SimpleNamespace(label="gate", complete_structured=lambda *a: raw)
     result = LLMGatekeeper(llm, _log()).evaluate(_utterance("noise"), [])
     assert not result.is_directed_at_tusk
-    assert result.metadata["classification"] == "ambient"
+    assert result.classification == "ambient"
 
 
 def test_gatekeeper_falls_back_when_structured_call_fails() -> None:

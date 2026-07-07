@@ -2,6 +2,7 @@ import queue
 import threading
 from collections.abc import Callable, Iterator
 
+from shells.voice.gate_action import GateAction
 from shells.voice.gate_dispatch import GateDispatch
 from shells.voice.gate_state import GateState
 from tusk.shared.schemas.app_status import AppStatus
@@ -88,16 +89,16 @@ class VoicePipeline:
         return self._dispatch(self._gatekeeper.process(buffered, recent, candidates), buffered.id, submit)
 
     def _dispatch(self, result: GateDispatch, current_id: str, submit: Callable[[str], KernelResponse]) -> KernelResponse | None:
-        if result.action == "interrupt":
+        if result.action == GateAction.INTERRUPT:
             return self._interrupt(current_id)
-        if result.action == "drop" or result.text is None:
+        if result.action == GateAction.DROP or result.text is None:
             self._buffer.mark(current_id, GateState.DROPPED)
             return None
         self._mark_accepted(result, current_id)
         return self._submit(result.text, submit)
 
     def _mark_accepted(self, result: GateDispatch, current_id: str) -> None:
-        if result.action == "forward_recovered":
+        if result.action == GateAction.FORWARD_RECOVERED:
             self._buffer.mark(result.recovered_id, GateState.RECOVERED)
             self._buffer.mark(current_id, GateState.CONSUMED)
             return

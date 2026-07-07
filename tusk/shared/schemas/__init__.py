@@ -3,6 +3,7 @@ from tusk.shared.schemas.app_status import AppStatus
 from tusk.shared.schemas.buffer_selection import BufferSelection
 from tusk.shared.schemas.chat_message import ChatMessage
 from tusk.shared.schemas.edit_operation import EditOperation
+from tusk.shared.schemas.gate_classification import GateClassification
 from tusk.shared.schemas.gate_result import GateResult
 from tusk.shared.schemas.kernel_response import KernelResponse
 from tusk.shared.schemas.llm_slot_config import LLMSlotConfig
@@ -22,6 +23,7 @@ __all__ = [
     "BufferSelection",
     "ChatMessage",
     "EditOperation",
+    "GateClassification",
     "GateResult",
     "KernelResponse",
     "LLMSlotConfig",
