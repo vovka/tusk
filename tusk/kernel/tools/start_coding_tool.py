@@ -1,5 +1,5 @@
 from tusk.kernel.modes.coding_state import CodingState
-from tusk.shared.schemas.tool_result import ToolResult
+from tusk.shared.schemas.tools.tool_result import ToolResult
 from tusk.kernel.adapter_manager import AdapterManager
 from tusk.kernel.interfaces.editor_driver import EditorDriver
 from tusk.kernel.tools.tool_registry import ToolRegistry

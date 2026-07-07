@@ -4,7 +4,7 @@ import os
 import re
 from dataclasses import asdict
 
-from tusk.shared.schemas.app_entry import AppEntry
+from tusk.shared.schemas.desktop.app_entry import AppEntry
 
 __all__ = ["AppCatalog"]
 

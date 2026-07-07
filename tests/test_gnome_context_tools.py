@@ -1,6 +1,6 @@
-from tusk.shared.schemas.desktop_context import DesktopContext
+from tusk.shared.schemas.desktop.desktop_context import DesktopContext
 from adapters.gnome.gnome_context_tools import GnomeContextTools
-from tusk.shared.schemas.window_info import WindowInfo
+from tusk.shared.schemas.desktop.window_info import WindowInfo
 
 
 class StubContextProvider:

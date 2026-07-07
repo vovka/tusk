@@ -3,8 +3,8 @@ import types
 from tusk.kernel.agent.orchestrator_tool_dispatcher import OrchestratorToolDispatcher
 from tusk.kernel.tools.registered_tool import RegisteredTool
 from tusk.kernel.tools.tool_registry import ToolRegistry
-from tusk.shared.schemas.tool_call import ToolCall
-from tusk.shared.schemas.tool_result import ToolResult
+from tusk.shared.schemas.tools.tool_call import ToolCall
+from tusk.shared.schemas.tools.tool_result import ToolResult
 
 _SCHEMA = {
     "type": "object",

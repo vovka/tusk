@@ -3,8 +3,8 @@ import shlex
 import sys
 
 from tusk.shared.mcp.mcp_stdio_transport import MCPStdioTransport
-from tusk.shared.schemas.mcp_tool_result import MCPToolResult
-from tusk.shared.schemas.mcp_tool_schema import MCPToolSchema
+from tusk.shared.schemas.tools.mcp_tool_result import MCPToolResult
+from tusk.shared.schemas.tools.mcp_tool_schema import MCPToolSchema
 
 __all__ = ["MCPClient"]
 

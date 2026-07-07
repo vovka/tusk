@@ -1,4 +1,4 @@
-from tusk.shared.schemas.tool_result import ToolResult
+from tusk.shared.schemas.tools.tool_result import ToolResult
 from tusk.shared.llm.llm_registry import LLMRegistry
 from tusk.shared.status.interfaces.status_reporter import StatusReporter
 

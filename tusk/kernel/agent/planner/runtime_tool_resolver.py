@@ -2,7 +2,7 @@ from dataclasses import replace
 
 from tusk.kernel.agent.agent_run_request import AgentRunRequest
 from tusk.kernel.agent.session.store import Store
-from tusk.shared.schemas.tool_sequence_plan import ToolSequencePlan
+from tusk.shared.schemas.tools.tool_sequence_plan import ToolSequencePlan
 
 __all__ = ["RuntimeToolResolver"]
 

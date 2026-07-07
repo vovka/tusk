@@ -52,5 +52,5 @@ def test_adapter_subprocess_can_import_tusk_shared(tmp_path) -> None:
 def _write_adapter(adapter_dir, imports_tusk: bool = False) -> None:
     adapter_dir.mkdir()
     (adapter_dir / "adapter.json").write_text(json.dumps(_MANIFEST))
-    prefix = "from tusk.shared.schemas.tool_result import ToolResult\n" if imports_tusk else ""
+    prefix = "from tusk.shared.schemas.tools.tool_result import ToolResult\n" if imports_tusk else ""
     (adapter_dir / "server.py").write_text(prefix + textwrap.dedent(_SERVER))

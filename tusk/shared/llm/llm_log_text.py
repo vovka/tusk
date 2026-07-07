@@ -1,6 +1,6 @@
 import json
 
-from tusk.shared.schemas.tool_call import ToolCall
+from tusk.shared.schemas.tools.tool_call import ToolCall
 
 __all__ = ["inline_json", "message_line", "pretty_json", "response_line", "tool_line"]
 

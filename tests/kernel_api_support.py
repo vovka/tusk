@@ -3,7 +3,7 @@ import types
 
 from tusk.kernel.main_agent import MainAgent
 from tusk.kernel.agent_profiles import build_agent_profiles
-from tusk.shared.schemas.tool_result import ToolResult
+from tusk.shared.schemas.tools.tool_result import ToolResult
 from tusk.kernel.tools.tool_registry import ToolRegistry
 from tusk.kernel.agent import AgentOrchestrator, FileStore
 

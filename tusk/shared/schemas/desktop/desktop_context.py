@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from tusk.shared.schemas.window_info import WindowInfo
+from tusk.shared.schemas.desktop.window_info import WindowInfo
 
 __all__ = ["DesktopContext"]
 

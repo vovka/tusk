@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Callable
 
-from tusk.shared.schemas.tool_result import ToolResult
+from tusk.shared.schemas.tools.tool_result import ToolResult
 
 __all__ = ["RegisteredTool"]
 

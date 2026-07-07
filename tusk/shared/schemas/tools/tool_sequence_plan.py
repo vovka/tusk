@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from tusk.shared.schemas.tool_sequence_step import ToolSequenceStep
+from tusk.shared.schemas.tools.tool_sequence_step import ToolSequenceStep
 
 __all__ = ["ToolSequencePlan"]
 

@@ -1,5 +1,5 @@
-from tusk.shared.schemas.tool_call import ToolCall
-from tusk.shared.schemas.tool_result import ToolResult
+from tusk.shared.schemas.tools.tool_call import ToolCall
+from tusk.shared.schemas.tools.tool_result import ToolResult
 from tusk.kernel.agent.agent_result import AgentResult
 from tusk.kernel.agent.agent_run_request import AgentRunRequest
 from tusk.kernel.agent.session.store import Store

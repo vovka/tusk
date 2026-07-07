@@ -1,5 +1,5 @@
-from tusk.shared.schemas.tool_call import ToolCall
-from tusk.shared.schemas.tool_result import ToolResult
+from tusk.shared.schemas.tools.tool_call import ToolCall
+from tusk.shared.schemas.tools.tool_result import ToolResult
 from tusk.kernel.agent.guards.conversation_failure_budget_guard import ConversationFailureBudgetGuard
 from tusk.kernel.agent.guards.conversation_run_agent_guard import ConversationRunAgentGuard
 from tusk.kernel.agent.guards.executor_clipboard_guard import ExecutorClipboardGuard

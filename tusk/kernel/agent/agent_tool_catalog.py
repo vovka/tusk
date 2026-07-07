@@ -1,6 +1,6 @@
 import json
 
-from tusk.shared.schemas.tool_result import ToolResult
+from tusk.shared.schemas.tools.tool_result import ToolResult
 from tusk.kernel.tools.tool_registry import ToolRegistry
 
 __all__ = ["AgentToolCatalog"]

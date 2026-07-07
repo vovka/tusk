@@ -2,8 +2,8 @@ import subprocess
 from dataclasses import asdict
 
 from adapters.gnome.app_catalog import AppCatalog
-from tusk.shared.schemas.desktop_context import DesktopContext
-from tusk.shared.schemas.window_info import WindowInfo
+from tusk.shared.schemas.desktop.desktop_context import DesktopContext
+from tusk.shared.schemas.desktop.window_info import WindowInfo
 
 __all__ = ["GnomeContextProvider"]
 

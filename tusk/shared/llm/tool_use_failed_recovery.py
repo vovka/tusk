@@ -2,7 +2,7 @@ import ast
 import json
 import re
 
-from tusk.shared.schemas.tool_call import ToolCall, normalize_tool_name
+from tusk.shared.schemas.tools.tool_call import ToolCall, normalize_tool_name
 
 __all__ = ["ToolUseFailedRecovery"]
 

@@ -3,7 +3,7 @@ import types
 from tusk.kernel.modes.coding_state import CodingState
 from tusk.kernel.tools.start_coding_tool import StartCodingTool
 from tusk.shared.schemas.kernel_response import KernelResponse
-from tusk.shared.schemas.tool_result import ToolResult
+from tusk.shared.schemas.tools.tool_result import ToolResult
 
 
 def test_execute_reads_buffer_and_starts_session() -> None:
