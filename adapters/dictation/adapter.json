@@ -4,5 +4,13 @@
   "description": "Dictation cleanup and refinement adapter",
   "transport": "stdio",
   "entry": "python server.py",
-  "provides_context": false
+  "provides_context": false,
+  "tools": {
+    "start_dictation": {
+      "planner_visible": false
+    },
+    "stop_dictation": {
+      "planner_visible": false
+    }
+  }
 }

@@ -83,7 +83,15 @@ class AdapterManager:
     def _register(self, name: str, client: MCPClient, manifest: dict, tools: list[object]) -> None:
         self._clients[name] = client
         self._manifests[name] = manifest
+        tool_flags = manifest.get("tools", {})
         for tool in tools:
-            self.tool_registry.register(MCPToolProxy(name, tool, client))
+            self.tool_registry.register(self._proxy(name, tool, client, tool_flags.get(tool.name, {})))
         if manifest.get("provides_context") and self._context_adapter is None:
             self._context_adapter = name
+
+    def _proxy(self, name: str, tool: object, client: MCPClient, flags: dict) -> MCPToolProxy:
+        return MCPToolProxy(
+            name, tool, client,
+            planner_visible=flags.get("planner_visible", True),
+            sequence_callable=flags.get("sequence_callable", False),
+        )

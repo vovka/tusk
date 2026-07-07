@@ -1,7 +1,6 @@
 import types
 
 from tusk.shared.mcp import MCPToolProxy
-from tusk.kernel.tool_registry import ToolRegistry
 
 
 def test_mcp_tool_proxy_converts_adapter_exception_to_failure() -> None:
@@ -11,25 +10,16 @@ def test_mcp_tool_proxy_converts_adapter_exception_to_failure() -> None:
     assert "tool execution failed" in result.message
 
 
-def test_dictation_lifecycle_tools_are_hidden_from_planner() -> None:
-    registry = ToolRegistry()
-    registry.register(MCPToolProxy("dictation", _schema("start_dictation"), _client()))
-    registry.register(MCPToolProxy("dictation", _schema("stop_dictation"), _client()))
-    registry.register(MCPToolProxy("dictation", _schema("process_segment"), _client()))
-    assert registry.planner_tool_names() == {"dictation.process_segment"}
-
-
-def test_coding_lifecycle_tools_are_hidden_from_planner() -> None:
-    registry = ToolRegistry()
-    registry.register(MCPToolProxy("coding", _schema("start_coding_session"), _client()))
-    registry.register(MCPToolProxy("coding", _schema("process_intent"), _client()))
-    registry.register(MCPToolProxy("coding", _schema("stop_coding_session"), _client()))
-    assert registry.planner_tool_names() == set()
-
-
-def test_non_lifecycle_adapter_tools_remain_planner_visible() -> None:
+def test_flags_default_to_visible_and_not_sequence_callable() -> None:
     proxy = MCPToolProxy("gnome", _schema("type_text"), _client())
     assert proxy.planner_visible is True
+    assert proxy.sequence_callable is False
+
+
+def test_flags_come_from_constructor() -> None:
+    proxy = MCPToolProxy("dictation", _schema("start_dictation"), _client(), planner_visible=False, sequence_callable=True)
+    assert proxy.planner_visible is False
+    assert proxy.sequence_callable is True
 
 
 def _schema(name: str = "close_window") -> object:
