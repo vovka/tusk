@@ -3,9 +3,6 @@ from tusk.kernel.interfaces.conversation_history import ConversationHistory
 from tusk.kernel.interfaces.conversation_summarizer import ConversationSummarizer
 from tusk.kernel.interfaces.edit_application_strategy import EditApplicationStrategy
 from tusk.kernel.interfaces.editor_driver import EditorDriver
-from tusk.kernel.interfaces.pipeline_control import PipelineControl
-from tusk.kernel.interfaces.pipeline_controller import PipelineController
-from tusk.kernel.interfaces.pipeline_mode import PipelineMode
 from tusk.kernel.interfaces.shell import Shell
 
 __all__ = [
@@ -14,8 +11,5 @@ __all__ = [
     "ConversationSummarizer",
     "EditApplicationStrategy",
     "EditorDriver",
-    "PipelineControl",
-    "PipelineController",
-    "PipelineMode",
     "Shell",
 ]
