@@ -8,11 +8,10 @@ from tusk.shared.llm.interfaces.llm_provider import LLMProvider
 from tusk.shared.llm.tool_use_failed_recovery import ToolUseFailedRecovery
 from tusk.shared.schemas.tool_call import ToolCall
 
-__all__ = ["OpenRouterLLM", "_tool_or_done"]
+__all__ = ["OpenRouterLLM"]
 
 _BASE_URL = "https://openrouter.ai/api/v1"
 _APP_HEADERS = {"HTTP-Referer": "https://github.com/vovka/tusk", "X-Title": "TUSK"}
-_tool_or_done = tool_or_done
 
 
 class OpenRouterLLM(LLMProvider):

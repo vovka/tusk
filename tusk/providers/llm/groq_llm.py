@@ -8,10 +8,9 @@ from tusk.shared.llm.interfaces.llm_provider import LLMProvider
 from tusk.shared.llm.tool_use_failed_recovery import ToolUseFailedRecovery
 from tusk.shared.schemas.tool_call import ToolCall
 
-__all__ = ["GroqLLM", "_tool_or_done"]
+__all__ = ["GroqLLM"]
 
 _STRICT_SCHEMA_MODELS = frozenset({"openai/gpt-oss-20b", "openai/gpt-oss-120b"})
-_tool_or_done = tool_or_done
 
 
 class GroqLLM(LLMProvider):
