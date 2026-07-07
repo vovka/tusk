@@ -76,14 +76,21 @@ def _prepare_socket_dir() -> None:
         )
 
 
-def main() -> None:
-    _prepare_socket_dir()
+def _listening_socket() -> socket.socket:
+    # 0o700: the socket executes commands as this user; the container shares
+    # the uid (compose user "1000:1000"), other local users get nothing.
     if os.path.exists(_SOCKET_PATH):
         os.unlink(_SOCKET_PATH)
-    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
-        sock.bind(_SOCKET_PATH)
-        os.chmod(_SOCKET_PATH, 0o777)
-        sock.listen(_BACKLOG)
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    sock.bind(_SOCKET_PATH)
+    os.chmod(_SOCKET_PATH, 0o700)
+    sock.listen(_BACKLOG)
+    return sock
+
+
+def main() -> None:
+    _prepare_socket_dir()
+    with _listening_socket() as sock:
         _serve(sock)
 
 

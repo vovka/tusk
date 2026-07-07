@@ -1,7 +1,17 @@
+import os
+import stat
+
 from launcher import tusk_host_launcher
 
 _SNAP_LEAKS = ("LD_LIBRARY_PATH", "GTK_PATH", "GTK_IM_MODULE_FILE",
                "GIO_MODULE_DIR", "GSETTINGS_SCHEMA_DIR", "LOCPATH")
+
+
+def test_launch_socket_is_owner_only(monkeypatch, tmp_path):
+    path = str(tmp_path / "launch.sock")
+    monkeypatch.setattr(tusk_host_launcher, "_SOCKET_PATH", path)
+    with tusk_host_launcher._listening_socket():
+        assert stat.S_IMODE(os.stat(path).st_mode) == 0o700
 
 
 def test_host_env_drops_snap_leaks_keeps_rest(monkeypatch):
