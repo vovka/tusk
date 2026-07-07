@@ -24,7 +24,7 @@ class LLMGatekeeper(Gatekeeper):
         llm_provider: LLMProvider,
         log_printer: LogPrinter,
         formatter: RecentContextFormatter | None = None,
-        time_source: object = time.monotonic,
+        time_source: Callable[[], float] = time.monotonic,
         follow_up_window_seconds: float = 30.0,
         is_busy: Callable[[], bool] | None = None,
         current_speech_text: Callable[[], str | None] | None = None,

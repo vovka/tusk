@@ -5,6 +5,12 @@ from collections.abc import Callable, Iterator
 from shells.voice.gate_action import GateAction
 from shells.voice.gate_dispatch import GateDispatch
 from shells.voice.gate_state import GateState
+from shells.voice.interfaces.gatekeeper import Gatekeeper
+from shells.voice.interfaces.transcription_buffer import TranscriptionBuffer
+from shells.voice.stages.sanitizer import Sanitizer
+from shells.voice.stages.transcriber import Transcriber
+from shells.voice.stages.utterance_detector import UtteranceDetector
+from tusk.shared.status.interfaces.status_reporter import StatusReporter
 from tusk.shared.schemas.app_status import AppStatus
 from tusk.shared.schemas.kernel_response import KernelResponse
 from tusk.shared.schemas.utterance import Utterance
@@ -15,14 +21,14 @@ __all__ = ["VoicePipeline"]
 class VoicePipeline:
     def __init__(
         self,
-        detector: object,
-        transcriber: object,
-        sanitizer: object,
-        buffer: object,
-        gatekeeper: object,
+        detector: UtteranceDetector,
+        transcriber: Transcriber,
+        sanitizer: Sanitizer,
+        buffer: TranscriptionBuffer,
+        gatekeeper: Gatekeeper,
         recovery_window_seconds: float = 60.0,
         recovery_candidate_limit: int = 6,
-        reporter: object | None = None,
+        reporter: StatusReporter | None = None,
         on_interrupt: Callable[[], None] | None = None,
     ) -> None:
         self._detector = detector
@@ -30,8 +36,7 @@ class VoicePipeline:
         self._sanitizer = sanitizer
         self._buffer = buffer
         self._gatekeeper = gatekeeper
-        self._recovery_window = recovery_window_seconds
-        self._recovery_limit = recovery_candidate_limit
+        self._recovery_window, self._recovery_limit = recovery_window_seconds, recovery_candidate_limit
         self._reporter = reporter
         self._on_interrupt = on_interrupt
 
@@ -108,4 +113,3 @@ class VoicePipeline:
         self._buffer.mark(current_id, GateState.CONSUMED)
         if self._on_interrupt is not None:
             self._on_interrupt()
-        return None
