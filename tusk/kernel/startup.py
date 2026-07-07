@@ -34,6 +34,6 @@ def build_agent(config: Config, log: ColorLogPrinter, llm_registry: LLMRegistry,
 
 def build_adapter_manager(config: Config, log: ColorLogPrinter, tool_registry: ToolRegistry) -> AdapterManager:
     manager = AdapterManager("adapters", tool_registry, log, config.adapter_env_cache_dir)
-    manager.run_async(manager.start_all())
+    manager.start_all()
     manager.start_watcher()
     return manager

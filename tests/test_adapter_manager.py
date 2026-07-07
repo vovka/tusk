@@ -38,7 +38,7 @@ for line in sys.stdin:
 def test_adapter_manager_registers_namespaced_tools(tmp_path) -> None:
     _write_adapter(tmp_path / "demo")
     manager = AdapterManager(str(tmp_path), ToolRegistry(), types.SimpleNamespace(log=lambda *a: None))
-    manager.run_async(manager.start_all())
+    manager.start_all()
     assert manager.tool_registry.get("demo.ping").name == "demo.ping"
 
 

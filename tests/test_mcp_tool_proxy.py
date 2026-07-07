@@ -5,7 +5,7 @@ from tusk.kernel.tool_registry import ToolRegistry
 
 
 def test_mcp_tool_proxy_converts_adapter_exception_to_failure() -> None:
-    proxy = MCPToolProxy("gnome", _schema(), _client(), lambda coro: (_ for _ in ()).throw(RuntimeError("boom")))
+    proxy = MCPToolProxy("gnome", _schema(), _failing_client())
     result = proxy.execute({})
     assert result.success is False
     assert "tool execution failed" in result.message
@@ -13,22 +13,22 @@ def test_mcp_tool_proxy_converts_adapter_exception_to_failure() -> None:
 
 def test_dictation_lifecycle_tools_are_hidden_from_planner() -> None:
     registry = ToolRegistry()
-    registry.register(MCPToolProxy("dictation", _schema("start_dictation"), _client(), lambda coro: None))
-    registry.register(MCPToolProxy("dictation", _schema("stop_dictation"), _client(), lambda coro: None))
-    registry.register(MCPToolProxy("dictation", _schema("process_segment"), _client(), lambda coro: None))
+    registry.register(MCPToolProxy("dictation", _schema("start_dictation"), _client()))
+    registry.register(MCPToolProxy("dictation", _schema("stop_dictation"), _client()))
+    registry.register(MCPToolProxy("dictation", _schema("process_segment"), _client()))
     assert registry.planner_tool_names() == {"dictation.process_segment"}
 
 
 def test_coding_lifecycle_tools_are_hidden_from_planner() -> None:
     registry = ToolRegistry()
-    registry.register(MCPToolProxy("coding", _schema("start_coding_session"), _client(), lambda coro: None))
-    registry.register(MCPToolProxy("coding", _schema("process_intent"), _client(), lambda coro: None))
-    registry.register(MCPToolProxy("coding", _schema("stop_coding_session"), _client(), lambda coro: None))
+    registry.register(MCPToolProxy("coding", _schema("start_coding_session"), _client()))
+    registry.register(MCPToolProxy("coding", _schema("process_intent"), _client()))
+    registry.register(MCPToolProxy("coding", _schema("stop_coding_session"), _client()))
     assert registry.planner_tool_names() == set()
 
 
 def test_non_lifecycle_adapter_tools_remain_planner_visible() -> None:
-    proxy = MCPToolProxy("gnome", _schema("type_text"), _client(), lambda coro: None)
+    proxy = MCPToolProxy("gnome", _schema("type_text"), _client())
     assert proxy.planner_visible is True
 
 
@@ -42,3 +42,10 @@ def _schema(name: str = "close_window") -> object:
 
 def _client() -> object:
     return types.SimpleNamespace(call_tool=lambda name, parameters: None)
+
+
+def _failing_client() -> object:
+    def call_tool(name: str, parameters: dict) -> object:
+        raise RuntimeError("boom")
+
+    return types.SimpleNamespace(call_tool=call_tool)
