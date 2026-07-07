@@ -1,31 +1,23 @@
-import json
 import sys
 import uuid
+from typing import TextIO
 
-try:
-    from dictation_session_store import DictationSessionStore
-    from dictation_tool_schema_catalog import DictationToolSchemaCatalog
-except ImportError:  # pragma: no cover
-    from adapters.dictation.dictation_session_store import DictationSessionStore
-    from adapters.dictation.dictation_tool_schema_catalog import DictationToolSchemaCatalog
+from adapters.dictation.dictation_session_store import DictationSessionStore
+from adapters.dictation.dictation_tool_schema_catalog import DictationToolSchemaCatalog
+from tusk.shared.mcp.mcp_stdio_server import MCPStdioServer
+
 
 class DictationServer:
-    def __init__(self, sessions: DictationSessionStore | None = None) -> None:
+    def __init__(
+        self, sessions: DictationSessionStore | None = None,
+        input_stream: TextIO = sys.stdin, output_stream: TextIO = sys.stdout,
+    ) -> None:
         self._sessions = sessions or DictationSessionStore()
         self._schemas = DictationToolSchemaCatalog().build()
+        self._rpc = MCPStdioServer("dictation", lambda: self._schemas, self._call, input_stream, output_stream)
 
     def serve(self) -> None:
-        for line in sys.stdin:
-            self._handle_line(line)
-
-    def _handle_line(self, line: str) -> None:
-        try:
-            request = json.loads(line)
-        except json.JSONDecodeError:
-            return
-        if not isinstance(request, dict) or "id" not in request:
-            return
-        self._write(request["id"], self._payload(request))
+        self._rpc.serve()
 
     def _call(self, name: str, arguments: dict) -> dict:
         handler = getattr(self, f"_tool_{name}", None)
@@ -33,12 +25,6 @@ class DictationServer:
             return self._error_content(f"unknown tool: {name}")
         payload = handler(arguments)
         return {"content": [{"type": "text", "text": payload["message"]}], "isError": not payload["success"], "data": payload.get("data")}
-
-    def _safe_call(self, name: str, arguments: dict) -> dict:
-        try:
-            return self._call(name, arguments)
-        except Exception as exc:
-            return self._error_content(f"tool {name} failed: {exc}")
 
     def _error_content(self, message: str) -> dict:
         return {"content": [{"type": "text", "text": message}], "isError": True, "data": None}
@@ -63,22 +49,6 @@ class DictationServer:
     def _tool_stop_dictation(self, arguments: dict) -> dict:
         self._sessions.pop(arguments["session_id"])
         return {"success": True, "message": "dictation stopped"}
-
-    def _write(self, request_id: int, payload: dict) -> None:
-        response = {"jsonrpc": "2.0", "id": request_id, "result": payload}
-        sys.stdout.write(json.dumps(response) + "\n")
-        sys.stdout.flush()
-
-    def _payload(self, request: dict) -> dict:
-        method = request.get("method")
-        params = request.get("params", {})
-        if method == "initialize":
-            return {"protocolVersion": "2024-11-05", "capabilities": {"tools": {}}}
-        if method == "tools/list":
-            return {"tools": self._schemas}
-        if method == "tools/call":
-            return self._safe_call(params.get("name", ""), params.get("arguments", {}))
-        return {}
 
     def _segment(self, previous: str, text: str) -> str:
         if not previous or not text or text[0] in ",.!?:;)]}":
