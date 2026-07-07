@@ -1,7 +1,7 @@
-__all__ = ["GnomeClipboardTools"]
+__all__ = ["ClipboardTools"]
 
 
-class GnomeClipboardTools:
+class ClipboardTools:
     def __init__(self, clipboard_provider: object) -> None:
         self._clipboard = clipboard_provider
 

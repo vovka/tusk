@@ -1,5 +1,5 @@
 from tusk.shared.schemas.desktop.desktop_context import DesktopContext
-from adapters.gnome.gnome_context_tools import GnomeContextTools
+from adapters.gnome.tools.context_tools import ContextTools
 from tusk.shared.schemas.desktop.window_info import WindowInfo
 
 
@@ -22,7 +22,7 @@ def _context() -> DesktopContext:
 def test_get_desktop_context_message_contains_active_window_and_window_list() -> None:
     """MCP clients see only `message`; the real desktop state must be in it.
     Regression: codex received the literal string 'context' and typed blind."""
-    result = GnomeContextTools(StubContextProvider(_context())).get_desktop_context({})
+    result = ContextTools(StubContextProvider(_context())).get_desktop_context({})
 
     assert result["success"] is True
     assert "active window: notes.txt - gedit -> gedit" in result["message"]
@@ -30,7 +30,7 @@ def test_get_desktop_context_message_contains_active_window_and_window_list() ->
 
 
 def test_get_desktop_context_keeps_data_for_kernel_clients() -> None:
-    result = GnomeContextTools(StubContextProvider(_context())).get_desktop_context({})
+    result = ContextTools(StubContextProvider(_context())).get_desktop_context({})
 
     assert result["data"]["active_window_title"] == "notes.txt - gedit"
     assert result["data"]["open_windows"][0]["title"] == "Системний монітор"

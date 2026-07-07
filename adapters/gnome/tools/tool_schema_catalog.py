@@ -1,4 +1,4 @@
-__all__ = ["GnomeToolSchemaCatalog"]
+__all__ = ["ToolSchemaCatalog"]
 
 _DEFINITIONS = [
     ("launch_application", "Launch an application", {"application_name": "string"}),
@@ -25,7 +25,7 @@ _DEFINITIONS = [
 ]
 
 
-class GnomeToolSchemaCatalog:
+class ToolSchemaCatalog:
     def build(self) -> dict[str, dict]:
         return {name: self._schema(name, description, fields) for name, description, fields in self._definitions()}
 

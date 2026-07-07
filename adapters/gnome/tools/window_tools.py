@@ -1,9 +1,9 @@
 import subprocess
 
-__all__ = ["GnomeWindowTools"]
+__all__ = ["WindowTools"]
 
 
-class GnomeWindowTools:
+class WindowTools:
     def close_window(self, arguments: dict) -> dict:
         title = self._title(arguments)
         if isinstance(title, dict):

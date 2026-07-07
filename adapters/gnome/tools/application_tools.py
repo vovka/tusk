@@ -1,12 +1,12 @@
 import socket
 import subprocess
 
-__all__ = ["GnomeApplicationTools"]
+__all__ = ["ApplicationTools"]
 
 _SOCKET_PATH = "/tmp/tusk/launch.sock"
 
 
-class GnomeApplicationTools:
+class ApplicationTools:
     def __init__(self, app_catalog: object) -> None:
         self._apps = app_catalog
 

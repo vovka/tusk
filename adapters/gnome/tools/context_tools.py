@@ -1,9 +1,9 @@
 from dataclasses import asdict
 
-__all__ = ["GnomeContextTools"]
+__all__ = ["ContextTools"]
 
 
-class GnomeContextTools:
+class ContextTools:
     def __init__(self, context_provider: object) -> None:
         self._context = context_provider
 

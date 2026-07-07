@@ -1,6 +1,6 @@
 import types
 
-from adapters.gnome.gnome_application_tools import GnomeApplicationTools
+from adapters.gnome.tools.application_tools import ApplicationTools
 from adapters.gnome.gnome_tool_router import GnomeToolRouter
 from adapters.gnome.server import build_router
 
@@ -32,9 +32,9 @@ def _search_handler(router: GnomeToolRouter) -> object:
     return router._application_handlers(tools)["search_applications"]
 
 
-def _application_tools(calls: list[str]) -> GnomeApplicationTools:
+def _application_tools(calls: list[str]) -> ApplicationTools:
     apps = types.SimpleNamespace(search=lambda query, limit=10: [types.SimpleNamespace(name="Firefox", exec_cmd="firefox")])
-    tools = GnomeApplicationTools(apps)
+    tools = ApplicationTools(apps)
     tools._launch = lambda application_name: _launch_response(calls, application_name)  # type: ignore[method-assign]
     return tools
 

@@ -1,7 +1,7 @@
-__all__ = ["GnomeInputTools"]
+__all__ = ["InputTools"]
 
 
-class GnomeInputTools:
+class InputTools:
     def __init__(self, input_simulator: object, text_paster: object, text_chunker: object) -> None:
         self._input = input_simulator
         self._paster = text_paster
