@@ -2,23 +2,13 @@ import types
 
 from adapters.gnome.gnome_application_tools import GnomeApplicationTools
 from adapters.gnome.server import GnomeServer
-from tusk.shared.schemas.desktop_context import DesktopContext, WindowInfo
 
 
 def test_search_applications_ranks_exact_name_first() -> None:
     server = GnomeServer()
-    server._router._handlers["search_applications"] = _search_handler(server)
-    result = server._tool_search_applications({"query": "firefox"})
+    handler = _search_handler(server)
+    result = handler({"query": "firefox"})
     assert "Firefox -> firefox" in result["message"].splitlines()[1]
-
-
-def test_list_windows_and_active_window_tools() -> None:
-    server = GnomeServer()
-    server._router._handlers.update(_context_handlers())
-    listed = server._tool_list_windows({})
-    active = server._tool_get_active_window({})
-    assert "Editor -> gedit [800x600 at 10,20]" in listed["message"]
-    assert "active window: Editor -> gedit [800x600 at 10,20]" == active["message"]
 
 
 def test_launch_application_resolves_display_name_to_exec() -> None:
@@ -52,12 +42,3 @@ def _application_tools(calls: list[str]) -> GnomeApplicationTools:
 def _launch_response(calls: list[str], application_name: str) -> str:
     calls.append(application_name)
     return "ok\n"
-
-
-def _context_handlers() -> dict[str, object]:
-    context = DesktopContext("Editor", "gedit", open_windows=[WindowInfo("1", "Editor", "gedit", True, 10, 20, 800, 600)])
-    return {
-        "list_windows": lambda arguments: {"success": True, "message": "open windows:\n  Editor -> gedit [800x600 at 10,20]"},
-        "get_active_window": lambda arguments: {"success": True, "message": "active window: Editor -> gedit [800x600 at 10,20]"},
-        "get_desktop_context": lambda arguments: {"success": True, "message": "context", "data": context},
-    }

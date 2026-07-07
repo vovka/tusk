@@ -1,9 +1,7 @@
-from tusk.shared.schemas.app_entry import AppEntry
 from tusk.shared.schemas.app_mode import AppMode
 from tusk.shared.schemas.app_status import AppStatus
 from tusk.shared.schemas.buffer_selection import BufferSelection
 from tusk.shared.schemas.chat_message import ChatMessage
-from tusk.shared.schemas.desktop_context import DesktopContext
 from tusk.shared.schemas.edit_operation import EditOperation
 from tusk.shared.schemas.gate_result import GateResult
 from tusk.shared.schemas.kernel_response import KernelResponse
@@ -19,12 +17,10 @@ from tusk.shared.schemas.utterance import Utterance
 from tusk.shared.schemas.window_info import WindowInfo
 
 __all__ = [
-    "AppEntry",
     "AppMode",
     "AppStatus",
     "BufferSelection",
     "ChatMessage",
-    "DesktopContext",
     "EditOperation",
     "GateResult",
     "KernelResponse",
