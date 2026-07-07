@@ -83,7 +83,6 @@ class ConfigFactory:
             "gate_recovery_candidate_limit": self._int("GATE_RECOVERY_CANDIDATE_LIMIT", "6"),
             "shells": self._shells(shells),
             "adapter_env_cache_dir": os.environ.get("TUSK_ADAPTER_ENV_CACHE_DIR", ".tusk_runtime/adapters"),
-            "conversation_log_dir": os.environ.get("TUSK_CONVERSATION_LOG_DIR", ".tusk_runtime/conversations"),
             "agent_session_log_dir": os.environ.get("TUSK_AGENT_SESSION_LOG_DIR", ".tusk_runtime/agent_sessions"),
         }
 

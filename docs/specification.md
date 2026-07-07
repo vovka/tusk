@@ -65,7 +65,6 @@ Legacy fallback env vars (used when per-agent vars are absent):
 | `MAX_FOLLOW_UP_TIMEOUT_SECONDS` | `float` | `120` | Positive float (seconds); follow-up window ceiling |
 | `TUSK_SHELLS` | `list[str]` | `["voice"]` | Comma-separated: `voice`, `cli`, `tray`, `emulator` (scripted-transcript shell). The shell loader automatically orders `tray` **last** (it owns the blocking GUI loop), so position in the env var does not matter |
 | `TUSK_ADAPTER_ENV_CACHE_DIR` | `str` | `".tusk_runtime/adapters"` | Directory for managed adapter venvs |
-| `TUSK_CONVERSATION_LOG_DIR` | `str` | `".tusk_runtime/conversations"` | Directory for daily conversation logs (parsed but not active) |
 | `TUSK_TRAY_ICON_THEME` | `str` | `"light"` | `light`, `dark` — icon asset set used by the tray shell |
 | `TUSK_TRAY_SHOW_LAST_ACTIVITY` | `bool` | `false` | `true`, `false` — opt-in: show the last command/reply line in the tray menu (off by default; the transcript may contain sensitive speech) |
 | `TUSK_CODING_EDITOR_DRIVER` | `str` | `"input_automation"` | Design option, not yet wired — only `input_automation` (any editor via `gnome.*`) is active |

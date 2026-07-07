@@ -1,10 +1,8 @@
-import tempfile
 from unittest.mock import patch
 
 from tusk.shared.config import StartupOptions
 from tusk.shared.config.startup_options import build_parser
-from tusk.shared.logging import ColorLogPrinter, DailyFileLogger
-from tusk.shared.schemas.chat_message import ChatMessage
+from tusk.shared.logging import ColorLogPrinter
 
 
 def test_startup_options_expand_groups_and_preview_config() -> None:
@@ -53,12 +51,3 @@ def test_diagnostic_content_uses_gray_style() -> None:
     with patch("builtins.print") as mocked:
         ColorLogPrinter(frozenset({"llm-request"})).log("LLMREQUEST", "diagnostic", "llm-request")
     assert "\033[90mdiagnostic\033[0m" in mocked.call_args[0][0]
-
-
-def test_daily_file_logger_writes_jsonl() -> None:
-    with tempfile.TemporaryDirectory() as tmp:
-        logger = DailyFileLogger(tmp)
-        logger.log_message(ChatMessage("user", "open Firefox"))
-        files = list(__import__("pathlib").Path(tmp).glob("*.jsonl"))
-        assert len(files) == 1
-        assert '"role": "user"' in files[0].read_text()

@@ -286,10 +286,8 @@ tusk/
 │   │   │   └── tool_use_failed_recovery.py # Graceful recovery for tool_use_failed errors
 │   │   ├── logging/
 │   │   │   ├── interfaces/
-│   │   │   │   ├── log_printer.py       # LogPrinter ABC — log, show_wait, clear_wait
-│   │   │   │   └── conversation_logger.py # ConversationLogger ABC — log_message
-│   │   │   ├── color_log_printer.py     # ColorLogPrinter — colored console output by tag
-│   │   │   └── daily_file_logger.py     # DailyFileLogger — daily-rotation conversation log
+│   │   │   │   └── log_printer.py       # LogPrinter ABC — log, show_wait, clear_wait
+│   │   │   └── color_log_printer.py     # ColorLogPrinter — colored console output by tag
 │   │   ├── mcp/
 │   │   │   ├── adapter_env_builder.py   # AdapterEnvironmentBuilder — managed venv setup
 │   │   │   ├── adapter_watcher.py       # AdapterWatcher — file-system hot-plug via watchdog
@@ -472,12 +470,6 @@ def clear_wait(self) -> None
 ```
 
 `show_wait` / `clear_wait` display a spinner while waiting for an LLM response.
-
-### ConversationLogger — `tusk/shared/logging/interfaces/conversation_logger.py`
-
-```python
-def log_message(self, message: ChatMessage) -> None
-```
 
 ### Gatekeeper — `shells/voice/interfaces/gatekeeper.py`
 
