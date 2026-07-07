@@ -2,7 +2,7 @@ import types
 
 from shells.voice.buffered_utterance import BufferedUtterance
 from shells.voice.gate_dispatch import GateDispatch
-from shells.voice.stages.stop_gatekeeper import StopGatekeeper
+from shells.voice.stages.gate.stop_gatekeeper import StopGatekeeper
 from tusk.shared.schemas.utterance import Utterance
 
 

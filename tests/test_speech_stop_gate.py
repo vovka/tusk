@@ -1,7 +1,7 @@
 import json
 import types
 
-from shells.voice.stages.speech_stop_gate import SpeechStopGate
+from shells.voice.stages.gate.speech_stop_gate import SpeechStopGate
 
 
 def test_stop_intent_returns_true() -> None:

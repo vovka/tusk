@@ -6,11 +6,11 @@ from shells.voice.gate_action import GateAction
 from shells.voice.gate_dispatch import GateDispatch
 from shells.voice.interfaces.gatekeeper import Gatekeeper
 from shells.voice.recovery_decision import RecoveryDecision
-from shells.voice.stages.command_gate_prompt import build_command_gate_prompt
-from shells.voice.stages.gate_llm_client import GateLLMClient
-from shells.voice.stages.gatekeeper_support import fallback_dispatch, has_wake_word, recovered_dispatch, recovery_worthwhile, to_utterance
-from shells.voice.stages.recent_context_formatter import RecentContextFormatter
-from shells.voice.stages.recovery_gate_prompt import build_recovery_gate_prompt
+from shells.voice.stages.gate.command_gate_prompt import build_command_gate_prompt
+from shells.voice.stages.gate.llm_client import LLMClient
+from shells.voice.stages.gate.gatekeeper_support import fallback_dispatch, has_wake_word, recovered_dispatch, recovery_worthwhile, to_utterance
+from shells.voice.stages.gate.recent_context_formatter import RecentContextFormatter
+from shells.voice.stages.gate.recovery_gate_prompt import build_recovery_gate_prompt
 from tusk.shared.llm.interfaces.llm_provider import LLMProvider
 from tusk.shared.logging.interfaces.log_printer import LogPrinter
 from tusk.shared.schemas import GateClassification, GateResult, Utterance
@@ -29,7 +29,7 @@ class LLMGatekeeper(Gatekeeper):
         is_busy: Callable[[], bool] | None = None,
         current_speech_text: Callable[[], str | None] | None = None,
     ) -> None:
-        self._client = GateLLMClient(llm_provider, log_printer)
+        self._client = LLMClient(llm_provider, log_printer)
         self._formatter = formatter or RecentContextFormatter()
         self._time = time_source
         self._window = follow_up_window_seconds

@@ -1,15 +1,15 @@
 from shells.voice.buffered_utterance import BufferedUtterance
 from shells.voice.recovery_decision import RecoveryDecision
-from shells.voice.stages.gatekeeper_parser import parse_gate_result, parse_recovery_decision
-from shells.voice.stages.gatekeeper_support import PRIMARY_SCHEMA, RECOVERY_SCHEMA, log_gate_result, log_recovery, normalize_recovery
+from shells.voice.stages.gate.gatekeeper_parser import parse_gate_result, parse_recovery_decision
+from shells.voice.stages.gate.gatekeeper_support import PRIMARY_SCHEMA, RECOVERY_SCHEMA, log_gate_result, log_recovery, normalize_recovery
 from tusk.shared.llm.interfaces.llm_provider import LLMProvider
 from tusk.shared.logging.interfaces.log_printer import LogPrinter
 from tusk.shared.schemas import GateResult
 
-__all__ = ["GateLLMClient"]
+__all__ = ["LLMClient"]
 
 
-class GateLLMClient:
+class LLMClient:
     """Runs the gatekeeper LLM calls and turns raw output into parsed, logged results."""
 
     def __init__(self, llm_provider: LLMProvider, log_printer: LogPrinter) -> None:
