@@ -6,8 +6,7 @@ from pathlib import Path
 from shells.voice.command_worker import CommandWorker
 from shells.voice.gatekeeper_slot import GatekeeperSlot
 from shells.voice.playback_gate import PlaybackGate
-from shells.voice.stages.coding_gatekeeper import CodingGatekeeper
-from shells.voice.stages.dictation_gatekeeper import DictationGatekeeper
+from shells.voice.stages.stop_gatekeeper import StopGatekeeper
 from shells.voice.stages.gatekeeper import LLMGatekeeper
 from shells.voice.stages.speech_playback import SpeechPlayback
 from shells.voice.stages.speech_stop_gate import SpeechStopGate
@@ -92,12 +91,12 @@ class ShellLoader:
 
     def _wire_dictation(self, slot: GatekeeperSlot, llm_gk: LLMGatekeeper, gk_llm: object, worker: CommandWorker) -> None:
         gate = ModeGate(gk_llm, "dictation", DICTATION_GATE_PROMPT, self._log)
-        make = lambda: self._guarded(DictationGatekeeper(gate, self._kernel.request_dictation_stop, self._log), gk_llm, worker)
+        make = lambda: self._guarded(StopGatekeeper(gate, self._kernel.request_dictation_stop), gk_llm, worker)
         self._kernel.set_dictation_callbacks(on_start=lambda: slot.swap(make()), on_stop=lambda: slot.swap(llm_gk))
 
     def _wire_coding(self, slot: GatekeeperSlot, llm_gk: LLMGatekeeper, gk_llm: object, worker: CommandWorker) -> None:
         gate = ModeGate(gk_llm, "coding", CODING_GATE_PROMPT, self._log)
-        make = lambda: self._guarded(CodingGatekeeper(gate, self._kernel.request_coding_stop, self._log), gk_llm, worker)
+        make = lambda: self._guarded(StopGatekeeper(gate, self._kernel.request_coding_stop), gk_llm, worker)
         self._kernel.set_coding_callbacks(on_start=lambda: slot.swap(make()), on_stop=lambda: slot.swap(llm_gk))
 
     def _guarded(self, inner: object, gk_llm: object, worker: CommandWorker) -> PlaybackGate:

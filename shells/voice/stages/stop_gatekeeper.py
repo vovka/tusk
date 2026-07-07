@@ -5,14 +5,15 @@ from shells.voice.gate_dispatch import GateDispatch
 from shells.voice.interfaces.gatekeeper import Gatekeeper
 from tusk.shared.schemas.utterance import Utterance
 
-__all__ = ["DictationGatekeeper"]
+__all__ = ["StopGatekeeper"]
 
 
-class DictationGatekeeper(Gatekeeper):
-    def __init__(self, dictation_gate: object, stop_callback: Callable[[], None], log: object) -> None:
-        self._gate = dictation_gate
+class StopGatekeeper(Gatekeeper):
+    """Forward-all gatekeeper for an active mode: only a stop intent breaks the flow."""
+
+    def __init__(self, gate: object, stop_callback: Callable[[], None]) -> None:
+        self._gate = gate
         self._stop = stop_callback
-        self._log = log
 
     def process(
         self,
