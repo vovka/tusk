@@ -1,5 +1,7 @@
 import types
 
+import pytest
+
 import shell_loader
 from shell_loader import ShellLoader
 from tusk.shared.interrupt import InterruptToken
@@ -52,6 +54,17 @@ def test_command_worker_receives_tts_engine_when_enabled(monkeypatch) -> None:
     loader._gatekeeper = lambda worker: None
     loader._load_class = lambda name: _voice_class()
     assert loader._build("voice").worker._tts is sentinel
+
+
+def test_registry_resolves_every_shell_without_manifests() -> None:
+    loader = _loader(["cli"])
+    names = {name: loader._load_class(name).__name__ for name in ("cli", "emulator", "tray", "voice")}
+    assert names == {"cli": "CLIShell", "emulator": "EmulatorShell", "tray": "TrayShell", "voice": "VoiceShell"}
+
+
+def test_unknown_shell_name_is_rejected() -> None:
+    with pytest.raises(ValueError):
+        _loader(["cli"])._load_class("bogus")
 
 
 def test_voice_shell_receives_configured_stt_engine(monkeypatch) -> None:

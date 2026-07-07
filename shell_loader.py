@@ -1,8 +1,8 @@
-import importlib.util
-import json
 import threading
-from pathlib import Path
 
+from shells.cli.cli_shell import CLIShell
+from shells.emulator.emulator_shell import EmulatorShell
+from shells.tray.tray_shell import TrayShell
 from shells.voice.command_worker import CommandWorker
 from shells.voice.gatekeeper_slot import GatekeeperSlot
 from shells.voice.playback_gate import PlaybackGate
@@ -10,6 +10,7 @@ from shells.voice.stages.stop_gatekeeper import StopGatekeeper
 from shells.voice.stages.gatekeeper import LLMGatekeeper
 from shells.voice.stages.speech_playback import SpeechPlayback
 from shells.voice.stages.speech_stop_gate import SpeechStopGate
+from shells.voice.voice_shell import VoiceShell
 from tusk.kernel.coding_gate_prompt import CODING_GATE_PROMPT
 from tusk.kernel.dictation_gate_prompt import DICTATION_GATE_PROMPT
 from tusk.kernel.mode_gate import ModeGate
@@ -105,14 +106,10 @@ class ShellLoader:
         return PlaybackGate(inner, lambda: worker.current_speech_text, SpeechStopGate(gk_llm, self._log))
 
     def _load_class(self, name: str) -> object:
-        manifest = json.loads((Path("shells") / name / "shell.json").read_text())
-        module = self._load_module(name, manifest["entry_module"])
-        return getattr(module, manifest["entry_class"])
+        try:
+            return _SHELL_CLASSES[name]
+        except KeyError:
+            raise ValueError(f"unknown shell: {name!r}") from None
 
-    def _load_module(self, name: str, module_name: str) -> object:
-        path = Path("shells") / name / f"{module_name}.py"
-        spec = importlib.util.spec_from_file_location(f"shells.{name}.{module_name}", path)
-        module = importlib.util.module_from_spec(spec)
-        assert spec.loader is not None
-        spec.loader.exec_module(module)
-        return module
+
+_SHELL_CLASSES = {"cli": CLIShell, "emulator": EmulatorShell, "tray": TrayShell, "voice": VoiceShell}
