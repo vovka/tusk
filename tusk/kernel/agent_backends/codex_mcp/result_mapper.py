@@ -1,10 +1,10 @@
 from tusk.kernel.agent_backends.agent_request import AgentRequest
 from tusk.kernel.agent_backends.agent_result import AgentResult
 
-__all__ = ["CodexMcpResultMapper"]
+__all__ = ["ResultMapper"]
 
 
-class CodexMcpResultMapper:
+class ResultMapper:
     """Maps codex mcp-server tool-call payloads onto AgentResult.
 
     The codex threadId becomes AgentResult.session_id, which CommandMode feeds

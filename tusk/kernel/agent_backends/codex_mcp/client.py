@@ -1,12 +1,12 @@
 import json
 
-from tusk.kernel.agent_backends.codex_mcp_response_reader import CodexMcpResponseReader
+from tusk.kernel.agent_backends.codex_mcp.response_reader import ResponseReader
 from tusk.shared.mcp.mcp_stdio_transport import MCPStdioTransport
 
-__all__ = ["CodexMcpClient"]
+__all__ = ["Client"]
 
 
-class CodexMcpClient:
+class Client:
     """One persistent `codex mcp-server` process spoken to over stdio JSON-RPC.
 
     codex rejects an `initialize` without clientInfo, so the handshake here is
@@ -16,7 +16,7 @@ class CodexMcpClient:
 
     def __init__(self, command: list[str], cwd: str, timeout_seconds: float) -> None:
         self._transport = MCPStdioTransport(command, cwd, None, timeout_seconds)
-        self._reader = CodexMcpResponseReader(self._transport)
+        self._reader = ResponseReader(self._transport)
         self._next_id = 0
         self._handshake()
 

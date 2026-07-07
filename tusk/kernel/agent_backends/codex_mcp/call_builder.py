@@ -1,7 +1,7 @@
-__all__ = ["CodexMcpCallBuilder"]
+__all__ = ["CallBuilder"]
 
 
-class CodexMcpCallBuilder:
+class CallBuilder:
     """Builds the (tool_name, arguments) pair for a codex mcp-server turn."""
 
     def __init__(self, config: object) -> None:

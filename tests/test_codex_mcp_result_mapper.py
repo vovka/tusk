@@ -1,9 +1,9 @@
 from tusk.kernel.agent_backends.agent_request import AgentRequest
-from tusk.kernel.agent_backends.codex_mcp_result_mapper import CodexMcpResultMapper
+from tusk.kernel.agent_backends.codex_mcp.result_mapper import ResultMapper
 
 
-def mapper() -> CodexMcpResultMapper:
-    return CodexMcpResultMapper("codex_mcp")
+def mapper() -> ResultMapper:
+    return ResultMapper("codex_mcp")
 
 
 def request(session_id: str = "") -> AgentRequest:

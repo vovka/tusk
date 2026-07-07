@@ -1,9 +1,9 @@
 import json
 
-__all__ = ["CodexMcpResponseReader"]
+__all__ = ["ResponseReader"]
 
 
-class CodexMcpResponseReader:
+class ResponseReader:
     """Reads id-correlated JSON-RPC responses from a codex mcp-server transport.
 
     codex emits `codex/event` notifications between a request and its response;
