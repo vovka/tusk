@@ -82,10 +82,18 @@ def _listening_socket() -> socket.socket:
     if os.path.exists(_SOCKET_PATH):
         os.unlink(_SOCKET_PATH)
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        _bind_and_listen(sock)
+    except OSError:
+        sock.close()
+        raise
+    return sock
+
+
+def _bind_and_listen(sock: socket.socket) -> None:
     sock.bind(_SOCKET_PATH)
     os.chmod(_SOCKET_PATH, 0o700)
     sock.listen(_BACKLOG)
-    return sock
 
 
 def main() -> None:
