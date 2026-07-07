@@ -1,4 +1,4 @@
-from tusk.kernel import CommandMode, KernelAPI, LLMConversationSummarizer, MainAgent, SlidingWindowHistory, ToolRegistry
+from tusk.kernel import CommandMode, KernelAPI, MainAgent, SlidingWindowHistory, ToolRegistry
 from tusk.kernel.adapter_manager import AdapterManager
 from tusk.kernel.agent import AgentOrchestrator, FileAgentSessionStore
 from tusk.kernel.agent_backends import AgentBackendFactory
@@ -14,7 +14,7 @@ from tusk.shared.status import StatusReporterHub
 def build_kernel(config: Config, log: ColorLogPrinter, llm_registry: LLMRegistry, reporter: StatusReporterHub, token: InterruptToken | None = None) -> KernelAPI:
     tool_registry = ToolRegistry()
     adapter_manager = build_adapter_manager(config, log, tool_registry)
-    history = SlidingWindowHistory(20, LLMConversationSummarizer(llm_registry.get("utility")))
+    history = SlidingWindowHistory(20)
     agent = build_agent(config, log, llm_registry, tool_registry, history, token)
     kernel = build_api(agent, config, log, llm_registry, reporter, token)
     ToolRuntime(tool_registry, llm_registry, adapter_manager, log, reporter).register_tools(kernel)

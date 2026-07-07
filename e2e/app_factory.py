@@ -1,5 +1,5 @@
 import main as app_main
-from tusk.kernel import CommandMode, KernelAPI, LLMConversationSummarizer, MainAgent, SlidingWindowHistory, ToolRegistry
+from tusk.kernel import CommandMode, KernelAPI, MainAgent, SlidingWindowHistory, ToolRegistry
 from tusk.kernel.agent import AgentOrchestrator, FileAgentSessionStore
 from tusk.kernel.agent_profiles import build_agent_profiles
 from tusk.shared.config import Config, StartupOptions
@@ -21,7 +21,7 @@ def build_app() -> tuple[KernelAPI, InterruptToken, ColorLogPrinter]:
 
 
 def _kernel(config: Config, log: ColorLogPrinter, registry: LLMRegistry, token: InterruptToken) -> KernelAPI:
-    history = SlidingWindowHistory(20, LLMConversationSummarizer(registry.get("utility")))
+    history = SlidingWindowHistory(20)
     store = FileAgentSessionStore(config.agent_session_log_dir)
     orchestrator = AgentOrchestrator(build_agent_profiles(registry), ToolRegistry(), store, log, token)
     return KernelAPI(CommandMode(MainAgent(orchestrator, history), log), registry, log, None, token)
