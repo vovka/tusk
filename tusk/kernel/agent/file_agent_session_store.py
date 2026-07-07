@@ -6,15 +6,20 @@ from pathlib import Path
 from tusk.kernel.agent.agent_result import AgentResult
 from tusk.kernel.agent.agent_session_store import AgentSessionStore
 from tusk.kernel.agent.session_event_formatter import SessionEventFormatter
-from tusk.kernel.agent.session_event_reader import SessionEventReader
 
 __all__ = ["FileAgentSessionStore"]
+
+
+def _read_events(path: Path) -> list[dict[str, object]]:
+    if not path.exists():
+        return []
+    lines = path.read_text().strip().splitlines()
+    return [json.loads(line) for line in lines if line.strip()]
 
 
 class FileAgentSessionStore(AgentSessionStore):
     def __init__(self, base_dir: str) -> None:
         self._base = Path(base_dir)
-        self._reader = SessionEventReader()
         self._formatter = SessionEventFormatter()
 
     def create_session_id(self) -> str:
@@ -41,15 +46,15 @@ class FileAgentSessionStore(AgentSessionStore):
             handle.write(json.dumps(entry) + "\n")
 
     def conversation_messages(self, session_id: str) -> list[dict[str, str]]:
-        events = self._reader.read(self._path(session_id))
+        events = _read_events(self._path(session_id))
         return [event["data"] for event in events if event.get("event_type") == "message_appended"]
 
     def session_digest(self, session_id: str) -> str:
-        events = self._reader.read(self._path(session_id))
+        events = _read_events(self._path(session_id))
         return self._formatter.digest(events)
 
     def final_result(self, session_id: str) -> AgentResult | None:
-        events = self._reader.read(self._path(session_id))
+        events = _read_events(self._path(session_id))
         return self._formatter.result(events)
 
     def _path(self, session_id: str) -> Path:

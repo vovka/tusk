@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 from tusk.shared.schemas.tool_call import ToolCall
 from tusk.shared.schemas.tool_result import ToolResult
 from tusk.kernel.tool_registry import ToolRegistry
@@ -12,7 +14,6 @@ from tusk.kernel.agent.agent_tool_catalog import AgentToolCatalog
 from tusk.kernel.agent.agent_toolset_builder import AgentToolsetBuilder
 from tusk.kernel.agent.executor_tool_guard import ExecutorToolGuard
 from tusk.kernel.agent.orchestrator_tool_dispatcher import OrchestratorToolDispatcher
-from tusk.kernel.agent.planner_request_enricher import PlannerRequestEnricher
 from tusk.kernel.agent.planner_result_validator import PlannerResultValidator
 from tusk.kernel.agent.planner_runtime_tool_resolver import PlannerRuntimeToolResolver
 from tusk.kernel.agent.tool_sequence_executor import ToolSequenceExecutor
@@ -40,7 +41,6 @@ class AgentOrchestrator:
         self._guard = AgentRunGuard()
         self._children = AgentChildRunner(store)
         self._executor_tools = ExecutorToolGuard()
-        self._planner_request = PlannerRequestEnricher()
         self._catalog = AgentToolCatalog(registry)
         self._planner_results = PlannerResultValidator(log)
         self._resolved_tools = PlannerRuntimeToolResolver(store)
@@ -70,8 +70,13 @@ class AgentOrchestrator:
         return None
 
     def _prepared(self, request: AgentRunRequest) -> AgentRunRequest:
-        request = self._planner_request.enrich(request, self._catalog.prompt_text())
+        request = self._enrich_planner(request)
         return self._resolved_tools.resolve(request, self._registry.real_tool_names())
+
+    def _enrich_planner(self, request: AgentRunRequest) -> AgentRunRequest:
+        if request.profile_id != "planner":
+            return request
+        return replace(request, instruction=f"{request.instruction}\n{self._catalog.prompt_text()}")
 
     def _check_executor(self, profile: AgentProfile, request: AgentRunRequest) -> AgentResult | None:
         names = self._tools.runtime_names(profile, request)
