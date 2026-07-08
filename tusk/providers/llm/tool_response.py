@@ -6,9 +6,10 @@ __all__ = ["message_content", "needs_tool_fallback", "tool_or_done"]
 
 
 def message_content(response: object) -> str:
-    content = response.choices[0].message.content
+    choice = response.choices[0]
+    content = choice.message.content
     if not isinstance(content, str) or not content.strip():
-        raise RuntimeError("empty completion from provider")
+        raise RuntimeError(f"empty completion from provider (finish_reason={getattr(choice, 'finish_reason', None)})")
     return content
 
 

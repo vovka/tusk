@@ -50,7 +50,7 @@ class LLMClient:
         except Exception as exc:
             self._log.log("GATEKEEPER", f"{name} structured output failed: {exc}", "gatekeeper")
         try:
-            return self._llm.complete(prompt, text, 256)
+            return self._llm.complete(prompt, text, 512)
         except Exception as exc:
             self._log.log("ERROR", f"{name} fallback completion failed: {exc}")
             return ""
