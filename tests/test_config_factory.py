@@ -86,6 +86,18 @@ def test_tts_can_be_disabled(monkeypatch) -> None:
     assert ConfigFactory().build().tts_enabled is False
 
 
+def test_ack_enabled_by_default(monkeypatch) -> None:
+    monkeypatch.setenv("GROQ_API_KEY", "test-key")
+    monkeypatch.delenv("TUSK_ACK", raising=False)
+    assert ConfigFactory().build().ack_enabled is True
+
+
+def test_ack_can_be_disabled(monkeypatch) -> None:
+    monkeypatch.setenv("GROQ_API_KEY", "test-key")
+    monkeypatch.setenv("TUSK_ACK", "off")
+    assert ConfigFactory().build().ack_enabled is False
+
+
 def test_config_defaults_tray_icon_theme_and_activity(monkeypatch) -> None:
     monkeypatch.setenv("GROQ_API_KEY", "test-key")
     monkeypatch.delenv("TUSK_TRAY_ICON_THEME", raising=False)
