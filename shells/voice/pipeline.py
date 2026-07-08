@@ -40,7 +40,7 @@ class VoicePipeline:
         self._reporter = reporter
         self._on_interrupt = on_interrupt
 
-    def run(self, submit: Callable[[str, str], KernelResponse]) -> Iterator[KernelResponse]:
+    def run(self, submit: Callable[[str, str], KernelResponse | None]) -> Iterator[KernelResponse]:
         self._report(AppStatus.LISTENING)
         stop = threading.Event()
         utterances: queue.Queue[Utterance | Exception | None] = queue.Queue()
@@ -51,7 +51,7 @@ class VoicePipeline:
             stop.set()
 
     def _consume(
-        self, utterances: "queue.Queue[Utterance | Exception | None]", submit: Callable[[str, str], KernelResponse],
+        self, utterances: "queue.Queue[Utterance | Exception | None]", submit: Callable[[str, str], KernelResponse | None],
     ) -> Iterator[KernelResponse]:
         while (item := utterances.get()) is not None:
             if isinstance(item, Exception):
@@ -65,7 +65,7 @@ class VoicePipeline:
         if self._reporter is not None:
             self._reporter.set_status(status, detail)
 
-    def _submit(self, text: str, refrain: str, submit: Callable[[str, str], KernelResponse]) -> KernelResponse:
+    def _submit(self, text: str, refrain: str, submit: Callable[[str, str], KernelResponse | None]) -> KernelResponse | None:
         self._report(AppStatus.REACTING, text)
         return submit(text, refrain)
 
@@ -81,7 +81,7 @@ class VoicePipeline:
         except Exception as exc:
             utterances.put(exc)
 
-    def _handle_utterance(self, utterance: Utterance, submit: Callable[[str, str], KernelResponse]) -> KernelResponse | None:
+    def _handle_utterance(self, utterance: Utterance, submit: Callable[[str, str], KernelResponse | None]) -> KernelResponse | None:
         transcribed = self._transcriber.process(utterance)
         sanitized = self._sanitizer.process(transcribed)
         if sanitized is None:
@@ -93,7 +93,7 @@ class VoicePipeline:
         candidates = self._buffer.recoverable(self._recovery_limit, self._recovery_window)
         return self._dispatch(self._gatekeeper.process(buffered, recent, candidates), buffered.id, submit)
 
-    def _dispatch(self, result: GateDispatch, current_id: str, submit: Callable[[str, str], KernelResponse]) -> KernelResponse | None:
+    def _dispatch(self, result: GateDispatch, current_id: str, submit: Callable[[str, str], KernelResponse | None]) -> KernelResponse | None:
         if result.action == GateAction.INTERRUPT:
             return self._interrupt(current_id)
         if result.action == GateAction.DROP or result.text is None:
