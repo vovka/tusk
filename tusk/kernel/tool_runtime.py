@@ -1,6 +1,8 @@
 from tusk.kernel.full_replace_edit_strategy import FullReplaceEditStrategy
 from tusk.kernel.input_automation_editor_driver import InputAutomationEditorDriver
 from tusk.kernel.internal_tools import CodingRouter, DictationRouter, StartCodingTool, StartDictationTool, SwitchModelTool
+from tusk.kernel.line_anchored_edit_strategy import LineAnchoredEditStrategy
+from tusk.kernel.verified_edit_strategy import VerifiedEditStrategy
 
 __all__ = ["ToolRuntime"]
 
@@ -21,5 +23,6 @@ class ToolRuntime:
 
     def _register_coding(self, controller: object) -> None:
         driver = InputAutomationEditorDriver(self._registry, self._manager.primary_desktop_source())
-        controller.attach_coding_router(CodingRouter(self._registry, controller, driver, FullReplaceEditStrategy(), self._log))
+        strategy = VerifiedEditStrategy(LineAnchoredEditStrategy(), FullReplaceEditStrategy())
+        controller.attach_coding_router(CodingRouter(self._registry, controller, driver, strategy, self._log))
         self._registry.register(StartCodingTool(self._registry, controller, self._manager, driver))
