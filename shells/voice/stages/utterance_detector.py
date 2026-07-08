@@ -35,27 +35,42 @@ class UtteranceDetector:
     def stream_utterances(self) -> Iterator[Utterance]:
         voiced_frames: list[bytes] = []
         silence_count = 0
+        speech_run = 0
         for frame in self._audio.stream_frames():
-            is_speech = self._vad.is_speech(frame, self._sample_rate)
-            if is_speech:
-                voiced_frames, silence_count = self._on_speech(voiced_frames, silence_count, frame)
-            elif voiced_frames:
-                voiced_frames, silence_count, utterance = self._on_silence(voiced_frames, silence_count)
-                if utterance is not None:
-                    yield utterance
+            voiced_frames, silence_count, speech_run, utterance = self._process_frame(
+                voiced_frames, silence_count, speech_run, frame,
+            )
+            if utterance is not None:
+                yield utterance
+
+    def _process_frame(
+        self, voiced_frames: list[bytes], silence_count: int, speech_run: int, frame: bytes,
+    ) -> tuple[list[bytes], int, int, Utterance | None]:
+        if self._vad.is_speech(frame, self._sample_rate):
+            speech_run += 1
+            voiced_frames, silence_count = self._on_speech(voiced_frames, silence_count, speech_run, frame)
+            return voiced_frames, silence_count, speech_run, None
+        if not voiced_frames:
+            return voiced_frames, silence_count, 0, None
+        voiced_frames, silence_count, utterance = self._on_silence(voiced_frames, silence_count)
+        return voiced_frames, silence_count, 0, utterance
 
     def _build_utterance(self, frames: list[bytes]) -> Utterance:
         raw = b"".join(frames)
         duration = len(frames) * self._frame_seconds
         return Utterance(text="", audio_frames=raw, duration_seconds=duration)
 
-    def _on_speech(self, voiced_frames: list[bytes], silence_count: int, frame: bytes) -> tuple[list[bytes], int]:
+    def _on_speech(
+        self, voiced_frames: list[bytes], silence_count: int, speech_run: int, frame: bytes,
+    ) -> tuple[list[bytes], int]:
         if not voiced_frames:
             self._log.log("DETECTOR", "speech started", "detector")
         voiced_frames.append(frame)
-        # ponytail: a lone VAD false-positive dents the trailing-silence run by 1, not to 0, so
-        # ambient blips can't stretch endpointing to ~10s. Ceiling: heavy noise → raise VAD_AGGRESSIVENESS.
-        return voiced_frames, max(0, silence_count - 1)
+        # ponytail: a lone VAD false-positive dents the trailing-silence run by 1 instead of
+        # resetting it, so ambient blips can't stretch endpointing to ~10s. Sustained speech
+        # (2+ consecutive frames) still resets fully. Ceiling: heavy noise → raise VAD_AGGRESSIVENESS.
+        new_silence_count = 0 if speech_run >= 2 else max(0, silence_count - 1)
+        return voiced_frames, new_silence_count
 
     def _on_silence(self, voiced_frames: list[bytes], silence_count: int) -> tuple[list[bytes], int, Utterance | None]:
         silence_count += 1
