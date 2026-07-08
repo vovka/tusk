@@ -60,9 +60,9 @@ class VoiceE2EHarness:
     def _wrap_enqueue(self) -> None:
         inner = self.worker.enqueue
 
-        def enqueue(text: str) -> None:
+        def enqueue(text: str, refrain: str = "") -> None:
             self.enqueued.append(text)
-            inner(text)
+            inner(text, refrain)
 
         self.worker.enqueue = enqueue
 

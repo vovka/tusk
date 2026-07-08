@@ -22,14 +22,14 @@ def test_capture_keeps_running_while_submit_is_busy() -> None:
 def test_pipeline_propagates_capture_failures() -> None:
     pipeline = _pipeline(_failing_detector())
     with pytest.raises(RuntimeError, match="microphone unplugged"):
-        list(pipeline.run(lambda text: KernelResponse(True, "done")))
+        list(pipeline.run(lambda text, refrain="": KernelResponse(True, "done")))
 
 
 def test_capture_thread_stops_when_generator_is_closed() -> None:
     proceed = threading.Event()
     pipeline = _pipeline(_endless_detector(proceed))
     before = set(threading.enumerate())
-    generator = pipeline.run(lambda text: KernelResponse(True, "done"))
+    generator = pipeline.run(lambda text, refrain="": KernelResponse(True, "done"))
     next(generator)
     capture_thread = (set(threading.enumerate()) - before).pop()
     generator.close()
@@ -76,7 +76,7 @@ def _endless_detector(proceed: threading.Event) -> object:
 
 
 def _busy_submitter(drained: threading.Event, submits: list[str]) -> object:
-    def submit(text: str) -> KernelResponse:
+    def submit(text: str, refrain: str = "") -> KernelResponse:
         assert drained.wait(timeout=5.0), "capture stalled while the agent was busy"
         submits.append(text)
         return KernelResponse(True, "done")

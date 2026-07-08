@@ -21,13 +21,15 @@ class CommandWorker:
         playback: SpeechPlayback,
         log_printer: LogPrinter,
         interrupt_token: InterruptToken,
+        ack_enabled: bool = True,
     ) -> None:
         self._submit = submit
         self._tts = tts_engine
         self._playback = playback
         self._log = log_printer
         self._token = interrupt_token
-        self._queue: queue.Queue[str] = queue.Queue()
+        self._ack_enabled = ack_enabled
+        self._queue: queue.Queue[tuple[str, str]] = queue.Queue()
         self._busy = threading.Event()
         self._speech_text: str | None = None
 
@@ -35,8 +37,8 @@ class CommandWorker:
         # ponytail: daemon thread, no shutdown protocol — the app runs until process exit
         threading.Thread(target=self._run, daemon=True).start()
 
-    def enqueue(self, text: str) -> None:
-        self._queue.put(text)
+    def enqueue(self, text: str, refrain: str = "") -> None:
+        self._queue.put((text, refrain))
 
     def flush(self) -> None:
         while True:
@@ -55,22 +57,30 @@ class CommandWorker:
 
     def _run(self) -> None:
         while True:
-            text = self._queue.get()
+            text, refrain = self._queue.get()
             self._busy.set()
             try:
-                self._execute(text)
+                self._execute(text, refrain)
             except Exception as exc:
                 self._log.log("ERROR", f"command failed: {exc}")
             finally:
                 self._busy.clear()
 
-    def _execute(self, text: str) -> None:
+    def _execute(self, text: str, refrain: str) -> None:
         self._token.clear()
+        self._announce(refrain)
         response = self._submit(text)
         reply = self._reply_for(response)
         if reply:
             self._log.log("TUSK", reply)
             self._speak(reply)
+
+    def _announce(self, refrain: str) -> None:
+        # spoken refrain of the request so the user hears TUSK engage before the work runs
+        if not (self._ack_enabled and refrain):
+            return
+        self._log.log("TUSK", refrain)
+        self._speak(refrain)
 
     def _reply_for(self, response: KernelResponse) -> str:
         # an interrupt during the run means the user wants silence: confirm briefly, never read a stale reply

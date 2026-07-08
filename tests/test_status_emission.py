@@ -39,7 +39,7 @@ def test_start_and_stop_dictation_toggle_mode() -> None:
 def test_pipeline_emits_listening_then_reacting_around_submit() -> None:
     hub, published = _hub()
     pipeline = _pipeline(hub)
-    list(pipeline.run(lambda text: KernelResponse(True, "done")))
+    list(pipeline.run(lambda text, refrain="": KernelResponse(True, "done")))
     assert [s.status for s in published] == [AppStatus.LISTENING, AppStatus.REACTING, AppStatus.LISTENING]
 
 

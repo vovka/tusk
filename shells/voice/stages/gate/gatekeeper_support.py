@@ -24,8 +24,8 @@ _REFERENCE_CUES = frozenset({"that", "those", "this", "these", "previous", "last
 
 PRIMARY_SCHEMA = {
     "type": "object",
-    "properties": {"classification": {"type": "string", "enum": ["command", "conversation", "ambient", "interrupt"]}, "cleaned_text": {"type": "string"}, "reason": {"type": "string"}},
-    "required": ["classification", "cleaned_text", "reason"],
+    "properties": {"classification": {"type": "string", "enum": ["command", "conversation", "ambient", "interrupt"]}, "cleaned_text": {"type": "string"}, "intent": {"type": "string"}, "reason": {"type": "string"}},
+    "required": ["classification", "cleaned_text", "intent", "reason"],
     "additionalProperties": False,
 }
 RECOVERY_SCHEMA = {
@@ -47,7 +47,7 @@ def recovered_dispatch(candidates: list[BufferedUtterance], decision: RecoveryDe
 
 def fallback_dispatch(result: GateResult, utterance: Utterance, wake_word: bool) -> GateDispatch:
     if result.classification == GateClassification.CONVERSATION and wake_word:
-        return GateDispatch(GateAction.FORWARD_CURRENT, result.cleaned_command or utterance.text)
+        return GateDispatch(GateAction.FORWARD_CURRENT, result.cleaned_command or utterance.text, intent=result.intent)
     return GateDispatch(GateAction.DROP)
 
 
