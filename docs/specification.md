@@ -976,7 +976,7 @@ so coding mode never destroys clipboard contents the user was holding.
 ### 19.5 EditApplicationStrategy — `tusk/kernel/interfaces/edit_application_strategy.py`
 
 One strategy is implemented and wired: **`FullReplaceEditStrategy`**
-(`tusk/kernel/modes/full_replace_edit_strategy.py`) —
+(`tusk/kernel/modes/edit_strategies/full_replace_edit_strategy.py`) —
 `driver.replace_buffer(edit.full_buffer)`, i.e. select-all + paste the authoritative
 buffer. It is drift-proof for a fire-and-forget input-automation driver: the editor
 always ends up exactly matching the adapter's model. (Line-anchored/raw-key/fallback

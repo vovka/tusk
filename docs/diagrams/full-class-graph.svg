@@ -1030,9 +1030,9 @@
 <polyline fill="none" stroke="black" points="7758.88,-5399.31 7919.88,-5399.31 "/>
 <text text-anchor="start" x="7836.88" y="-5384.11" font-family="Times,serif" font-size="14.00"> </text>
 </g>
-<!-- tusk.kernel.modes.full_replace_edit_strategy.FullReplaceEditStrategy -->
+<!-- tusk.kernel.modes.edit_strategies.full_replace_edit_strategy.FullReplaceEditStrategy -->
 <g id="node72" class="node">
-<title>tusk.kernel.modes.full_replace_edit_strategy.FullReplaceEditStrategy</title>
+<title>tusk.kernel.modes.edit_strategies.full_replace_edit_strategy.FullReplaceEditStrategy</title>
 <polygon fill="none" stroke="black" points="7968.88,-5397.41 7968.88,-5468.21 8371.88,-5468.21 8371.88,-5397.41 7968.88,-5397.41"/>
 <text text-anchor="start" x="8081.88" y="-5453.01" font-family="Times,serif" font-size="14.00">FullReplaceEditStrategy</text>
 <polyline fill="none" stroke="black" points="7968.88,-5445.21 8371.88,-5445.21 "/>
@@ -1049,9 +1049,9 @@
 <text text-anchor="start" x="8147.88" y="-6428.71" font-family="Times,serif" font-style="italic" font-size="14.00">apply</text>
 <text text-anchor="start" x="8187.88" y="-6428.71" font-family="Times,serif" font-size="14.00">(edit: EditOperation, driver: EditorDriver): None</text>
 </g>
-<!-- tusk.kernel.modes.full_replace_edit_strategy.FullReplaceEditStrategy&#45;&gt;tusk.kernel.interfaces.edit_application_strategy.EditApplicationStrategy -->
+<!-- tusk.kernel.modes.edit_strategies.full_replace_edit_strategy.FullReplaceEditStrategy&#45;&gt;tusk.kernel.interfaces.edit_application_strategy.EditApplicationStrategy -->
 <g id="edge23" class="edge">
-<title>tusk.kernel.modes.full_replace_edit_strategy.FullReplaceEditStrategy&#45;&gt;tusk.kernel.interfaces.edit_application_strategy.EditApplicationStrategy</title>
+<title>tusk.kernel.modes.edit_strategies.full_replace_edit_strategy.FullReplaceEditStrategy&#45;&gt;tusk.kernel.interfaces.edit_application_strategy.EditApplicationStrategy</title>
 <path fill="none" stroke="black" d="M8176.33,-5468.3C8202.25,-5622.81 8305.22,-6236.74 8334.24,-6409.73"/>
 <polygon fill="none" stroke="black" points="8330.81,-6410.48 8335.92,-6419.77 8337.72,-6409.33 8330.81,-6410.48"/>
 </g>
