@@ -21,6 +21,14 @@ def test_utterance_duration_uses_configured_frame_length(monkeypatch) -> None:
     assert utterance.duration_seconds == 5 * 0.020
 
 
+def test_isolated_speech_blip_does_not_restart_silence(monkeypatch) -> None:
+    monkeypatch.setattr(utterance_detector, "webrtcvad", types.SimpleNamespace(Vad=_FakeVad))
+    frames = [b"speech"] * 5 + [b"silence"] * 15 + [b"speech"] + [b"silence"] * 15
+    audio = types.SimpleNamespace(stream_frames=lambda: iter(frames))
+    detector = utterance_detector.UtteranceDetector(audio, 16000, 2, _log([]))
+    assert len(list(detector.stream_utterances())) == 1
+
+
 class _FakeVad:
     def __init__(self, aggressiveness: int) -> None:
         self._aggressiveness = aggressiveness

@@ -38,7 +38,7 @@ class UtteranceDetector:
         for frame in self._audio.stream_frames():
             is_speech = self._vad.is_speech(frame, self._sample_rate)
             if is_speech:
-                voiced_frames, silence_count = self._on_speech(voiced_frames, frame)
+                voiced_frames, silence_count = self._on_speech(voiced_frames, silence_count, frame)
             elif voiced_frames:
                 voiced_frames, silence_count, utterance = self._on_silence(voiced_frames, silence_count)
                 if utterance is not None:
@@ -49,11 +49,13 @@ class UtteranceDetector:
         duration = len(frames) * self._frame_seconds
         return Utterance(text="", audio_frames=raw, duration_seconds=duration)
 
-    def _on_speech(self, voiced_frames: list[bytes], frame: bytes) -> tuple[list[bytes], int]:
+    def _on_speech(self, voiced_frames: list[bytes], silence_count: int, frame: bytes) -> tuple[list[bytes], int]:
         if not voiced_frames:
             self._log.log("DETECTOR", "speech started", "detector")
         voiced_frames.append(frame)
-        return voiced_frames, 0
+        # ponytail: a lone VAD false-positive dents the trailing-silence run by 1, not to 0, so
+        # ambient blips can't stretch endpointing to ~10s. Ceiling: heavy noise → raise VAD_AGGRESSIVENESS.
+        return voiced_frames, max(0, silence_count - 1)
 
     def _on_silence(self, voiced_frames: list[bytes], silence_count: int) -> tuple[list[bytes], int, Utterance | None]:
         silence_count += 1
