@@ -9,6 +9,10 @@ services:
     environment:
       DISPLAY: ${DISPLAY:-:0}
       XAUTHORITY: /root/.Xauthority
+      # GTK (via pystray appindicator) loads the ATK->AT-SPI bridge at init; there
+      # is no accessibility bus in the container, so it prints a dbind-WARNING.
+      # Nothing consumes a11y here, so skip the bridge entirely.
+      NO_AT_BRIDGE: "1"
       HOME: /tmp
       # pystray writes the tray icon to a tempfile and hands the PATH to the
       # host's panel over D-Bus; point tempfile at the shared mount so the host
