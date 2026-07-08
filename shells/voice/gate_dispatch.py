@@ -10,3 +10,4 @@ class GateDispatch:
     action: GateAction
     text: str | None = None
     recovered_id: str = ""
+    intent: str = ""

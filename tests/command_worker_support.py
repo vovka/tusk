@@ -7,10 +7,10 @@ from tusk.shared.interrupt import InterruptToken
 from tusk.shared.schemas.kernel_response import KernelResponse
 
 
-def make_worker(submit, tts=None, playback=None, token=None, logs=None) -> CommandWorker:
+def make_worker(submit, tts=None, playback=None, token=None, logs=None, ack_enabled=True) -> CommandWorker:
     log = types.SimpleNamespace(log=lambda *args: logs.append(args) if logs is not None else None)
     playback = playback or types.SimpleNamespace(play=lambda wav: None)
-    worker = CommandWorker(submit, tts, playback, log, token or InterruptToken())
+    worker = CommandWorker(submit, tts, playback, log, token or InterruptToken(), ack_enabled)
     worker.start()
     return worker
 

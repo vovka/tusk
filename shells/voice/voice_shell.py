@@ -43,7 +43,7 @@ class VoiceShell:
     def start(self, submit: Callable[[str], KernelResponse]) -> None:
         if self._worker is not None:
             self._worker.start()
-        target = self._worker.enqueue if self._worker is not None else submit
+        target = self._worker.enqueue if self._worker is not None else lambda text, refrain="": submit(text)
         for result in self._pipeline.run(target):
             if not self._running:
                 return

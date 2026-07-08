@@ -719,8 +719,10 @@ selected by name from `TUSK_SHELLS` (default `voice`). There are no shell manife
 - **`VoiceShell`** — builds the `VoicePipeline` from the stage classes and drives it in a
   loop. The forward target is `CommandWorker.enqueue`: the worker thread runs
   `kernel.submit`, logs the reply, and — when TTS is enabled (`TUSK_TTS=on`, default) —
-  speaks it via `SpeechPlayback`. Listening continues while the worker executes, which is
-  what makes voice interrupts possible. Also exposes `pause()`/`resume()` for the tray.
+  speaks it via `SpeechPlayback`. When `TUSK_ACK=on` (default) it first speaks a brief
+  refrain of the request (produced by the gatekeeper) so the user hears TUSK engage before
+  the work runs. Listening continues while the worker executes, which is what makes voice
+  interrupts possible. Also exposes `pause()`/`resume()` for the tray.
   See `shells/voice/README.md`.
 - **`CLIShell`** — stdin REPL: `input("tusk> ")` → `submit(text)` → print reply.
 - **`EmulatorShell`** — replays a scripted transcript into the kernel, standing in for
@@ -812,7 +814,8 @@ via `canopylabs/orpheus-v1-english` (voice `daniel`); `TextChunker` splits repli
 individually because Orpheus streams a placeholder frame count in headers).
 `SpeechPlayback` plays via `paplay`, polling the `InterruptToken` every 100 ms and
 terminating the process on interrupt. TTS + playback run on the `CommandWorker` thread —
-off the STT → gatekeeper hot path entirely.
+off the STT → gatekeeper hot path entirely. The acknowledgment refrain (`TUSK_ACK`) rides
+this same path: it is spoken before the reply and is likewise silent when `TUSK_TTS` is off.
 
 ---
 

@@ -21,7 +21,7 @@ The voice shell uses the gatekeeper to classify utterances, then routes actionab
 - `tusk/kernel/agent/conversation_failure_budget_guard.py`: limits repeated failed executor/default delegations.
 
 ## How It Works
-1. Voice input is classified by `LLMGatekeeper`.
+1. Voice input is classified by `LLMGatekeeper`. Its structured JSON now also carries an `intent` field — a terse present-continuous refrain of the request (e.g. "Opening gedit and inserting a poem") — parsed into `GateResult.intent` and forwarded on the `GateDispatch`. When `TUSK_ACK` is on, `CommandWorker` speaks this refrain before running the command (see `docs/features/spoken-acknowledgment.md`).
 2. Command-like utterances are forwarded into the kernel.
 3. Conversation agent delegates to planner with the tool catalog embedded in the request.
 4. Planner returns `done` with `payload.selected_tool_names`, `payload.execution_mode`, and `payload.planned_steps`.

@@ -11,3 +11,4 @@ class GateResult:
     cleaned_command: str
     confidence: float
     classification: GateClassification = GateClassification.AMBIENT
+    intent: str = ""

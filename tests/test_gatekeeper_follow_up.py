@@ -25,6 +25,20 @@ def test_stale_forward_uses_base_prompt_only() -> None:
     assert "Recent context:" not in prompts[-1]
 
 
+def test_command_dispatch_carries_intent_refrain() -> None:
+    payload = '{"classification":"command","cleaned_text":"open Firefox","intent":"Opening Firefox"}'
+    llm = types.SimpleNamespace(label="gate", complete_structured=lambda prompt, *_args: payload)
+    gatekeeper = LLMGatekeeper(llm, _log())
+    assert gatekeeper.process(_utterance("Tusk open Firefox"), []).intent == "Opening Firefox"
+
+
+def test_conversation_dispatch_carries_intent_refrain() -> None:
+    payload = '{"classification":"conversation","cleaned_text":"tell me a joke","intent":"Telling a joke"}'
+    llm = types.SimpleNamespace(label="gate", complete_structured=lambda prompt, *_args: payload)
+    gatekeeper = LLMGatekeeper(llm, _log())
+    assert gatekeeper.process(_utterance("Tusk tell me a joke"), []).intent == "Telling a joke"
+
+
 def _llm(prompts: list[str]) -> object:
     def complete_structured(prompt: str, *_args) -> str:
         prompts.append(prompt)

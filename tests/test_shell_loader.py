@@ -10,7 +10,7 @@ from tusk.shared.interrupt import InterruptToken
 def _loader(shells: list[str], log: object | None = None, tts_enabled: bool = False, stt_engine: str = "groq") -> ShellLoader:
     config = types.SimpleNamespace(
         shells=shells, groq_api_key="k", follow_up_timeout_seconds=30, tts_enabled=tts_enabled,
-        stt_engine=stt_engine, whisper_model_size="base",
+        ack_enabled=True, stt_engine=stt_engine, whisper_model_size="base",
     )
     kernel = types.SimpleNamespace(
         submit=lambda text: None,

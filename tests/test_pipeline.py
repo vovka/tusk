@@ -25,6 +25,13 @@ def test_pipeline_drops_ambient_speech() -> None:
     assert list(pipeline.run(_submitter([]))) == []
 
 
+def test_pipeline_forwards_intent_refrain() -> None:
+    forwarded: list[tuple[str, str]] = []
+    dispatch = GateDispatch("forward_current", "open Firefox", intent="Opening Firefox")
+    list(_pipeline(dispatch, []).run(_refrain_submitter(forwarded)))
+    assert forwarded == [("open Firefox", "Opening Firefox")]
+
+
 def test_pipeline_submits_recovered_text_and_consumes_current_entry() -> None:
     submits, states = [], []
     dispatch = GateDispatch("forward_recovered", "open Firefox", "u0")
@@ -64,7 +71,11 @@ def _sanitizer() -> object:
 
 
 def _submitter(submits: list[str]) -> object:
-    return lambda text: submits.append(text) or KernelResponse(True, "done")
+    return lambda text, refrain="": submits.append(text) or KernelResponse(True, "done")
+
+
+def _refrain_submitter(forwarded: list[tuple[str, str]]) -> object:
+    return lambda text, refrain="": forwarded.append((text, refrain)) or KernelResponse(True, "done")
 
 
 def _transcriber(text: str) -> object:

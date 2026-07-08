@@ -40,7 +40,7 @@ class VoicePipeline:
         self._reporter = reporter
         self._on_interrupt = on_interrupt
 
-    def run(self, submit: Callable[[str], KernelResponse]) -> Iterator[KernelResponse]:
+    def run(self, submit: Callable[[str, str], KernelResponse | None]) -> Iterator[KernelResponse]:
         self._report(AppStatus.LISTENING)
         stop = threading.Event()
         utterances: queue.Queue[Utterance | Exception | None] = queue.Queue()
@@ -51,7 +51,7 @@ class VoicePipeline:
             stop.set()
 
     def _consume(
-        self, utterances: "queue.Queue[Utterance | Exception | None]", submit: Callable[[str], KernelResponse],
+        self, utterances: "queue.Queue[Utterance | Exception | None]", submit: Callable[[str, str], KernelResponse | None],
     ) -> Iterator[KernelResponse]:
         while (item := utterances.get()) is not None:
             if isinstance(item, Exception):
@@ -65,9 +65,9 @@ class VoicePipeline:
         if self._reporter is not None:
             self._reporter.set_status(status, detail)
 
-    def _submit(self, text: str, submit: Callable[[str], KernelResponse]) -> KernelResponse:
+    def _submit(self, text: str, refrain: str, submit: Callable[[str, str], KernelResponse | None]) -> KernelResponse | None:
         self._report(AppStatus.REACTING, text)
-        return submit(text)
+        return submit(text, refrain)
 
     def _capture_into(self, utterances: "queue.Queue[Utterance | Exception | None]", stop: threading.Event) -> None:
         # ponytail: capture+VAD stay real-time on this thread; STT and the agent run on
@@ -81,7 +81,7 @@ class VoicePipeline:
         except Exception as exc:
             utterances.put(exc)
 
-    def _handle_utterance(self, utterance: Utterance, submit: Callable[[str], KernelResponse]) -> KernelResponse | None:
+    def _handle_utterance(self, utterance: Utterance, submit: Callable[[str, str], KernelResponse | None]) -> KernelResponse | None:
         transcribed = self._transcriber.process(utterance)
         sanitized = self._sanitizer.process(transcribed)
         if sanitized is None:
@@ -93,14 +93,14 @@ class VoicePipeline:
         candidates = self._buffer.recoverable(self._recovery_limit, self._recovery_window)
         return self._dispatch(self._gatekeeper.process(buffered, recent, candidates), buffered.id, submit)
 
-    def _dispatch(self, result: GateDispatch, current_id: str, submit: Callable[[str], KernelResponse]) -> KernelResponse | None:
+    def _dispatch(self, result: GateDispatch, current_id: str, submit: Callable[[str, str], KernelResponse | None]) -> KernelResponse | None:
         if result.action == GateAction.INTERRUPT:
             return self._interrupt(current_id)
         if result.action == GateAction.DROP or result.text is None:
             self._buffer.mark(current_id, GateState.DROPPED)
             return None
         self._mark_accepted(result, current_id)
-        return self._submit(result.text, submit)
+        return self._submit(result.text, result.intent, submit)
 
     def _mark_accepted(self, result: GateDispatch, current_id: str) -> None:
         if result.action == GateAction.FORWARD_RECOVERED:
