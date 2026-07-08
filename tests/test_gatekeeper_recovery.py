@@ -1,8 +1,8 @@
 import types
 
 from shells.voice.buffered_utterance import BufferedUtterance
-from shells.voice.stages.gatekeeper import LLMGatekeeper
-from shells.voice.stages.recovery_gate_prompt import build_recovery_gate_prompt
+from shells.voice.stages.gate.gatekeeper import LLMGatekeeper
+from shells.voice.stages.gate.recovery_gate_prompt import build_recovery_gate_prompt
 from tusk.shared.schemas.utterance import Utterance
 
 

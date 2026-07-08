@@ -1,40 +1,28 @@
-import json
 import sys
 from pathlib import Path
+from typing import TextIO
 
 try:
     from emulated_editor import EmulatedEditor
-except ImportError:  # pragma: no cover
+except ImportError:  # pragma: no cover - in-process import path
     from demos.editor_emulator.emulated_editor import EmulatedEditor
+
+from tusk.shared.mcp.mcp_stdio_server import MCPStdioServer
 
 _SNAPSHOT_PATH = Path(__file__).resolve().parents[2] / ".tusk_runtime" / "editor_emulator_buffer.txt"
 
 
 class EditorEmulatorServer:
-    def __init__(self, editor: EmulatedEditor, snapshot_path: Path) -> None:
+    def __init__(
+        self, editor: EmulatedEditor, snapshot_path: Path,
+        input_stream: TextIO = sys.stdin, output_stream: TextIO = sys.stdout,
+    ) -> None:
         self._editor = editor
         self._snapshot_path = snapshot_path
+        self._rpc = MCPStdioServer("editor_emulator", self._schemas, self._call, input_stream, output_stream)
 
     def serve(self) -> None:
-        for line in sys.stdin:
-            request = json.loads(line)
-            self._write(request["id"], self._payload(request))
-
-    def _write(self, request_id: int, payload: dict) -> None:
-        response = {"jsonrpc": "2.0", "id": request_id, "result": payload}
-        sys.stdout.write(json.dumps(response) + "\n")
-        sys.stdout.flush()
-
-    def _payload(self, request: dict) -> dict:
-        method = request.get("method")
-        params = request.get("params", {})
-        if method == "initialize":
-            return {"protocolVersion": "2024-11-05", "capabilities": {"tools": {}}}
-        if method == "tools/list":
-            return {"tools": self._schemas()}
-        if method == "tools/call":
-            return self._call(params["name"], params.get("arguments", {}))
-        return {}
+        self._rpc.serve()
 
     def _call(self, name: str, arguments: dict) -> dict:
         payload = getattr(self, f"_tool_{name}")(arguments)

@@ -2,7 +2,7 @@ import types
 
 import pytest
 
-from tusk.kernel.mode_slot import ModeSlot
+from tusk.kernel.modes.mode_slot import ModeSlot
 from tusk.shared.schemas.kernel_response import KernelResponse
 
 
@@ -48,3 +48,16 @@ def test_started_mode_routes_through_attached_router() -> None:
     slot.start(types.SimpleNamespace(), _log())
     assert slot.process_text("hello") == KernelResponse(True, "updated")
     assert seen == ["hello"]
+
+
+def test_slot_uses_injected_mode_factory() -> None:
+    created: list[tuple] = []
+
+    def factory(state: object, router: object, log: object, tag: str) -> object:
+        created.append((state, router, tag))
+        return types.SimpleNamespace(process_text=lambda text: KernelResponse(True, "custom"))
+
+    slot = ModeSlot("DICTATION", "Dictation started.", mode_factory=factory)
+    slot.start(types.SimpleNamespace(), _log())
+    assert created and created[0][2] == "DICTATION"
+    assert slot.process_text("hi") == KernelResponse(True, "custom")

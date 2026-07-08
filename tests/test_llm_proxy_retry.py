@@ -1,7 +1,7 @@
 import types
 
 from tusk.shared.llm import LLMProxy, LLMRetryRunner
-from tusk.shared.schemas.tool_call import ToolCall
+from tusk.shared.schemas.tools.tool_call import ToolCall
 
 
 def test_llm_proxy_retries_transient_message_failures() -> None:

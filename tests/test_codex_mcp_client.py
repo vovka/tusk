@@ -3,7 +3,7 @@ import time
 
 import pytest
 
-from tusk.kernel.agent_backends.codex_mcp_client import CodexMcpClient
+from tusk.kernel.agent_backends.codex_mcp.client import Client
 
 # Fake codex mcp-server: rejects initialize without clientInfo, echoes the
 # methods it has seen inside the tools/call result, and emits two codex/event
@@ -50,8 +50,8 @@ for line in sys.stdin:
 """
 
 
-def client(script: str, timeout: float = 5.0) -> CodexMcpClient:
-    return CodexMcpClient(["python", "-c", script], cwd=".", timeout_seconds=timeout)
+def client(script: str, timeout: float = 5.0) -> Client:
+    return Client(["python", "-c", script], cwd=".", timeout_seconds=timeout)
 
 
 def test_client_handshakes_with_client_info_and_initialized_notification() -> None:
@@ -90,7 +90,7 @@ def test_client_raises_runtime_error_on_error_response() -> None:
 
 def test_client_raises_file_not_found_for_missing_binary() -> None:
     with pytest.raises(FileNotFoundError):
-        CodexMcpClient(["missing-codex-binary", "mcp-server"], cwd=".", timeout_seconds=1.0)
+        Client(["missing-codex-binary", "mcp-server"], cwd=".", timeout_seconds=1.0)
 
 
 def test_client_stop_terminates_server() -> None:

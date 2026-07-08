@@ -2,9 +2,9 @@ import types
 
 import pytest
 
-from tusk.kernel.coding_gate_prompt import CODING_GATE_PROMPT
-from tusk.kernel.dictation_gate_prompt import DICTATION_GATE_PROMPT
-from tusk.kernel.mode_gate import ModeGate
+from tusk.kernel.modes.coding_gate_prompt import CODING_GATE_PROMPT
+from tusk.kernel.modes.dictation_gate_prompt import DICTATION_GATE_PROMPT
+from tusk.kernel.modes.mode_gate import ModeGate
 
 _MODES = [("dictation", DICTATION_GATE_PROMPT), ("coding", CODING_GATE_PROMPT)]
 

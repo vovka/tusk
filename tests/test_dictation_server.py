@@ -1,3 +1,4 @@
+import io
 import json
 
 from adapters.dictation.dictation_session_store import DictationSessionStore
@@ -40,14 +41,16 @@ def test_unknown_tool_returns_error_payload() -> None:
     assert "unknown tool" in result["content"][0]["text"]
 
 
-def test_malformed_request_line_is_skipped(capsys) -> None:
-    DictationServer()._handle_line("this is not json")
-    assert capsys.readouterr().out == ""
+def test_malformed_request_line_is_skipped() -> None:
+    output = io.StringIO()
+    DictationServer(input_stream=io.StringIO("this is not json\n"), output_stream=output).serve()
+    assert output.getvalue() == ""
 
 
-def test_non_dict_request_line_is_skipped(capsys) -> None:
-    DictationServer()._handle_line("123")
-    assert capsys.readouterr().out == ""
+def test_non_dict_request_line_is_skipped() -> None:
+    output = io.StringIO()
+    DictationServer(input_stream=io.StringIO("123\n"), output_stream=output).serve()
+    assert output.getvalue() == ""
 
 
 def test_process_segment_on_unknown_session_returns_error() -> None:
@@ -56,10 +59,11 @@ def test_process_segment_on_unknown_session_returns_error() -> None:
     assert "missing" in payload["message"]
 
 
-def test_tool_crash_is_answered_as_error(capsys) -> None:
+def test_tool_crash_is_answered_as_error() -> None:
     line = json.dumps({"jsonrpc": "2.0", "id": 7, "method": "tools/call", "params": {"name": "process_segment", "arguments": {}}})
-    DictationServer()._handle_line(line)
-    response = json.loads(capsys.readouterr().out)
+    output = io.StringIO()
+    DictationServer(input_stream=io.StringIO(line + "\n"), output_stream=output).serve()
+    response = json.loads(output.getvalue())
     assert response["id"] == 7
     assert response["result"]["isError"] is True
 
@@ -81,3 +85,11 @@ def _update(operation: str, text: str, replace_chars: int) -> dict:
         "replace_chars": replace_chars,
         "should_stop": False,
     }
+
+
+def test_serve_answers_tools_list_over_injected_streams() -> None:
+    request = '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
+    output = io.StringIO()
+    DictationServer(input_stream=io.StringIO(request + "\n"), output_stream=output).serve()
+    tools = json.loads(output.getvalue())["result"]["tools"]
+    assert {tool["name"] for tool in tools} == {"start_dictation", "process_segment", "stop_dictation"}

@@ -1,17 +1,17 @@
 import tempfile
 
 from tusk.kernel.agent.agent_run_request import AgentRunRequest
-from tusk.kernel.agent.file_agent_session_store import FileAgentSessionStore
-from tusk.kernel.agent.planner_runtime_tool_resolver import PlannerRuntimeToolResolver
+from tusk.kernel.agent.session.file_store import FileStore
+from tusk.kernel.agent.planner.runtime_tool_resolver import RuntimeToolResolver
 
 
 def test_resolver_recovers_sequence_mode_and_plan_from_session_ref() -> None:
-    store = FileAgentSessionStore(tempfile.mkdtemp(prefix="tusk-sequence-"))
+    store = FileStore(tempfile.mkdtemp(prefix="tusk-sequence-"))
     session_id = store.create_session_id()
     store.start_session(session_id, "planner", "", "", {})
     store.append_event(session_id, "session_finished", _result(session_id))
     request = AgentRunRequest("type hello", profile_id="executor", session_refs=(session_id,))
-    resolved = PlannerRuntimeToolResolver(store).resolve(request, {"gnome.type_text"})
+    resolved = RuntimeToolResolver(store).resolve(request, {"gnome.type_text"})
     assert resolved.runtime_tool_names == ("gnome.type_text",)
     assert resolved.execution_mode == "sequence"
     assert resolved.sequence_plan is not None

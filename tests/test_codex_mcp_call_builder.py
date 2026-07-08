@@ -1,13 +1,13 @@
 from types import SimpleNamespace
 
-from tusk.kernel.agent_backends.codex_mcp_call_builder import CodexMcpCallBuilder
+from tusk.kernel.agent_backends.codex_mcp.call_builder import CallBuilder
 
 
-def builder(model: str = "", sandbox: str = "", workdir: str = "") -> CodexMcpCallBuilder:
+def builder(model: str = "", sandbox: str = "", workdir: str = "") -> CallBuilder:
     config = SimpleNamespace(
         codex_exec_model=model, codex_exec_sandbox_mode=sandbox, codex_exec_workdir=workdir
     )
-    return CodexMcpCallBuilder(config)
+    return CallBuilder(config)
 
 
 def test_new_thread_uses_codex_tool_with_prompt_and_approval_policy() -> None:

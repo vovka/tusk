@@ -2,8 +2,8 @@ import types
 
 import pytest
 
-from tusk.kernel.adapter_mode import AdapterMode
-from tusk.kernel.coding_state import CodingState
+from tusk.kernel.modes.adapter_mode import AdapterMode
+from tusk.kernel.modes.coding_state import CodingState
 from tusk.shared.schemas.kernel_response import KernelResponse
 
 

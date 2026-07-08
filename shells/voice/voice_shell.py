@@ -1,12 +1,20 @@
 import threading
+from collections.abc import Callable
 
+from shells.voice.command_worker import CommandWorker
+from shells.voice.interfaces.gatekeeper import Gatekeeper
 from shells.voice.pipeline import VoicePipeline
 from shells.voice.stages.audio_capture import AudioCapture
 from shells.voice.stages.sanitizer import Sanitizer
 from shells.voice.stages.transcriber import Transcriber
 from shells.voice.stages.transcription_buffer import TranscriptionBuffer
 from shells.voice.stages.utterance_detector import UtteranceDetector
+from tusk.shared.config.config import Config
+from tusk.shared.logging.interfaces.log_printer import LogPrinter
 from tusk.shared.schemas.app_status import AppStatus
+from tusk.shared.schemas.kernel_response import KernelResponse
+from tusk.shared.status.interfaces.status_reporter import StatusReporter
+from tusk.shared.stt.interfaces.stt_engine import STTEngine
 
 __all__ = ["VoiceShell"]
 
@@ -14,14 +22,14 @@ __all__ = ["VoiceShell"]
 class VoiceShell:
     def __init__(
         self,
-        config: object,
-        log_printer: object,
-        stt_engine: object | None = None,
-        gatekeeper: object | None = None,
-        pipeline: object | None = None,
-        worker: object | None = None,
-        reporter: object | None = None,
-        on_interrupt: object | None = None,
+        config: Config,
+        log_printer: LogPrinter,
+        stt_engine: STTEngine | None = None,
+        gatekeeper: Gatekeeper | None = None,
+        pipeline: VoicePipeline | None = None,
+        worker: CommandWorker | None = None,
+        reporter: StatusReporter | None = None,
+        on_interrupt: Callable[[], None] | None = None,
     ) -> None:
         self._reporter = reporter
         self._pause_gate = threading.Event()
@@ -32,7 +40,7 @@ class VoiceShell:
         self._log = log_printer
         self._running = True
 
-    def start(self, submit: object) -> None:
+    def start(self, submit: Callable[[str], KernelResponse]) -> None:
         if self._worker is not None:
             self._worker.start()
         target = self._worker.enqueue if self._worker is not None else submit
@@ -58,10 +66,10 @@ class VoiceShell:
 
     def _build_pipeline(
         self,
-        config: object,
-        log_printer: object,
-        stt_engine: object | None,
-        gatekeeper: object | None,
+        config: Config,
+        log_printer: LogPrinter,
+        stt_engine: STTEngine | None,
+        gatekeeper: Gatekeeper | None,
     ) -> VoicePipeline:
         _require_pipeline_inputs(stt_engine, gatekeeper)
         settings = _pipeline_settings(config)
@@ -74,7 +82,7 @@ class VoiceShell:
             settings[0], settings[1], self._reporter, self._on_interrupt,
         )
 
-    def _detector(self, config: object, log_printer: object) -> UtteranceDetector:
+    def _detector(self, config: Config, log_printer: LogPrinter) -> UtteranceDetector:
         return UtteranceDetector(
             AudioCapture(config.audio_sample_rate, config.audio_frame_duration_ms, self._pause_gate),
             config.audio_sample_rate,
@@ -83,19 +91,19 @@ class VoiceShell:
             frame_duration_ms=config.audio_frame_duration_ms,
         )
 
-    def _log_reply(self, result: object) -> None:
+    def _log_reply(self, result: KernelResponse) -> None:
         reply = getattr(result, "reply", "")
         if not reply:
             return
         self._log.log("TUSK", reply)
 
 
-def _require_pipeline_inputs(stt_engine: object | None, gatekeeper: object | None) -> None:
+def _require_pipeline_inputs(stt_engine: STTEngine | None, gatekeeper: Gatekeeper | None) -> None:
     if stt_engine is None:
         raise ValueError("voice shell requires an STT engine")
     if gatekeeper is None:
         raise ValueError("voice shell requires a gatekeeper")
 
 
-def _pipeline_settings(config: object) -> tuple[float, int]:
+def _pipeline_settings(config: Config) -> tuple[float, int]:
     return config.gate_recovery_window_seconds, config.gate_recovery_candidate_limit

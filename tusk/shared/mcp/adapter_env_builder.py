@@ -5,13 +5,22 @@ from pathlib import Path
 
 __all__ = ["AdapterEnvironmentBuilder"]
 
+_REPO_ROOT = str(Path(__file__).resolve().parents[3])
+
 
 class AdapterEnvironmentBuilder:
     def __init__(self, cache_dir: str) -> None:
         self._cache_dir = Path(cache_dir)
 
-    def build(self, path: Path, manifest: dict) -> dict:
+    def base_env(self) -> dict:
+        # adapters import tusk.shared (schemas, MCP server loop) from their own cwd
         env = os.environ.copy()
+        existing = env.get("PYTHONPATH")
+        env["PYTHONPATH"] = f"{_REPO_ROOT}{os.pathsep}{existing}" if existing else _REPO_ROOT
+        return env
+
+    def build(self, path: Path, manifest: dict) -> dict:
+        env = self.base_env()
         if not (path / "requirements.txt").exists():
             return env
         cache = self._cache(self._cache_dir, manifest)

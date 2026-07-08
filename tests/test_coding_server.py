@@ -42,3 +42,14 @@ def test_stop_coding_session_clears_state() -> None:
 
 def _planner(new_buffer: str | None) -> object:
     return types.SimpleNamespace(plan=lambda intent, buffer_text: new_buffer)
+
+
+def test_serve_answers_tools_list_over_injected_streams() -> None:
+    import io
+    import json
+
+    request = '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
+    output = io.StringIO()
+    CodingServer(_planner(""), input_stream=io.StringIO(request + "\n"), output_stream=output).serve()
+    tools = json.loads(output.getvalue())["result"]["tools"]
+    assert {tool["name"] for tool in tools} == {"start_coding_session", "process_intent", "stop_coding_session"}

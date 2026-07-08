@@ -1,4 +1,4 @@
-from shells.voice.stages.gatekeeper_parser import parse_gate_result, parse_recovery_decision
+from shells.voice.stages.gate.gatekeeper_parser import parse_gate_result, parse_recovery_decision
 
 _PAYLOAD = '{"classification": "command", "cleaned_text": "open firefox", "reason": "direct"}'
 

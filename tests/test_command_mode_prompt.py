@@ -1,4 +1,4 @@
-from shells.voice.stages.command_gate_prompt import build_command_gate_prompt
+from shells.voice.stages.gate.command_gate_prompt import build_command_gate_prompt
 
 
 def test_command_mode_prompt_treats_wake_word_as_addressing_not_command() -> None:

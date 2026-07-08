@@ -1,27 +1,25 @@
-import json
 import os
 import sys
 import uuid
-from pathlib import Path
+from typing import TextIO
 
-try:
-    from coding_edit_planner import CodingEditPlanner
-    from coding_tool_schema_catalog import CodingToolSchemaCatalog
-except ImportError:  # pragma: no cover
-    from adapters.coding.coding_edit_planner import CodingEditPlanner
-    from adapters.coding.coding_tool_schema_catalog import CodingToolSchemaCatalog
+from adapters.coding.coding_edit_planner import CodingEditPlanner
+from adapters.coding.coding_tool_schema_catalog import CodingToolSchemaCatalog
+from tusk.shared.mcp.mcp_stdio_server import MCPStdioServer
 
 
 class CodingServer:
-    def __init__(self, planner: object) -> None:
+    def __init__(
+        self, planner: object,
+        input_stream: TextIO = sys.stdin, output_stream: TextIO = sys.stdout,
+    ) -> None:
         self._sessions: dict[str, str] = {}
         self._planner = planner
         self._schemas = CodingToolSchemaCatalog().build()
+        self._rpc = MCPStdioServer("coding", lambda: self._schemas, self._call, input_stream, output_stream)
 
     def serve(self) -> None:
-        for line in sys.stdin:
-            request = json.loads(line)
-            self._write(request["id"], self._payload(request))
+        self._rpc.serve()
 
     def _call(self, name: str, arguments: dict) -> dict:
         payload = getattr(self, f"_tool_{name}")(arguments)
@@ -46,23 +44,6 @@ class CodingServer:
         self._sessions.pop(arguments["session_id"], None)
         return {"success": True, "message": "coding stopped"}
 
-    def _write(self, request_id: int, payload: dict) -> None:
-        response = {"jsonrpc": "2.0", "id": request_id, "result": payload}
-        sys.stdout.write(json.dumps(response) + "\n")
-        sys.stdout.flush()
-
-    def _payload(self, request: dict) -> dict:
-        method = request.get("method")
-        params = request.get("params", {})
-        if method == "initialize":
-            return {"protocolVersion": "2024-11-05", "capabilities": {"tools": {}}}
-        if method == "tools/list":
-            return {"tools": self._schemas}
-        if method == "tools/call":
-            return self._call(params["name"], params.get("arguments", {}))
-        return {}
-
-
 def _replace_operation(old_buffer: str, new_buffer: str) -> dict:
     return {
         "kind": "replace",
@@ -73,12 +54,7 @@ def _replace_operation(old_buffer: str, new_buffer: str) -> dict:
     }
 
 
-def _repo_root() -> str:
-    return str(Path(__file__).resolve().parents[2])
-
-
 def _default_planner() -> CodingEditPlanner:  # pragma: no cover
-    sys.path.insert(0, _repo_root())
     from tusk.providers.llm import ConfigurableLLMFactory
 
     factory = ConfigurableLLMFactory(os.environ.get("GROQ_API_KEY", ""), os.environ.get("OPENROUTER_API_KEY", ""))

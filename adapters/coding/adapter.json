@@ -4,5 +4,16 @@
   "description": "Pair-coding edit-planning adapter",
   "transport": "stdio",
   "entry": "python server.py",
-  "provides_context": false
+  "provides_context": false,
+  "tools": {
+    "start_coding_session": {
+      "planner_visible": false
+    },
+    "process_intent": {
+      "planner_visible": false
+    },
+    "stop_coding_session": {
+      "planner_visible": false
+    }
+  }
 }

@@ -4,5 +4,49 @@
   "description": "GNOME desktop control adapter",
   "transport": "stdio",
   "entry": "python server.py",
-  "provides_context": true
+  "provides_context": true,
+  "tools": {
+    "close_window": {
+      "sequence_callable": true
+    },
+    "focus_window": {
+      "sequence_callable": true
+    },
+    "maximize_window": {
+      "sequence_callable": true
+    },
+    "minimize_window": {
+      "sequence_callable": true
+    },
+    "move_resize_window": {
+      "sequence_callable": true
+    },
+    "switch_workspace": {
+      "sequence_callable": true
+    },
+    "press_keys": {
+      "sequence_callable": true
+    },
+    "type_text": {
+      "sequence_callable": true
+    },
+    "replace_recent_text": {
+      "sequence_callable": true
+    },
+    "mouse_click": {
+      "sequence_callable": true
+    },
+    "mouse_move": {
+      "sequence_callable": true
+    },
+    "mouse_drag": {
+      "sequence_callable": true
+    },
+    "mouse_scroll": {
+      "sequence_callable": true
+    },
+    "write_clipboard": {
+      "sequence_callable": true
+    }
+  }
 }

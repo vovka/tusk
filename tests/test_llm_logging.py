@@ -1,7 +1,7 @@
 import types
 
 from tusk.shared.llm import LLMProxy
-from tusk.shared.schemas.tool_call import ToolCall
+from tusk.shared.schemas.tools.tool_call import ToolCall
 
 
 class LoggedProvider:

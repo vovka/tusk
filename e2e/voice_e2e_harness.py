@@ -7,7 +7,7 @@ from e2e.fake_playback import FakePlayback
 from e2e.queue_detector import QueueDetector
 from shells.voice.command_worker import CommandWorker
 from shells.voice.pipeline import VoicePipeline
-from shells.voice.stages.gatekeeper import LLMGatekeeper
+from shells.voice.stages.gate.gatekeeper import LLMGatekeeper
 from shells.voice.stages.sanitizer import Sanitizer
 from shells.voice.stages.transcription_buffer import TranscriptionBuffer
 from shells.voice.voice_shell import VoiceShell

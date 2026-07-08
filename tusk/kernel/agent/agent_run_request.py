@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 
-from tusk.shared.schemas.tool_sequence_plan import ToolSequencePlan
+from tusk.shared.schemas.tools.tool_sequence_plan import ToolSequencePlan
 
 __all__ = ["AgentRunRequest"]
 

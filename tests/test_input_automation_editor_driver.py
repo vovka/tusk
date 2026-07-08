@@ -2,9 +2,9 @@ import types
 
 import pytest
 
-from tusk.kernel.input_automation_editor_driver import InputAutomationEditorDriver
+from tusk.kernel.modes.input_automation_editor_driver import InputAutomationEditorDriver
 from tusk.shared.schemas.buffer_selection import BufferSelection
-from tusk.shared.schemas.tool_result import ToolResult
+from tusk.shared.schemas.tools.tool_result import ToolResult
 
 
 def test_goto_line_uses_ctrl_g_then_types_number() -> None:

@@ -1,5 +1,5 @@
 from tests.kernel_api_support import make_registry_tool
-from tusk.kernel.tool_registry import ToolRegistry
+from tusk.kernel.tools.tool_registry import ToolRegistry
 
 
 def test_tool_registry_returns_planner_visible_tools_only() -> None:

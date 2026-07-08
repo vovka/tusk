@@ -1,14 +1,9 @@
 import subprocess
 from dataclasses import asdict
 
-try:
-    from app_catalog import AppCatalog
-    from desktop_context import DesktopContext
-    from window_info import WindowInfo
-except ImportError:  # pragma: no cover
-    from adapters.gnome.app_catalog import AppCatalog
-    from adapters.gnome.desktop_context import DesktopContext
-    from adapters.gnome.window_info import WindowInfo
+from adapters.gnome.app_catalog import AppCatalog
+from tusk.shared.schemas.desktop.desktop_context import DesktopContext
+from tusk.shared.schemas.desktop.window_info import WindowInfo
 
 __all__ = ["GnomeContextProvider"]
 

@@ -6,14 +6,14 @@ from shells.tray.tray_shell import TrayShell
 from shells.voice.command_worker import CommandWorker
 from shells.voice.gatekeeper_slot import GatekeeperSlot
 from shells.voice.playback_gate import PlaybackGate
-from shells.voice.stages.stop_gatekeeper import StopGatekeeper
-from shells.voice.stages.gatekeeper import LLMGatekeeper
+from shells.voice.stages.gate.stop_gatekeeper import StopGatekeeper
+from shells.voice.stages.gate.gatekeeper import LLMGatekeeper
 from shells.voice.stages.speech_playback import SpeechPlayback
-from shells.voice.stages.speech_stop_gate import SpeechStopGate
+from shells.voice.stages.gate.speech_stop_gate import SpeechStopGate
 from shells.voice.voice_shell import VoiceShell
-from tusk.kernel.coding_gate_prompt import CODING_GATE_PROMPT
-from tusk.kernel.dictation_gate_prompt import DICTATION_GATE_PROMPT
-from tusk.kernel.mode_gate import ModeGate
+from tusk.kernel.modes.coding_gate_prompt import CODING_GATE_PROMPT
+from tusk.kernel.modes.dictation_gate_prompt import DICTATION_GATE_PROMPT
+from tusk.kernel.modes.mode_gate import ModeGate
 from tusk.providers.stt import STTEngineFactory
 from tusk.providers.tts import GroqTTS
 

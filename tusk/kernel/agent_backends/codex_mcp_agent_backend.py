@@ -5,9 +5,9 @@ from tusk.kernel.agent_backends.agent_backend import AgentBackend
 from tusk.kernel.agent_backends.agent_request import AgentRequest
 from tusk.kernel.agent_backends.agent_result import AgentResult
 from tusk.kernel.agent_backends.backend_run_logger import BackendRunLogger
-from tusk.kernel.agent_backends.codex_mcp_call_builder import CodexMcpCallBuilder
-from tusk.kernel.agent_backends.codex_mcp_client import CodexMcpClient
-from tusk.kernel.agent_backends.codex_mcp_result_mapper import CodexMcpResultMapper
+from tusk.kernel.agent_backends.codex_mcp.call_builder import CallBuilder
+from tusk.kernel.agent_backends.codex_mcp.client import Client
+from tusk.kernel.agent_backends.codex_mcp.result_mapper import ResultMapper
 from tusk.kernel.agent_backends.codex_prompt_builder import CodexPromptBuilder
 from tusk.shared.logging.interfaces.log_printer import LogPrinter
 
@@ -20,11 +20,11 @@ class CodexMcpAgentBackend(AgentBackend):
     def __init__(self, config: object, log_printer: LogPrinter) -> None:
         self._config = config
         self._prompt_builder = CodexPromptBuilder()
-        self._call_builder = CodexMcpCallBuilder(config)
-        self._mapper = CodexMcpResultMapper(self.name)
+        self._call_builder = CallBuilder(config)
+        self._mapper = ResultMapper(self.name)
         self._run_logger = BackendRunLogger(log_printer, self.name)
         self._lock = threading.Lock()
-        self._client: CodexMcpClient | None = None
+        self._client: Client | None = None
         atexit.register(self._reset_client)
 
     @property
@@ -71,9 +71,9 @@ class CodexMcpAgentBackend(AgentBackend):
         self._run_logger.schema(request, "structuredContent" in payload, "structured_content")
         return self._mapper.success(request, payload)
 
-    def _client_or_spawn(self) -> CodexMcpClient:
+    def _client_or_spawn(self) -> Client:
         if self._client is None:
-            self._client = CodexMcpClient(self._command(), self._server_cwd(), self._timeout())
+            self._client = Client(self._command(), self._server_cwd(), self._timeout())
         return self._client
 
     def _drop_client_if_dead(self) -> None:

@@ -1,17 +1,23 @@
+import threading
 from collections.abc import Callable
 
-from tusk.kernel.mode_slot import ModeSlot
+from tusk.kernel.modes.mode_slot import ModeSlot
 from tusk.kernel.submit_status_reporter import SubmitStatusReporter
 from tusk.shared.schemas.app_mode import AppMode
 from tusk.shared.schemas.kernel_response import KernelResponse
+from tusk.shared.interrupt.interrupt_token import InterruptToken
+from tusk.shared.llm.llm_registry import LLMRegistry
+from tusk.shared.logging.interfaces.log_printer import LogPrinter
+from tusk.shared.status.interfaces.status_reporter import StatusReporter
 
 __all__ = ["KernelAPI"]
 
 
 class KernelAPI:
     def __init__(
-        self, command_mode: object, llm_registry: object, log: object | None = None,
-        reporter: object | None = None, interrupt_token: object | None = None,
+        self, command_mode: object, llm_registry: LLMRegistry | None, log: LogPrinter | None = None,
+        reporter: StatusReporter | None = None, interrupt_token: InterruptToken | None = None,
+        dictation_slot: ModeSlot | None = None, coding_slot: ModeSlot | None = None,
     ) -> None:
         self._command_mode = command_mode
         self._llm_registry = llm_registry
@@ -19,8 +25,9 @@ class KernelAPI:
         self._reporter = reporter
         self._interrupt_token = interrupt_token
         self._submit_reporter = SubmitStatusReporter(reporter) if reporter is not None else None
-        self._dictation = ModeSlot("DICTATION", "Dictation started.")
-        self._coding = ModeSlot("CODING", "Coding started.")
+        self._submit_lock = threading.Lock()
+        self._dictation = dictation_slot or ModeSlot("DICTATION", "Dictation started.")
+        self._coding = coding_slot or ModeSlot("CODING", "Coding started.")
 
     def request_interrupt(self) -> None:
         if self._interrupt_token is not None:
@@ -31,10 +38,12 @@ class KernelAPI:
         return self._interrupt_token
 
     def submit(self, text: str) -> KernelResponse:
-        self._log_input(text)
-        if self._submit_reporter is None:
-            return self._route(text)
-        return self._submit_reporter.run(text, self._route)
+        # ponytail: one global lock — commands are serial by design (single user voice stream)
+        with self._submit_lock:
+            self._log_input(text)
+            if self._submit_reporter is None:
+                return self._route(text)
+            return self._submit_reporter.run(text, self._route)
 
     def _log_input(self, text: str) -> None:
         if self._log is not None:
@@ -88,5 +97,5 @@ class KernelAPI:
     def stop_coding(self) -> None:
         self._coding.stop()
 
-    def get_llm_registry(self) -> object:
+    def get_llm_registry(self) -> LLMRegistry | None:
         return self._llm_registry

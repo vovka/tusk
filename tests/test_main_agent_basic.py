@@ -2,8 +2,8 @@ import json
 import types
 
 from tests.kernel_api_support import HistoryRecorder, make_agent, make_registry_tool
-from tusk.shared.schemas.tool_call import ToolCall
-from tusk.kernel.tool_registry import ToolRegistry
+from tusk.shared.schemas.tools.tool_call import ToolCall
+from tusk.kernel.tools.tool_registry import ToolRegistry
 
 
 def test_main_agent_returns_final_reply() -> None:

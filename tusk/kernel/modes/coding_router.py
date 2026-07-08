@@ -1,0 +1,48 @@
+from tusk.shared.schemas.edit_operation import EditOperation
+from tusk.shared.schemas.kernel_response import KernelResponse
+from tusk.kernel.interfaces.edit_application_strategy import EditApplicationStrategy
+from tusk.kernel.interfaces.editor_driver import EditorDriver
+from tusk.kernel.tools.tool_registry import ToolRegistry
+from tusk.shared.logging.interfaces.log_printer import LogPrinter
+
+__all__ = ["CodingRouter"]
+
+
+class CodingRouter:
+    def __init__(self, tool_registry: ToolRegistry, controller: object, driver: EditorDriver, strategy: EditApplicationStrategy, log_printer: LogPrinter) -> None:
+        self._registry = tool_registry
+        self._controller = controller
+        self._driver = driver
+        self._strategy = strategy
+        self._log = log_printer
+
+    def process(self, state: object, text: str) -> KernelResponse:
+        result = self._intent_result(state, text)
+        self._log.log("CODING", f"intent={text!r}")
+        if not result.success or result.data is None:
+            return KernelResponse(False, result.message)
+        return self._apply(result)
+
+    def _apply(self, result: object) -> KernelResponse:
+        try:
+            self._apply_all(result.data.get("operations", []))
+        except (RuntimeError, KeyError, TypeError, AttributeError) as exc:
+            self._log.log("CODING", f"apply failed: {exc}")
+            return KernelResponse(False, "I couldn't apply that edit.")
+        return KernelResponse(True, "")
+
+    def stop(self, state: object) -> KernelResponse:
+        self._registry.get(f"{state.adapter_name}.stop_coding_session").execute({"session_id": state.session_id})
+        self._controller.stop_coding()
+        return KernelResponse(True, "Coding stopped.")
+
+    def _intent_result(self, state: object, text: str) -> object:
+        name = f"{state.adapter_name}.process_intent"
+        return self._registry.get(name).execute({"session_id": state.session_id, "intent": text})
+
+    def _apply_all(self, operations: list[dict]) -> None:
+        for operation in operations:
+            self._strategy.apply(self._to_operation(operation), self._driver)
+
+    def _to_operation(self, data: dict) -> EditOperation:
+        return EditOperation(data["kind"], data["target_start"], data["target_end"], data.get("new_text", ""), data.get("full_buffer", ""))
