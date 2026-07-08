@@ -1,6 +1,7 @@
 import types
 
 from tests.command_worker_support import await_condition, make_worker, recording_submit, working_tts
+from tusk.shared.interrupt import InterruptToken
 from tusk.shared.schemas.kernel_response import KernelResponse
 
 
@@ -46,3 +47,15 @@ def test_refrain_logged_when_tts_off() -> None:
     worker.enqueue("open gedit", "Opening gedit")
     await_condition(lambda: submits == ["open gedit"])
     assert ("TUSK", "Opening gedit") in logs
+
+
+def test_interrupt_during_refrain_aborts_before_submit() -> None:
+    token = InterruptToken()
+    submits: list[str] = []
+    logs: list[tuple] = []
+    playback = types.SimpleNamespace(play=lambda wav: token.interrupt())
+    worker = make_worker(recording_submit(submits), tts=working_tts(), playback=playback, token=token, logs=logs)
+    worker.enqueue("delete everything", "Deleting everything")
+    await_condition(lambda: not worker.is_busy)
+    assert submits == []
+    assert ("TUSK", "Stopped.") in logs

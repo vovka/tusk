@@ -69,6 +69,8 @@ class CommandWorker:
     def _execute(self, text: str, refrain: str) -> None:
         self._token.clear()
         self._announce(refrain)
+        if self._interrupted_during_ack():
+            return
         response = self._submit(text)
         reply = self._reply_for(response)
         if reply:
@@ -81,6 +83,15 @@ class CommandWorker:
             return
         self._log.log("TUSK", refrain)
         self._speak(refrain)
+
+    def _interrupted_during_ack(self) -> bool:
+        # a stop during the refrain must abort before the command reaches the kernel
+        if not self._token.is_interrupted:
+            return False
+        self._token.clear()
+        self._log.log("TUSK", "Stopped.")
+        self._speak("Stopped.")
+        return True
 
     def _reply_for(self, response: KernelResponse) -> str:
         # an interrupt during the run means the user wants silence: confirm briefly, never read a stale reply
