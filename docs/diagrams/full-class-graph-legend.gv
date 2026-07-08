@@ -1,0 +1,33 @@
+subgraph cluster_legend {
+  label="Legend"; style=filled; fillcolor="#ffffff"; color="black"; fontsize=22; margin=24;
+  node [shape=box, style=filled, fillcolor="white", fontsize=13, fontname="Helvetica"];
+  edge [fontname="Helvetica", fontsize=12];
+
+  Leg_tip [shape=plaintext, fontsize=11, fontcolor="#444444",
+    label="Tip: the green label names an attribute.\nPlain arrow -> it's on the class the arrow STARTS from.\nDiamond arrow -> it's on the class the arrow ENDS at (diamond touches the owner)."];
+
+  Leg_sub [label="Dog"];
+  Leg_super [label="Animal"];
+  Leg_sub -> Leg_super [arrowhead="empty", arrowtail="none"];
+  Leg_cap1 [shape=plaintext, fontsize=11, fontcolor="#444444",
+    label="Dog inherits from Animal\n(Dog IS-A Animal)"];
+  Leg_super -> Leg_cap1 [style=invis];
+
+  Leg_a [label="Car"];
+  Leg_b [label="Engine"];
+  Leg_a -> Leg_b [arrowhead="vee", arrowtail="none", fontcolor="green", label="  engine"];
+  Leg_cap2 [shape=plaintext, fontsize=11, fontcolor="#444444",
+    label="Car has an Engine\n(Car owns a single 'engine' field)"];
+  Leg_b -> Leg_cap2 [style=invis];
+
+  Leg_item [label="Item"];
+  Leg_container [label="Container"];
+  Leg_item -> Leg_container [arrowhead="odiamond", arrowtail="none", fontcolor="green", label="  items"];
+  Leg_cap3 [shape=plaintext, fontsize=11, fontcolor="#444444",
+    label="Container has many Items\n(Container owns the 'items' collection)"];
+  Leg_container -> Leg_cap3 [style=invis];
+
+  Leg_tip -> Leg_sub [style=invis];
+  Leg_cap1 -> Leg_a [style=invis];
+  Leg_cap2 -> Leg_item [style=invis];
+}

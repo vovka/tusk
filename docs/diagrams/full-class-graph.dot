@@ -1,0 +1,379 @@
+digraph "classes_full"
+{
+overlap="prism"
+splines=true
+pack=true
+packmode="clust"
+sep="+15"
+esep="+8"
+fontname="Helvetica"
+subgraph cluster_0 {
+  label="adapters"; style=filled; fillcolor="#fdf0c8"; fontsize=22; margin=24;
+  subgraph cluster_0_0 {
+    label="gnome"; style="solid,rounded"; color="#555555"; fontsize=15; margin=14;
+    "adapters.gnome.app_catalog.AppCatalog" [color="black", fontcolor="black", label=<{AppCatalog|<br ALIGN="LEFT"/>|list_apps(): list[AppEntry]<br ALIGN="LEFT"/>list_dicts(): list[dict]<br ALIGN="LEFT"/>search(query: str, limit: int): list[AppEntry]<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "adapters.gnome.tools.application_tools.ApplicationTools" [color="black", fontcolor="black", label=<{ApplicationTools|<br ALIGN="LEFT"/>|launch_application(arguments: dict): dict<br ALIGN="LEFT"/>open_uri(arguments: dict): dict<br ALIGN="LEFT"/>search_applications(arguments: dict): dict<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "adapters.gnome.tools.clipboard_tools.ClipboardTools" [color="black", fontcolor="black", label=<{ClipboardTools|<br ALIGN="LEFT"/>|read_clipboard(arguments: dict): dict<br ALIGN="LEFT"/>write_clipboard(arguments: dict): dict<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "adapters.gnome.tools.context_tools.ContextTools" [color="black", fontcolor="black", label=<{ContextTools|<br ALIGN="LEFT"/>|get_active_window(arguments: dict): dict<br ALIGN="LEFT"/>get_desktop_context(arguments: dict): dict<br ALIGN="LEFT"/>list_windows(arguments: dict): dict<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "adapters.gnome.gnome_clipboard_provider.GnomeClipboardProvider" [color="black", fontcolor="black", label=<{GnomeClipboardProvider|<br ALIGN="LEFT"/>|read(): str<br ALIGN="LEFT"/>write(text: str): None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "adapters.gnome.gnome_context_provider.GnomeContextProvider" [color="black", fontcolor="black", label=<{GnomeContextProvider|<br ALIGN="LEFT"/>|get_context(): DesktopContext<br ALIGN="LEFT"/>get_context_dict(): dict<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "adapters.gnome.gnome_input_simulator.GnomeInputSimulator" [color="black", fontcolor="black", label=<{GnomeInputSimulator|<br ALIGN="LEFT"/>|mouse_click(x: int, y: int, button: int, clicks: int): None<br ALIGN="LEFT"/>mouse_drag(from_x: int, from_y: int, to_x: int, to_y: int, button: int): None<br ALIGN="LEFT"/>mouse_move(x: int, y: int): None<br ALIGN="LEFT"/>mouse_scroll(direction: str, clicks: int): None<br ALIGN="LEFT"/>press_keys(keys: str): None<br ALIGN="LEFT"/>type_text(text: str): None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "adapters.gnome.gnome_text_chunker.GnomeTextChunker" [color="black", fontcolor="black", label=<{GnomeTextChunker|<br ALIGN="LEFT"/>|split(text: str): list[str]<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "adapters.gnome.gnome_text_paster.GnomeTextPaster" [color="black", fontcolor="black", label=<{GnomeTextPaster|<br ALIGN="LEFT"/>|paste(text: str): None<br ALIGN="LEFT"/>replace(char_count: int, new_text: str): None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "adapters.gnome.gnome_tool_router.GnomeToolRouter" [color="black", fontcolor="black", label=<{GnomeToolRouter|<br ALIGN="LEFT"/>|call(name: str, arguments: dict): dict<br ALIGN="LEFT"/>schemas(): dict[str, dict]<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "adapters.gnome.tools.input_tools.InputTools" [color="black", fontcolor="black", label=<{InputTools|<br ALIGN="LEFT"/>|mouse_click(arguments: dict): dict<br ALIGN="LEFT"/>mouse_drag(arguments: dict): dict<br ALIGN="LEFT"/>mouse_move(arguments: dict): dict<br ALIGN="LEFT"/>mouse_scroll(arguments: dict): dict<br ALIGN="LEFT"/>press_keys(arguments: dict): dict<br ALIGN="LEFT"/>replace_recent_text(arguments: dict): dict<br ALIGN="LEFT"/>type_text(arguments: dict): dict<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "adapters.gnome.tools.tool_schema_catalog.ToolSchemaCatalog" [color="black", fontcolor="black", label=<{ToolSchemaCatalog|<br ALIGN="LEFT"/>|build(): dict[str, dict]<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "adapters.gnome.tools.window_tools.WindowTools" [color="black", fontcolor="black", label=<{WindowTools|<br ALIGN="LEFT"/>|close_window(arguments: dict): dict<br ALIGN="LEFT"/>focus_window(arguments: dict): dict<br ALIGN="LEFT"/>maximize_window(arguments: dict): dict<br ALIGN="LEFT"/>minimize_window(arguments: dict): dict<br ALIGN="LEFT"/>move_resize_window(arguments: dict): dict<br ALIGN="LEFT"/>switch_workspace(arguments: dict): dict<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  }
+  subgraph cluster_0_1 {
+    label="coding"; style="solid,rounded"; color="#555555"; fontsize=15; margin=14;
+    "adapters.coding.coding_edit_planner.CodingEditPlanner" [color="black", fontcolor="black", label=<{CodingEditPlanner|<br ALIGN="LEFT"/>|plan(intent: str, buffer_text: str): str \| None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "adapters.coding.server.CodingServer" [color="black", fontcolor="black", label=<{CodingServer|<br ALIGN="LEFT"/>|serve(): None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "adapters.coding.coding_tool_schema_catalog.CodingToolSchemaCatalog" [color="black", fontcolor="black", label=<{CodingToolSchemaCatalog|<br ALIGN="LEFT"/>|build(): list[dict]<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  }
+  subgraph cluster_0_2 {
+    label="dictation"; style="solid,rounded"; color="#555555"; fontsize=15; margin=14;
+    "adapters.dictation.session_response.DictationEdit" [color="black", fontcolor="black", label=<{DictationEdit|operation : str<br ALIGN="LEFT"/>replace_chars : int<br ALIGN="LEFT"/>text : str<br ALIGN="LEFT"/>|}>, shape="record", style="solid"];
+    "adapters.dictation.dictation_refiner.DictationRefiner" [color="black", fontcolor="black", label=<{DictationRefiner|<br ALIGN="LEFT"/>|refine(text: str): str<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "adapters.dictation.server.DictationServer" [color="black", fontcolor="black", label=<{DictationServer|<br ALIGN="LEFT"/>|serve(): None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "adapters.dictation.dictation_session_store.DictationSessionStore" [color="black", fontcolor="black", label=<{DictationSessionStore|<br ALIGN="LEFT"/>|get(session_id: str): str<br ALIGN="LEFT"/>pop(session_id: str): None<br ALIGN="LEFT"/>prune_stale(): None<br ALIGN="LEFT"/>set(session_id: str, text: str): None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "adapters.dictation.dictation_tool_schema_catalog.DictationToolSchemaCatalog" [color="black", fontcolor="black", label=<{DictationToolSchemaCatalog|<br ALIGN="LEFT"/>|build(): list[dict]<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  }
+}
+subgraph cluster_1 {
+  label="kernel.agent"; style=filled; fillcolor="#f8d9d9"; fontsize=22; margin=24;
+  subgraph cluster_1_0 {
+    label="guards"; style="solid,rounded"; color="#555555"; fontsize=15; margin=14;
+    "tusk.kernel.agent.guards.agent_run_guard.AgentRunGuard" [color="black", fontcolor="black", label=<{AgentRunGuard|<br ALIGN="LEFT"/>|child_lineage(request: AgentRunRequest, session_id: str, lineage: tuple[tuple[str, str, str], ...]): tuple[tuple[str, str, str], ...]<br ALIGN="LEFT"/>validate(request: AgentRunRequest, profile: AgentProfile \| None, lineage: tuple[tuple[str, str, str], ...]): AgentResult \| None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.kernel.agent.guards.conversation_failure_budget_guard.ConversationFailureBudgetGuard" [color="black", fontcolor="black", label=<{ConversationFailureBudgetGuard|<br ALIGN="LEFT"/>|observe(tool_call: ToolCall, tool_result: ToolResult): None<br ALIGN="LEFT"/>violation(profile_id: str, tool_call: ToolCall): str \| None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.kernel.agent.guards.conversation_run_agent_guard.ConversationRunAgentGuard" [color="black", fontcolor="black", label=<{ConversationRunAgentGuard|<br ALIGN="LEFT"/>|observe(tool_call: ToolCall, tool_result: ToolResult): None<br ALIGN="LEFT"/>violation(profile_id: str, tool_call: ToolCall): str \| None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.kernel.agent.guards.executor_clipboard_guard.ExecutorClipboardGuard" [color="black", fontcolor="black", label=<{ExecutorClipboardGuard|<br ALIGN="LEFT"/>|observe(tool_call: ToolCall, tool_result: ToolResult): None<br ALIGN="LEFT"/>violation(profile_id: str, tool_call: ToolCall): str \| None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.kernel.agent.guards.executor_tool_guard.ExecutorToolGuard" [color="black", fontcolor="black", label=<{ExecutorToolGuard|<br ALIGN="LEFT"/>|validate(profile_id: str, request: AgentRunRequest, runtime_names: set[str]): AgentResult \| None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  }
+  subgraph cluster_1_1 {
+    label="session"; style="solid,rounded"; color="#555555"; fontsize=15; margin=14;
+    "tusk.kernel.agent.session.event_formatter.EventFormatter" [color="black", fontcolor="black", label=<{EventFormatter|<br ALIGN="LEFT"/>|digest(events: list[dict[str, object]]): str<br ALIGN="LEFT"/>result(events: list[dict[str, object]]): AgentResult \| None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.kernel.agent.session.file_store.FileStore" [color="black", fontcolor="black", label=<{FileStore|<br ALIGN="LEFT"/>|append_event(session_id: str, event_type: str, data: dict[str, object]): None<br ALIGN="LEFT"/>conversation_messages(session_id: str): list[dict[str, str]]<br ALIGN="LEFT"/>create_session_id(): str<br ALIGN="LEFT"/>final_result(session_id: str): AgentResult \| None<br ALIGN="LEFT"/>has_session(session_id: str): bool<br ALIGN="LEFT"/>session_digest(session_id: str): str<br ALIGN="LEFT"/>start_session(session_id: str, profile_id: str, parent_session_id: str, parent_call_id: str, metadata: dict[str, object]): None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.kernel.agent.session.store.Store" [color="black", fontcolor="black", label=<{Store|<br ALIGN="LEFT"/>|<I>append_event</I>(session_id: str, event_type: str, data: dict[str, object]): None<br ALIGN="LEFT"/><I>conversation_messages</I>(session_id: str): list[dict[str, str]]<br ALIGN="LEFT"/><I>create_session_id</I>(): str<br ALIGN="LEFT"/><I>final_result</I>(session_id: str): AgentResult \| None<br ALIGN="LEFT"/><I>has_session</I>(session_id: str): bool<br ALIGN="LEFT"/><I>session_digest</I>(session_id: str): str<br ALIGN="LEFT"/><I>start_session</I>(session_id: str, profile_id: str, parent_session_id: str, parent_call_id: str, metadata: dict[str, object]): None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  }
+  subgraph cluster_1_2 {
+    label="tool_sequence"; style="solid,rounded"; color="#555555"; fontsize=15; margin=14;
+    "tusk.kernel.agent.tool_sequence.executor.Executor" [color="black", fontcolor="black", label=<{Executor|<br ALIGN="LEFT"/>|execute(session_id: str, parameters: dict[str, object], allowed: set[str]): ToolResult<br ALIGN="LEFT"/>execute_plan(session_id: str, plan: ToolSequencePlan \| None, allowed: set[str]): ToolResult<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.kernel.agent.tool_sequence.plan_validator.PlanValidator" [color="black", fontcolor="black", label=<{PlanValidator|<br ALIGN="LEFT"/>|validate(plan_data: object, allowed: set[str]): str \| None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.kernel.agent.tool_sequence.recorder.Recorder" [color="black", fontcolor="black", label=<{Recorder|<br ALIGN="LEFT"/>|finished(session_id: str, status: str, summary: str): None<br ALIGN="LEFT"/>requested(session_id: str, step_id: str, tool_name: str, args: dict[str, object]): None<br ALIGN="LEFT"/>result(session_id: str, step_id: str, tool_name: str, result: ToolResult): None<br ALIGN="LEFT"/>started(session_id: str, goal: str): None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  }
+  subgraph cluster_1_3 {
+    label="runtime"; style="solid,rounded"; color="#555555"; fontsize=15; margin=14;
+    "tusk.kernel.agent.runtime.message_history_builder.MessageHistoryBuilder" [color="black", fontcolor="black", label=<{MessageHistoryBuilder|<br ALIGN="LEFT"/>|build(session_id: str, request: AgentRunRequest): list[dict[str, str]]<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.kernel.agent.runtime.result_factory.ResultFactory" [color="black", fontcolor="black", label=<{ResultFactory|<br ALIGN="LEFT"/>|cancelled(session_id: str): AgentResult<br ALIGN="LEFT"/>failed(session_id: str, reason: str): AgentResult<br ALIGN="LEFT"/>from_parameters(session_id: str, parameters: dict[str, object]): AgentResult<br ALIGN="LEFT"/>persist(session_id: str, result: AgentResult, reply: str): AgentResult<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.kernel.agent.runtime.step_recorder.StepRecorder" [color="black", fontcolor="black", label=<{StepRecorder|<br ALIGN="LEFT"/>|append_message(session_id: str, role: str, content: str): None<br ALIGN="LEFT"/>appended(messages: list[dict[str, str]], tool_call: ToolCall, tool_result: ToolResult): None<br ALIGN="LEFT"/>requested(session_id: str, step: int, tool_call: ToolCall): None<br ALIGN="LEFT"/>result(session_id: str, step: int, tool_call: ToolCall, tool_result: ToolResult): None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.kernel.agent.runtime.turn_guards.TurnGuards" [color="black", fontcolor="black", label=<{TurnGuards|<br ALIGN="LEFT"/>|observe(tool_call: ToolCall, tool_result: ToolResult): None<br ALIGN="LEFT"/>violation(profile_id: str, tool_call: ToolCall): str \| None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  }
+  subgraph cluster_1_4 {
+    label="planner"; style="solid,rounded"; color="#555555"; fontsize=15; margin=14;
+    "tusk.kernel.agent.planner.result_validator.ResultValidator" [color="black", fontcolor="black", label=<{ResultValidator|<br ALIGN="LEFT"/>|validate(profile_id: str, result: AgentResult, allowed: object): AgentResult<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.kernel.agent.planner.runtime_tool_resolver.RuntimeToolResolver" [color="black", fontcolor="black", label=<{RuntimeToolResolver|<br ALIGN="LEFT"/>|resolve(request: AgentRunRequest, real_names: set[str]): AgentRunRequest<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.kernel.agent.planner.sequence_promoter.SequencePromoter" [color="black", fontcolor="black", label=<{SequencePromoter|<br ALIGN="LEFT"/>|materialize(result: AgentResult): AgentResult<br ALIGN="LEFT"/>promote(result: AgentResult): AgentResult<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.kernel.agent.planner.step_plan_validator.StepPlanValidator" [color="black", fontcolor="black", label=<{StepPlanValidator|<br ALIGN="LEFT"/>|validate(plan_data: object): str \| None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  }
+  "tusk.kernel.agent.agent_child_runner.AgentChildRunner" [color="black", fontcolor="black", label=<{AgentChildRunner|<br ALIGN="LEFT"/>|finished(parent_session_id: str, profile_id: str, result: AgentResult): None<br ALIGN="LEFT"/>invalid_request(): ToolResult<br ALIGN="LEFT"/>request(tool_call: ToolCall, parent_session_id: str): AgentRunRequest<br ALIGN="LEFT"/>result(profile_id: str, agent_result: AgentResult): ToolResult<br ALIGN="LEFT"/>started(parent_session_id: str, child: AgentRunRequest): None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  "tusk.kernel.agent.agent_orchestrator.AgentOrchestrator" [color="black", fontcolor="black", label=<{AgentOrchestrator|<br ALIGN="LEFT"/>|run(request: AgentRunRequest): AgentResult<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  "tusk.kernel.agent.agent_profile.AgentProfile" [color="black", fontcolor="black", label=<{AgentProfile|llm_provider<br ALIGN="LEFT"/>max_steps : int<br ALIGN="LEFT"/>profile_id : str<br ALIGN="LEFT"/>runtime_allowed_tool_names : tuple[str, ...]<br ALIGN="LEFT"/>static_tool_names : tuple[str, ...]<br ALIGN="LEFT"/>system_prompt : str<br ALIGN="LEFT"/>|}>, shape="record", style="solid"];
+  "tusk.kernel.agent.agent_result.AgentResult" [color="black", fontcolor="black", label=<{AgentResult|artifact_refs : list[dict[str, str]]<br ALIGN="LEFT"/>payload : dict[str, object]<br ALIGN="LEFT"/>session_id : str<br ALIGN="LEFT"/>status : str<br ALIGN="LEFT"/>summary : str<br ALIGN="LEFT"/>text : str<br ALIGN="LEFT"/>|reply_text(): str<br ALIGN="LEFT"/>to_dict(): dict[str, object]<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  "tusk.kernel.agent.agent_run_request.AgentRunRequest" [color="black", fontcolor="black", label=<{AgentRunRequest|execution_mode : str<br ALIGN="LEFT"/>instruction : str<br ALIGN="LEFT"/>metadata : dict[str, object]<br ALIGN="LEFT"/>parent_call_id : str<br ALIGN="LEFT"/>parent_session_id : str<br ALIGN="LEFT"/>profile_id : str<br ALIGN="LEFT"/>runtime_tool_names : tuple[str, ...]<br ALIGN="LEFT"/>sequence_plan : ToolSequencePlan \| None<br ALIGN="LEFT"/>session_id : str<br ALIGN="LEFT"/>session_refs : tuple[str, ...]<br ALIGN="LEFT"/>|}>, shape="record", style="solid"];
+  "tusk.kernel.agent.agent_runtime.AgentRuntime" [color="black", fontcolor="black", label=<{AgentRuntime|<br ALIGN="LEFT"/>|run(request: AgentRunRequest, profile: AgentProfile, tools: list[dict[str, object]], executor: Callable[[ToolCall, str], ToolResult]): AgentResult<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  "tusk.kernel.agent.agent_tool_catalog.AgentToolCatalog" [color="black", fontcolor="black", label=<{AgentToolCatalog|<br ALIGN="LEFT"/>|list_tools(): ToolResult<br ALIGN="LEFT"/>prompt_text(): str<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  "tusk.kernel.agent.agent_toolset_builder.AgentToolsetBuilder" [color="black", fontcolor="black", label=<{AgentToolsetBuilder|<br ALIGN="LEFT"/>|build(profile: AgentProfile, request: AgentRunRequest): list[dict[str, object]]<br ALIGN="LEFT"/>runtime_names(profile: AgentProfile, request: AgentRunRequest): set[str]<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  "tusk.kernel.agent.orchestrator_tool_dispatcher.OrchestratorToolDispatcher" [color="black", fontcolor="black", label=<{OrchestratorToolDispatcher|<br ALIGN="LEFT"/>|dispatch(tool_call: ToolCall, run_agent: Callable[[ToolCall], ToolResult], session_id: str, allowed_tool_names: set[str] \| None, sequence_plan: ToolSequencePlan \| None): ToolResult<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  "tusk.kernel.agent.simple_schema_validator.SimpleSchemaValidator" [color="black", fontcolor="black", label=<{SimpleSchemaValidator|<br ALIGN="LEFT"/>|validate(schema: dict[str, object], value: object): str \| None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+}
+subgraph cluster_2 {
+  label="kernel.agent_backends"; style=filled; fillcolor="#fde8e8"; fontsize=22; margin=24;
+  subgraph cluster_2_0 {
+    label="codex_mcp"; style="solid,rounded"; color="#555555"; fontsize=15; margin=14;
+    "tusk.kernel.agent_backends.codex_mcp.call_builder.CallBuilder" [color="black", fontcolor="black", label=<{CallBuilder|<br ALIGN="LEFT"/>|build(prompt: str, working_directory: str, thread_id: str): tuple[str, dict]<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.kernel.agent_backends.codex_mcp.client.Client" [color="black", fontcolor="black", label=<{Client|<br ALIGN="LEFT"/>|call_tool(name: str, arguments: dict): dict<br ALIGN="LEFT"/>is_running(): bool<br ALIGN="LEFT"/>stop(): None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.kernel.agent_backends.codex_mcp.response_reader.ResponseReader" [color="black", fontcolor="black", label=<{ResponseReader|<br ALIGN="LEFT"/>|read(request_id: int, method: str): dict<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.kernel.agent_backends.codex_mcp.result_mapper.ResultMapper" [color="black", fontcolor="black", label=<{ResultMapper|<br ALIGN="LEFT"/>|failure(request: AgentRequest, message: str, status: str): AgentResult<br ALIGN="LEFT"/>success(request: AgentRequest, payload: dict): AgentResult<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  }
+  "tusk.kernel.agent_backends.agent_backend.AgentBackend" [color="black", fontcolor="black", label=<{AgentBackend|<br ALIGN="LEFT"/>|<I>run</I>(request: AgentRequest): AgentResult<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  "tusk.kernel.agent_backends.agent_backend_factory.AgentBackendFactory" [color="black", fontcolor="black", label=<{AgentBackendFactory|<br ALIGN="LEFT"/>|create(): AgentBackend<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  "tusk.kernel.agent_backends.agent_request.AgentRequest" [color="black", fontcolor="black", label=<{AgentRequest|context : dict[str, object]<br ALIGN="LEFT"/>environment : dict[str, str]<br ALIGN="LEFT"/>metadata : dict[str, object]<br ALIGN="LEFT"/>mode : str<br ALIGN="LEFT"/>session_id : str<br ALIGN="LEFT"/>timeout_seconds : float \| None<br ALIGN="LEFT"/>user_text : str<br ALIGN="LEFT"/>working_directory : str<br ALIGN="LEFT"/>|}>, shape="record", style="solid"];
+  "tusk.kernel.agent_backends.agent_result.AgentResult" [color="black", fontcolor="black", label=<{AgentResult|final_text : str<br ALIGN="LEFT"/>handled : bool<br ALIGN="LEFT"/>metadata : dict[str, object]<br ALIGN="LEFT"/>raw_output : Optional[object]<br ALIGN="LEFT"/>reply : str<br ALIGN="LEFT"/>session_id : str<br ALIGN="LEFT"/>status : str<br ALIGN="LEFT"/>|}>, shape="record", style="solid"];
+  "tusk.kernel.agent_backends.backend_run_logger.BackendRunLogger" [color="black", fontcolor="black", label=<{BackendRunLogger|<br ALIGN="LEFT"/>|end(request: AgentRequest, started_at: float, result: AgentResult): None<br ALIGN="LEFT"/>failure(request: AgentRequest, started_at: float, status: str, error: str): None<br ALIGN="LEFT"/>schema(request: AgentRequest, success: bool, detail: str): None<br ALIGN="LEFT"/>start(request: AgentRequest): float<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  "tusk.kernel.agent_backends.codex_exec_agent_backend.CodexExecAgentBackend" [color="black", fontcolor="black", label=<{CodexExecAgentBackend|name : str<br ALIGN="LEFT"/>supports_streaming : bool<br ALIGN="LEFT"/>|run(request: AgentRequest): AgentResult<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  "tusk.kernel.agent_backends.codex_exec_command_builder.CodexExecCommandBuilder" [color="black", fontcolor="black", label=<{CodexExecCommandBuilder|<br ALIGN="LEFT"/>|build(prompt: str): list[str]<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  "tusk.kernel.agent_backends.codex_mcp_agent_backend.CodexMcpAgentBackend" [color="black", fontcolor="black", label=<{CodexMcpAgentBackend|name : str<br ALIGN="LEFT"/>supports_streaming : bool<br ALIGN="LEFT"/>|run(request: AgentRequest): AgentResult<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  "tusk.kernel.agent_backends.codex_prompt_builder.CodexPromptBuilder" [color="black", fontcolor="black", label=<{CodexPromptBuilder|<br ALIGN="LEFT"/>|build(request: AgentRequest): str<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  "tusk.kernel.agent_backends.codex_result_parser.CodexResultParser" [color="black", fontcolor="black", label=<{CodexResultParser|<br ALIGN="LEFT"/>|parse(output: str): dict \| None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  "tusk.kernel.agent_backends.fallback_agent_backend.FallbackAgentBackend" [color="black", fontcolor="black", label=<{FallbackAgentBackend|name : str<br ALIGN="LEFT"/>supports_streaming : bool<br ALIGN="LEFT"/>|run(request: AgentRequest): AgentResult<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  "tusk.kernel.agent_backends.tusk_agent_backend.TuskAgentBackend" [color="black", fontcolor="black", label=<{TuskAgentBackend|name : str<br ALIGN="LEFT"/>supports_streaming : bool<br ALIGN="LEFT"/>|run(request: AgentRequest): AgentResult<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+}
+subgraph cluster_3 {
+  label="kernel.core"; style=filled; fillcolor="#fbe5c8"; fontsize=22; margin=24;
+  subgraph cluster_3_0 {
+    label="modes"; style="solid,rounded"; color="#555555"; fontsize=15; margin=14;
+    "tusk.kernel.modes.adapter_mode.AdapterMode" [color="black", fontcolor="black", label=<{AdapterMode|state : object<br ALIGN="LEFT"/>|process_text(text: str): KernelResponse<br ALIGN="LEFT"/>stop(): KernelResponse<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.kernel.modes.coding_router.CodingRouter" [color="black", fontcolor="black", label=<{CodingRouter|<br ALIGN="LEFT"/>|process(state: object, text: str): KernelResponse<br ALIGN="LEFT"/>stop(state: object): KernelResponse<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.kernel.modes.coding_state.CodingState" [color="black", fontcolor="black", label=<{CodingState|adapter_name : str<br ALIGN="LEFT"/>desktop_source : str<br ALIGN="LEFT"/>session_id : str<br ALIGN="LEFT"/>|}>, shape="record", style="solid"];
+    "tusk.kernel.modes.dictation_router.DictationRouter" [color="black", fontcolor="black", label=<{DictationRouter|<br ALIGN="LEFT"/>|process(state: object, text: str): KernelResponse<br ALIGN="LEFT"/>stop(state: object): KernelResponse<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.kernel.modes.dictation_state.DictationState" [color="black", fontcolor="black", label=<{DictationState|adapter_name : str<br ALIGN="LEFT"/>desktop_source : str<br ALIGN="LEFT"/>session_id : str<br ALIGN="LEFT"/>|}>, shape="record", style="solid"];
+    "tusk.kernel.modes.edit_strategies.full_replace_edit_strategy.FullReplaceEditStrategy" [color="black", fontcolor="black", label=<{FullReplaceEditStrategy|<br ALIGN="LEFT"/>|apply(edit: EditOperation, driver: EditorDriver): None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.kernel.modes.input_automation_editor_driver.InputAutomationEditorDriver" [color="black", fontcolor="black", label=<{InputAutomationEditorDriver|<br ALIGN="LEFT"/>|goto_line(line_number: int): None<br ALIGN="LEFT"/>paste(text: str): None<br ALIGN="LEFT"/>press_keys(keys: str): None<br ALIGN="LEFT"/>read_buffer(): str<br ALIGN="LEFT"/>replace_buffer(text: str): None<br ALIGN="LEFT"/>select_range(selection: BufferSelection): None<br ALIGN="LEFT"/>type_text(text: str): None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.kernel.modes.mode_gate.ModeGate" [color="black", fontcolor="black", label=<{ModeGate|<br ALIGN="LEFT"/>|should_stop(text: str): bool<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.kernel.modes.mode_slot.ModeSlot" [color="black", fontcolor="black", label=<{ModeSlot|active : bool<br ALIGN="LEFT"/>|attach_router(router: object): None<br ALIGN="LEFT"/>process_text(text: str): KernelResponse<br ALIGN="LEFT"/>request_stop(): KernelResponse<br ALIGN="LEFT"/>set_callbacks(on_start: Callable[[], None], on_stop: Callable[[], None]): None<br ALIGN="LEFT"/>start(state: object, log: object): KernelResponse<br ALIGN="LEFT"/>stop(): None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  }
+  subgraph cluster_3_1 {
+    label="interfaces"; style="solid,rounded"; color="#555555"; fontsize=15; margin=14;
+    "tusk.kernel.interfaces.agent.Agent" [color="black", fontcolor="black", label=<{Agent|<br ALIGN="LEFT"/>|<I>process_command</I>(command: str): str<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.kernel.interfaces.conversation_history.ConversationHistory" [color="black", fontcolor="black", label=<{ConversationHistory|<br ALIGN="LEFT"/>|<I>append</I>(message: ChatMessage): None<br ALIGN="LEFT"/><I>clear</I>(): None<br ALIGN="LEFT"/><I>get_messages</I>(): list[ChatMessage]<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.kernel.interfaces.edit_application_strategy.EditApplicationStrategy" [color="black", fontcolor="black", label=<{EditApplicationStrategy|<br ALIGN="LEFT"/>|<I>apply</I>(edit: EditOperation, driver: EditorDriver): None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.kernel.interfaces.editor_driver.EditorDriver" [color="black", fontcolor="black", label=<{EditorDriver|<br ALIGN="LEFT"/>|<I>goto_line</I>(line_number: int): None<br ALIGN="LEFT"/><I>paste</I>(text: str): None<br ALIGN="LEFT"/><I>press_keys</I>(keys: str): None<br ALIGN="LEFT"/><I>read_buffer</I>(): str<br ALIGN="LEFT"/><I>replace_buffer</I>(text: str): None<br ALIGN="LEFT"/><I>select_range</I>(selection: BufferSelection): None<br ALIGN="LEFT"/><I>type_text</I>(text: str): None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.kernel.interfaces.shell.Shell" [color="black", fontcolor="black", label=<{Shell|<br ALIGN="LEFT"/>|<I>start</I>(api: object): None<br ALIGN="LEFT"/><I>stop</I>(): None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  }
+  subgraph cluster_3_2 {
+    label="tools"; style="solid,rounded"; color="#555555"; fontsize=15; margin=14;
+    "tusk.kernel.tools.registered_tool.RegisteredTool" [color="black", fontcolor="black", label=<{RegisteredTool|description : str<br ALIGN="LEFT"/>execute : Callable[[dict], ToolResult]<br ALIGN="LEFT"/>input_schema : dict<br ALIGN="LEFT"/>name : str<br ALIGN="LEFT"/>planner_visible : bool<br ALIGN="LEFT"/>sequence_callable : bool<br ALIGN="LEFT"/>source : str<br ALIGN="LEFT"/>|}>, shape="record", style="solid"];
+    "tusk.kernel.tools.repeated_tool_call_guard.RepeatedToolCallGuard" [color="black", fontcolor="black", label=<{RepeatedToolCallGuard|<br ALIGN="LEFT"/>|repeated(tool_call: ToolCall): bool<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.kernel.tools.start_coding_tool.StartCodingTool" [color="black", fontcolor="black", label=<{StartCodingTool|description : str<br ALIGN="LEFT"/>input_schema : dict<br ALIGN="LEFT"/>name : str<br ALIGN="LEFT"/>source : str<br ALIGN="LEFT"/>|execute(parameters: dict): ToolResult<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.kernel.tools.start_dictation_tool.StartDictationTool" [color="black", fontcolor="black", label=<{StartDictationTool|description : str<br ALIGN="LEFT"/>input_schema : dict<br ALIGN="LEFT"/>name : str<br ALIGN="LEFT"/>source : str<br ALIGN="LEFT"/>|execute(parameters: dict): ToolResult<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.kernel.tools.switch_model_tool.SwitchModelTool" [color="black", fontcolor="black", label=<{SwitchModelTool|description : str<br ALIGN="LEFT"/>input_schema : dict<br ALIGN="LEFT"/>name : str<br ALIGN="LEFT"/>source : str<br ALIGN="LEFT"/>|execute(parameters: dict): ToolResult<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.kernel.tools.tool_registry.ToolRegistry" [color="black", fontcolor="black", label=<{ToolRegistry|<br ALIGN="LEFT"/>|all_tools(): list[RegisteredTool]<br ALIGN="LEFT"/>definitions_for(names: set[str]): list[dict[str, object]]<br ALIGN="LEFT"/>get(name: str): RegisteredTool<br ALIGN="LEFT"/>planner_tool_names(): set[str]<br ALIGN="LEFT"/>planner_tools(): list[RegisteredTool]<br ALIGN="LEFT"/>real_tool_names(): set[str]<br ALIGN="LEFT"/>real_tools(): list[RegisteredTool]<br ALIGN="LEFT"/>register(tool: object): None<br ALIGN="LEFT"/>sequence_tool_names(): set[str]<br ALIGN="LEFT"/>sequence_tools(): list[RegisteredTool]<br ALIGN="LEFT"/>unregister_source(source: str): None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.kernel.tools.tool_runtime.ToolRuntime" [color="black", fontcolor="black", label=<{ToolRuntime|<br ALIGN="LEFT"/>|register_tools(controller: object): None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  }
+  "tusk.kernel.adapter_manager.AdapterManager" [color="black", fontcolor="black", label=<{AdapterManager|adapters_dir : Path<br ALIGN="LEFT"/>tool_registry<br ALIGN="LEFT"/>|primary_desktop_source(): str<br ALIGN="LEFT"/>start_adapter(adapter_dir: str): None<br ALIGN="LEFT"/>start_all(): None<br ALIGN="LEFT"/>start_watcher(): None<br ALIGN="LEFT"/>stop_adapter(name: str): None<br ALIGN="LEFT"/>stop_all(): None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  "tusk.kernel.clipboard_guard.ClipboardGuard" [color="black", fontcolor="black", label=<{ClipboardGuard|<br ALIGN="LEFT"/>|}>, shape="record", style="solid"];
+  "tusk.kernel.command_mode.CommandMode" [color="black", fontcolor="black", label=<{CommandMode|<br ALIGN="LEFT"/>|process_command(command: str): KernelResponse<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  "tusk.kernel.api.KernelAPI" [color="black", fontcolor="black", label=<{KernelAPI|coding_active : bool<br ALIGN="LEFT"/>interrupt_token : object \| None<br ALIGN="LEFT"/>|attach_coding_router(router: object): None<br ALIGN="LEFT"/>attach_dictation_router(router: object): None<br ALIGN="LEFT"/>get_llm_registry(): LLMRegistry \| None<br ALIGN="LEFT"/>request_coding_stop(): KernelResponse<br ALIGN="LEFT"/>request_dictation_stop(): KernelResponse<br ALIGN="LEFT"/>request_interrupt(): None<br ALIGN="LEFT"/>set_coding_callbacks(on_start: Callable[[], None], on_stop: Callable[[], None]): None<br ALIGN="LEFT"/>set_dictation_callbacks(on_start: Callable[[], None], on_stop: Callable[[], None]): None<br ALIGN="LEFT"/>start_coding(state: object): KernelResponse<br ALIGN="LEFT"/>start_dictation(state: object): KernelResponse<br ALIGN="LEFT"/>stop_coding(): None<br ALIGN="LEFT"/>stop_dictation(): None<br ALIGN="LEFT"/>submit(text: str): KernelResponse<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  "tusk.kernel.main_agent.MainAgent" [color="black", fontcolor="black", label=<{MainAgent|<br ALIGN="LEFT"/>|process_command(command: str): str<br ALIGN="LEFT"/>run(request: AgentRequest): BackendAgentResult<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  "tusk.kernel.model_failure_reply_builder.ModelFailureReplyBuilder" [color="black", fontcolor="black", label=<{ModelFailureReplyBuilder|<br ALIGN="LEFT"/>|build(exc: Exception): str<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  "tusk.kernel.sliding_window_history.SlidingWindowHistory" [color="black", fontcolor="black", label=<{SlidingWindowHistory|<br ALIGN="LEFT"/>|append(message: ChatMessage): None<br ALIGN="LEFT"/>clear(): None<br ALIGN="LEFT"/>get_messages(): list[ChatMessage]<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  "tusk.kernel.submit_status_reporter.SubmitStatusReporter" [color="black", fontcolor="black", label=<{SubmitStatusReporter|<br ALIGN="LEFT"/>|run(text: str, route: Callable[[str], object]): object<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+}
+subgraph cluster_4 {
+  label="providers"; style=filled; fillcolor="#e0e8fb"; fontsize=22; margin=24;
+  subgraph cluster_4_0 {
+    label="llm"; style="solid,rounded"; color="#555555"; fontsize=15; margin=14;
+    "tusk.providers.llm.configurable_llm_factory.ConfigurableLLMFactory" [color="black", fontcolor="black", label=<{ConfigurableLLMFactory|<br ALIGN="LEFT"/>|create(provider_name: str, model: str): LLMProvider<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.providers.llm.groq_llm.GroqLLM" [color="black", fontcolor="black", label=<{GroqLLM|label : str<br ALIGN="LEFT"/>|complete(system_prompt: str, user_message: str, max_tokens: int): str<br ALIGN="LEFT"/>complete_messages(system_prompt: str, messages: list[dict]): str<br ALIGN="LEFT"/>complete_structured(system_prompt: str, user_message: str, schema_name: str, schema: dict, max_tokens: int): str<br ALIGN="LEFT"/>complete_tool_call(system_prompt: str, messages: list[dict], tools: list[dict[str, object]]): ToolCall<br ALIGN="LEFT"/>set_payload_logger(logger: object): None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.providers.llm.open_router_llm.OpenRouterLLM" [color="black", fontcolor="black", label=<{OpenRouterLLM|label : str<br ALIGN="LEFT"/>|complete(system_prompt: str, user_message: str, max_tokens: int): str<br ALIGN="LEFT"/>complete_messages(system_prompt: str, messages: list[dict]): str<br ALIGN="LEFT"/>complete_structured(system_prompt: str, user_message: str, schema_name: str, schema: dict, max_tokens: int): str<br ALIGN="LEFT"/>complete_tool_call(system_prompt: str, messages: list[dict], tools: list[dict[str, object]]): ToolCall<br ALIGN="LEFT"/>set_payload_logger(logger: object): None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  }
+  subgraph cluster_4_1 {
+    label="stt"; style="solid,rounded"; color="#555555"; fontsize=15; margin=14;
+    "tusk.providers.stt.groq_stt.GroqSTT" [color="black", fontcolor="black", label=<{GroqSTT|<br ALIGN="LEFT"/>|transcribe(audio_frames: bytes, sample_rate: int): Utterance<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.providers.stt.stt_engine_factory.STTEngineFactory" [color="black", fontcolor="black", label=<{STTEngineFactory|<br ALIGN="LEFT"/>|create(name: str): STTEngine<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.providers.stt.whisper_stt.WhisperSTT" [color="black", fontcolor="black", label=<{WhisperSTT|<br ALIGN="LEFT"/>|transcribe(audio_frames: bytes, sample_rate: int): Utterance<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  }
+  subgraph cluster_4_2 {
+    label="tts"; style="solid,rounded"; color="#555555"; fontsize=15; margin=14;
+    "tusk.providers.tts.groq_tts.GroqTTS" [color="black", fontcolor="black", label=<{GroqTTS|<br ALIGN="LEFT"/>|synthesize(text: str): bytes<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.providers.tts.text_chunker.TextChunker" [color="black", fontcolor="black", label=<{TextChunker|<br ALIGN="LEFT"/>|split(text: str): list[str]<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.providers.tts.wav_concatenator.WavConcatenator" [color="black", fontcolor="black", label=<{WavConcatenator|<br ALIGN="LEFT"/>|concatenate(clips: list[bytes]): bytes<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  }
+}
+subgraph cluster_5 {
+  label="shared.contracts"; style=filled; fillcolor="#d7f0d3"; fontsize=22; margin=24;
+  subgraph cluster_5_0 {
+    label="mcp"; style="solid,rounded"; color="#555555"; fontsize=15; margin=14;
+    "tusk.shared.mcp.adapter_env_builder.AdapterEnvironmentBuilder" [color="black", fontcolor="black", label=<{AdapterEnvironmentBuilder|<br ALIGN="LEFT"/>|base_env(): dict<br ALIGN="LEFT"/>build(path: Path, manifest: dict): dict<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.shared.mcp.adapter_watcher.AdapterWatcher" [color="black", fontcolor="black", label=<{AdapterWatcher|<br ALIGN="LEFT"/>|on_created(event): None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.shared.mcp.mcp_client.MCPClient" [color="black", fontcolor="black", label=<{MCPClient|<br ALIGN="LEFT"/>|call_tool(name: str, arguments: dict): MCPToolResult<br ALIGN="LEFT"/><I>connect_http</I>(url: str): None<br ALIGN="LEFT"/>connect_stdio(command: list[str], cwd: str, env: dict \| None): None<br ALIGN="LEFT"/>is_running(): bool<br ALIGN="LEFT"/>list_tools(): list[MCPToolSchema]<br ALIGN="LEFT"/>shutdown(): None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.shared.mcp.mcp_stdio_server.MCPStdioServer" [color="black", fontcolor="black", label=<{MCPStdioServer|<br ALIGN="LEFT"/>|serve(): None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.shared.mcp.mcp_stdio_transport.MCPStdioTransport" [color="black", fontcolor="black", label=<{MCPStdioTransport|<br ALIGN="LEFT"/>|is_running(): bool<br ALIGN="LEFT"/>read_line(): str \| None<br ALIGN="LEFT"/>stderr_text(): str<br ALIGN="LEFT"/>stop(): None<br ALIGN="LEFT"/>write_line(line: str): None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.shared.mcp.mcp_tool_proxy.MCPToolProxy" [color="black", fontcolor="black", label=<{MCPToolProxy|description<br ALIGN="LEFT"/>input_schema<br ALIGN="LEFT"/>name : str<br ALIGN="LEFT"/>planner_visible : bool<br ALIGN="LEFT"/>sequence_callable : bool<br ALIGN="LEFT"/>source : str<br ALIGN="LEFT"/>|execute(parameters: dict): ToolResult<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  }
+  subgraph cluster_5_1 {
+    label="logging"; style="solid,rounded"; color="#555555"; fontsize=15; margin=14;
+    "tusk.shared.logging.color_log_printer.ColorLogPrinter" [color="black", fontcolor="black", label=<{ColorLogPrinter|<br ALIGN="LEFT"/>|<I>clear_wait</I>(): None<br ALIGN="LEFT"/>log(tag: str, message: str, group: str \| None): None<br ALIGN="LEFT"/>show_wait(label: str, group: str): None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.shared.logging.interfaces.log_printer.LogPrinter" [color="black", fontcolor="black", label=<{LogPrinter|<br ALIGN="LEFT"/>|<I>clear_wait</I>(): None<br ALIGN="LEFT"/><I>log</I>(tag: str, message: str, group: str \| None): None<br ALIGN="LEFT"/><I>show_wait</I>(label: str, group: str): None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  }
+  subgraph cluster_5_2 {
+    label="config"; style="solid,rounded"; color="#555555"; fontsize=15; margin=14;
+    "tusk.shared.config.config.Config" [color="black", fontcolor="black", label=<{Config|adapter_env_cache_dir : str<br ALIGN="LEFT"/>agent_backend : str<br ALIGN="LEFT"/>agent_backend_fallback : str<br ALIGN="LEFT"/>agent_session_log_dir : str<br ALIGN="LEFT"/>audio_frame_duration_ms : int<br ALIGN="LEFT"/>audio_sample_rate : int<br ALIGN="LEFT"/>codex_exec_binary : str<br ALIGN="LEFT"/>codex_exec_extra_args : tuple[str, ...]<br ALIGN="LEFT"/>codex_exec_log_raw_events : bool<br ALIGN="LEFT"/>codex_exec_model : str<br ALIGN="LEFT"/>codex_exec_output_schema_path : str<br ALIGN="LEFT"/>codex_exec_sandbox_mode : str<br ALIGN="LEFT"/>codex_exec_timeout_seconds : int<br ALIGN="LEFT"/>codex_exec_workdir : str<br ALIGN="LEFT"/>conversation_agent_llm<br ALIGN="LEFT"/>default_agent_llm<br ALIGN="LEFT"/>executor_agent_llm<br ALIGN="LEFT"/>follow_up_timeout_seconds : float<br ALIGN="LEFT"/>gate_recovery_candidate_limit : int<br ALIGN="LEFT"/>gate_recovery_window_seconds : float<br ALIGN="LEFT"/>gatekeeper_llm<br ALIGN="LEFT"/>groq_api_key : str<br ALIGN="LEFT"/>max_follow_up_timeout_seconds : float<br ALIGN="LEFT"/>openrouter_api_key : str<br ALIGN="LEFT"/>planner_agent_llm<br ALIGN="LEFT"/>shells : list[str]<br ALIGN="LEFT"/>stt_engine : str<br ALIGN="LEFT"/>tray_icon_theme : str<br ALIGN="LEFT"/>tray_show_last_activity : bool<br ALIGN="LEFT"/>tts_enabled : bool<br ALIGN="LEFT"/>utility_llm<br ALIGN="LEFT"/>vad_aggressiveness : int<br ALIGN="LEFT"/>whisper_model_size : str<br ALIGN="LEFT"/>|from_env(): 'Config'<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.shared.config.config_factory.ConfigFactory" [color="black", fontcolor="black", label=<{ConfigFactory|<br ALIGN="LEFT"/>|build(): Config<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.shared.config.startup_options.StartupOptions" [color="black", fontcolor="black", label=<{StartupOptions|hidden_groups : frozenset[str]<br ALIGN="LEFT"/>llm_log_preview_chars : int<br ALIGN="LEFT"/>log_groups : frozenset[str]<br ALIGN="LEFT"/>|from_sources(argv: list[str] \| None, environ: dict[str, str] \| None): 'StartupOptions'<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  }
+  subgraph cluster_5_3 {
+    label="interrupt"; style="solid,rounded"; color="#555555"; fontsize=15; margin=14;
+    "tusk.shared.interrupt.interrupt_token.InterruptToken" [color="black", fontcolor="black", label=<{InterruptToken|is_interrupted : bool<br ALIGN="LEFT"/>|clear(): None<br ALIGN="LEFT"/>interrupt(): None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  }
+  subgraph cluster_5_4 {
+    label="llm"; style="solid,rounded"; color="#555555"; fontsize=15; margin=14;
+    "tusk.shared.llm.llm_payload_logger.LLMPayloadLogger" [color="black", fontcolor="black", label=<{LLMPayloadLogger|<br ALIGN="LEFT"/>|before_request(provider: str, payload: dict[str, object]): None<br ALIGN="LEFT"/>log_response(response: str \| ToolCall): None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.shared.llm.interfaces.llm_provider.LLMProvider" [color="black", fontcolor="black", label=<{LLMProvider|label : str<br ALIGN="LEFT"/>|<I>complete</I>(system_prompt: str, user_message: str, max_tokens: int): str<br ALIGN="LEFT"/><I>complete_messages</I>(system_prompt: str, messages: list[dict]): str<br ALIGN="LEFT"/><I>complete_structured</I>(system_prompt: str, user_message: str, schema_name: str, schema: dict, max_tokens: int): str<br ALIGN="LEFT"/><I>complete_tool_call</I>(system_prompt: str, messages: list[dict], tools: list[dict[str, object]]): ToolCall<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.shared.llm.interfaces.llm_provider_factory.LLMProviderFactory" [color="black", fontcolor="black", label=<{LLMProviderFactory|<br ALIGN="LEFT"/>|<I>create</I>(provider_name: str, model: str): LLMProvider<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.shared.llm.llm_proxy.LLMProxy" [color="black", fontcolor="black", label=<{LLMProxy|label : str<br ALIGN="LEFT"/>|complete(system_prompt: str, user_message: str, max_tokens: int): str<br ALIGN="LEFT"/>complete_messages(system_prompt: str, messages: list[dict]): str<br ALIGN="LEFT"/>complete_structured(system_prompt: str, user_message: str, schema_name: str, schema: dict, max_tokens: int): str<br ALIGN="LEFT"/>complete_tool_call(system_prompt: str, messages: list[dict], tools: list[dict[str, object]]): ToolCall<br ALIGN="LEFT"/>swap(provider: LLMProvider): None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.shared.llm.llm_registry.LLMRegistry" [color="black", fontcolor="black", label=<{LLMRegistry|slot_names : list[str]<br ALIGN="LEFT"/>|get(name: str): LLMProvider<br ALIGN="LEFT"/>model_labels(): tuple[tuple[str, str], ...]<br ALIGN="LEFT"/>register_slot(name: str, proxy: LLMProxy): None<br ALIGN="LEFT"/>swap(slot_name: str, provider_name: str, model: str): str<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.shared.llm.llm_retry_policy.LLMRetryPolicy" [color="black", fontcolor="black", label=<{LLMRetryPolicy|<br ALIGN="LEFT"/>|should_retry(exc: Exception): bool<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.shared.llm.llm_retry_runner.LLMRetryRunner" [color="black", fontcolor="black", label=<{LLMRetryRunner|<br ALIGN="LEFT"/>|run(operation: object, on_retry: object \| None): str<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.shared.llm.tool_use_failed_recovery.ToolUseFailedRecovery" [color="black", fontcolor="black", label=<{ToolUseFailedRecovery|<br ALIGN="LEFT"/>|recover(exc: Exception): ToolCall \| None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  }
+  subgraph cluster_5_5 {
+    label="status"; style="solid,rounded"; color="#555555"; fontsize=15; margin=14;
+    "tusk.shared.status.null_status_sink.NullStatusSink" [color="black", fontcolor="black", label=<{NullStatusSink|<br ALIGN="LEFT"/>|publish(snapshot: StatusSnapshot): None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.shared.status.interfaces.status_reporter.StatusReporter" [color="black", fontcolor="black", label=<{StatusReporter|status : AppStatus<br ALIGN="LEFT"/>|<I>set_mic_device</I>(device: str): None<br ALIGN="LEFT"/><I>set_mode</I>(mode: AppMode): None<br ALIGN="LEFT"/><I>set_models</I>(models: tuple[tuple[str, str], ...]): None<br ALIGN="LEFT"/><I>set_status</I>(status: AppStatus, detail: str): None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.shared.status.status_reporter_hub.StatusReporterHub" [color="black", fontcolor="black", label=<{StatusReporterHub|status : AppStatus<br ALIGN="LEFT"/>|attach_sink(sink: StatusSink): None<br ALIGN="LEFT"/>set_mic_device(device: str): None<br ALIGN="LEFT"/>set_mode(mode: AppMode): None<br ALIGN="LEFT"/>set_models(models: tuple[tuple[str, str], ...]): None<br ALIGN="LEFT"/>set_status(status: AppStatus, detail: str): None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.shared.status.interfaces.status_sink.StatusSink" [color="black", fontcolor="black", label=<{StatusSink|<br ALIGN="LEFT"/>|<I>publish</I>(snapshot: StatusSnapshot): None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  }
+  subgraph cluster_5_6 {
+    label="stt"; style="solid,rounded"; color="#555555"; fontsize=15; margin=14;
+    "tusk.shared.stt.interfaces.stt_engine.STTEngine" [color="black", fontcolor="black", label=<{STTEngine|<br ALIGN="LEFT"/>|<I>transcribe</I>(audio_frames: bytes, sample_rate: int): Utterance<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  }
+  subgraph cluster_5_7 {
+    label="tts"; style="solid,rounded"; color="#555555"; fontsize=15; margin=14;
+    "tusk.shared.tts.interfaces.tts_engine.TTSEngine" [color="black", fontcolor="black", label=<{TTSEngine|<br ALIGN="LEFT"/>|<I>synthesize</I>(text: str): bytes<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  }
+}
+subgraph cluster_6 {
+  label="shared.schemas"; style=filled; fillcolor="#e3f2e1"; fontsize=22; margin=24;
+  subgraph cluster_6_0 {
+    label="desktop"; style="solid,rounded"; color="#555555"; fontsize=15; margin=14;
+    "tusk.shared.schemas.desktop.app_entry.AppEntry" [color="black", fontcolor="black", label=<{AppEntry|exec_cmd : str<br ALIGN="LEFT"/>name : str<br ALIGN="LEFT"/>|}>, shape="record", style="solid"];
+    "tusk.shared.schemas.desktop.desktop_context.DesktopContext" [color="black", fontcolor="black", label=<{DesktopContext|active_application : str<br ALIGN="LEFT"/>active_window_title : str<br ALIGN="LEFT"/>available_applications : list[object]<br ALIGN="LEFT"/>open_windows : list[WindowInfo]<br ALIGN="LEFT"/>|}>, shape="record", style="solid"];
+    "tusk.shared.schemas.desktop.window_info.WindowInfo" [color="black", fontcolor="black", label=<{WindowInfo|application : str<br ALIGN="LEFT"/>height : int<br ALIGN="LEFT"/>is_active : bool<br ALIGN="LEFT"/>title : str<br ALIGN="LEFT"/>width : int<br ALIGN="LEFT"/>window_id : str<br ALIGN="LEFT"/>x : int<br ALIGN="LEFT"/>y : int<br ALIGN="LEFT"/>|}>, shape="record", style="solid"];
+  }
+  subgraph cluster_6_1 {
+    label="tools"; style="solid,rounded"; color="#555555"; fontsize=15; margin=14;
+    "tusk.shared.schemas.tools.mcp_tool_result.MCPToolResult" [color="black", fontcolor="black", label=<{MCPToolResult|content : str<br ALIGN="LEFT"/>data : dict \| None<br ALIGN="LEFT"/>is_error : bool<br ALIGN="LEFT"/>|}>, shape="record", style="solid"];
+    "tusk.shared.schemas.tools.mcp_tool_schema.MCPToolSchema" [color="black", fontcolor="black", label=<{MCPToolSchema|description : str<br ALIGN="LEFT"/>input_schema : dict<br ALIGN="LEFT"/>name : str<br ALIGN="LEFT"/>|}>, shape="record", style="solid"];
+    "tusk.shared.schemas.tools.tool_call.ToolCall" [color="black", fontcolor="black", label=<{ToolCall|call_id : str<br ALIGN="LEFT"/>parameters : dict[str, object]<br ALIGN="LEFT"/>tool_name : str<br ALIGN="LEFT"/>|}>, shape="record", style="solid"];
+    "tusk.shared.schemas.tools.tool_result.ToolResult" [color="black", fontcolor="black", label=<{ToolResult|data : dict \| None<br ALIGN="LEFT"/>message : str<br ALIGN="LEFT"/>success : bool<br ALIGN="LEFT"/>|}>, shape="record", style="solid"];
+    "tusk.shared.schemas.tools.tool_sequence_plan.ToolSequencePlan" [color="black", fontcolor="black", label=<{ToolSequencePlan|goal : str<br ALIGN="LEFT"/>steps : tuple[ToolSequenceStep, ...]<br ALIGN="LEFT"/>|from_dict(data: object): 'ToolSequencePlan \| None'<br ALIGN="LEFT"/>ordered_tool_names(): tuple[str, ...]<br ALIGN="LEFT"/>to_dict(): dict[str, object]<br ALIGN="LEFT"/>tool_names(): set[str]<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "tusk.shared.schemas.tools.tool_sequence_step.ToolSequenceStep" [color="black", fontcolor="black", label=<{ToolSequenceStep|args : dict[str, object]<br ALIGN="LEFT"/>step_id : str<br ALIGN="LEFT"/>tool_name : str<br ALIGN="LEFT"/>|from_dict(data: object): 'ToolSequenceStep \| None'<br ALIGN="LEFT"/>to_dict(): dict[str, object]<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  }
+  "tusk.shared.schemas.app_mode.AppMode" [color="black", fontcolor="black", label=<{AppMode|name<br ALIGN="LEFT"/>|}>, shape="record", style="solid"];
+  "tusk.shared.schemas.app_status.AppStatus" [color="black", fontcolor="black", label=<{AppStatus|name<br ALIGN="LEFT"/>|}>, shape="record", style="solid"];
+  "tusk.shared.schemas.buffer_selection.BufferSelection" [color="black", fontcolor="black", label=<{BufferSelection|end_line : int<br ALIGN="LEFT"/>start_line : int<br ALIGN="LEFT"/>|}>, shape="record", style="solid"];
+  "tusk.shared.schemas.chat_message.ChatMessage" [color="black", fontcolor="black", label=<{ChatMessage|content : str<br ALIGN="LEFT"/>is_summary : bool<br ALIGN="LEFT"/>role : str<br ALIGN="LEFT"/>|to_dict(): dict[str, str]<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  "tusk.shared.schemas.edit_operation.EditOperation" [color="black", fontcolor="black", label=<{EditOperation|full_buffer : str<br ALIGN="LEFT"/>kind : str<br ALIGN="LEFT"/>new_text : str<br ALIGN="LEFT"/>target_end : int<br ALIGN="LEFT"/>target_start : int<br ALIGN="LEFT"/>|}>, shape="record", style="solid"];
+  "tusk.shared.schemas.gate_classification.GateClassification" [color="black", fontcolor="black", label=<{GateClassification|name<br ALIGN="LEFT"/>|}>, shape="record", style="solid"];
+  "tusk.shared.schemas.gate_result.GateResult" [color="black", fontcolor="black", label=<{GateResult|classification<br ALIGN="LEFT"/>cleaned_command : str<br ALIGN="LEFT"/>confidence : float<br ALIGN="LEFT"/>is_directed_at_tusk : bool<br ALIGN="LEFT"/>|}>, shape="record", style="solid"];
+  "tusk.shared.schemas.kernel_response.KernelResponse" [color="black", fontcolor="black", label=<{KernelResponse|handled : bool<br ALIGN="LEFT"/>reply : str<br ALIGN="LEFT"/>|}>, shape="record", style="solid"];
+  "tusk.shared.schemas.llm_slot_config.LLMSlotConfig" [color="black", fontcolor="black", label=<{LLMSlotConfig|model : str<br ALIGN="LEFT"/>provider_name : str<br ALIGN="LEFT"/>|parse(value: str): 'LLMSlotConfig'<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  "tusk.shared.schemas.status_snapshot.StatusSnapshot" [color="black", fontcolor="black", label=<{StatusSnapshot|detail : str<br ALIGN="LEFT"/>mic_device : str<br ALIGN="LEFT"/>mode<br ALIGN="LEFT"/>models : tuple[tuple[str, str], ...]<br ALIGN="LEFT"/>status<br ALIGN="LEFT"/>|}>, shape="record", style="solid"];
+  "tusk.shared.schemas.utterance.Utterance" [color="black", fontcolor="black", label=<{Utterance|audio_frames : bytes<br ALIGN="LEFT"/>confidence : float<br ALIGN="LEFT"/>duration_seconds : float<br ALIGN="LEFT"/>text : str<br ALIGN="LEFT"/>|}>, shape="record", style="solid"];
+}
+subgraph cluster_7 {
+  label="shells"; style=filled; fillcolor="#f3e3fa"; fontsize=22; margin=24;
+  subgraph cluster_7_0 {
+    label="tray"; style="solid,rounded"; color="#555555"; fontsize=15; margin=14;
+    "shells.tray.appindicator_tray_backend.AppIndicatorTrayBackend" [color="black", fontcolor="black", label=<{AppIndicatorTrayBackend|<br ALIGN="LEFT"/>|run(): None<br ALIGN="LEFT"/>set_icon(name: str): None<br ALIGN="LEFT"/>set_menu(items: tuple[TrayMenuItem, ...]): None<br ALIGN="LEFT"/>set_tooltip(text: str): None<br ALIGN="LEFT"/>stop(): None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "shells.tray.status_icon_resolver.StatusIconResolver" [color="black", fontcolor="black", label=<{StatusIconResolver|<br ALIGN="LEFT"/>|resolve(status: AppStatus): str<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "shells.tray.interfaces.tray_backend.TrayBackend" [color="black", fontcolor="black", label=<{TrayBackend|<br ALIGN="LEFT"/>|<I>run</I>(): None<br ALIGN="LEFT"/><I>set_icon</I>(name: str): None<br ALIGN="LEFT"/><I>set_menu</I>(items: tuple[TrayMenuItem, ...]): None<br ALIGN="LEFT"/><I>set_tooltip</I>(text: str): None<br ALIGN="LEFT"/><I>stop</I>(): None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "shells.tray.tray_menu_actions.TrayMenuActions" [color="black", fontcolor="black", label=<{TrayMenuActions|exit : Callable[[], None]<br ALIGN="LEFT"/>open_logs : Callable[[], None]<br ALIGN="LEFT"/>pause : Callable[[], None]<br ALIGN="LEFT"/>restart : Callable[[], None]<br ALIGN="LEFT"/>resume : Callable[[], None]<br ALIGN="LEFT"/>|}>, shape="record", style="solid"];
+    "shells.tray.tray_menu_builder.TrayMenuBuilder" [color="black", fontcolor="black", label=<{TrayMenuBuilder|<br ALIGN="LEFT"/>|build(snapshot: StatusSnapshot, actions: TrayMenuActions, show_last_activity: bool): tuple[TrayMenuItem, ...]<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "shells.tray.tray_menu_item.TrayMenuItem" [color="black", fontcolor="black", label=<{TrayMenuItem|action : Callable[[], None] \| None<br ALIGN="LEFT"/>children : tuple['TrayMenuItem', ...]<br ALIGN="LEFT"/>enabled : bool<br ALIGN="LEFT"/>label : str<br ALIGN="LEFT"/>|}>, shape="record", style="solid"];
+    "shells.tray.tray_shell.TrayShell" [color="black", fontcolor="black", label=<{TrayShell|<br ALIGN="LEFT"/>|start(submit: object): None<br ALIGN="LEFT"/>stop(): None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "shells.tray.tray_status_sink.TrayStatusSink" [color="black", fontcolor="black", label=<{TrayStatusSink|<br ALIGN="LEFT"/>|publish(snapshot: StatusSnapshot): None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  }
+  subgraph cluster_7_1 {
+    label="voice"; style="solid,rounded"; color="#555555"; fontsize=15; margin=14;
+    "shells.voice.stages.audio_capture.AudioCapture" [color="black", fontcolor="black", label=<{AudioCapture|<br ALIGN="LEFT"/>|stream_frames(): Iterator[bytes]<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "shells.voice.buffered_utterance.BufferedUtterance" [color="black", fontcolor="black", label=<{BufferedUtterance|gate_state<br ALIGN="LEFT"/>id : str<br ALIGN="LEFT"/>received_at : float<br ALIGN="LEFT"/>text : str<br ALIGN="LEFT"/>utterance<br ALIGN="LEFT"/>|}>, shape="record", style="solid"];
+    "shells.voice.command_worker.CommandWorker" [color="black", fontcolor="black", label=<{CommandWorker|current_speech_text : str \| None<br ALIGN="LEFT"/>is_busy : bool<br ALIGN="LEFT"/>|enqueue(text: str): None<br ALIGN="LEFT"/>flush(): None<br ALIGN="LEFT"/>start(): None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "shells.voice.gate_action.GateAction" [color="black", fontcolor="black", label=<{GateAction|name<br ALIGN="LEFT"/>|}>, shape="record", style="solid"];
+    "shells.voice.gate_dispatch.GateDispatch" [color="black", fontcolor="black", label=<{GateDispatch|action<br ALIGN="LEFT"/>recovered_id : str<br ALIGN="LEFT"/>text : str \| None<br ALIGN="LEFT"/>|}>, shape="record", style="solid"];
+    "shells.voice.gate_state.GateState" [color="black", fontcolor="black", label=<{GateState|name<br ALIGN="LEFT"/>|}>, shape="record", style="solid"];
+    "shells.voice.interfaces.gatekeeper.Gatekeeper" [color="black", fontcolor="black", label=<{Gatekeeper|<br ALIGN="LEFT"/>|<I>process</I>(utterance: Utterance \| BufferedUtterance, recent: list[Utterance], candidates: list[BufferedUtterance] \| None): GateDispatch<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "shells.voice.gatekeeper_slot.GatekeeperSlot" [color="black", fontcolor="black", label=<{GatekeeperSlot|<br ALIGN="LEFT"/>|process(utterance: Utterance \| BufferedUtterance, recent: list[Utterance], candidates: list[BufferedUtterance] \| None): GateDispatch<br ALIGN="LEFT"/>swap(gatekeeper: Gatekeeper): None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "shells.voice.stages.gate.llm_client.LLMClient" [color="black", fontcolor="black", label=<{LLMClient|<br ALIGN="LEFT"/>|primary(prompt: str, text: str): GateResult<br ALIGN="LEFT"/>recovery(prompt: str, text: str, candidates: list[BufferedUtterance]): RecoveryDecision<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "shells.voice.stages.gate.gatekeeper.LLMGatekeeper" [color="black", fontcolor="black", label=<{LLMGatekeeper|<br ALIGN="LEFT"/>|evaluate(utterance: Utterance, recent: list[Utterance]): GateResult<br ALIGN="LEFT"/>process(utterance: Utterance \| BufferedUtterance, recent: list[Utterance], candidates: list[BufferedUtterance] \| None): GateDispatch<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "shells.voice.playback_gate.PlaybackGate" [color="black", fontcolor="black", label=<{PlaybackGate|<br ALIGN="LEFT"/>|process(utterance: Utterance \| BufferedUtterance, recent: list[Utterance], candidates: list[BufferedUtterance] \| None): GateDispatch<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "shells.voice.stages.gate.recent_context_formatter.RecentContextFormatter" [color="black", fontcolor="black", label=<{RecentContextFormatter|<br ALIGN="LEFT"/>|format(utterances: list[Utterance]): str<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "shells.voice.recovery_decision.RecoveryDecision" [color="black", fontcolor="black", label=<{RecoveryDecision|action : str<br ALIGN="LEFT"/>candidate_id : str<br ALIGN="LEFT"/>reason : str<br ALIGN="LEFT"/>|}>, shape="record", style="solid"];
+    "shells.voice.stages.sanitizer.Sanitizer" [color="black", fontcolor="black", label=<{Sanitizer|<br ALIGN="LEFT"/>|process(utterance: Utterance): Utterance \| None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "shells.voice.stages.speech_playback.SpeechPlayback" [color="black", fontcolor="black", label=<{SpeechPlayback|<br ALIGN="LEFT"/>|play(wav_bytes: bytes): None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "shells.voice.stages.gate.speech_stop_gate.SpeechStopGate" [color="black", fontcolor="black", label=<{SpeechStopGate|<br ALIGN="LEFT"/>|should_stop(text: str, speaking: str): bool<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "shells.voice.stages.gate.stop_gatekeeper.StopGatekeeper" [color="black", fontcolor="black", label=<{StopGatekeeper|<br ALIGN="LEFT"/>|process(utterance: Utterance \| BufferedUtterance, recent: list[Utterance], candidates: list[BufferedUtterance] \| None): GateDispatch<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "shells.voice.stages.transcriber.Transcriber" [color="black", fontcolor="black", label=<{Transcriber|<br ALIGN="LEFT"/>|process(utterance: Utterance): Utterance<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "shells.voice.stages.transcription_buffer.TranscriptionBuffer" [color="black", fontcolor="black", label=<{TranscriptionBuffer|<br ALIGN="LEFT"/>|mark(entry_id: str, state: GateState): None<br ALIGN="LEFT"/>process(utterance: Utterance): BufferedUtterance<br ALIGN="LEFT"/>recent(count: int): list[Utterance]<br ALIGN="LEFT"/>recoverable(count: int, max_age_seconds: float): list[BufferedUtterance]<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "shells.voice.interfaces.transcription_buffer.TranscriptionBuffer" [color="black", fontcolor="black", label=<{TranscriptionBuffer|<br ALIGN="LEFT"/>|<I>mark</I>(entry_id: str, state: GateState): None<br ALIGN="LEFT"/><I>process</I>(utterance: Utterance): BufferedUtterance \| None<br ALIGN="LEFT"/><I>recent</I>(count: int): list[Utterance]<br ALIGN="LEFT"/><I>recoverable</I>(count: int, max_age_seconds: float): list[BufferedUtterance]<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "shells.voice.stages.utterance_detector.UtteranceDetector" [color="black", fontcolor="black", label=<{UtteranceDetector|<br ALIGN="LEFT"/>|stream_utterances(): Iterator[Utterance]<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "shells.voice.pipeline.VoicePipeline" [color="black", fontcolor="black", label=<{VoicePipeline|<br ALIGN="LEFT"/>|run(submit: Callable[[str], KernelResponse]): Iterator[KernelResponse]<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+    "shells.voice.voice_shell.VoiceShell" [color="black", fontcolor="black", label=<{VoiceShell|<br ALIGN="LEFT"/>|pause(): None<br ALIGN="LEFT"/>resume(): None<br ALIGN="LEFT"/>start(submit: Callable[[str], KernelResponse]): None<br ALIGN="LEFT"/>stop(): None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  }
+  subgraph cluster_7_2 {
+    label="cli"; style="solid,rounded"; color="#555555"; fontsize=15; margin=14;
+    "shells.cli.cli_shell.CLIShell" [color="black", fontcolor="black", label=<{CLIShell|<br ALIGN="LEFT"/>|start(submit: object): None<br ALIGN="LEFT"/>stop(): None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  }
+  subgraph cluster_7_3 {
+    label="emulator"; style="solid,rounded"; color="#555555"; fontsize=15; margin=14;
+    "shells.emulator.emulator_shell.EmulatorShell" [color="black", fontcolor="black", label=<{EmulatorShell|<br ALIGN="LEFT"/>|start(submit: object): None<br ALIGN="LEFT"/>stop(): None<br ALIGN="LEFT"/>}>, shape="record", style="solid"];
+  }
+}
+subgraph cluster_legend {
+  label="Legend"; style=filled; fillcolor="#ffffff"; color="black"; fontsize=22; margin=24;
+  node [shape=box, style=filled, fillcolor="white", fontsize=13, fontname="Helvetica"];
+  edge [fontname="Helvetica", fontsize=12];
+
+  Leg_tip [shape=plaintext, fontsize=11, fontcolor="#444444",
+    label="Tip: the green label names an attribute.\nPlain arrow -> it's on the class the arrow STARTS from.\nDiamond arrow -> it's on the class the arrow ENDS at (diamond touches the owner)."];
+
+  Leg_sub [label="Dog"];
+  Leg_super [label="Animal"];
+  Leg_sub -> Leg_super [arrowhead="empty", arrowtail="none"];
+  Leg_cap1 [shape=plaintext, fontsize=11, fontcolor="#444444",
+    label="Dog inherits from Animal\n(Dog IS-A Animal)"];
+  Leg_super -> Leg_cap1 [style=invis];
+
+  Leg_a [label="Car"];
+  Leg_b [label="Engine"];
+  Leg_a -> Leg_b [arrowhead="vee", arrowtail="none", fontcolor="green", label="  engine"];
+  Leg_cap2 [shape=plaintext, fontsize=11, fontcolor="#444444",
+    label="Car has an Engine\n(Car owns a single 'engine' field)"];
+  Leg_b -> Leg_cap2 [style=invis];
+
+  Leg_item [label="Item"];
+  Leg_container [label="Container"];
+  Leg_item -> Leg_container [arrowhead="odiamond", arrowtail="none", fontcolor="green", label="  items"];
+  Leg_cap3 [shape=plaintext, fontsize=11, fontcolor="#444444",
+    label="Container has many Items\n(Container owns the 'items' collection)"];
+  Leg_container -> Leg_cap3 [style=invis];
+
+  Leg_tip -> Leg_sub [style=invis];
+  Leg_cap1 -> Leg_a [style=invis];
+  Leg_cap2 -> Leg_item [style=invis];
+}
+rankdir=BT
+charset="utf-8"
+"shells.tray.appindicator_tray_backend.AppIndicatorTrayBackend" -> "shells.tray.interfaces.tray_backend.TrayBackend" [arrowhead="empty", arrowtail="none"];
+"shells.tray.tray_status_sink.TrayStatusSink" -> "tusk.shared.status.interfaces.status_sink.StatusSink" [arrowhead="empty", arrowtail="none"];
+"shells.voice.gatekeeper_slot.GatekeeperSlot" -> "shells.voice.interfaces.gatekeeper.Gatekeeper" [arrowhead="empty", arrowtail="none"];
+"shells.voice.playback_gate.PlaybackGate" -> "shells.voice.interfaces.gatekeeper.Gatekeeper" [arrowhead="empty", arrowtail="none"];
+"shells.voice.stages.gate.gatekeeper.LLMGatekeeper" -> "shells.voice.interfaces.gatekeeper.Gatekeeper" [arrowhead="empty", arrowtail="none"];
+"shells.voice.stages.gate.stop_gatekeeper.StopGatekeeper" -> "shells.voice.interfaces.gatekeeper.Gatekeeper" [arrowhead="empty", arrowtail="none"];
+"shells.voice.stages.transcription_buffer.TranscriptionBuffer" -> "shells.voice.interfaces.transcription_buffer.TranscriptionBuffer" [arrowhead="empty", arrowtail="none"];
+"tusk.kernel.agent.session.file_store.FileStore" -> "tusk.kernel.agent.session.store.Store" [arrowhead="empty", arrowtail="none"];
+"tusk.kernel.agent_backends.codex_exec_agent_backend.CodexExecAgentBackend" -> "tusk.kernel.agent_backends.agent_backend.AgentBackend" [arrowhead="empty", arrowtail="none"];
+"tusk.kernel.agent_backends.codex_mcp_agent_backend.CodexMcpAgentBackend" -> "tusk.kernel.agent_backends.agent_backend.AgentBackend" [arrowhead="empty", arrowtail="none"];
+"tusk.kernel.agent_backends.fallback_agent_backend.FallbackAgentBackend" -> "tusk.kernel.agent_backends.agent_backend.AgentBackend" [arrowhead="empty", arrowtail="none"];
+"tusk.kernel.agent_backends.tusk_agent_backend.TuskAgentBackend" -> "tusk.kernel.agent_backends.agent_backend.AgentBackend" [arrowhead="empty", arrowtail="none"];
+"tusk.kernel.main_agent.MainAgent" -> "tusk.kernel.agent_backends.agent_backend.AgentBackend" [arrowhead="empty", arrowtail="none"];
+"tusk.kernel.modes.edit_strategies.full_replace_edit_strategy.FullReplaceEditStrategy" -> "tusk.kernel.interfaces.edit_application_strategy.EditApplicationStrategy" [arrowhead="empty", arrowtail="none"];
+"tusk.kernel.modes.input_automation_editor_driver.InputAutomationEditorDriver" -> "tusk.kernel.interfaces.editor_driver.EditorDriver" [arrowhead="empty", arrowtail="none"];
+"tusk.kernel.sliding_window_history.SlidingWindowHistory" -> "tusk.kernel.interfaces.conversation_history.ConversationHistory" [arrowhead="empty", arrowtail="none"];
+"tusk.providers.llm.configurable_llm_factory.ConfigurableLLMFactory" -> "tusk.shared.llm.interfaces.llm_provider_factory.LLMProviderFactory" [arrowhead="empty", arrowtail="none"];
+"tusk.providers.llm.groq_llm.GroqLLM" -> "tusk.shared.llm.interfaces.llm_provider.LLMProvider" [arrowhead="empty", arrowtail="none"];
+"tusk.providers.llm.open_router_llm.OpenRouterLLM" -> "tusk.shared.llm.interfaces.llm_provider.LLMProvider" [arrowhead="empty", arrowtail="none"];
+"tusk.providers.stt.groq_stt.GroqSTT" -> "tusk.shared.stt.interfaces.stt_engine.STTEngine" [arrowhead="empty", arrowtail="none"];
+"tusk.providers.stt.whisper_stt.WhisperSTT" -> "tusk.shared.stt.interfaces.stt_engine.STTEngine" [arrowhead="empty", arrowtail="none"];
+"tusk.providers.tts.groq_tts.GroqTTS" -> "tusk.shared.tts.interfaces.tts_engine.TTSEngine" [arrowhead="empty", arrowtail="none"];
+"tusk.shared.llm.llm_proxy.LLMProxy" -> "tusk.shared.llm.interfaces.llm_provider.LLMProvider" [arrowhead="empty", arrowtail="none"];
+"tusk.shared.logging.color_log_printer.ColorLogPrinter" -> "tusk.shared.logging.interfaces.log_printer.LogPrinter" [arrowhead="empty", arrowtail="none"];
+"tusk.shared.status.null_status_sink.NullStatusSink" -> "tusk.shared.status.interfaces.status_sink.StatusSink" [arrowhead="empty", arrowtail="none"];
+"tusk.shared.status.status_reporter_hub.StatusReporterHub" -> "tusk.shared.status.interfaces.status_reporter.StatusReporter" [arrowhead="empty", arrowtail="none"];
+"shells.voice.gate_dispatch.GateDispatch" -> "shells.voice.gate_action.GateAction" [arrowhead="vee", arrowtail="none", fontcolor="green", label="action", style="solid"];
+"shells.voice.buffered_utterance.BufferedUtterance" -> "shells.voice.gate_state.GateState" [arrowhead="vee", arrowtail="none", fontcolor="green", label="gate_state", style="solid"];
+"tusk.kernel.agent.agent_profile.AgentProfile" -> "tusk.shared.llm.interfaces.llm_provider.LLMProvider" [arrowhead="vee", arrowtail="none", fontcolor="green", label="llm_provider", style="solid"];
+"tusk.shared.schemas.status_snapshot.StatusSnapshot" -> "tusk.shared.schemas.app_mode.AppMode" [arrowhead="vee", arrowtail="none", fontcolor="green", label="mode", style="solid"];
+"tusk.shared.schemas.status_snapshot.StatusSnapshot" -> "tusk.shared.schemas.app_status.AppStatus" [arrowhead="vee", arrowtail="none", fontcolor="green", label="status", style="solid"];
+"tusk.shared.schemas.gate_result.GateResult" -> "tusk.shared.schemas.gate_classification.GateClassification" [arrowhead="vee", arrowtail="none", fontcolor="green", label="classification", style="solid"];
+"tusk.shared.config.config.Config" -> "tusk.shared.schemas.llm_slot_config.LLMSlotConfig" [arrowhead="vee", arrowtail="none", fontcolor="green", label="gatekeeper_llm", style="solid"];
+"tusk.shared.config.config.Config" -> "tusk.shared.schemas.llm_slot_config.LLMSlotConfig" [arrowhead="vee", arrowtail="none", fontcolor="green", label="conversation_agent_llm", style="solid"];
+"tusk.shared.config.config.Config" -> "tusk.shared.schemas.llm_slot_config.LLMSlotConfig" [arrowhead="vee", arrowtail="none", fontcolor="green", label="planner_agent_llm", style="solid"];
+"tusk.shared.config.config.Config" -> "tusk.shared.schemas.llm_slot_config.LLMSlotConfig" [arrowhead="vee", arrowtail="none", fontcolor="green", label="executor_agent_llm", style="solid"];
+"tusk.shared.config.config.Config" -> "tusk.shared.schemas.llm_slot_config.LLMSlotConfig" [arrowhead="vee", arrowtail="none", fontcolor="green", label="default_agent_llm", style="solid"];
+"tusk.shared.config.config.Config" -> "tusk.shared.schemas.llm_slot_config.LLMSlotConfig" [arrowhead="vee", arrowtail="none", fontcolor="green", label="utility_llm", style="solid"];
+"shells.voice.buffered_utterance.BufferedUtterance" -> "tusk.shared.schemas.utterance.Utterance" [arrowhead="vee", arrowtail="none", fontcolor="green", label="utterance", style="solid"];
+"tusk.kernel.tools.tool_registry.ToolRegistry" -> "tusk.kernel.adapter_manager.AdapterManager" [arrowhead="odiamond", arrowtail="none", fontcolor="green", label="tool_registry", style="solid"];
+}

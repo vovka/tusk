@@ -7,19 +7,21 @@ microphone audio continuously, detects speech boundaries, transcribes speech to 
 filters ambient noise and hallucinations, passes confirmed commands to a conversation
 agent, and executes desktop actions via hot-pluggable MCP adapters. The agent step itself is
 pluggable: an `AgentBackend` runs either TUSK's own planner/executor pipeline or an external
-`codex exec` process (see [Agent Backends](#agent-backends)). Execution and speech
+`codex` process (see [Agent Backends](#agent-backends)). Execution and speech
 run on a background `CommandWorker` thread so listening never blocks; a shared
 `InterruptToken` lets the user cancel any running task or spoken reply by voice, in any
 wording (see Voice Interrupt Flow below).
 
-The system is split into five layers: **Shells** (voice, CLI, tray, future), a thin **Kernel**
-(agent loop + tool dispatch), a **Shared** layer (ABCs, schemas, LLM access — depended on
-by all other layers), hot-pluggable **Adapters** (MCP servers), and swappable **Providers**
-(LLM and STT implementations). The agent pipeline uses a three-profile delegation chain: a
-conversation agent that delegates via `run_agent`, a planner agent that selects tool names and
-returns them in `done`, and an executor agent that either calls runtime tools step-by-step or
-invokes a compiled `execute_tool_sequence` meta tool for deterministic plans. All three profiles
-share the same `AgentRuntime` loop.
+The system is split into five layers: **Shells** (voice, CLI, emulator, tray), a thin
+**Kernel** (agent loop + tool dispatch), a **Shared** layer (ABCs, schemas, LLM access —
+depended on by all other layers), hot-pluggable **Adapters** (MCP servers), and swappable
+**Providers** (LLM, STT, and TTS implementations). A small host-side **launcher** daemon
+(outside the container) executes application-launch commands as the host user. The agent
+pipeline uses a three-profile delegation chain: a conversation agent that delegates via
+`run_agent`, a planner agent that selects tool names and returns them in `done`, and an
+executor agent that either calls runtime tools step-by-step or invokes a compiled
+`execute_tool_sequence` meta tool for deterministic plans. All profiles share the same
+`AgentRuntime` loop.
 
 Dependency direction is strict: Shells → Shared, Kernel → Shared, Adapters → Shared,
 Providers → Shared. No layer imports from a peer layer. Shells and kernel communicate
@@ -32,10 +34,9 @@ only through `kernel.submit(text)` at runtime and shared ABCs at design time.
 ![System Block Diagram](diagrams/architecture.png)
 
 > Source: [`docs/diagrams/architecture.svg`](diagrams/architecture.svg)
->
-> The diagram includes the optional `tray` shell, the shared `Status` layer
-> (`StatusReporter → StatusSink`), and the TTS provider. The `PipelineControl` pause/resume
-> wiring and the full status flow are described textually below and in §22 of the specification.
+> Per-package class diagrams: [class-diagrams.md](class-diagrams.md)
+> Whole-project class graph (zoomable SVG): [diagrams/full-class-graph.md](diagrams/full-class-graph.md)
+> Interfaces and their implementations: [`docs/diagrams/interfaces.svg`](diagrams/interfaces.svg)
 
 ---
 
@@ -60,10 +61,10 @@ sequenceDiagram
     participant MCP as MCP Adapter
     participant HX as SlidingWindowHistory
 
-    CMD->>MA: process_command(text)
+    CMD->>MA: run(AgentRequest)
     MA->>ORC: run(AgentRunRequest, profile="conversation")
 
-    Note over ORC,RT: AgentRuntime is shared by all three profiles
+    Note over ORC,RT: AgentRuntime is shared by all profiles
     ORC->>RT: run(request, conversation_profile, [done, run_agent])
     RT->>SS: conversation_messages(session_id)
     SS-->>RT: prior turn messages
@@ -139,6 +140,91 @@ sequenceDiagram
 
 ---
 
+## Adapter Mode Flow (dictation & coding)
+
+Dictation and coding are the two "forward-all" modes. They share one set of classes —
+the differences live entirely in the injected prompt, router, and adapter:
+
+| Piece | Class | Per-mode difference |
+|---|---|---|
+| Kernel mode holder | `ModeSlot` (`tusk/kernel/modes/mode_slot.py`) | log tag + start reply |
+| Active mode | `AdapterMode` | none — routes text to the injected router |
+| Stop classifier | `ModeGate` (utility for the gatekeeper LLM) | prompt: `DICTATION_GATE_PROMPT` / `CODING_GATE_PROMPT` |
+| Voice-side gatekeeper | `StopGatekeeper` (`shells/voice/stages/gate/`) | none — wraps the mode's `ModeGate` |
+| Router | `DictationRouter` / `CodingRouter` | dictation types text; coding applies `EditOperation`s via `EditorDriver` |
+| Adapter | `dictation` / `coding` MCP server | segment refinement vs. LLM edit planning over `BufferModel` |
+
+`KernelAPI` owns two `ModeSlot`s and routes every `submit(text)` to the active one
+(coding is checked first) before falling back to `CommandMode`. Entering a mode swaps the
+voice shell's `GatekeeperSlot` from `LLMGatekeeper` to a `StopGatekeeper` wrapped in
+`PlaybackGate` (so TUSK's own speech can only be interrupted or dropped, never typed).
+Callbacks are wired in `ShellLoader._wire_modes`.
+
+```mermaid
+sequenceDiagram
+    participant EX as Executor agent
+    participant ST as StartDictationTool /<br/>StartCodingTool
+    participant K as KernelAPI
+    participant MS as ModeSlot
+    participant GS as GatekeeperSlot
+    participant SG as StopGatekeeper
+    participant MG as ModeGate (LLM)
+    participant R as DictationRouter /<br/>CodingRouter
+    participant A as dictation / coding<br/>adapter (MCP)
+    participant G as gnome adapter (MCP)
+
+    Note over EX,MS: Enter — a normal command-mode agent turn
+    EX->>ST: tool call start_dictation / start_coding
+    ST->>A: start_* session (coding: driver.read_buffer() seeds the buffer)
+    A-->>ST: session_id
+    ST->>K: start_dictation(state) / start_coding(state)
+    K->>MS: start(state) — builds AdapterMode
+    MS->>GS: on_start callback → swap(PlaybackGate(StopGatekeeper))
+
+    loop each utterance while the mode is active
+        GS->>SG: process(utterance)
+        SG->>MG: should_stop(text)?
+        alt normal segment
+            MG-->>SG: false
+            SG-->>GS: GateDispatch(FORWARD_CURRENT, text)
+            Note over GS,K: CommandWorker → kernel.submit(text)
+            K->>MS: active → process_text(text)
+            MS->>R: AdapterMode → router.process(state, text)
+            R->>A: process_segment / process_intent (JSON-RPC)
+            A-->>R: edit data
+            alt dictation
+                R->>G: type_text / replace_recent_text
+            else coding
+                R->>G: EditApplicationStrategy.apply(op, EditorDriver) → gnome.* keys/clipboard
+            end
+        else stop intent
+            MG-->>SG: true
+            SG->>K: request_dictation_stop() / request_coding_stop()
+            K->>MS: request_stop → AdapterMode.stop()
+            MS->>R: router.stop(state)
+            R->>A: stop_* session(session_id)
+            R->>K: stop_dictation() / stop_coding()
+            K->>MS: stop() → on_stop callback
+            MS->>GS: swap back to LLMGatekeeper
+            SG-->>GS: GateDispatch(DROP) — the stop phrase is never typed
+        end
+    end
+```
+
+`ModeGate.should_stop` asks the gatekeeper LLM with the mode-specific prompt
+(structured output, plain-`complete` fallback; on double failure the text is forwarded as
+a literal segment). Stop detection relies on the model returning a non-null
+`metadata_stop` string, not on hard-coded phrases.
+
+Coding specifics: the `coding` adapter owns an authoritative, immutable `BufferModel`
+seeded once from the editor at session start. `CodingEditPlanner` (adapter-side LLM)
+turns each spoken intent + buffer into `EditOperation`s; the kernel-side `CodingRouter`
+applies them through `FullReplaceEditStrategy` over `InputAutomationEditorDriver`, which
+composes `gnome.*` key/clipboard primitives. `EditOperation.full_buffer` re-pastes the
+authoritative buffer, making every edit drift-proof under fire-and-forget GUI automation.
+
+---
+
 ## Voice Interrupt Flow
 
 Semantic stop while TUSK is busy — no fixed phrases, one shared `InterruptToken`, checked
@@ -167,656 +253,134 @@ interrupt-or-drop so TUSK's own voice is never typed into the editor.
 
 ## Directory Structure
 
+Two levels of packages — file-level detail lives in
+[class-diagrams.md](class-diagrams.md) and the
+[full class graph](diagrams/full-class-graph.md), which are regenerated from source.
+
 ```
-tusk/
-├── main.py                              # Startup wiring — builds the kernel, delegates shells to ShellLoader
-├── shell_loader.py                      # ShellLoader — loads shells, orders tray last, injects deps
-├── requirements.txt
-├── .env.example
+tusk/                        (repo root)
+├── main.py                  # Entry point: config, log, LLM registry, kernel, ShellLoader
+├── shell_loader.py          # ShellLoader — builds shells from TUSK_SHELLS, wires voice modes, orders tray last
+├── launcher/                # Host-side launcher daemon (Unix socket) — runs GUI apps as the host user
 ├── tusk/
-│   ├── kernel/                          # Thin orchestration layer
-│   │   ├── agent/                       # Agentic reasoning loop
-│   │   │   ├── agent_child_runner.py    # Runs child agent turns
-│   │   │   ├── agent_orchestrator.py    # Routes run_agent calls to child profiles
-│   │   │   ├── agent_profile.py         # AgentProfile — prompt + tool config per role
-│   │   │   ├── agent_result.py          # AgentResult — final output from a run
-│   │   │   ├── agent_run_guard.py       # Guard: max turns, depth, recursion
-│   │   │   ├── agent_run_request.py     # AgentRunRequest — frozen run parameters
-│   │   │   ├── agent_runtime.py         # AgentRuntime — shared turn/tool loop
-│   │   │   ├── agent_session_store.py   # AgentSessionStore ABC
-│   │   │   ├── agent_tool_catalog.py    # Builds catalog text with sequence_callable flags
-│   │   │   ├── agent_toolset_builder.py # Selects tool schemas per profile and mode
-│   │   │   ├── child_result_message_builder.py  # Structured [child-result] messages
-│   │   │   ├── clipboard_write_message_builder.py # [clipboard-written] context messages
-│   │   │   ├── conversation_failure_budget_guard.py # Blocks after 2 failed executors
-│   │   │   ├── conversation_run_agent_guard.py  # Blocks re-delegation after executor done
-│   │   │   ├── executor_clipboard_guard.py      # Clipboard progress enforcement
-│   │   │   ├── executor_tool_guard.py           # Validates tool calls before dispatch
-│   │   │   ├── file_agent_session_store.py      # File-backed session event log
-│   │   │   ├── orchestrator_tool_dispatcher.py  # Routes tool calls incl. execute_tool_sequence
-│   │   │   ├── planner_request_enricher.py      # Injects tool catalog into planner request
-│   │   │   ├── planner_result_validator.py      # Validates planner output + sequence promotion
-│   │   │   ├── planner_runtime_tool_resolver.py # Resolves executor tools from planner refs
-│   │   │   ├── planner_sequence_promoter.py     # Promotes normal → sequence mode
-│   │   │   ├── planner_step_plan_validator.py   # Validates planned_steps structure
-│   │   │   ├── runtime_message_history_builder.py # Builds message history for runtime
-│   │   │   ├── runtime_result_factory.py        # Creates AgentResult instances
-│   │   │   ├── runtime_step_recorder.py         # Records step results as messages
-│   │   │   ├── runtime_turn_guards.py           # Composes profile-specific constraints
-│   │   │   ├── session_event_formatter.py       # Formats session events
-│   │   │   ├── session_event_reader.py          # Reads session events
-│   │   │   ├── simple_schema_validator.py       # Lightweight JSON Schema validation
-│   │   │   ├── static_tool_schemas.py           # Done, run_agent, execute_tool_sequence schemas
-│   │   │   ├── tool_sequence_executor.py        # Executes compiled sequence plans
-│   │   │   ├── tool_sequence_plan_validator.py  # Pre-execution sequence validation
-│   │   │   └── tool_sequence_recorder.py        # Records sequence execution events
-│   │   ├── agent_backends/              # Swappable agent backends behind CommandMode
-│   │   │   ├── agent_backend.py         # AgentBackend ABC — run(AgentRequest) → AgentResult
-│   │   │   ├── agent_backend_factory.py # Selects backend from AGENT_BACKEND (+ fallback)
-│   │   │   ├── agent_request.py         # AgentRequest — user_text, mode, session, context
-│   │   │   ├── agent_result.py          # AgentResult — success, reply, status, metadata
-│   │   │   ├── tusk_agent_backend.py    # TuskAgentBackend — wraps the in-process pipeline
-│   │   │   ├── codex_exec_agent_backend.py   # CodexExecAgentBackend — shells out to codex exec
-│   │   │   ├── codex_exec_command_builder.py # Builds the `codex exec --json` argv
-│   │   │   ├── codex_mcp_agent_backend.py    # CodexMcpAgentBackend — persistent codex mcp-server
-│   │   │   ├── codex_mcp_call_builder.py     # Builds codex / codex-reply tool-call arguments
-│   │   │   ├── codex_mcp_client.py           # JSON-RPC session over MCPStdioTransport
-│   │   │   ├── codex_mcp_response_reader.py  # Id-correlated reads; skips codex/event notifications
-│   │   │   ├── codex_mcp_result_mapper.py    # Maps tool payloads to AgentResult (threadId→session)
-│   │   │   ├── codex_prompt_builder.py  # Builds codex prompt + desktop-assistant context
-│   │   │   ├── codex_result_parser.py   # Parses codex's final agent_message JSON event
-│   │   │   ├── codex_agent_result.schema.json  # --output-schema for codex structured output
-│   │   │   ├── fallback_agent_backend.py # FallbackAgentBackend — codex → tusk on failure
-│   │   │   └── backend_run_logger.py    # Structured start/end/failure backend logging
-│   │   ├── interfaces/                  # Kernel ABCs
-│   │   │   ├── conversation_history.py  # ConversationHistory ABC
-│   │   │   ├── conversation_summarizer.py # ConversationSummarizer ABC
-│   │   │   ├── pipeline_control.py      # PipelineControl ABC — pause/resume mic capture
-│   │   │   ├── editor_driver.py         # EditorDriver ABC — read/navigate/edit the editor buffer
-│   │   │   ├── edit_application_strategy.py # EditApplicationStrategy ABC — apply(edit, driver)
-│   │   │   └── pipeline_mode.py         # PipelineMode ABC — gatekeeper prompt + handler
-│   │   ├── adapter_manager.py           # AdapterManager — MCP adapter lifecycle
-│   │   ├── agent_profiles.py            # build_agent_profiles() — 4 profiles
-│   │   ├── api.py                       # KernelAPI — submit(text) public entry point
-│   │   ├── clipboard_guard.py           # ClipboardGuard — saves/restores clipboard around input-automation ops
-│   │   ├── coding_gate.py               # CodingGate — LLM-based stop-coding classification
-│   │   ├── coding_gate_prompt.py        # Coding-specific prompt for CodingGate
-│   │   ├── coding_mode.py               # AdapterCodingMode — active coding state
-│   │   ├── coding_router.py             # CodingRouter — intent → edit ops → editor
-│   │   ├── coding_state.py              # CodingState — adapter name + session id + desktop source
-│   │   ├── command_mode.py              # CommandMode — routes submitted text to agent
-│   │   ├── dictation_gate.py            # DictationGate — LLM-based stop classification
-│   │   ├── dictation_gate_prompt.py     # Dictation-specific prompt for DictationGate
-│   │   ├── dictation_mode.py            # AdapterDictationMode — active dictation state
-│   │   ├── dictation_router.py          # DictationRouter — routes segments and edits
-│   │   ├── dictation_state.py           # DictationState — session id + adapter names
-│   │   ├── fallback_edit_strategy.py    # FallbackEditStrategy — design only, not yet implemented
-│   │   ├── full_replace_edit_strategy.py # FullReplaceEditStrategy — select-all + paste buffer (wired strategy)
-│   │   ├── input_automation_editor_driver.py # InputAutomationEditorDriver — drives editor via gnome.*
-│   │   ├── internal_tools.py            # Re-exports tool classes
-│   │   ├── line_anchored_edit_strategy.py # LineAnchoredEditStrategy — goto-line + paste region (ships; not wired)
-│   │   ├── llm_conversation_summarizer.py # LLM-based history compaction
-│   │   ├── main_agent.py                # MainAgent — entry point for a conversation turn
-│   │   ├── model_failure_reply_builder.py # Human-readable failure messages
-│   │   ├── raw_key_edit_strategy.py     # RawKeyEditStrategy — design only, not yet implemented
-│   │   ├── registered_tool.py           # RegisteredTool — frozen entry in ToolRegistry
-│   │   ├── repeated_tool_call_guard.py  # Detects repeated identical tool calls
-│   │   ├── sliding_window_history.py    # SlidingWindowHistory — max-20 with LLM compaction
-│   │   ├── start_coding_tool.py         # StartCodingTool — reads buffer + launches coding session
-│   │   ├── start_dictation_tool.py      # StartDictationTool — launches dictation session
-│   │   ├── switch_model_tool.py         # SwitchModelTool — hot-swaps an LLM slot
-│   │   ├── tool_runtime.py              # ToolRuntime — wires tools + DictationRouter + CodingRouter
-│   │   └── vscode_editor_driver.py      # VSCodeEditorDriver — future plugin-backed driver (contract only)
-│   ├── shared/                          # Used by all layers; depends on nothing else
-│   │   ├── config/
-│   │   │   ├── config.py                # Config — frozen dataclass, all runtime settings
-│   │   │   ├── config_factory.py        # ConfigFactory — reads env vars, builds Config
-│   │   │   └── startup_options.py       # StartupOptions — CLI args (verbosity, log groups)
-│   │   ├── interrupt/
-│   │   │   └── interrupt_token.py       # InterruptToken — shared cooperative-cancellation flag
-│   │   ├── llm/
-│   │   │   ├── interfaces/
-│   │   │   │   ├── llm_provider.py      # LLMProvider ABC — complete, complete_tool_call, etc.
-│   │   │   │   └── llm_provider_factory.py # LLMProviderFactory ABC
-│   │   │   ├── llm_payload_logger.py    # Logs prompts and tool schemas for debugging
-│   │   │   ├── llm_proxy.py             # LLMProxy — retry + wait indicator + swap()
-│   │   │   ├── llm_registry.py          # LLMRegistry — named slots + runtime swap
-│   │   │   ├── llm_retry_policy.py      # LLMRetryPolicy — retryable error classification
-│   │   │   ├── llm_retry_runner.py      # LLMRetryRunner — exponential backoff loop
-│   │   │   └── tool_use_failed_recovery.py # Graceful recovery for tool_use_failed errors
-│   │   ├── logging/
-│   │   │   ├── interfaces/
-│   │   │   │   └── log_printer.py       # LogPrinter ABC — log, show_wait, clear_wait
-│   │   │   └── color_log_printer.py     # ColorLogPrinter — colored console output by tag
-│   │   ├── mcp/
-│   │   │   ├── adapter_env_builder.py   # AdapterEnvironmentBuilder — managed venv setup
-│   │   │   ├── adapter_watcher.py       # AdapterWatcher — file-system hot-plug via watchdog
-│   │   │   ├── mcp_client.py            # MCPClient — stdio JSON-RPC client
-│   │   │   └── mcp_tool_proxy.py        # MCPToolProxy — adapts MCPToolSchema to RegisteredTool
-│   │   ├── schemas/                     # Frozen dataclasses (all inter-layer data)
-│   │   │   ├── app_entry.py             # AppEntry — desktop application (name + exec_cmd)
-│   │   │   ├── app_mode.py              # AppMode — interaction mode enum (default, dictation, …)
-│   │   │   ├── app_status.py            # AppStatus — operational status enum (listening, reacting, …)
-│   │   │   ├── buffer_selection.py      # BufferSelection — inclusive start/end line range
-│   │   │   ├── chat_message.py          # ChatMessage — role + content, summary detection
-│   │   │   ├── coding_gate_result.py    # CodingGateResult — stop-coding classification output
-│   │   │   ├── desktop_context.py       # DesktopContext — active window + window list
-│   │   │   ├── edit_operation.py        # EditOperation — insert/replace/delete + target + text
-│   │   │   ├── gate_result.py           # GateResult — gatekeeper output
-│   │   │   ├── kernel_response.py       # KernelResponse — final handled + reply
-│   │   │   ├── llm_slot_config.py       # LLMSlotConfig — parsed provider/model string
-│   │   │   ├── mcp_tool_result.py       # MCPToolResult — adapter tool response
-│   │   │   ├── mcp_tool_schema.py       # MCPToolSchema — adapter tool definition
-│   │   │   ├── status_snapshot.py       # StatusSnapshot — status + mode + detail + mic + models
-│   │   │   ├── tool_call.py             # ToolCall — tool name + parameters + call_id
-│   │   │   ├── tool_result.py           # ToolResult — success + message + data
-│   │   │   ├── tool_sequence_plan.py    # ToolSequencePlan — ordered steps + goal
-│   │   │   ├── tool_sequence_step.py    # ToolSequenceStep — step_id + tool_name + args
-│   │   │   ├── utterance.py             # Utterance — transcribed text + audio + confidence
-│   │   │   └── window_info.py           # WindowInfo — title + app + geometry + active flag
-│   │   ├── status/
-│   │   │   ├── interfaces/
-│   │   │   │   ├── status_reporter.py   # StatusReporter ABC — what producers call
-│   │   │   │   └── status_sink.py       # StatusSink ABC — what the tray implements
-│   │   │   ├── status_reporter_hub.py   # StatusReporterHub — holds state, builds + publishes snapshots
-│   │   │   └── null_status_sink.py      # NullStatusSink — no-op sink (default when no tray)
-│   │   ├── stt/
-│   │   │   └── interfaces/
-│   │   │       └── stt_engine.py        # STTEngine ABC — transcribe(audio_frames, sample_rate)
-│   │   └── tts/
-│   │       └── interfaces/
-│   │           └── tts_engine.py        # TTSEngine ABC — synthesize(text) → WAV bytes
-│   └── providers/                       # Swappable implementations behind shared ABCs
-│       ├── llm/
-│       │   ├── groq_llm.py              # GroqLLM — Groq cloud API with structured output
-│       │   ├── open_router_llm.py       # OpenRouterLLM — OpenRouter via OpenAI client
-│       │   └── configurable_llm_factory.py # Parses "provider/model" strings
-│       ├── stt/
-│       │   ├── groq_stt.py              # GroqSTT — Groq cloud Whisper-large-v3-turbo
-│       │   └── whisper_stt.py           # WhisperSTT — local OpenAI Whisper model
-│       └── tts/
-│           ├── groq_tts.py              # GroqTTS — Groq Orpheus WAV synthesis, chunked
-│           ├── text_chunker.py          # TextChunker — splits text under Orpheus 200-char cap
-│           └── wav_concatenator.py      # WavConcatenator — merges clip WAVs into one
+│   ├── kernel/              # Thin orchestration layer: KernelAPI, CommandMode, MainAgent,
+│   │   │                    #   AdapterManager, agent profiles, SlidingWindowHistory, startup wiring
+│   │   ├── interfaces/      # Agent, Shell, ConversationHistory, EditorDriver, EditApplicationStrategy
+│   │   ├── agent/           # Agentic loop: AgentOrchestrator, AgentRuntime, tool catalog/toolset, dispatcher
+│   │   │   ├── guards/      # AgentRunGuard + turn guards (delegation, failure budget, clipboard, executor tools)
+│   │   │   ├── planner/     # Planner output validation, sequence promotion, runtime tool resolution
+│   │   │   ├── runtime/     # Message history builder, result factory, step recorder, guard composition
+│   │   │   ├── session/     # Store ABC, FileStore event log, event formatter
+│   │   │   └── tool_sequence/ # Compiled sequences: PlanValidator, Executor, Recorder
+│   │   ├── agent_backends/  # AgentBackend ABC; tusk / codex_exec / codex_mcp / fallback backends
+│   │   │   └── codex_mcp/   # Persistent codex mcp-server session (Client, CallBuilder, ResponseReader, ResultMapper)
+│   │   ├── modes/           # Dictation/coding machinery: ModeSlot, AdapterMode, ModeGate, routers,
+│   │   │                    #   states, gate prompts, InputAutomationEditorDriver, FullReplaceEditStrategy
+│   │   └── tools/           # ToolRegistry, RegisteredTool, ToolRuntime, RepeatedToolCallGuard,
+│   │                        #   kernel tools: start_dictation, start_coding, switch_model
+│   ├── shared/              # Contracts + cross-layer plumbing; depends on nothing else
+│   │   ├── config/          # Config (frozen), ConfigFactory (env), StartupOptions (CLI)
+│   │   ├── interrupt/       # InterruptToken
+│   │   ├── llm/             # LLMProxy, LLMRegistry, retry policy/runner, payload logging, JSON helpers
+│   │   │   └── interfaces/  # LLMProvider, LLMProviderFactory
+│   │   ├── logging/         # LogPrinter ABC, ColorLogPrinter, tag palette
+│   │   ├── mcp/             # MCPClient, MCPToolProxy, MCPStdioServer/Transport, env builder, hot-plug watcher
+│   │   ├── schemas/         # Frozen dataclasses for all inter-layer data
+│   │   │   ├── desktop/     # DesktopContext, WindowInfo, AppEntry
+│   │   │   └── tools/       # ToolCall/ToolResult, MCPToolSchema/Result, ToolSequencePlan/Step
+│   │   ├── status/          # StatusReporter/StatusSink ABCs, StatusReporterHub, NullStatusSink
+│   │   ├── stt/             # STTEngine ABC
+│   │   └── tts/             # TTSEngine ABC
+│   └── providers/           # Swappable implementations behind shared ABCs
+│       ├── llm/             # GroqLLM, OpenRouterLLM, ConfigurableLLMFactory
+│       ├── stt/             # GroqSTT, WhisperSTT, STTEngineFactory
+│       └── tts/             # GroqTTS + text chunking / WAV concatenation
 ├── shells/
-│   ├── voice/                           # Six-stage composable voice pipeline
-│   │   ├── README.md                    # Voice shell architecture (see that file)
-│   │   ├── pipeline.py                  # VoicePipeline — assembles stages, dispatches GateDispatch
-│   │   ├── voice_shell.py               # VoiceShell — entry point; forwards to CommandWorker
-│   │   ├── command_worker.py            # CommandWorker — background submit + TTS + playback thread
-│   │   ├── playback_gate.py             # PlaybackGate — interrupt-or-drop while TUSK speaks (forward-all modes)
-│   │   ├── buffered_utterance.py        # BufferedUtterance — Utterance + id + gate_state
-│   │   ├── gate_dispatch.py             # GateDispatch — action + text + recovered_id
-│   │   ├── gatekeeper_slot.py           # GatekeeperSlot — mutable proxy; swapped at dictation start/stop
-│   │   ├── recovery_decision.py         # RecoveryDecision — action + candidate_id + reason
-│   │   ├── interfaces/
-│   │   │   ├── gatekeeper.py            # Gatekeeper ABC
-│   │   │   └── transcription_buffer.py  # TranscriptionBuffer ABC
-│   │   └── stages/
-│   │       ├── audio_capture.py         # AudioCapture — sounddevice PulseAudio stream
-│   │       ├── utterance_detector.py    # UtteranceDetector — WebRTC VAD boundary detection
-│   │       ├── transcriber.py           # Transcriber — wraps STTEngine
-│   │       ├── speech_playback.py       # SpeechPlayback — plays synthesized WAV replies
-│   │       ├── sanitizer.py             # Sanitizer — hallucination / ghost-phrase filter
-│   │       ├── transcription_buffer.py  # TranscriptionBuffer — rolling window + state tracking
-│   │       ├── gatekeeper.py            # LLMGatekeeper — primary classify + recovery; busy/speaking-aware
-│   │       ├── gate_llm_client.py       # GateLLMClient — gatekeeper LLM call/parse plumbing
-│   │       ├── speech_stop_gate.py      # SpeechStopGate — yes/no LLM stop classifier for PlaybackGate
-│   │       ├── coding_gatekeeper.py     # CodingGatekeeper — forwards all text; LLM stop-coding detection
-│   │       ├── dictation_gatekeeper.py  # DictationGatekeeper — forwards all text; LLM stop detection
-│   │       ├── gatekeeper_parser.py     # JSON parsing for gate and recovery LLM responses
-│   │       ├── gatekeeper_support.py    # Helpers: schemas, dispatch builders, wake-word check
-│   │       ├── command_gate_prompt.py   # Prompt builder for the primary classification call
-│   │       ├── recovery_gate_prompt.py  # Prompt builder for the recovery LLM call
-│   │       └── recent_context_formatter.py # Formats recent utterances for context
-│   ├── cli/
-│   │   ├── shell.json                   # Shell manifest
-│   │   └── cli_shell.py                 # CLIShell — stdin REPL, bypasses voice pipeline
-│   └── tray/                            # Status-and-control tray indicator (optional shell)
-│       ├── shell.json                   # Shell manifest (entry_class: TrayShell)
-│       ├── tray_shell.py                # TrayShell — owns the GUI loop; start()/stop()
-│       ├── interfaces/
-│       │   └── tray_backend.py          # TrayBackend ABC — cross-platform tray seam
-│       ├── appindicator_tray_backend.py # AppIndicatorTrayBackend — pystray/AppIndicator backend
-│       ├── tray_status_sink.py          # TrayStatusSink — StatusSink; marshals snapshot to GUI thread
-│       ├── status_icon_resolver.py      # StatusIconResolver — pure AppStatus → icon asset map
-│       ├── tray_menu_builder.py         # TrayMenuBuilder — builds menu items from a StatusSnapshot
-│       ├── tray_menu_actions.py         # TrayMenuActions — DI container of action callables
-│       ├── tray_menu_item.py            # TrayMenuItem — frozen menu item schema
-│       └── icons/                       # Per-status icon assets (light/dark themes)
-├── adapters/
-│   ├── gnome/
-│   │   ├── adapter.json                 # Adapter manifest (name, transport, entry, provides_context)
-│   │   ├── server.py                    # GNOME MCP server entry point
-│   │   ├── gnome_tool_router.py         # Routes tool calls to handler modules
-│   │   ├── gnome_tool_schema_catalog.py # Builds all tool schemas for MCP list_tools
-│   │   ├── gnome_application_tools.py   # launch_application
-│   │   ├── gnome_window_tools.py        # close/focus/maximize/minimize/move_resize/switch_workspace
-│   │   ├── gnome_input_tools.py         # press_keys, type_text, replace_recent_text
-│   │   ├── gnome_mouse_tools.py         # mouse_click, mouse_move, mouse_drag, mouse_scroll
-│   │   ├── gnome_clipboard_tools.py     # read_clipboard, write_clipboard
-│   │   ├── gnome_context_tools.py       # get_desktop_context, get_active_window, list_windows
-│   │   ├── gnome_context_provider.py    # Queries desktop state (wmctrl, xdotool, xdg-open)
-│   │   ├── gnome_input_simulator.py     # Low-level xdotool key/mouse/type
-│   │   ├── gnome_clipboard_provider.py  # xclip read/write
-│   │   ├── gnome_text_paster.py         # Paste + replace via xdotool type + BackSpace
-│   │   ├── app_catalog.py               # search_applications — installed desktop app search
-│   │   ├── open_uri_tool.py             # open_uri — xdg-open
-│   │   └── desktop_context.py           # DesktopContext snapshot builder
-│   ├── dictation/
-│   │   ├── adapter.json                 # Adapter manifest (provides_context=false)
-│   │   ├── server.py                    # DictationServer — MCP server for dictation sessions
-│   │   ├── dictation_refiner.py         # DictationRefiner — LLM cleanup (unused; reserved for future proofreading)
-│   │   └── dictation_tool_schema_catalog.py # start_dictation, process_segment, stop_dictation
-│   └── coding/
-│       ├── adapter.json                 # Adapter manifest (provides_context=false)
-│       ├── server.py                    # CodingServer — MCP server holding the buffer model
-│       ├── buffer_model.py              # BufferModel — immutable lines; with_edit returns new model
-│       ├── coding_edit_planner.py       # CodingEditPlanner — (intent + buffer) → EditOperation(s)
-│       └── coding_tool_schema_catalog.py # start_coding_session, process_intent, stop_coding_session
-├── tools/
-│   └── codex_mcp_config_generator.py    # Emits codex config.toml mcp_servers from adapter manifests
-├── docker/
-│   └── codex-entrypoint.sh              # Builds codex CODEX_HOME + config.toml, then execs
-├── e2e/                                 # Voice-interrupt e2e harness — real LLM/kernel, scripted audio edges
-└── tests/
-    ├── test_pipeline.py
-    ├── test_voice_shell.py
-    ├── test_transcription_buffer.py
-    ├── test_gatekeeper_follow_up.py
-    └── ...                              # Full test suite for all layers
+│   ├── voice/               # Voice pipeline shell (see shells/voice/README.md): VoiceShell, VoicePipeline,
+│   │   │                    #   CommandWorker, GatekeeperSlot, PlaybackGate, buffer/dispatch schemas
+│   │   ├── interfaces/      # Gatekeeper, TranscriptionBuffer ABCs
+│   │   └── stages/          # AudioCapture, UtteranceDetector, Transcriber, Sanitizer, TranscriptionBuffer
+│   │       └── gate/        # LLMGatekeeper, StopGatekeeper, SpeechStopGate, prompts, parsing
+│   ├── cli/                 # CLIShell — stdin REPL
+│   ├── emulator/            # EmulatorShell — replays a scripted transcript as kernel input
+│   └── tray/                # TrayShell, TrayBackend ABC, AppIndicator backend, status sink, menu builder, icons
+├── adapters/                # Out-of-process MCP servers, discovered from adapter.json manifests
+│   ├── gnome/               # Desktop control: windows, input, mouse, clipboard, context (tools/ subpackage)
+│   ├── dictation/           # Dictation sessions + segment processing
+│   └── coding/              # Pair-coding: BufferModel + CodingEditPlanner (adapter-side LLM)
+├── demos/                   # Scripted demo transcripts + emulated-editor adapter for demos
+├── e2e/                     # Voice-interrupt e2e harness — real kernel, scripted audio edges
+├── tests/                   # Full test suite (mirrors source layout)
+├── tools/                   # codex_mcp_config_generator — adapter manifests → codex config.toml
+└── docker/                  # codex-entrypoint.sh
 ```
 
 ---
 
-## Abstract Base Classes
+## Interfaces
 
-TUSK defines ABCs at each layer boundary. No concrete class imports another concrete
-class directly — only ABCs cross layer boundaries.
+Every layer boundary is an ABC; concrete classes never cross a boundary. The full
+interface map — each ABC, its implementations, and its consumers — is drawn in
+[`diagrams/interfaces.svg`](diagrams/interfaces.svg). Method signatures live in the
+source files; this table is the index:
 
-### LLMProvider — `tusk/shared/llm/interfaces/llm_provider.py`
+| ABC | Defined in | Implementations | Key consumers |
+|---|---|---|---|
+| `Agent` | `tusk/kernel/interfaces/agent.py` | `MainAgent` (structural) | `TuskAgentBackend`, `AgentBackendFactory` |
+| `Shell` | `tusk/kernel/interfaces/shell.py` | `VoiceShell`, `CLIShell`, `EmulatorShell`, `TrayShell` (structural) | `ShellLoader` |
+| `ConversationHistory` | `tusk/kernel/interfaces/conversation_history.py` | `SlidingWindowHistory` | `MainAgent` |
+| `EditorDriver` | `tusk/kernel/interfaces/editor_driver.py` | `InputAutomationEditorDriver` | `CodingRouter`, `StartCodingTool`, strategies |
+| `EditApplicationStrategy` | `tusk/kernel/interfaces/edit_application_strategy.py` | `FullReplaceEditStrategy` | `CodingRouter` |
+| `AgentBackend` | `tusk/kernel/agent_backends/agent_backend.py` | `MainAgent`, `TuskAgentBackend`, `CodexExecAgentBackend`, `CodexMcpAgentBackend`, `FallbackAgentBackend` | `CommandMode` |
+| `Store` (sessions) | `tusk/kernel/agent/session/store.py` | `FileStore` | `AgentRuntime`, `AgentOrchestrator`, recorders |
+| `LLMProvider` | `tusk/shared/llm/interfaces/llm_provider.py` | `GroqLLM`, `OpenRouterLLM`, `LLMProxy` (wrapper) | agent profiles, gatekeepers, `ModeGate` |
+| `LLMProviderFactory` | `tusk/shared/llm/interfaces/llm_provider_factory.py` | `ConfigurableLLMFactory` | `LLMRegistry` |
+| `LogPrinter` | `tusk/shared/logging/interfaces/log_printer.py` | `ColorLogPrinter` | everything |
+| `StatusReporter` | `tusk/shared/status/interfaces/status_reporter.py` | `StatusReporterHub` | `VoicePipeline`, `KernelAPI`, `ToolRuntime` |
+| `StatusSink` | `tusk/shared/status/interfaces/status_sink.py` | `NullStatusSink`, `TrayStatusSink` | `StatusReporterHub` |
+| `STTEngine` | `tusk/shared/stt/interfaces/stt_engine.py` | `GroqSTT`, `WhisperSTT` | `Transcriber` |
+| `TTSEngine` | `tusk/shared/tts/interfaces/tts_engine.py` | `GroqTTS` | `CommandWorker` |
+| `Gatekeeper` | `shells/voice/interfaces/gatekeeper.py` | `LLMGatekeeper`, `StopGatekeeper`, `GatekeeperSlot`, `PlaybackGate` | `VoicePipeline` |
+| `TranscriptionBuffer` | `shells/voice/interfaces/transcription_buffer.py` | `TranscriptionBuffer` (stages) | `VoicePipeline` |
+| `TrayBackend` | `shells/tray/interfaces/tray_backend.py` | `AppIndicatorTrayBackend` | `TrayShell` |
 
-```python
-@property def label(self) -> str
-def complete(self, system_prompt: str, user_message: str, max_tokens: int = 256) -> str
-def complete_messages(self, system_prompt: str, messages: list[dict]) -> str
-def complete_tool_call(self, system_prompt: str, messages: list[dict], tools: list[dict]) -> ToolCall
-def complete_structured(self, system_prompt: str, user_message: str,
-                        schema_name: str, schema: dict, max_tokens: int = 256) -> str
-```
+"Structural" means the concrete class satisfies the ABC's methods without inheriting it
+(kept duck-typed to avoid a kernel import in the shells). The `Gatekeeper` chain is
+compositional: `GatekeeperSlot` holds the active gatekeeper and is swapped at mode
+start/stop; `PlaybackGate` wraps a `StopGatekeeper` while TUSK speaks.
 
-`complete_tool_call` returns a `ToolCall` directly. `complete_structured` requests a
-JSON response conforming to a named schema — used by planner and gatekeeper. Providers
-may fall back to `complete` if structured output is unavailable.
-
-### LLMProviderFactory — `tusk/shared/llm/interfaces/llm_provider_factory.py`
-
-```python
-def create(self, provider_name: str, model: str) -> LLMProvider
-```
-
-### STTEngine — `tusk/shared/stt/interfaces/stt_engine.py`
-
-```python
-def transcribe(self, audio_frames: bytes, sample_rate: int) -> Utterance
-```
-
-### LogPrinter — `tusk/shared/logging/interfaces/log_printer.py`
-
-```python
-def log(self, tag: str, message: str, group: str | None = None) -> None
-def show_wait(self, label: str, group: str = "wait") -> None
-def clear_wait(self) -> None
-```
-
-`show_wait` / `clear_wait` display a spinner while waiting for an LLM response.
-
-### Gatekeeper — `shells/voice/interfaces/gatekeeper.py`
-
-```python
-def evaluate(self, utterance: Utterance, recent: list[Utterance]) -> GateResult
-def process(self, utterance: Utterance | BufferedUtterance,
-            recent: list[Utterance],
-            candidates: list[BufferedUtterance] | None = None) -> GateDispatch
-```
-
-`process` returns a `GateDispatch` (action + optional text + recovered_id). Actions:
-`forward_current`, `forward_recovered`, `forward_clarification`, `drop`, `interrupt`
-(stop intent while the worker is busy — the pipeline fires the interrupt callback instead
-of forwarding). The follow-up window is tracked internally via `_last_forwarded_at`.
-Recovery is a second LLM call triggered when the primary classification is not `command`.
-
-### TranscriptionBuffer — `shells/voice/interfaces/transcription_buffer.py`
-
-```python
-def process(self, utterance: Utterance) -> BufferedUtterance | None
-def recent(self, count: int) -> list[Utterance]
-def recoverable(self, count: int, max_age_seconds: float) -> list[BufferedUtterance]
-def mark_consumed(self, entry_id: str) -> None
-def mark_dropped(self, entry_id: str) -> None
-def mark_forwarded(self, entry_id: str) -> None
-def mark_recovered(self, entry_id: str) -> None
-```
-
-`process` wraps the utterance in a `BufferedUtterance` (adds `id`, `received_at`,
-`gate_state`). `recoverable` returns entries with `gate_state == "dropped"` within
-`max_age_seconds`. The pipeline calls `mark_*` after the gatekeeper decides.
-
-### ConversationHistory — `tusk/kernel/interfaces/conversation_history.py`
-
-```python
-def get_messages(self) -> list[ChatMessage]
-def append(self, message: ChatMessage) -> None
-def clear(self) -> None
-```
-
-### ConversationSummarizer — `tusk/kernel/interfaces/conversation_summarizer.py`
-
-```python
-def summarize(self, messages: list[ChatMessage]) -> str
-```
-
-### PipelineMode — `tusk/kernel/interfaces/pipeline_mode.py`
-
-```python
-@property def gatekeeper_prompt(self) -> str
-def handle_command(self, text: str) -> KernelResponse
-```
-
-Used by `CommandMode`, `DictationMode`, and `CodingMode` to route submitted text inside
-the kernel.
-
-### EditorDriver — `tusk/kernel/interfaces/editor_driver.py`
-
-```python
-def read_buffer(self) -> str
-def goto_line(self, line_number: int) -> None
-def select_range(self, selection: BufferSelection) -> None
-def paste(self, text: str) -> None
-def type_text(self, text: str) -> None
-def press_keys(self, keys: str) -> None
-def replace_buffer(self, text: str) -> None
-```
-
-Abstracts the editor backend for coding mode. Methods are intentionally low-level so the
-edit-application strategies can compose them. `InputAutomationEditorDriver` implements
-them via the `gnome.*` tools (editor-agnostic, no plugin); the future
-`VSCodeEditorDriver` implements the same contract over a VS Code extension. Every method
-sits on the coding hot path — its latency cost is documented in the specification.
-
-### EditApplicationStrategy — `tusk/kernel/interfaces/edit_application_strategy.py`
-
-```python
-def apply(self, edit: EditOperation, driver: EditorDriver) -> None
-```
-
-Maps a single `EditOperation` onto a sequence of `EditorDriver` calls. Depends only on
-the `EditOperation` schema and the `EditorDriver` ABC. `FullReplaceEditStrategy`
-(re-pastes `full_buffer`) is the one wired in `ToolRuntime` — drift-proof under the
-fire-and-forget input-automation driver. `LineAnchoredEditStrategy` (paste only the
-changed region) ships but is not wired; `RawKeyEditStrategy` and `FallbackEditStrategy`
-are design options (see specification §17.0).
-
-### StatusReporter — `tusk/shared/status/interfaces/status_reporter.py`
-
-```python
-def set_status(self, status: AppStatus, detail: str = "") -> None
-def set_mode(self, mode: AppMode) -> None
-def set_models(self, models: tuple[tuple[str, str], ...]) -> None
-def set_mic_device(self, device: str) -> None
-```
-
-What producers (the voice pipeline and `KernelAPI`) call to report state. Producers depend
-only on this abstraction and never know whether a tray is present.
-
-### StatusSink — `tusk/shared/status/interfaces/status_sink.py`
-
-```python
-def publish(self, snapshot: StatusSnapshot) -> None
-```
-
-Implemented by observers. `NullStatusSink` is a no-op default; `TrayStatusSink` marshals the
-snapshot onto the GUI thread. `publish` must return immediately (never block the producer).
-
-### PipelineControl — `tusk/kernel/interfaces/pipeline_control.py`
-
-```python
-def pause(self) -> None    # suspend microphone capture
-def resume(self) -> None   # resume microphone capture
-```
-
-Implemented by the voice shell. The tray calls it (via an injected reference) so "Pause"
-actually stops capture rather than dropping commands downstream.
-
-### TrayBackend — `shells/tray/interfaces/tray_backend.py`
-
-```python
-def run(self) -> None
-def stop(self) -> None
-def set_icon(self, name: str) -> None
-def set_tooltip(self, text: str) -> None
-def set_menu(self, items: tuple[TrayMenuItem, ...]) -> None
-```
-
-Cross-platform seam. v1 ships `AppIndicatorTrayBackend` (`pystray` + AppIndicator). Future
-macOS/Windows/Qt backends are new classes behind this ABC — `TrayShell` is unchanged.
+There is no pause/resume ABC: `VoiceShell.pause()/resume()` are called directly by the
+tray via an injected reference (wired in `ShellLoader`).
 
 ---
 
 ## Schemas
 
-All inter-component data is passed as immutable frozen dataclasses. No untyped dicts
-cross component boundaries.
+All inter-component data is passed as immutable frozen dataclasses (or enums). No untyped
+dicts cross component boundaries. Fields are declared in the source files — one glance at
+the dataclass is the authoritative schema. Index:
 
-### Utterance — `tusk/shared/schemas/utterance.py`
-
-| Field | Type | Description |
+| Schema | Module (`tusk/shared/schemas/`) | Carries |
 |---|---|---|
-| `text` | `str` | Transcribed text (empty until STT runs) |
-| `audio_frames` | `bytes` | Raw PCM audio |
-| `duration_seconds` | `float` | Duration of the audio segment |
-| `confidence` | `float` | STT confidence score (0.0–1.0) |
+| `Utterance` | `utterance.py` | transcribed text + raw audio + duration + confidence |
+| `GateResult` | `gate_result.py` | gatekeeper verdict + cleaned command + `metadata` (incl. `classification`) |
+| `GateClassification` | `gate_classification.py` | enum: command / conversation / ambient / interrupt |
+| `KernelResponse` | `kernel_response.py` | handled flag + reply text |
+| `ChatMessage` | `chat_message.py` | role + content; summary detection + `to_dict()` |
+| `EditOperation` | `edit_operation.py` | insert/replace/delete + target lines + text + authoritative `full_buffer` |
+| `BufferSelection` | `buffer_selection.py` | inclusive 1-based line range |
+| `AppStatus` / `AppMode` | `app_status.py` / `app_mode.py` | enums: operational state / interaction mode |
+| `StatusSnapshot` | `status_snapshot.py` | status + mode + detail + mic + model labels |
+| `LLMSlotConfig` | `llm_slot_config.py` | parsed `provider/model` string |
+| `ToolCall` / `ToolResult` | `tools/` | tool invocation / execution outcome (+ optional `data`) |
+| `MCPToolSchema` / `MCPToolResult` | `tools/` | adapter tool definition / adapter response |
+| `ToolSequencePlan` / `ToolSequenceStep` | `tools/` | compiled deterministic plan + ordered steps |
+| `DesktopContext` / `WindowInfo` / `AppEntry` | `desktop/` | desktop snapshot / window geometry / installed app |
 
-### GateResult — `tusk/shared/schemas/gate_result.py`
-
-| Field | Type | Description |
-|---|---|---|
-| `is_directed_at_tusk` | `bool` | Whether to process this utterance |
-| `cleaned_command` | `str` | Text after wake-word removal |
-| `confidence` | `float` | Gatekeeper confidence |
-| `metadata` | `dict[str, str]` | Mode-specific signals; includes `classification` key |
-
-The `classification` key in `metadata` holds `"command"`, `"conversation"`, `"ambient"`,
-or `"interrupt"` (only honored while the `CommandWorker` is busy).
-
-### ToolCall — `tusk/shared/schemas/tool_call.py`
-
-| Field | Type | Description |
-|---|---|---|
-| `tool_name` | `str` | Name of the tool to execute |
-| `parameters` | `dict[str, object]` | Tool input parameters |
-| `call_id` | `str` | Provider-assigned call ID (empty string if absent) |
-
-### ToolResult — `tusk/shared/schemas/tool_result.py`
-
-| Field | Type | Description |
-|---|---|---|
-| `success` | `bool` | Whether execution succeeded |
-| `message` | `str` | Human-readable result or error |
-| `data` | `dict \| None` | Structured output (e.g. dictation session data) |
-
-### ChatMessage — `tusk/shared/schemas/chat_message.py`
-
-| Field | Type | Description |
-|---|---|---|
-| `role` | `str` | `"user"` or `"assistant"` |
-| `content` | `str` | Message text |
-
-`is_summary` property: returns `True` if content starts with `"Previous context summary: "`.
-`to_dict()` method: returns `{"role": ..., "content": ...}` for LLM API calls.
-
-### KernelResponse — `tusk/shared/schemas/kernel_response.py`
-
-| Field | Type | Description |
-|---|---|---|
-| `handled` | `bool` | Whether the pipeline processed this input |
-| `reply` | `str` | Text reply to surface to the user |
-
-### EditOperation — `tusk/shared/schemas/edit_operation.py`
-
-| Field | Type | Description |
-|---|---|---|
-| `kind` | `str` | `"insert"`, `"replace"`, or `"delete"` |
-| `target_start` | `int` | 1-based start line of the target range |
-| `target_end` | `int` | 1-based end line (equals `target_start` for single-line / insert) |
-| `new_text` | `str` | Replacement or inserted text (empty for delete) |
-| `anchor` | `str` | `"line_start"` or `"line_end"` — caret anchor within the target |
-| `full_buffer` | `str` | Authoritative full buffer after this op (used by full-replace / resync) |
-
-Produced by the coding adapter and converted from the JSON-RPC `data` payload into typed
-`EditOperation` instances by `CodingRouter` before reaching any strategy.
-
-### BufferSelection — `tusk/shared/schemas/buffer_selection.py`
-
-| Field | Type | Description |
-|---|---|---|
-| `start_line` | `int` | 1-based inclusive start line |
-| `end_line` | `int` | 1-based inclusive end line |
-
-### CodingGateResult — `tusk/shared/schemas/coding_gate_result.py`
-
-| Field | Type | Description |
-|---|---|---|
-| `is_directed_at_tusk` | `bool` | `True` only for a stop-coding command |
-| `cleaned_command` | `str` | Cleaned stop command (empty otherwise) |
-| `stop_reason` | `str \| None` | Short stop reason, or `None` |
-
-### CodingState — `tusk/kernel/coding_state.py`
-
-| Field | Type | Description |
-|---|---|---|
-| `adapter_name` | `str` | MCP adapter name (`"coding"`) |
-| `session_id` | `str` | Adapter session id |
-| `desktop_source` | `str` | Input-automation source (e.g. `"gnome"`) |
-
-The driver and strategy are wired in `ToolRuntime` (single driver, `FullReplaceEditStrategy`),
-not selected per-session — `CodingState` carries no `driver_name` / `strategy_name`.
-
-### BufferModel — `adapters/coding/buffer_model.py`
-
-| Member | Type | Description |
-|---|---|---|
-| `lines` | `tuple[str, ...]` | Immutable line list — the authoritative buffer model |
-| `from_text(text)` | classmethod → `BufferModel` | Build a model from a raw buffer string |
-| `to_text()` | `str` | Render the model back to a buffer string |
-| `with_edit(op)` | `EditOperation` → `BufferModel` | Return a new model with the op applied |
-
-Lives in the coding adapter (alongside its owner, like `DictationState` lives in the
-kernel). Immutable — edits produce new instances.
-
-### MCPToolSchema — `tusk/shared/schemas/mcp_tool_schema.py`
-
-| Field | Type | Description |
-|---|---|---|
-| `name` | `str` | Tool name as reported by the adapter |
-| `description` | `str` | One-line tool description |
-| `input_schema` | `dict` | JSON Schema object describing parameters |
-
-### MCPToolResult — `tusk/shared/schemas/mcp_tool_result.py`
-
-| Field | Type | Description |
-|---|---|---|
-| `content` | `str` | Text content from the adapter response |
-| `is_error` | `bool` | Whether the adapter reported an error |
-| `data` | `dict \| None` | Structured payload (e.g. dictation edit operations) |
-
-### LLMSlotConfig — `tusk/shared/schemas/llm_slot_config.py`
-
-| Field | Type | Description |
-|---|---|---|
-| `provider_name` | `str` | First path segment of `provider/model` string |
-| `model` | `str` | Remainder after the first `/` |
-
-`LLMSlotConfig.parse("groq/llama-3.1-8b-instant")` → `LLMSlotConfig("groq", "llama-3.1-8b-instant")`
-
-### DesktopContext — `tusk/shared/schemas/desktop_context.py`
-
-| Field | Type | Description |
-|---|---|---|
-| `active_window_title` | `str` | Title of the focused window |
-| `active_application` | `str` | Application name of the focused window |
-| `open_windows` | `list[WindowInfo]` | All open windows with geometry |
-| `available_applications` | `list[AppEntry]` | Installed desktop applications |
-
-### WindowInfo — `tusk/shared/schemas/window_info.py`
-
-| Field | Type | Description |
-|---|---|---|
-| `window_id` | `str` | Platform window ID |
-| `title` | `str` | Window title |
-| `application` | `str` | Application name |
-| `is_active` | `bool` | Whether this is the focused window |
-| `x`, `y`, `width`, `height` | `int` | Window geometry |
-
-### AppEntry — `tusk/shared/schemas/app_entry.py`
-
-| Field | Type | Description |
-|---|---|---|
-| `name` | `str` | Human-readable application name |
-| `exec_cmd` | `str` | Shell command to launch the application |
-
-### ToolSequenceStep — `tusk/shared/schemas/tool_sequence_step.py`
-
-| Field | Type | Description |
-|---|---|---|
-| `step_id` | `str` | Unique step identifier |
-| `tool_name` | `str` | Name of the tool to execute |
-| `args` | `dict[str, object]` | Tool input parameters |
-
-Class methods: `from_dict(data) -> ToolSequenceStep | None`, `to_dict() -> dict`.
-
-### ToolSequencePlan — `tusk/shared/schemas/tool_sequence_plan.py`
-
-| Field | Type | Description |
-|---|---|---|
-| `steps` | `tuple[ToolSequenceStep, ...]` | Ordered sequence of tool steps |
-| `goal` | `str` | Natural-language goal description |
-
-Class methods: `from_dict(data) -> ToolSequencePlan | None`, `to_dict() -> dict`,
-`tool_names() -> set[str]`, `ordered_tool_names() -> tuple[str, ...]`.
-
-### AppStatus — `tusk/shared/schemas/app_status.py`
-
-`Enum` of operational states: `STARTING`, `LISTENING`, `REACTING`, `PAUSED`, `ERROR`,
-`STOPPED`. "Running" is implicit (any non-`STOPPED`). The tray icon is a pure function of this
-value (`StatusIconResolver`).
-
-### AppMode — `tusk/shared/schemas/app_mode.py`
-
-`Enum` of interaction modes: `DEFAULT`, `DICTATION` (future modes such as `CODING_ASSISTANT`
-are added here). Independent of `AppStatus`; surfaced in the tray menu, not the icon.
-
-### StatusSnapshot — `tusk/shared/schemas/status_snapshot.py`
-
-| Field | Type | Description |
-|---|---|---|
-| `status` | `AppStatus` | Current operational state |
-| `mode` | `AppMode` | Current interaction mode |
-| `detail` | `str` | Secondary line — last command/reply or error text |
-| `mic_device` | `str` | Active input device label |
-| `models` | `tuple[tuple[str, str], ...]` | `(slot_name, "provider/model")` pairs |
-
-Immutable snapshot built by `StatusReporterHub` and passed to `StatusSink.publish`.
-`models` is a tuple-of-tuples (not a dict) to satisfy the no-untyped-dicts + immutability rules.
-
-### TrayMenuItem — `shells/tray/tray_menu_item.py`
-
-| Field | Type | Description |
-|---|---|---|
-| `label` | `str` | Display text |
-| `action` | `Callable[[], None] \| None` | Click handler; `None` for disabled info lines |
-| `enabled` | `bool` | Whether the item is clickable |
-| `children` | `tuple[TrayMenuItem, ...]` | Submenu items (e.g. the models submenu) |
+Mode/session state that belongs to one component lives next to it, not in shared:
+`DictationState` and `CodingState` in `tusk/kernel/modes/`, `BufferModel` in
+`adapters/coding/`, `BufferedUtterance`/`GateDispatch`/`GateAction`/`GateState`/`RecoveryDecision`
+in `shells/voice/`, `TrayMenuItem` in `shells/tray/`.
 
 ---
 
@@ -824,85 +388,45 @@ Immutable snapshot built by `StatusReporterHub` and passed to `StatusSink.publis
 
 ### Voice Shell Path
 
+Audio capture + VAD run on a producer thread feeding a queue; STT and everything after run
+on the consumer, so speech arriving during an agent run is processed afterwards, not lost.
+
 ```
 AudioCapture.stream_frames()
-    → UtteranceDetector.stream_utterances()    # WebRTC VAD + boundary buffering
+    → UtteranceDetector.stream_utterances()    # WebRTC VAD + boundary buffering (producer thread)
     → Transcriber.process(utterance)           # STTEngine.transcribe() → text
     → Sanitizer.process(transcribed)           # hallucination / ghost-phrase filter → DROP
-    → TranscriptionBuffer.process(sanitized)   # append to rolling window
-    → GatekeeperSlot.process(buffered, recent)  # delegates to active inner gatekeeper
-        # command mode:   LLMGatekeeper — LLM classify (busy/speaking-aware) → DROP (ambient) / INTERRUPT
-        # dictation mode: DictationGatekeeper — forward all; LLM stop detection → DROP (stop phrase)
-        # coding mode:    CodingGatekeeper — forward all; LLM stop-coding detection → DROP (stop phrase)
-        # while TUSK speaks: forward-all modes wrapped in PlaybackGate → INTERRUPT or DROP only
-    → CommandWorker.enqueue(command_text)        # worker thread — listening never blocks
-      → KernelAPI.submit(command_text)
-        → CommandMode.process_command(text)
-            → MainAgent.process_command(command)
-                → AgentOrchestrator.run(profile="conversation")
-                    → AgentRuntime: LLM_C → run_agent(profile="planner")
-                        → AgentRuntime: LLM_P → done(selected_tool_names=[...])
-                    → AgentRuntime: LLM_C → run_agent(profile="executor", session_refs)
-                        → AgentRuntime: LLM_E → ToolRegistry → MCPToolProxy
-                            → adapter (stdio JSON-RPC)
-                    → AgentRuntime: LLM_C → done(text)
-    → KernelResponse(handled, reply)
+    → TranscriptionBuffer.process(sanitized)   # rolling window + gate-state tracking
+    → GatekeeperSlot.process(buffered, recent, candidates)   # delegates to active gatekeeper
+        # command mode:    LLMGatekeeper — LLM classify (busy/speaking-aware) → DROP / INTERRUPT
+        # dictation/coding: StopGatekeeper — forward all; ModeGate LLM stop detection → DROP (stop phrase)
+        # while TUSK speaks: mode gates wrapped in PlaybackGate → INTERRUPT or DROP only
+    → GateDispatch(action, text, recovered_id) — GateAction enum
+    → CommandWorker.enqueue(text)              # worker thread — listening never blocks
+      → KernelAPI.submit(text)                 # serialized by one submit lock
+        → active ModeSlot (coding, then dictation) or CommandMode.process_command(text)
+            → AgentBackend.run(AgentRequest)   # tusk backend: MainAgent → AgentOrchestrator
+    → KernelResponse(handled, reply) → TTS → SpeechPlayback
 
-# Recovery path (when gatekeeper returns forward_recovered):
-    → GateDispatch(action="forward_recovered", text=prior_text, recovered_id)
-    → buffer.mark_recovered(recovered_id); buffer.mark_consumed(current_id)
+# Recovery path (gatekeeper returns FORWARD_RECOVERED):
+    → buffer.mark(recovered_id, RECOVERED); buffer.mark(current_id, CONSUMED)
     → KernelAPI.submit(prior_text)
 
-# Interrupt path (gatekeeper returns "interrupt" while the worker is busy):
+# Interrupt path (gatekeeper returns INTERRUPT while the worker is busy):
     → kernel.request_interrupt()      # sets the shared InterruptToken
     → worker.flush()                  # queued commands dropped
-    → buffer.mark_consumed(current_id)
+    → buffer.mark(current_id, CONSUMED)
     # AgentRuntime cancels at the next step boundary → reply "Stopped."
     # SpeechPlayback polls the token every 100 ms → paplay terminated mid-word
 ```
 
-### CLI Shell Path
+### CLI / Emulator Shell Path
 
 ```
-stdin → CLIShell.start(api)
-    → KernelAPI.submit(text)             # bypasses entire voice pipeline
-    → CommandMode.handle(text)
-    → [same from MainAgent onward]
-    → KernelResponse(handled, reply)
-    → print(reply)
+stdin (CLI) or scripted transcript (emulator)
+    → kernel.submit(text)      # bypasses STT, sanitizing, and gatekeeping entirely
+    → KernelResponse → print/log reply
 ```
-
-`submit(text)` bypasses STT, hallucination filtering, and gatekeeping entirely.
-
-### Coding Mode Path
-
-```
-# Entered by start_coding (reads the buffer once, then owns it):
-StartCodingTool.execute()
-    → driver.read_buffer()                       # Ctrl+A → Ctrl+C → gnome.read_clipboard
-    → coding.start_coding_session(initial_buffer) # seeds adapter BufferModel → session_id
-    → KernelAPI.start_coding(CodingState)         # swaps in CodingGatekeeper
-
-# Per utterance while coding mode is active:
-GatekeeperSlot.process(...) → CodingGatekeeper
-    → CodingGate.should_stop(text)?
-        # yes → kernel.request_coding_stop() → DROP
-        # no  → forward as a coding instruction
-    → KernelAPI.submit(intent) → AdapterCodingMode.process_text(intent)
-        → CodingRouter.process(state, intent)
-            → coding.process_intent(session_id, intent)   # adapter (stdio JSON-RPC)
-                → CodingEditPlanner: (intent + BufferModel) --LLM--> [EditOperation]
-                → BufferModel.with_edit(op)                # adapter model updated
-                → data = {operations, should_stop}
-            → for each op: EditApplicationStrategy.apply(EditOperation, EditorDriver)
-                → InputAutomationEditorDriver → gnome.* primitives
-                     (Ctrl+G / select range / write_clipboard + Ctrl+V / type_text)
-    → editor buffer mutated (the deliverable)
-```
-
-The adapter's `BufferModel` and the editor stay in lockstep because every change flows
-through TUSK. `EditOperation.full_buffer` lets `FullReplaceEditStrategy` re-paste the
-authoritative buffer as a resync / recovery path.
 
 ---
 
@@ -910,7 +434,7 @@ authoritative buffer as a resync / recovery path.
 
 `CommandMode` never talks to the agent pipeline directly — it submits an `AgentRequest` to an
 `AgentBackend` (`tusk/kernel/agent_backends/`). `AgentBackendFactory` picks the implementation
-from `AGENT_BACKEND`. Both backends return an `AgentResult` and both drive the same
+from `AGENT_BACKEND`. All backends return an `AgentResult` and drive the same
 gnome/dictation MCP tools, so the choice is invisible to the shells.
 
 ```mermaid
@@ -920,7 +444,7 @@ flowchart TD
     SEL -->|codex_exec| CODEX[CodexExecAgentBackend]
     SEL -->|codex_mcp| MCPB[CodexMcpAgentBackend]
 
-    TUSK --> ORC[AgentRuntime loop<br/>conversation → planner → executor]
+    TUSK --> ORC[MainAgent → AgentRuntime loop<br/>conversation → planner → executor]
     ORC --> REG[ToolRegistry → MCPToolProxy]
 
     CODEX --> PROC[codex exec --json<br/>subprocess per turn]
@@ -941,7 +465,8 @@ flowchart TD
     SRV -->|AgentResult<br/>session_id = threadId| CM
 ```
 
-- **`tusk`** (default) — `TuskAgentBackend` wraps `MainAgent`, running the in-process
+- **`tusk`** (default) — `TuskAgentBackend` wraps `MainAgent` (which itself implements
+  `AgentBackend` and is used directly when no wrapper is needed), running the in-process
   conversation → planner → executor loop documented under [Agent Structure](#agent-structure).
 - **`codex_exec`** — `CodexExecAgentBackend` shells out to `codex exec --json`
   (`CodexExecCommandBuilder` builds argv, `CodexPromptBuilder` adds the desktop-assistant
@@ -951,7 +476,7 @@ flowchart TD
   emits `config.toml` `[mcp_servers.*]` sections from the same `adapters/*/adapter.json`
   manifests the kernel loads — so codex sees an identical tool set, not a hardcoded subset.
 - **`codex_mcp`** — `CodexMcpAgentBackend` keeps one persistent `codex mcp-server` child
-  (spawned lazily on the first turn, reused across turns; `CodexMcpClient` over the shared
+  (spawned lazily on the first turn, reused across turns; `codex_mcp.Client` over the shared
   `MCPStdioTransport`). Each turn calls the `codex` MCP tool — or `codex-reply` when the
   request carries a session — with `approval-policy: "never"` and the same prompt/config as
   `codex_exec`. The returned codex `threadId` becomes `AgentResult.session_id`, which
@@ -986,289 +511,179 @@ the codex backends **only** via the fallback path.
 
 ## Agent Structure
 
-### Three Profiles — `tusk/kernel/agent_profiles.py`
+### Profiles — `tusk/kernel/agent_profiles.py`
 
-All three profiles run through the same `AgentRuntime` loop. Each gets its own LLM slot,
-system prompt, allowed tools, and `max_steps`.
+All profiles run through the same `AgentRuntime` loop. Each gets its own LLM slot,
+system prompt, allowed tools, and `max_steps`. `done` is available to every profile;
+`run_agent` only where listed.
 
 | Profile | LLM slot | Static tools | Runtime tools | max_steps |
 |---|---|---|---|---|
 | `conversation` | `conversation_agent` | `done`, `run_agent` | — | 8 |
 | `planner` | `planner_agent` | `done` | — | 8 |
-| `executor` | `executor_agent` | `done` | resolved from planner session | 16 |
+| `executor` | `executor_agent` | `done` | resolved from planner session (`*`) | 16 |
+| `default` | `default_agent` | `done`, `run_agent` | — | 8 |
 
-**Conversation prompt (key rules):**
-- Answer directly with `done` for conversational replies.
-- Delegate actionable work: call `run_agent(profile_id="planner")` first, then
-  `run_agent(profile_id="executor", session_refs=[planner_session_id])`.
-- After executor returns `status=done`, call `done` immediately.
+**Conversation prompt (key rules):** answer conversation directly with `done`; treat
+start/stop/switch of dictation, coding, or the model as actionable work; delegate
+actionable work to `planner` then `executor` (passing the planner's `session_id` as
+`session_refs`); after an executor/default child returns `done`, finish immediately; stop
+delegating after two failed children in one turn.
 
-**Planner prompt (key rules):**
-- Plan but do not execute.
-- Use the provided tool catalog (injected into prompt context) to inspect tool schemas,
-  required arguments, and `sequence_callable` flags.
-- Draft `payload.planned_steps` as concrete ordered tool steps with exact args.
-- Return `payload.execution_mode` as `normal` or `sequence`.
-- Try to promote to sequence mode when all steps are linear, deterministic, and every tool
-  is `sequence_callable`.
-- For large text insertion, prefer clipboard write + paste tools over `gnome.type_text`.
-- Return `done(payload={selected_tool_names, execution_mode, plan_text, planned_steps})`.
+**Planner prompt (key rules):** plan but do not execute; use the injected tool catalog to
+pick real tool names and draft `payload.planned_steps` with exact args; return
+`payload.execution_mode` (`normal`/`sequence`), promoting to sequence when steps are
+linear, deterministic, and every tool is `sequence_callable`; prefer clipboard+paste tools
+over character typing for large text.
 
-**Executor prompt (key rules):**
-- Execute using only the runtime tools provided.
-- Every response must be a single tool call.
-- When `execute_tool_sequence` is available, call it first with empty arguments `{}`.
-- Do not rewrite or reconstruct the compiled sequence plan in tool arguments.
-- After `execute_tool_sequence` returns success, call `done` immediately.
-- Prefer clipboard + paste (`gnome.write_clipboard` + `gnome.press_keys`) for large text
-  over `gnome.type_text`. After a clipboard write, move toward focus/paste.
-- Use `gnome.press_keys` only for shortcuts, not for literal text or URLs.
-- Call the tool named `done` (not a natural-language reply) after the final action.
+**Executor prompt (key rules):** every response is a single tool call, using only the
+provided runtime tools; when `execute_tool_sequence` is offered, call it first with `{}`
+and never rewrite the compiled plan; prefer clipboard write + paste for large text; keys
+tools are for shortcuts only; call `done` immediately after the final successful action.
 
 ### AgentRuntime — `tusk/kernel/agent/agent_runtime.py`
 
-Shared across all profiles. Each run is independent:
+Shared across all profiles. Each run:
 
-1. `RuntimeMessageHistoryBuilder` loads prior messages from `SessionStore` for this session.
-2. Appends the user instruction to messages and session store.
+1. `runtime.MessageHistoryBuilder` loads prior messages from the session `Store`.
+2. Appends the user instruction to messages and the session event log (`runtime.StepRecorder`).
 3. Loops up to `profile.max_steps`:
    - If the `InterruptToken` is set → returns `AgentResult(status="cancelled")` immediately.
-   - Calls `profile.llm_provider.complete_tool_call(system_prompt, messages, tools)`.
-   - `RepeatedToolCallGuard` aborts on duplicate identical call.
-   - `RuntimeTurnGuards` enforces profile-specific constraints.
-   - Dispatches the tool call; appends call + result to messages and session store.
-   - If tool is `done` → finish and persist result.
-4. Returns `AgentResult` with `session_id`, `status`, `reply_text`.
+   - Calls `profile.llm_provider.complete_tool_call(system_prompt, messages, tools)`;
+     an LLM failure becomes a synthetic `done(status="failed")` via `ModelFailureReplyBuilder`.
+   - `done` → finish and persist the result (`runtime.ResultFactory`).
+   - `runtime.TurnGuards` checks profile-specific violations; `RepeatedToolCallGuard`
+     aborts on a duplicate identical call — both fail the run.
+   - Dispatches the tool call; records call + result to messages and the session store.
+4. Returns `AgentResult` with `session_id`, `status`, `reply_text()`.
 
-**RuntimeTurnGuards** composes profile-specific constraints:
-- `ConversationRunAgentGuard` — blocks the conversation profile from calling `run_agent`
-  again after an executor or default child already returned `status=done`. Planner `done` is
-  intermediate and does NOT trigger this guard.
-- `ConversationFailureBudgetGuard` — blocks further delegation after two failed executor or
-  default child runs in the same conversation turn.
-- `ExecutorClipboardGuard` — blocks repeated `gnome.write_clipboard` calls and requires
-  progress toward `gnome.focus_window` or a paste shortcut before allowing another write.
-- `ClipboardWriteMessageBuilder` — surfaces clipboard text as a `[clipboard-written]`
-  message so the executor sees the exact text already prepared.
-- `RuntimeStepRecorder` / `ChildResultMessageBuilder` — formats child-agent results as
-  structured `[child-result]` assistant messages instead of raw JSON user messages.
+**`runtime.TurnGuards` composes** (`tusk/kernel/agent/guards/`):
+- `ConversationRunAgentGuard` — blocks the conversation profile from delegating again
+  after an executor/default child already returned `done` (planner `done` is intermediate).
+- `ConversationFailureBudgetGuard` — blocks delegation after two failed children in one turn.
+- `ExecutorClipboardGuard` — blocks repeated `write_clipboard` calls without progress
+  toward focus/paste in between.
 
-### History Management
+`AgentOrchestrator` additionally applies `guards.AgentRunGuard` (recursion depth,
+self-delegation, lineage) before a run and `guards.ExecutorToolGuard` (validates the
+resolved runtime tool names) for executor requests.
 
-`SlidingWindowHistory` is maintained by `MainAgent._remember()` after each turn (user
-command + assistant reply). It is **not** used as LLM context by `AgentRuntime` —
-the runtime reads from `SessionStore` per session. `SlidingWindowHistory` compaction
-is local string formatting (no LLM call): the oldest half is summarised as the last 6
-evicted messages truncated to 120 chars, joined with `" | "`.
+### History
 
-### Tool Handoff — `tusk/kernel/agent/planner_runtime_tool_resolver.py`
+`SlidingWindowHistory` (max 20 messages) is maintained by `MainAgent` after each turn.
+It is **not** used as LLM context — `AgentRuntime` reads per-session messages from the
+session `Store`. On overflow the oldest half is compacted locally (no LLM call) into a
+`"Previous context summary: ..."` message: the last 6 evicted messages truncated to 120
+chars, joined with `" | "`. The gatekeeper's follow-up prompt reads recent user commands
+from this history.
+
+### Planner → Executor Handoff — `tusk/kernel/agent/planner/`
 
 When the executor profile receives `session_refs=[planner_session_id]`,
-`PlannerRuntimeToolResolver` reads the planner's persisted `done` payload from
-`SessionStore` and resolves three fields for the executor request:
-- `runtime_tool_names` — validated against `ToolRegistry.real_tool_names()`. When a
-  `sequence_plan` is present, names are derived from `plan.ordered_tool_names()` instead.
-- `execution_mode` — `"normal"` or `"sequence"`, carried from the planner payload.
-- `sequence_plan` — a `ToolSequencePlan` materialized from `planned_steps` or
-  `sequence_plan` in the planner payload.
+`planner.RuntimeToolResolver` reads the planner's persisted `done` payload and resolves:
+- `runtime_tool_names` — validated against `ToolRegistry.real_tool_names()`; with a
+  `sequence_plan` present, derived from `plan.ordered_tool_names()` instead.
+- `execution_mode` — `"normal"` or `"sequence"`.
+- `sequence_plan` — a `ToolSequencePlan` materialized from the planner payload.
 
-### Agent Delegation Model
+### Delegation Model
 
-Delegation is controlled solely by `AgentProfile.static_tool_names`. A profile that
-includes `"run_agent"` can delegate; a profile that omits it cannot. The `run_agent` schema
-is global: any profile that has the tool can request `planner`, `executor`, or `default` as
-the child profile. `AgentRunGuard` blocks self-recursion and excessive depth but does NOT
-enforce parent-specific child-profile allowlists.
+Delegation is controlled solely by `AgentProfile.static_tool_names`: a profile with
+`"run_agent"` can delegate to any child profile (`planner`, `executor`, `default`);
+`guards.AgentRunGuard` blocks self-recursion and excessive depth but does not enforce
+parent-specific child allowlists. `conversation` and `default` can delegate; `planner`
+and `executor` cannot.
 
-Current delegation permissions:
-- `conversation`: has `run_agent` — can delegate to any child profile.
-- `planner`: no `run_agent` — cannot delegate.
-- `executor`: no `run_agent` — cannot delegate.
-- `default`: has `run_agent` — can delegate to any child profile.
-
----
-
-## Tool Registry — `tusk/kernel/tool_registry.py`
-
-Central store for all executable tools. Every entry is a `RegisteredTool` frozen
-dataclass:
-
-| Field | Type | Description |
-|---|---|---|
-| `name` | `str` | Unique tool name |
-| `description` | `str` | One-line description (used in planner catalog) |
-| `input_schema` | `dict` | JSON Schema for parameters |
-| `execute` | `Callable[[dict], ToolResult]` | Execution function |
-| `source` | `str` | `"kernel"` or adapter name (e.g. `"gnome"`) |
-| `planner_visible` | `bool` | Whether planner catalog includes this tool |
-| `sequence_callable` | `bool` | Whether the tool may appear in a compiled sequence plan (default `False`) |
-
-**Key methods:**
-
-| Method | Returns | Description |
-|---|---|---|
-| `register(tool)` | — | Adds tool to registry by `tool.name` |
-| `unregister_source(source)` | — | Removes all tools from a named source |
-| `get(name)` | `RegisteredTool` | Retrieves tool by name (raises `KeyError` if absent) |
-| `real_tools()` | `list[RegisteredTool]` | All tools, sorted by name |
-| `planner_tools()` | `list[RegisteredTool]` | Only `planner_visible=True` tools |
-| `planner_tool_names()` | `set[str]` | Names of planner-visible tools |
-| `build_planner_catalog_text()` | `str` | `"name: description\n..."` for planner prompt |
-| `definitions_for(names)` | `list[dict]` | Native tool defs for a named subset |
-| `sequence_tools()` | `list[RegisteredTool]` | Only `sequence_callable=True` tools |
-| `sequence_tool_names()` | `set[str]` | Names of sequence-callable tools |
-
-Adapter tools are registered as `adapter_name.tool_name` (e.g. `gnome.launch_application`).
-The planner receives the full tool catalog as text in its system prompt context via
-`AgentToolCatalog`, which exposes each tool's name, description, parameters, and
-`sequence_callable` flag. The synthetic `list_available_tools` tool is retained in
-`OrchestratorToolDispatcher` for backward compatibility but is no longer exposed to the
-planner profile.
-
----
-
-## Pipeline Modes
-
-### CommandMode — `tusk/kernel/command_mode.py`
-
-Handles the normal voice command flow. The gatekeeper prompt is built dynamically:
-
-**Outside the follow-up window:** Standard static prompt. Wake-word or obvious imperative
-detection. Returns `{"classification": "command|conversation|ambient", "cleaned_text": ..., "reason": ...}`.
-
-**Within the follow-up window:** Standard prompt extended with:
-```
-The user recently interacted with TUSK. Follow-up utterances may omit the wake word.
-Recent context:
-  User: Command: <truncated to 150 chars>
-  User: Command: <truncated>
-  ...
-```
-The last 6 non-summary user messages from `SlidingWindowHistory` are included.
-
-`handle_gate_result`: discards `is_directed_at_tusk=False`; calls `kernel.submit(text)`
-which routes the command to the agent.
-
-### AdapterDictationMode — `tusk/kernel/dictation_mode.py`
-
-Active when `start_dictation` has been executed. Holds a `DictationState` (session ID,
-adapter name, desktop source name).
-
-**process_text(text):** Forwards the raw segment to `DictationRouter.process()`. The
-router calls `dictation.process_segment` (MCP), receives an edit operation, and applies
-it through the active desktop adapter (`gnome.type_text` or `gnome.replace_recent_text`).
-
-**stop():** Calls `DictationRouter.stop()` which calls `dictation.stop_dictation` (MCP)
-and clears the pipeline's dictation mode pointer.
-
-**Stop detection — `shells/voice/stages/dictation_gatekeeper.py`:** When dictation starts,
-`KernelAPI` fires an `on_dictation_started` callback (wired in `main.py`) that swaps the
-`GatekeeperSlot`'s inner delegate from `LLMGatekeeper` to `DictationGatekeeper`. On every
-utterance, `DictationGatekeeper` calls `DictationGate.should_stop(text)` which uses the
-gatekeeper LLM with a dictation-specific prompt (`tusk/kernel/dictation_gate_prompt.py`) to
-classify whether the spoken segment is a stop request. Stop detection relies on the model
-returning `metadata_stop` (a non-null string), not on hard-coded phrase matching. When
-structured output fails, `DictationGate` falls back to a plain `complete()` call. If both
-fail, the segment is forwarded as literal dictation text.
-
-On stop detection, `DictationGatekeeper` calls `kernel.request_dictation_stop()` which
-triggers the full stop sequence: adapter cleanup via `DictationRouter.stop()`, kernel state
-reset via `stop_dictation()`, and an `on_dictation_stopped` callback that swaps the slot
-back to `LLMGatekeeper`. The stop phrase itself is dropped (not typed).
-
-### AdapterCodingMode — `tusk/kernel/coding_mode.py`
-
-Active when `start_coding` has been executed. Holds a `CodingState` (session ID, adapter
-name, desktop source). Structurally a sibling of
-`AdapterDictationMode` — the difference is that spoken intent is converted into structured
-code edits rather than inserted verbatim.
-
-**process_text(text):** Forwards the spoken intent to `CodingRouter.process()`. The router
-calls `coding.process_intent` (MCP), which runs the coding LLM over the intent plus the
-adapter's authoritative `BufferModel` and returns one or more `EditOperation`s. The router
-converts each into a typed `EditOperation` and applies it via the injected
-`EditApplicationStrategy` + `EditorDriver` (`FullReplaceEditStrategy` over
-`InputAutomationEditorDriver`, which composes `gnome.*` key/clipboard tools).
-
-**stop():** Calls `CodingRouter.stop()` which calls `coding.stop_coding_session` (MCP) and
-clears the pipeline's coding mode pointer.
-
-**Stop detection — `shells/voice/stages/coding_gatekeeper.py`:** When coding starts,
-`KernelAPI` fires an `on_coding_started` callback (wired in `main.py`) that swaps the
-`GatekeeperSlot`'s inner delegate from `LLMGatekeeper` to `CodingGatekeeper`. On every
-utterance, `CodingGatekeeper` calls `CodingGate.should_stop(text)`, which uses the
-gatekeeper LLM with a coding-specific prompt (`tusk/kernel/coding_gate_prompt.py`) — the
-only command it detects is a request to stop coding; everything else is forwarded as a
-coding instruction. The parse/fallback chain mirrors `DictationGate`: structured output
-first, plain `complete()` fallback, and on double failure the text is forwarded as an
-instruction. On stop detection, `CodingGatekeeper` calls `kernel.request_coding_stop()`,
-which runs the full stop sequence (`CodingRouter.stop()`, `stop_coding()`, and an
-`on_coding_stopped` callback that swaps the slot back to `LLMGatekeeper`). No new slot
-class is needed — `GatekeeperSlot.swap()` already supports arbitrary inner gatekeepers.
-
-### Tool Sequence Execution
+### Tool Sequence Execution — `tusk/kernel/agent/tool_sequence/`
 
 The executor can run a compiled deterministic plan through a single synthetic tool
-`execute_tool_sequence` instead of making per-step LLM calls. This reduces latency and
-token cost for short desktop workflows.
+`execute_tool_sequence` instead of per-step LLM calls — less latency and token cost for
+short desktop workflows.
 
-**Validation pipeline:**
-1. `PlannerStepPlanValidator` validates `planned_steps` structure at planner output —
-   rejects forbidden synthetic tools, checks step schema and args against tool input
-   schemas. Does NOT check `sequence_callable`.
-2. `PlannerSequencePromoter` promotes `execution_mode=normal` to `sequence` when all steps
-   are linear and every tool is `sequence_callable`. Logs promotion under `SEQPROMOTE`.
-3. `PlannerResultValidator` orchestrates step validation, promotion, and derives
-   `sequence_plan` from validated `planned_steps`.
-4. `ToolSequencePlanValidator` runs immediately before execution — re-checks
-   `sequence_callable`, rejects forbidden tools, enforces max 8 steps.
+Validation pipeline:
+1. `planner.StepPlanValidator` — validates `planned_steps` structure at planner output:
+   step schema, args against tool input schemas, no forbidden synthetic tools.
+2. `planner.SequencePromoter` — promotes `execution_mode=normal` to `sequence` when all
+   steps are linear and every tool is `sequence_callable` (logged under `SEQPROMOTE`).
+3. `planner.ResultValidator` — orchestrates both and derives `sequence_plan`.
+4. `tool_sequence.PlanValidator` — re-checks immediately before execution:
+   `sequence_callable`, forbidden tools, max 8 steps.
 
-**Forbidden tools in sequence plans:** `done`, `run_agent`, `list_available_tools`,
+Forbidden in sequence plans: `done`, `run_agent`, `list_available_tools`,
 `execute_tool_sequence`.
 
-**Execution:** `ToolSequenceExecutor` iterates the validated plan, calling
-`ToolRegistry.get(step.tool_name).execute(args)` for each step. `ToolSequenceRecorder`
-records `sequence_started`, `sequence_step_requested`, `sequence_step_result`, and
-`sequence_finished` events to the session store. On any step failure, remaining steps are
-aborted and a partial-result `ToolResult` is returned.
+`tool_sequence.Executor` iterates the validated plan calling
+`ToolRegistry.get(step.tool_name).execute(args)`; `tool_sequence.Recorder` writes
+`sequence_started/step_requested/step_result/finished` events to the session store. Any
+step failure (or a set `InterruptToken`) aborts the remaining steps and returns a
+partial-result `ToolResult`. No wait/polling primitives, no step-output references, no
+retries, no branching — sequence mode is limited to already-synchronous tools.
 
-**Known limitations:** No wait/polling primitives, no step-output references, no retry
-policies, no branching or loops. Sequence mode is limited to already-synchronous tools.
+---
+
+## Tool Registry — `tusk/kernel/tools/tool_registry.py`
+
+Central store for all executable tools. Every entry is a `RegisteredTool` frozen dataclass:
+`name`, `description`, `input_schema`, `execute` callable, `source` (`"kernel"` or the
+adapter name), `planner_visible` (default `True`), `sequence_callable` (default `False`).
+Adapter tools are registered as `adapter_name.tool_name` (e.g. `gnome.launch_application`);
+per-tool flags come from the adapter's manifest (see Adapter Model). The registry exposes
+lookups by name and filtered views (`real_tools`, `planner_tools`, `sequence_tools`,
+`definitions_for(names)`) — see the class for the exact API.
+
+The planner receives the full catalog as text in its request context via
+`AgentToolCatalog` (name, description, parameters, `sequence_callable` flag per tool).
+The synthetic `list_available_tools` tool is retained in `OrchestratorToolDispatcher` for
+backward compatibility but is no longer exposed to any profile.
+
+Kernel-internal tools (registered by `ToolRuntime`): `start_dictation`, `start_coding`,
+`switch_model`. Synthetic tools (`done`, `run_agent`, `execute_tool_sequence`) are built
+per profile by `AgentToolsetBuilder` and never stored in the registry.
 
 ---
 
 ## Adapter Model
 
-Adapters are out-of-process MCP servers discovered from `adapter.json` manifests. The
-shipped adapters are `gnome` (`provides_context=true`), `dictation`, and `coding` (both
-`provides_context=false`). The `coding` adapter holds the authoritative buffer model and
-runs the coding LLM; it does not provide desktop context.
+Adapters are out-of-process MCP servers discovered from `adapter.json` manifests. Shipped
+adapters: `gnome` (`provides_context=true`), `dictation`, and `coding`. The `coding`
+adapter holds the authoritative buffer model and runs the coding LLM; it provides no
+desktop context. All servers share `MCPStdioServer` (`tusk/shared/mcp/`) for their
+JSON-RPC request loop.
 
 ### Manifest Schema (`adapter.json`)
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `name` | `str` | yes | Unique adapter name; becomes tool name prefix |
-| `transport` | `str` | yes | Must be `"stdio"` (HTTP not yet implemented) |
+| `name` | `str` | yes | Unique adapter name; becomes the tool-name prefix |
+| `version` | `str` | no | Adapter version string |
+| `transport` | `str` | yes | Must be `"stdio"` (HTTP not implemented) |
 | `entry` | `str` | yes | Shell command to start the server (e.g. `"python server.py"`) |
 | `provides_context` | `bool` | no | If true, this adapter becomes the primary desktop source |
+| `tools` | `object` | no | Per-tool flags: `planner_visible`, `sequence_callable` |
 
-### Startup Sequence (`AdapterManager`)
+Per-tool flags are declared in the manifest, not in kernel code. The gnome manifest marks
+window/input/mouse/`write_clipboard` tools `sequence_callable`; `launch_application` and
+`open_uri` are excluded because their success does not guarantee dependent UI state is
+ready, and read-only inspection tools are excluded as pointless in a compiled plan. The
+dictation/coding manifests hide their session tools from the planner
+(`planner_visible=false`) — they are driven by kernel tools and routers instead.
 
-1. `start_all()` iterates `adapters/*/` directories
-2. For each directory with a valid `adapter.json`:
-   a. Reads manifest, checks `transport == "stdio"`
-   b. Spawns the server process via `MCPClient.connect_stdio()`
-   c. Sends MCP `initialize` handshake
-   d. Calls `tools/list` to discover tools
-   e. Registers each tool as an `MCPToolProxy` in `ToolRegistry`
-3. First adapter with `provides_context=true` becomes `_context_adapter`
-4. On failure, retries with a managed virtualenv (`AdapterEnvironmentBuilder`)
-5. `start_watcher()` watches `adapters/` for hot-plug via `watchdog`
+### Startup Sequence (`AdapterManager` — `tusk/kernel/adapter_manager.py`)
 
-### MCPClient Protocol — `tusk/shared/mcp/mcp_client.py`
+1. `start_all()` iterates `adapters/*/` directories with a valid `adapter.json`.
+2. For each: spawn the server via `MCPClient.connect_stdio()` (retrying once with a
+   managed virtualenv from `AdapterEnvironmentBuilder` on failure), send the MCP
+   `initialize` handshake, call `tools/list`.
+3. Register each discovered tool as an `MCPToolProxy` in `ToolRegistry`, applying the
+   manifest's per-tool flags.
+4. The first adapter with `provides_context=true` becomes the primary desktop source
+   (`primary_desktop_source()`, falls back to `"gnome"`).
+5. `start_watcher()` watches `adapters/` for hot-plug via `watchdog` (skipped if
+   watchdog is not installed).
 
-Communication is line-delimited JSON-RPC 2.0 over the subprocess's stdin/stdout:
+### MCP Protocol — `tusk/shared/mcp/mcp_client.py`
+
+Line-delimited JSON-RPC 2.0 over the subprocess's stdin/stdout:
 
 ```
 → {"jsonrpc": "2.0", "id": N, "method": "tools/call",
@@ -1276,74 +691,55 @@ Communication is line-delimited JSON-RPC 2.0 over the subprocess's stdin/stdout:
 ← {"jsonrpc": "2.0", "id": N, "result": {"content": [{"type": "text", "text": "..."}]}}
 ```
 
-Tool names in `tools/call` use the unscoped name (the `adapter_name.` prefix is added by
-`MCPToolProxy` during registration and stripped during dispatch).
+`MCPToolProxy` presents the `RegisteredTool` interface: prefixes the tool name with the
+adapter name at registration, strips it on dispatch, and converts `MCPToolResult` →
+`ToolResult(success=not is_error, message=content, data=data)`.
 
-### MCPToolProxy — `tusk/shared/mcp/mcp_tool_proxy.py`
+---
 
-Wraps an `MCPToolSchema` to present the `RegisteredTool` interface. On `execute()`:
-1. Calls `MCPClient.call_tool(unscoped_name, parameters)` synchronously
-2. Converts `MCPToolResult` to `ToolResult`
-3. Returns `ToolResult(success=not is_error, message=content, data=data)`
+## Host Launcher — `launcher/tusk_host_launcher.py`
 
-`MCPToolProxy` sets `sequence_callable` based on a scoped-name allowlist in
-`mcp_tool_proxy.py`. The GNOME allowlist includes window management, input simulation,
-mouse, and clipboard tools. `gnome.launch_application` and `gnome.open_uri` are excluded
-because their success semantics do not guarantee that dependent UI state is ready for the
-next step. Read-only inspection tools (`gnome.read_clipboard`, `gnome.get_desktop_context`,
-`gnome.get_active_window`, `gnome.list_windows`, `gnome.search_applications`) are excluded
-as they are not needed in sequence plans.
+TUSK runs inside Docker, so `gnome.launch_application` cannot spawn GUI apps directly.
+A small host-side daemon listens on a Unix socket (`/tmp/tusk/launch.sock`, mode `0700`,
+shared with the container via the compose `1000:1000` user) and executes received
+commands as the host user via `subprocess.Popen`. It strips snap-injected environment
+variables (`LD_LIBRARY_PATH`, `GTK_PATH`, …) so host GUI apps don't crash loading snap
+libraries built against a different glibc. The gnome adapter's `ApplicationTools` writes
+the exec command to the socket and reads back `ok` / `error: ...`.
 
 ---
 
 ## Shell Model
 
-Shells are dynamically loaded from `shell.json` manifests by `main.py`.
+Shells are plain classes satisfying the `Shell` contract (`start(submit)` / `stop()`),
+selected by name from `TUSK_SHELLS` (default `voice`). There are no shell manifests —
+`ShellLoader` maps names to classes directly (`_SHELL_CLASSES`: `voice`, `cli`,
+`emulator`, `tray`).
 
-### Manifest Schema (`shell.json`)
-
-```json
-{
-  "name": "voice",
-  "description": "Voice shell",
-  "entry_module": "voice_shell",
-  "entry_class": "VoiceShell"
-}
-```
-
-### VoiceShell — `shells/voice/voice_shell.py`
-
-Builds a `VoicePipeline` from the six stages and drives it in a loop. The forward target
-is `CommandWorker.enqueue` (wired by `ShellLoader`): the worker thread runs
-`kernel.submit`, logs the reply, and — when a `TTSEngine` is injected (`TUSK_TTS=on`,
-default) — speaks it via `SpeechPlayback`. Listening continues while the worker executes,
-which is what makes voice interrupts possible. See `shells/voice/README.md`.
-
-### CLIShell — `shells/cli/cli_shell.py`
-
-REPL loop: `input("tusk> ")` → `KernelAPI.submit_text(text)` → print reply. Exits on
-`"exit"` or `"quit"`. Takes no constructor arguments.
-
-### TrayShell — `shells/tray/tray_shell.py`
-
-Optional status-and-control shell. Owns the GUI main loop via a `TrayBackend`, so it must run
-on the main thread. The shell loader places `tray` **last** automatically (see Threading), so
-its position in `TUSK_SHELLS` does not matter. It registers a `TrayStatusSink` into the
-`StatusReporterHub`, renders the icon from `AppStatus` (`StatusIconResolver`), and builds the
-menu (`TrayMenuBuilder`) wired to injected actions (pause/resume via `PipelineControl`, open
-logs, restart, exit via a shutdown callback). If the GUI loop crashes, `start()` does not
-return — it blocks on the shutdown event so the daemon voice shell keeps running headless. It
-holds no business logic and the kernel never imports it. See §22 of the specification.
+- **`VoiceShell`** — builds the `VoicePipeline` from the stage classes and drives it in a
+  loop. The forward target is `CommandWorker.enqueue`: the worker thread runs
+  `kernel.submit`, logs the reply, and — when TTS is enabled (`TUSK_TTS=on`, default) —
+  speaks it via `SpeechPlayback`. Listening continues while the worker executes, which is
+  what makes voice interrupts possible. Also exposes `pause()`/`resume()` for the tray.
+  See `shells/voice/README.md`.
+- **`CLIShell`** — stdin REPL: `input("tusk> ")` → `submit(text)` → print reply.
+- **`EmulatorShell`** — replays a scripted transcript into the kernel, standing in for
+  voice input (used by demos).
+- **`TrayShell`** — optional status-and-control indicator. Registers a `TrayStatusSink`
+  into the `StatusReporterHub`, renders the icon from `AppStatus` (`StatusIconResolver`),
+  and builds the menu (`TrayMenuBuilder`) wired to injected actions — pause/resume call the
+  `VoiceShell` reference injected by the loader; open logs; restart; exit via a shutdown
+  event. It holds no business logic and the kernel never imports it. The `TrayBackend`
+  ABC isolates the tray library (v1: `pystray`/AppIndicator) so other platforms are new
+  backends, not shell changes.
 
 ### Threading
 
-When multiple shells are configured, all but the last start in daemon threads. The last
-shell runs on the main thread (blocking). This allows `voice` + `cli`, or `voice` + `tray`,
-simultaneously. Because GTK/AppIndicator main loops must run on the main thread, the loader
-**reorders `tray` to the end** of the resolved shell list regardless of its position in
-`TUSK_SHELLS` — the constraint is enforced, not left to the user. The process stays alive as
-long as the last shell blocks; `TrayShell` keeps blocking on a shutdown event even if its GUI
-loop dies, so a tray crash degrades to headless rather than killing the daemon voice shell.
+All but the last shell start in daemon threads; the last blocks on the main thread.
+Because GTK/AppIndicator main loops must own the main thread, the loader **reorders
+`tray` to the end** of the shell list regardless of its position in `TUSK_SHELLS`. If the
+tray's GUI loop crashes, `TrayShell.start()` keeps blocking on the shutdown event, so a
+tray crash degrades to headless instead of killing the daemon voice shell.
 
 ---
 
@@ -1353,193 +749,144 @@ loop dies, so a tray crash degrades to headless rather than killing the daemon v
 
 Wraps any `LLMProvider`. Adds:
 
-- **Wait indicator:** Calls `log.show_wait(label)` before each LLM request, `log.clear_wait()` after
-- **Retry:** All calls go through `LLMRetryRunner` (3 attempts, delay `0.5 * attempt` seconds)
-- **Payload logging:** `LLMPayloadLogger` logs system prompts and messages to the debug group
-- **Runtime swap:** `swap(provider)` replaces the inner provider without creating a new proxy
+- **Wait indicator:** `log.show_wait(label)` before each request, `log.clear_wait()` after.
+- **Retry:** all calls go through `LLMRetryRunner` (3 attempts, delay `0.5 * attempt` s).
+  Retries network/rate-limit/5xx errors; never retries `invalid_request_error` or
+  `tool_use_failed`. When the injected `InterruptToken` is set, pending retries are
+  abandoned immediately — an interrupt must not wait out backoff.
+- **Payload logging:** `LLMPayloadLogger` logs prompts and tool schemas to debug groups.
+- **Runtime swap:** `swap(provider)` replaces the inner provider in place.
 
 ### LLMRegistry — `tusk/shared/llm/llm_registry.py`
 
-Holds six named `LLMProxy` slots. `swap(slot_name, provider_name, model)` creates a new
-provider via `ConfigurableLLMFactory` and calls `proxy.swap()`.
+Named `LLMProxy` slots; `swap(slot, provider, model)` builds a new provider via the
+factory and swaps it into the proxy (used by the `switch_model` tool). The agent slots
+get the `InterruptToken`; **`gatekeeper` and `utility` do not** — they must stay usable
+while an interrupt is pending.
 
-Slots: `gatekeeper`, `conversation_agent`, `planner_agent`, `executor_agent`,
-`default_agent`, `utility`.
+| Slot | Env var | Default |
+|---|---|---|
+| `gatekeeper` | `GATEKEEPER_LLM` | `groq/llama-3.1-8b-instant` |
+| `conversation_agent` | `CONVERSATION_AGENT_LLM` (falls back to `AGENT_LLM`) | `groq/openai/gpt-oss-120b` |
+| `planner_agent` | `PLANNER_AGENT_LLM` (falls back to `PLANNER_LLM`) | `groq/openai/gpt-oss-20b` |
+| `executor_agent` | `EXECUTOR_AGENT_LLM` (falls back to `AGENT_LLM`) | `groq/openai/gpt-oss-120b` |
+| `default_agent` | `DEFAULT_AGENT_LLM` (falls back to `AGENT_LLM`) | `groq/openai/gpt-oss-120b` |
+| `utility` | `UTILITY_LLM` | `groq/llama-3.3-70b-versatile` |
 
-### LLMRetryRunner — `tusk/shared/llm/llm_retry_runner.py`
+### Providers — `tusk/providers/llm/`
 
-Retries on network and rate-limit errors. Does **not** retry `invalid_request_error` or
-`tool_use_failed` errors. Retried error classes: HTTP 429, 500, 502, 503, 504, connection
-errors, rate limit, timeout. When the injected `InterruptToken` is set, pending retries
-are abandoned immediately (an interrupt must not wait out backoff). The gatekeeper and
-utility LLM slots get no token — they must stay usable while an interrupt is pending.
-
-### GroqLLM — `tusk/shared/llm/providers/groq_llm.py`
-
-- **Client:** `groq.Groq`, timeout 30 seconds
-- **Structured output:** Uses `response_format` with `json_schema` for models in
-  `_STRICT_SCHEMA_MODELS` (`openai/gpt-oss-20b`, `openai/gpt-oss-120b`); falls back to
-  `json_object` for other models
-- **Tool calling:** `tool_choice="required"` first; on "did not call a tool" error, retries
-  with `tool_choice="auto"`
-- **label:** `"groq/<model>"`
-
-### OpenRouterLLM — `tusk/shared/llm/providers/open_router_llm.py`
-
-- **Client:** `openai.OpenAI` with base URL `https://openrouter.ai/api/v1`
-- **Headers:** `HTTP-Referer: https://github.com/vovka/tusk`, `X-Title: TUSK`
-- **Structured output:** Falls back to plain `complete()` (no schema enforcement)
-- **label:** `"openrouter/<model>"`
+- **`GroqLLM`** — `groq.Groq` client, 30 s timeout. Structured output via
+  `response_format json_schema` for strict-schema models (`openai/gpt-oss-20b/120b`),
+  `json_object` otherwise. Tool calling: `tool_choice="required"` first, retrying with
+  `"auto"` on "did not call a tool". Label `"groq/<model>"`.
+- **`OpenRouterLLM`** — `openai.OpenAI` client against `https://openrouter.ai/api/v1`;
+  structured output falls back to plain `complete()`. Label `"openrouter/<model>"`.
+- **`ConfigurableLLMFactory`** — parses `"provider/model"` strings (`LLMSlotConfig`) and
+  instantiates the matching provider.
 
 ---
 
-## TTS Provider Specification
+## STT / TTS Providers
 
-Spoken replies are optional, controlled by `TUSK_TTS` (`on` by default; `off`/`0`/`false`
-disables). When disabled, no `TTSEngine` is injected and `VoiceShell` only logs replies.
+### STT — `tusk/providers/stt/`
 
-### GroqTTS — `tusk/providers/tts/groq_tts.py`
+`STTEngineFactory` selects by `STT_ENGINE` (`groq` default, or `whisper`).
 
-- **Model:** `canopylabs/orpheus-v1-english`, voice `daniel`, `response_format="wav"`
-- **Chunking:** Orpheus caps `input` at 200 chars, so `TextChunker` splits long replies on word
-  boundaries; each chunk is synthesized separately.
-- **Concatenation:** `WavConcatenator` merges the per-chunk WAV clips into one. Orpheus streams
-  clips with a placeholder frame count in the header, so the writer's channels/width/rate are
-  copied individually (never `setparams`) and the output size is derived from the bytes actually
-  written — otherwise the placeholder count overflows the uint32 WAV size field.
-
-### SpeechPlayback — `shells/voice/stages/speech_playback.py`
-
-Plays the synthesized WAV via `paplay` (`Popen`; a daemon thread feeds stdin and closes it
-via `with` even on write errors). Polls the `InterruptToken` every 100 ms and terminates
-the process on interrupt — speech cuts off mid-word. `CommandWorker._speak` catches
-playback/synthesis errors and logs them under `ERROR` so a TTS failure never kills the worker.
-
-> ⚠️ Latency: TTS + playback run on the `CommandWorker` thread, off the STT →
-> gatekeeper hot path entirely, so they do not affect command latency.
-
----
-
-## STT Provider Specification
-
-### GroqSTT — `tusk/shared/stt/providers/groq_stt.py`
-
-- **Model:** `whisper-large-v3-turbo`
-- **Audio format:** PCM frames wrapped in a WAV container via `wave` stdlib module
-- **Hallucination detection:** Regex `^\[.+\]$` — matches `[BLANK_AUDIO]`, `[Music]`,
-  `[Applause]`, etc. → sets `confidence=0.0`
-- **Normal result:** `confidence=1.0`
-
-### WhisperSTT — `tusk/shared/stt/providers/whisper_stt.py`
-
-- **Model loading:** `whisper.load_model(model_size)` at construction time
-- **PCM decoding:** `numpy.frombuffer(audio_frames, dtype=numpy.int16) / 32768.0`
-- **Inference:** `model.transcribe(audio, fp16=False, language="en")`
-- **Confidence:** `min(1.0, max(0.0, (avg_logprob + 1.0))) * (1.0 - no_speech_prob)` per segment, averaged
+- **`GroqSTT`** — `whisper-large-v3-turbo` over the Groq API; PCM wrapped into WAV via
+  the `wave` stdlib. Bracket-only transcripts (`[BLANK_AUDIO]`, `[Music]`, …) get
+  `confidence=0.0`, everything else `1.0`.
+- **`WhisperSTT`** — local `whisper.load_model(model_size)` (`WHISPER_MODEL_SIZE`,
+  default `base`); confidence derived from `avg_logprob` and `no_speech_prob`.
 
 ### Sanitizer — `shells/voice/stages/sanitizer.py`
 
-Applied after STT, before the buffer. Provider-agnostic hallucination and ghost-phrase
-filter. Rejects:
-- Duration < 0.4 seconds
-- Punctuation-only text
-- Text that normalizes (lowercase, strip trailing `.!?,`) to a known ghost phrase
-  (`"thank you"`, `"thanks"`, `"okay"`, `"um"`, `"hmm"`, `"bye"`, `"hello"`, and ~25 others)
-- Single words of 3 or fewer characters
+Provider-agnostic hallucination/ghost-phrase filter applied after STT: drops segments
+under 0.4 s, punctuation-only text, known ghost phrases ("thank you", "okay", …), and
+single words of ≤ 3 characters.
+
+### TTS — `tusk/providers/tts/`
+
+Spoken replies are controlled by `TUSK_TTS` (`on` default). **`GroqTTS`** synthesizes WAV
+via `canopylabs/orpheus-v1-english` (voice `daniel`); `TextChunker` splits replies at the
+200-char Orpheus cap and `WavConcatenator` merges the clips (copying channel/width/rate
+individually because Orpheus streams a placeholder frame count in headers).
+`SpeechPlayback` plays via `paplay`, polling the `InterruptToken` every 100 ms and
+terminating the process on interrupt. TTS + playback run on the `CommandWorker` thread —
+off the STT → gatekeeper hot path entirely.
 
 ---
 
 ## Gatekeeper Specification
 
-**Source:** `shells/voice/stages/gatekeeper.py`
+**Source:** `shells/voice/stages/gate/` — `LLMGatekeeper` orchestrates; `LLMClient` runs
+the LLM calls; `gatekeeper_parser`/`gatekeeper_support` handle schemas and parsing;
+prompts live in `command_gate_prompt.py` / `recovery_gate_prompt.py`.
 
-### Command Schema
+### Command Classification
 
-Used when the system prompt does not contain `"metadata_stop"`:
+Primary call returns `{"classification": "command|conversation|ambient", "cleaned_text",
+"reason"}`. `interrupt` is honored only while the `CommandWorker` is busy. Within the
+follow-up window (default 30 s since the last forward, `FOLLOW_UP_TIMEOUT_SECONDS`) the
+prompt is extended with recent user commands from `SlidingWindowHistory` so follow-ups
+work without a wake word; `LLMGatekeeper` tracks its own `_last_forwarded_at`. Recovery
+is a second LLM call, triggered when the primary classification is not `command`, that
+may resurrect a recently dropped utterance (`forward_recovered`).
 
-```json
-{
-  "classification": "command|conversation|ambient",
-  "cleaned_text": "string",
-  "reason": "string"
-}
-```
+### Mode Stop Classification
 
-### Dictation Schema
-
-Used when the system prompt contains `"metadata_stop"` (dictation gate prompt):
-
-```json
-{
-  "directed": true|false,
-  "cleaned_command": "string",
-  "metadata_stop": "true|null"
-}
-```
-
-### Response Parsing
-
-1. Strip markdown code fences if present
-2. Parse JSON
-3. If parsed value is a list, use `list[0]`
-4. If parsed value has an `"arguments"` key, unwrap it
-5. Extract `reason` and log it
-6. Extract `classification` (or derive from `directed` boolean for dictation schema)
-7. Extract `cleaned_text` or `cleaned_command` as `cleaned_command`
-8. Extract all keys starting with `metadata_` into `GateResult.metadata`
-9. `is_directed_at_tusk = classification in ("command", "conversation")`
-10. On any failure: return `GateResult(False, "", 0.0)`
+`ModeGate` (`tusk/kernel/modes/mode_gate.py`) uses the same gatekeeper LLM slot with a
+mode-specific prompt and schema `{"directed", "cleaned_command", "metadata_stop"}` —
+stop is detected when `directed` is true and `metadata_stop` is a non-empty string.
+`SpeechStopGate` is the third variant: a yes/no classifier asking whether an utterance
+heard during playback requests TUSK to stop (used by `PlaybackGate`).
 
 ### Fallback Chain
 
-1. Try `complete_structured` with appropriate schema
-2. On failure, try plain `complete` (flexible JSON parsing handles non-schema output)
-3. On second failure: return `GateResult(False, "", 0.0)` — silently discard the utterance
+1. `complete_structured` with the appropriate schema.
+2. On failure, plain `complete` (flexible JSON extraction via `llm_json`).
+3. On second failure: command gate returns `GateResult(False, "", 0.0)` (utterance
+   silently discarded); mode gates forward the text as a literal segment.
 
 ---
 
-## Startup Wiring — `main.py`
+## Startup Wiring
+
+`main.py` builds the platform pieces; `tusk/kernel/startup.py` builds the kernel;
+`shell_loader.py` builds the shells.
 
 ```
 main()
-  → StartupOptions.from_sources(sys.argv)
-  → Config.from_env()                          # reads all TUSK_* env vars
-  → _build_log(options)                        # ColorLogPrinter with log groups
-  → StatusReporterHub(NullStatusSink())        # default sink; real sink attached by tray later
-  → _build_kernel(config, log, options, reporter, InterruptToken())
-      → _build_llm_registry(config, log, options, token)   # agent slots get the token;
-                                                           # gatekeeper/utility slots do NOT
+  → StartupOptions.from_sources(argv)          # verbosity + log groups
+  → Config.from_env()                          # all env settings
+  → ColorLogPrinter(options)
+  → StatusReporterHub(NullStatusSink(), log)   # real sink attached later by the tray
+  → build_kernel(config, log, llm_registry, reporter, InterruptToken())   # startup.py
       → ToolRegistry()
-      → _build_adapter_manager(config, log, registry)
-          → AdapterManager.start_all()         # discovers + connects adapters
-          → AdapterManager.start_watcher()     # file-system hot-plug
-      → SlidingWindowHistory(20, LLMConversationSummarizer(...))
-      → ToolRuntime(registry, llm_registry, adapter_manager, log)
-      → _build_agent(config, log, llm_registry, tool_registry, history, token)
-      → KernelAPI(CommandMode(agent, log), llm_registry, log, reporter, token)
-      → ToolRuntime(...).register_tools(kernel)    # attaches DictationRouter + tools
-  → reporter.set_models(...)                       # initial model labels from LLMRegistry
-  → ShellLoader(config, kernel, log, reporter).start()   # loads shell modules; reorders "tray" last
-      # Voice shell builds its own six-stage pipeline and exposes PipelineControl:
-      → worker = CommandWorker(kernel.submit, tts_engine, SpeechPlayback(token), log, token)
-      → LLMGatekeeper(llm_registry.get("gatekeeper"), log,
-                      is_busy=worker.is_busy, current_speech_text=worker.current_speech_text)
-      → VoiceShell(config, log, stt_engine, gatekeeper, worker=worker, reporter=reporter,
-                   on_interrupt=kernel.request_interrupt + worker.flush)
-          → VoicePipeline(detector, transcriber, sanitizer, buffer, gatekeeper, reporter,
-                          on_interrupt=...)
-      # Tray shell (when "tray" in TUSK_SHELLS, forced last by the loader):
-      → TrayShell(reporter, pipeline_control, shutdown_event, config)
-          → reporter.attach_sink(TrayStatusSink(...))   # late-binds the real sink
-  → run shells (all but last in daemon threads, last blocks). The loader moves "tray"
-    to the end so its GUI loop owns the main thread. TrayShell blocks on shutdown_event,
-    so a GUI-loop crash degrades to headless instead of returning and killing daemons.
+      → AdapterManager("adapters", ...).start_all() + start_watcher()
+      → SlidingWindowHistory(20)
+      → MainAgent(AgentOrchestrator(build_agent_profiles(llm_registry),
+                                    tool_registry, FileStore(session_log_dir), log, token),
+                  history)
+      → KernelAPI(CommandMode(AgentBackendFactory(agent, config, log).create(), log),
+                  llm_registry, log, reporter, token)     # owns dictation/coding ModeSlots
+      → ToolRuntime(...).register_tools(kernel)  # start_dictation/start_coding/switch_model,
+                                                 # routers + editor driver + strategy attached
+  → reporter.set_models(registry.model_labels())
+  → ShellLoader(config, kernel, log, reporter).start()
+      → per TUSK_SHELLS: build each shell ("tray" forced last)
+      → voice: STTEngineFactory → CommandWorker(kernel.submit, GroqTTS?, SpeechPlayback(token), token)
+               → LLMGatekeeper(gatekeeper slot, busy/speaking probes from the worker)
+               → GatekeeperSlot(llm_gk); mode callbacks wired:
+                   on_start → slot.swap(PlaybackGate(StopGatekeeper(ModeGate(prompt), request_stop)))
+                   on_stop  → slot.swap(llm_gk)
+               → VoiceShell(..., on_interrupt = kernel.request_interrupt + worker.flush)
+      → tray: TrayShell(reporter, voice_shell_ref, shutdown_event, config)
+      → run: all but last in daemon threads; last blocks the main thread
 ```
 
-The tray is wired only in `ShellLoader` (the wiring layer, which is allowed to know about
-shells; `main.py` builds the kernel and hands off to it). The kernel and pipeline depend solely
-on the `StatusReporter` / `PipelineControl` abstractions and never import `shells.tray`. When no
-tray shell is loaded, the `NullStatusSink` stays in place and status reporting is a no-op.
+The kernel and pipeline depend only on the `StatusReporter` abstraction and never import
+`shells.tray`; with no tray, the `NullStatusSink` stays and status reporting is a no-op.
+LLM slot proxies for agents carry the `InterruptToken`; gatekeeper/utility do not.
 
 ---
 
@@ -1549,35 +896,30 @@ tray shell is loaded, the `NullStatusSink` stays in place and status reporting i
    Components may not hold mutable references to schemas returned by other components.
 
 2. **Text is always present before the gatekeeper.** `UtteranceDetector` yields
-   utterances with `text=""`. The pipeline fills `text` via `STTEngine.transcribe()`
-   before passing to any gatekeeper or mode handler.
+   utterances with `text=""`; the pipeline fills `text` via `STTEngine.transcribe()`
+   before any gatekeeper or mode handler sees it.
 
-3. **`tusk.kernel` never imports from `tusk.lib` concrete classes directly.** Kernel
-   components depend only on interfaces from `tusk.lib.*.interfaces`. Concrete
-   implementations are injected from `main.py`.
+3. **Only `tusk.shared` crosses layers.** Kernel, shells, adapters, and providers import
+   ABCs and schemas from `tusk.shared.*`; no layer imports a peer layer's concrete
+   classes. Concrete implementations meet only in the wiring layer (`main.py`,
+   `startup.py`, `shell_loader.py`).
 
-4. **`tusk.lib` never imports from `tusk.kernel` business logic.** The only shared types
-   are schemas in `tusk.kernel.schemas`, which `tusk.lib` may import.
+4. **Adapters are isolated processes.** The kernel has no import dependency on any
+   adapter module; capabilities are discovered at runtime via MCP.
 
-5. **Adapters are isolated processes.** The kernel has no import dependency on any adapter
-   module. Adapter capabilities are discovered at runtime via MCP protocol.
+5. **Gatekeeper prompts are supplied by the caller.** Gate classes are stateless with
+   respect to classification rules — `ModeGate` receives its prompt at construction.
 
-6. **Gatekeeper prompt is always supplied by the caller.** The gatekeeper has no embedded
-   prompt — it is stateless with respect to classification rules.
-
-7. **Tools are the only place platform-specific execution logic lives.** `Pipeline`,
+6. **Tools are the only place platform-specific execution logic lives.** The pipeline,
    `MainAgent`, and `CommandMode` are platform-agnostic.
 
-8. **Status notifications never block producers.** `StatusSink.publish` returns immediately;
-   the tray marshals updates onto its own GUI thread. `StatusReporterHub` swallows sink
-   exceptions so a broken UI can never propagate into the audio or kernel threads.
+7. **Status notifications never block producers.** `StatusSink.publish` returns
+   immediately; the tray marshals onto its GUI thread; `StatusReporterHub` swallows sink
+   exceptions so a broken UI can never propagate into audio or kernel threads.
 
-9. **Core emits status only through the `StatusReporter` abstraction.** No core module
-   (kernel or voice pipeline) imports `shells.tray`. The tray is wired in `main.py` only.
-
-10. **`AppStatus` is the single source of truth for the indicator.** The icon is a pure
-    function of it (`StatusIconResolver`); new interaction modes are added to `AppMode` plus a
-    `set_mode` call — the tray requires no change.
+8. **`AppStatus` is the single source of truth for the tray icon** — the icon is a pure
+   function of it (`StatusIconResolver`); modes surface via `AppMode.set_mode` without
+   tray changes.
 
 ---
 
@@ -1586,30 +928,24 @@ tray shell is loaded, the `NullStatusSink` stays in place and status reporting i
 | Component | Exception | Behaviour |
 |---|---|---|
 | `AudioCapture` | `sounddevice.PortAudioError` | Propagates — crashes process |
-| `GroqSTT` | Any | Propagates to `Transcriber` — utterance dropped |
-| `WhisperSTT` | Any | Propagates to `Transcriber` — utterance dropped |
+| `GroqSTT` / `WhisperSTT` | Any | Propagates to `Transcriber` — utterance dropped |
 | `Sanitizer` | — | Returns `None` — utterance discarded silently |
-| `LLMGatekeeper` | JSON parse error | Returns `GateResult(False, "", 0.0)` |
-| `LLMGatekeeper` | Both LLM calls fail | Returns `GateResult(False, "", 0.0)` |
-| `MainAgent` | LLM failure | Returns `ModelFailureReplyBuilder` message string |
-| `AgentRuntime` | LLM failure | `ModelFailureReplyBuilder` → `done(status="failed")` |
-| `AgentRuntime` | Max steps reached | Returns `AgentResult(status="failed")` |
-| `AgentRuntime` | Repeated tool call | Returns `AgentResult(status="failed")` |
-| `AgentRuntime` | `InterruptToken` set | Returns `AgentResult(status="cancelled")` at the next step boundary → "Stopped." |
-| `ToolSequenceExecutor` | `InterruptToken` set | Aborts remaining steps; `ToolResult(False, "sequence cancelled by user")` |
-| `CommandWorker` | Any from `kernel.submit` | Logged under `ERROR`; worker thread keeps processing the queue |
-| `PlannerResultValidator` | Invalid planner output | Validates `planned_steps` against tool schemas; promotes to sequence when eligible; fails if no valid steps remain |
-| `PlannerStepPlanValidator` | Malformed `planned_steps` | Rejects forbidden synthetic tools, validates step structure and args against schemas |
-| `ToolSequencePlanValidator` | Invalid sequence plan | Pre-execution: rejects non-`sequence_callable` tools, forbidden tools, max 8 steps |
-| `ToolSequenceExecutor` | Step failure | Aborts remaining steps; returns `ToolResult(False, ...)` with partial results |
+| `LLMGatekeeper` | JSON parse error / both LLM calls fail | Returns `GateResult(False, "", 0.0)` |
+| `ModeGate` | Both LLM calls fail | Text forwarded as a literal mode segment |
+| `AgentRuntime` | LLM failure | `ModelFailureReplyBuilder` → synthetic `done(status="failed")` |
+| `AgentRuntime` | Max steps / repeated tool call / guard violation | Returns `AgentResult(status="failed")` |
+| `AgentRuntime` | `InterruptToken` set | `AgentResult(status="cancelled")` at the next step boundary → "Stopped." |
+| `planner.ResultValidator` | Invalid planner output | Validates steps, promotes to sequence when eligible; fails if no valid steps remain |
+| `tool_sequence.PlanValidator` | Invalid sequence plan | Pre-execution rejection: non-`sequence_callable`, forbidden tools, > 8 steps |
+| `tool_sequence.Executor` | Step failure or `InterruptToken` set | Aborts remaining steps; `ToolResult(False, ...)` with partial results |
+| `CommandWorker` | Any from `kernel.submit` or TTS | Logged under `ERROR`; worker thread keeps processing |
 | `MCPToolProxy` | Adapter error | Returns `ToolResult(False, error_message)` |
-| `AdapterManager` | Adapter startup fails | Logs error, continues without that adapter |
-| `VoicePipeline.run` | Any from above | Stage returns `None` — utterance silently dropped |
-| `LLMRetryRunner` | Retryable error | Retries up to 3 times, delay `0.5 * attempt` s |
-| `LLMRetryRunner` | Non-retryable | Re-raises immediately |
-| `TrayShell` | Tray library `ImportError` | Logs once; runs no-op (no icon); TUSK otherwise unaffected |
+| `AdapterManager` | Adapter startup fails | Retries once with a managed venv; then logs and continues without that adapter |
+| `VoicePipeline` | Stage returns `None` | Utterance silently dropped |
+| `LLMRetryRunner` | Retryable error | Up to 3 attempts, delay `0.5 * attempt` s; non-retryable re-raises |
+| `TrayShell` | Tray library `ImportError` / GUI-loop crash | Logs; blocks on the shutdown event so daemon shells keep running headless |
 | `StatusReporterHub` | `StatusSink.publish` raises | Caught + logged; never propagates to the producer |
-| `TrayShell` | GUI main-loop crash | Backend torn down + logged; `start()` blocks on the shutdown event so daemon shells keep running headless; process exits only on the shutdown callback |
+| Host launcher | Launch command fails | Replies `error: ...` on the socket; adapter returns a failed `ToolResult` |
 
 ---
 
@@ -1619,115 +955,59 @@ tray shell is loaded, the `NullStatusSink` stays in place and status reporting i
 
 | Tool | Name | Parameters | Execution |
 |---|---|---|---|
-| `StartDictationTool` | `start_dictation` | *(none)* | Starts MCP dictation session, sets kernel dictation mode |
-| `StartCodingTool` | `start_coding` | *(none)* | Reads the editor buffer once, starts MCP coding session, sets kernel coding mode |
+| `StartDictationTool` | `start_dictation` | *(none)* | Starts an MCP dictation session, activates the dictation `ModeSlot` |
+| `StartCodingTool` | `start_coding` | *(none)* | Reads the editor buffer once, starts an MCP coding session, activates the coding `ModeSlot` |
 | `SwitchModelTool` | `switch_model` | `slot`, `provider`, `model` | Calls `LLMRegistry.swap()` |
-
-Synthetic tools (`done`, `run_agent`, `execute_tool_sequence`) are built dynamically by
-`AgentToolsetBuilder` per profile and are never stored in `ToolRegistry`.
-`list_available_tools` is retained in `OrchestratorToolDispatcher` for backward
-compatibility but is no longer exposed to any profile. `execute_tool_sequence` is exposed
-only to the executor profile in sequence mode.
 
 ### GNOME Adapter Tools (prefix: `gnome.`)
 
-**Application & Window Management:**
+| Group | Tools |
+|---|---|
+| Applications | `launch_application` (via the host launcher socket), `search_applications`, `open_uri` |
+| Windows | `close_window`, `focus_window`, `maximize_window`, `minimize_window`, `move_resize_window`, `switch_workspace` |
+| Input | `press_keys`, `type_text`, `replace_recent_text` |
+| Mouse | `mouse_click`, `mouse_move`, `mouse_drag`, `mouse_scroll` |
+| Clipboard | `read_clipboard`, `write_clipboard` |
+| Inspection | `get_desktop_context`, `get_active_window`, `list_windows` |
 
-| Tool | Parameters | Execution |
-|---|---|---|
-| `launch_application` | `application_name` | Spawns application via host |
-| `close_window` | `window_title` | `wmctrl -c` |
-| `focus_window` | `window_title` | `wmctrl -a` |
-| `maximize_window` | `window_title` | `wmctrl -b add,maximized_vert,maximized_horz` |
-| `minimize_window` | `window_title` | `xdotool` windowminimize |
-| `move_resize_window` | `window_title`, `geometry` | `wmctrl -e 0,x,y,w,h` |
-| `switch_workspace` | `workspace_number` | `wmctrl -s` |
-
-**Input Simulation:**
-
-| Tool | Parameters | Execution |
-|---|---|---|
-| `press_keys` | `keys` | `xdotool key <keys>` |
-| `type_text` | `text` | `xdotool type --delay 0 -- <text>` |
-| `replace_recent_text` | `replace_chars`, `text` | BackSpace × N, then type_text |
-
-**Mouse Control:**
-
-| Tool | Parameters | Execution |
-|---|---|---|
-| `mouse_click` | `x`, `y`, `button`, `clicks` | `xdotool mousemove` + `click` |
-| `mouse_move` | `x`, `y` | `xdotool mousemove` |
-| `mouse_drag` | `from_x`, `from_y`, `to_x`, `to_y`, `button` | mousedown + move + mouseup |
-| `mouse_scroll` | `direction`, `clicks` | `xdotool click 4/5` |
-
-**Clipboard:**
-
-| Tool | Parameters | Execution |
-|---|---|---|
-| `read_clipboard` | *(none)* | `xclip -selection clipboard -o` |
-| `write_clipboard` | `text` | `xclip -selection clipboard` via stdin |
-
-**Desktop Navigation:**
-
-| Tool | Parameters | Execution |
-|---|---|---|
-| `open_uri` | `uri` | `xdg-open <uri>` |
-
-**Desktop Inspection:**
-
-| Tool | Parameters | Execution |
-|---|---|---|
-| `get_desktop_context` | *(none)* | Full desktop snapshot (windows + apps) |
-| `get_active_window` | *(none)* | Active window title, app, geometry |
-| `list_windows` | *(none)* | All open windows with app names + geometry |
-| `search_applications` | `query` | Search installed desktop apps by name or exec |
+Implementation: `wmctrl`/`xdotool`/`xclip` via the handler classes in
+`adapters/gnome/tools/`; `launch_application` delegates to the host launcher.
 
 ### Dictation Adapter Tools (prefix: `dictation.`)
 
 | Tool | Parameters | Execution |
 |---|---|---|
-| `start_dictation` | *(none)* | Creates session, returns `session_id` |
-| `process_segment` | `session_id`, `text` | Refines text, returns edit operation |
-| `stop_dictation` | `session_id` | Closes session |
+| `start_dictation` | *(none)* | Creates a session, returns `session_id` |
+| `process_segment` | `session_id`, `text` | Returns an edit operation (insert / replace) |
+| `stop_dictation` | `session_id` | Closes the session |
 
 ### Coding Adapter Tools (prefix: `coding.`)
 
 | Tool | Parameters | Execution |
 |---|---|---|
-| `start_coding_session` | `initial_buffer` | Creates session, seeds `BufferModel`, returns `session_id` |
-| `process_intent` | `session_id`, `intent` | Coding LLM turns intent + buffer into `EditOperation`(s); updates model; returns ops |
-| `stop_coding_session` | `session_id` | Closes session |
+| `start_coding_session` | `initial_buffer` | Creates a session, seeds `BufferModel`, returns `session_id` |
+| `process_intent` | `session_id`, `intent` | Coding LLM turns intent + buffer into `EditOperation`(s); updates the model; returns ops |
+| `stop_coding_session` | `session_id` | Closes the session |
 
-The input-automation driver reuses the existing `gnome.*` primitives (`press_keys`,
-`type_text`, `read_clipboard`, `write_clipboard`) — coding mode adds no new GNOME tools.
+The coding driver reuses the existing `gnome.*` primitives — coding mode adds no new
+GNOME tools.
 
 ---
 
 ## Notes
 
-- `tusk/kernel/tool_call_parser.py` is present as a legacy helper but is not used by
-  the active native tool-calling runtime.
-- HTTP MCP transport is not implemented. `MCPClient.connect_http()` raises
-  `NotImplementedError`.
+- HTTP MCP transport is not implemented (`MCPClient.connect_http()` raises
+  `NotImplementedError`).
 - Dangerous-action confirmation and cross-session memory remain out of scope.
-- The `LLMGatekeeper` tracks its own `_last_forwarded_at` timestamp. When it forwarded
-  recently (within `follow_up_window_seconds`, default 30 s), it includes recent context
-  in the classification prompt so conversational follow-ups work without a wake word.
-  No external clock or side channel is needed.
-- The tray indicator (§22 of the specification) uses the StatusNotifierItem / AppIndicator
-  D-Bus protocol. On GNOME/Wayland the icon appears only when the host has the "AppIndicator
-  and KStatusNotifierItem Support" GNOME Shell extension enabled — a host prerequisite TUSK
-  cannot satisfy from inside the container.
-- The `TrayBackend` ABC isolates the tray library so other Linux desktops, macOS, and Windows
-  backends can be added later without changing `TrayShell`, the sink, or the menu builder.
-- Coding mode reads the editor buffer exactly once at session start and then owns an
-  authoritative in-memory `BufferModel`; it never writes files on disk. Every edit is
-  applied to the model and the editor in lockstep. Manual edits made by the user during a
-  session are **not detected** — they would cause the model to drift from the editor. The
-  full-replace strategy (re-pasting `EditOperation.full_buffer`) is the resync / recovery
-  path. Under the input-automation driver (fire-and-forget GUI automation, no feedback
-  channel) drift cannot be detected automatically, so resync is user-initiated;
-  feedback-capable drivers (future `VSCodeEditorDriver`) can trigger it automatically.
-- The input-automation driver uses the system clipboard for `Ctrl+C` / `Ctrl+V`, so it
-  saves and restores the user's clipboard around every operation (`ClipboardGuard`) to
-  avoid clobbering clipboard data the user was holding.
+- The tray indicator uses the StatusNotifierItem/AppIndicator D-Bus protocol; on
+  GNOME/Wayland the icon appears only with the "AppIndicator and KStatusNotifierItem
+  Support" shell extension enabled — a host prerequisite TUSK cannot satisfy from inside
+  the container.
+- Coding mode reads the editor buffer exactly once at session start and then owns the
+  authoritative in-memory `BufferModel`; it never writes files. Manual edits made by the
+  user during a session are **not detected** and would drift the model; the full-replace
+  strategy (re-pasting `EditOperation.full_buffer`) is the resync path. Feedback-capable
+  editor drivers (e.g. a future VS Code extension implementing `EditorDriver`) could
+  detect drift automatically.
+- The input-automation driver uses the system clipboard for `Ctrl+C`/`Ctrl+V`, so
+  `ClipboardGuard` saves and restores the user's clipboard around every operation.
