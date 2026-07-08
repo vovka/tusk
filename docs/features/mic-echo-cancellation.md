@@ -26,6 +26,16 @@ speaker ◀── echo-cancel-sink ◀── TUSK playback (paplay)
 ```bash
 mkdir -p ~/.config/pipewire/pipewire.conf.d
 cp docker/pipewire-echo-cancel.conf ~/.config/pipewire/pipewire.conf.d/
+
+# 1. Find your real mic (source) and speaker (sink) node names — look under
+#    "Sources" and "Sinks":
+wpctl status
+
+# 2. Edit the copied file, replacing YOUR_ALSA_INPUT_SOURCE / YOUR_ALSA_OUTPUT_SINK
+#    with those names:
+nano ~/.config/pipewire/pipewire.conf.d/pipewire-echo-cancel.conf
+
+# 3. Apply:
 systemctl --user restart wireplumber pipewire pipewire-pulse
 wpctl status | grep -i echo-cancel   # confirm the two virtual nodes exist
 docker compose up -d --force-recreate tusk
@@ -40,9 +50,10 @@ docker compose up -d --force-recreate tusk
 
 ## Known limits
 
-- **Machine-specific config.** `target.object` in the conf pins this host's ALSA
-  node names (`alsa_input...sofhdadsp_6__source`, `alsa_output...sofhdadsp__sink`).
-  A different machine needs its own names from `wpctl status`.
+- **Machine-specific config.** `target.object` in the conf ships as a placeholder
+  (`YOUR_ALSA_INPUT_SOURCE`/`YOUR_ALSA_OUTPUT_SINK`) — each host must fill in its
+  own node names from `wpctl status` (see Setup step 2). Left unedited, the
+  module loads but never binds to real hardware, so nothing is cancelled.
 - **Host-only, opt-in.** Nothing in the container depends on this; without the
   host-side setup step, `PULSE_SINK`/`PULSE_SOURCE` point at names that don't
   exist and libpulse silently falls back to the raw default mic/speaker —

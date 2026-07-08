@@ -22,9 +22,10 @@ services:
       # Route only TUSK through the host's WebRTC echo-canceller (see
       # docker/pipewire-echo-cancel.conf) so it stops hearing its own TTS.
       # libpulse applies these when a client opens the default device, which
-      # both paplay (TTS) and PortAudio capture do.
-      PULSE_SINK: echo-cancel-sink
-      PULSE_SOURCE: echo-cancel-source
+      # both paplay (TTS) and PortAudio capture do. Override via .env to bypass
+      # echo cancellation or target a different device.
+      PULSE_SINK: ${PULSE_SINK:-echo-cancel-sink}
+      PULSE_SOURCE: ${PULSE_SOURCE:-echo-cancel-source}
       PYTHONUNBUFFERED: "1"
       DBUS_SESSION_BUS_ADDRESS: unix:path=/run/user/1000/bus
       SHOW_LOGS: ${SHOW_LOGS:-}
