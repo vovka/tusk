@@ -76,6 +76,7 @@ There is **no kernel-side coding LLM slot**: the coding adapter owns its own mod
 | `AUDIO_FRAME_DURATION_MS` | `int` | `30` | `10`, `20`, or `30` (WebRTC VAD constraint) |
 | `VAD_AGGRESSIVENESS` | `int` | `2` | `0`–`3` |
 | `TUSK_TTS` | `bool` | on | Disabled by `off`, `0`, or `false` |
+| `TUSK_ACK` | `bool` | on | Speak a brief refrain of the request before running it. Disabled by `off`, `0`, or `false` |
 | `FOLLOW_UP_TIMEOUT_SECONDS` | `float` | `30` | Gatekeeper follow-up window |
 | `MAX_FOLLOW_UP_TIMEOUT_SECONDS` | `float` | `120` | Parsed into `Config`; currently unused |
 | `GATE_RECOVERY_WINDOW_SECONDS` | `float` | `60` | Age limit for recoverable dropped utterances |
@@ -97,7 +98,7 @@ There is **no kernel-side coding LLM slot**: the coding adapter owns its own mod
 | `CODEX_EXEC_LOG_RAW_EVENTS` | `bool` | `false` | Log codex stdout/stderr verbatim |
 
 Boolean parsing accepts `true`, `1`, `yes`, `on` (case-insensitive), except `TUSK_TTS`
-which is on unless set to `off`/`0`/`false`.
+and `TUSK_ACK` which are on unless set to `off`/`0`/`false`.
 
 ### 2.4 Environment Read Outside `Config`
 
@@ -1019,8 +1020,8 @@ receives `kernel.submit`.
 
 `ShellLoader` also builds the voice stack: STT engine via `STTEngineFactory`,
 `CommandWorker` (with `GroqTTS` when `TUSK_TTS` is on, `SpeechPlayback`, the interrupt
-token), the busy/speaking-aware `LLMGatekeeper` inside a `GatekeeperSlot`, and the mode
-gate wiring of §16.4.
+token, and the `TUSK_ACK` flag), the busy/speaking-aware `LLMGatekeeper` inside a
+`GatekeeperSlot`, and the mode gate wiring of §16.4.
 
 ### 20.2 VoiceShell — `shells/voice/voice_shell.py`
 
@@ -1134,11 +1135,13 @@ which also refreshes the tray's model list). `model_labels()` feeds the tray men
 
 ### 22.2 CommandWorker — `shells/voice/command_worker.py`
 
-Daemon thread + `queue.Queue[str]` between the pipeline and the kernel:
+Daemon thread + `queue.Queue[tuple[str, str]]` (command text + acknowledgment refrain)
+between the pipeline and the kernel:
 
 | Member | Behavior |
 |---|---|
-| `enqueue(text)` | returns immediately; commands run sequentially in order |
+| `enqueue(text, refrain="")` | returns immediately; commands run sequentially in order |
+| acknowledgment | when `TUSK_ACK` is on and the refrain is non-empty, it is logged and spoken (via the same TTS path as replies) before `submit` runs — silent when TTS is off |
 | `flush()` | drops queued (not yet started) commands |
 | `is_busy` | true while executing or the queue is non-empty — enables the gatekeeper busy clause |
 | `current_speech_text` | the reply text while it is being spoken, else `None` — enables the echo clause and the playback gate |
