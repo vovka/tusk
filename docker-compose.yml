@@ -19,6 +19,12 @@ services:
       # can actually read it (otherwise it falls back to a generic icon).
       TMPDIR: /tmp/tusk
       PULSE_SERVER: unix:/run/user/1000/pulse/native
+      # Route only TUSK through the host's WebRTC echo-canceller (see
+      # docker/pipewire-echo-cancel.conf) so it stops hearing its own TTS.
+      # libpulse applies these when a client opens the default device, which
+      # both paplay (TTS) and PortAudio capture do.
+      PULSE_SINK: echo-cancel-sink
+      PULSE_SOURCE: echo-cancel-source
       PYTHONUNBUFFERED: "1"
       DBUS_SESSION_BUS_ADDRESS: unix:path=/run/user/1000/bus
       SHOW_LOGS: ${SHOW_LOGS:-}
