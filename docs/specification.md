@@ -1361,7 +1361,7 @@ up to 4096 tokens) + full-replace paste (~20–60 ms, scales with buffer size, p
 | Idle | no busy clause; normal single gatekeeper call | n/a |
 | During speech playback | gate/stop-gate classifies → token set → 100 ms playback poll → `terminate()` | ~0.4–1.0 s |
 | During agent run | token checked at step boundaries; the in-flight LLM/tool call finishes first | ~1.5–3.5 s (bounded by the in-flight call) |
-| Speaker bleed while TUSK talks | extra VAD segments → extra STT + gate calls, classified `ambient`/dropped | cost only, no misfires; PulseAudio `module-echo-cancel` is the optional env-level fix |
+| Speaker bleed while TUSK talks | extra VAD segments → extra STT + gate calls, classified `ambient`/dropped | cost only, no misfires; optional PipeWire `module-echo-cancel` env-level fix, see [mic-echo-cancellation](features/mic-echo-cancellation.md) |
 
 ---
 
@@ -1476,4 +1476,5 @@ busy/speaking-aware prompt covers it in the same single gatekeeper call.
 ### 30.5 Out of Scope
 
 Hard-killing in-flight HTTP calls; CLI shell interruption; undo of executed desktop
-actions; acoustic echo cancellation (optional PulseAudio `module-echo-cancel`).
+actions. Acoustic echo cancellation is available as an optional host-level PipeWire
+config, see [mic-echo-cancellation](features/mic-echo-cancellation.md).
