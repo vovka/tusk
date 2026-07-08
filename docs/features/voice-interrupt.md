@@ -75,8 +75,8 @@ sequenceDiagram
 ## Known limits
 
 Coding-mode edit-driver internals not token-covered (own stop flow); CLI shell not
-interruptible; no undo of executed desktop actions; optional PulseAudio
-`module-echo-cancel` for speaker bleed.
+interruptible; no undo of executed desktop actions. Speaker bleed during playback has
+an optional acoustic fix, see [mic-echo-cancellation](mic-echo-cancellation.md).
 
 ---
 **Last updated**: 2026-07-04 · **Updated by**: Claude · **Exploration depth**: Deep
