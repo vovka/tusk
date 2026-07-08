@@ -1,6 +1,6 @@
 import types
 
-from tusk.kernel.verified_edit_strategy import VerifiedEditStrategy
+from tusk.kernel.modes.edit_strategies.verified_edit_strategy import VerifiedEditStrategy
 from tusk.shared.schemas.edit_operation import EditOperation
 
 

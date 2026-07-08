@@ -1,8 +1,8 @@
 import types
 
-from tusk.kernel.modes.full_replace_edit_strategy import FullReplaceEditStrategy
-from tusk.kernel.modes.line_anchored_edit_strategy import LineAnchoredEditStrategy
-from tusk.kernel.modes.verified_edit_strategy import VerifiedEditStrategy
+from tusk.kernel.modes.edit_strategies.full_replace_edit_strategy import FullReplaceEditStrategy
+from tusk.kernel.modes.edit_strategies.line_anchored_edit_strategy import LineAnchoredEditStrategy
+from tusk.kernel.modes.edit_strategies.verified_edit_strategy import VerifiedEditStrategy
 from tusk.kernel.tools.tool_runtime import ToolRuntime
 
 

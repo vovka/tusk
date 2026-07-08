@@ -1,8 +1,8 @@
 from tusk.kernel.adapter_manager import AdapterManager
-from tusk.kernel.modes.full_replace_edit_strategy import FullReplaceEditStrategy
+from tusk.kernel.modes.edit_strategies.full_replace_edit_strategy import FullReplaceEditStrategy
 from tusk.kernel.modes.input_automation_editor_driver import InputAutomationEditorDriver
-from tusk.kernel.modes.line_anchored_edit_strategy import LineAnchoredEditStrategy
-from tusk.kernel.modes.verified_edit_strategy import VerifiedEditStrategy
+from tusk.kernel.modes.edit_strategies.line_anchored_edit_strategy import LineAnchoredEditStrategy
+from tusk.kernel.modes.edit_strategies.verified_edit_strategy import VerifiedEditStrategy
 from tusk.kernel.tools.internal_tools import CodingRouter, DictationRouter, StartCodingTool, StartDictationTool, SwitchModelTool
 from tusk.kernel.tools.tool_registry import ToolRegistry
 from tusk.shared.llm.llm_registry import LLMRegistry
