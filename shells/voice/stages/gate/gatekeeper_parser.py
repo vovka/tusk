@@ -21,7 +21,7 @@ def _gate_result(data: dict) -> GateResult:
     kind = _classification(data)
     text = str(data.get("cleaned_text", ""))
     directed = kind in (GateClassification.COMMAND, GateClassification.CONVERSATION)
-    return GateResult(directed, text, 1.0, kind)
+    return GateResult(directed, text, 1.0, kind, str(data.get("intent", "")))
 
 
 def _classification(data: dict) -> GateClassification:

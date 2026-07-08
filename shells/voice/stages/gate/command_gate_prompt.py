@@ -12,8 +12,11 @@ _BASE_PROMPT = "\n".join([
     "Without a wake word, treat chit-chat, observations, and open-ended questions as ambient unless they clearly continue a task or correct a prior drop.",
     "Treat background speech, filler, and unrelated chatter as ambient.",
     "When uncertain between command/conversation and ambient, choose ambient.",
-    'Return strict JSON only: {"classification":"command|conversation|ambient","cleaned_text":"...","reason":"..."}.',
+    'Return strict JSON only: {"classification":"command|conversation|ambient","cleaned_text":"...","intent":"...","reason":"..."}.',
     "For command or conversation, remove wake words like 'tusk', 'task', 'hey tusk', or 'hey task'.",
+    "For every command or conversation, set intent to a terse 3-6 word present-continuous refrain of the "
+    "request, as TUSK acknowledging it aloud: 'open gedit and add a poem' -> 'Opening gedit and adding a poem'; "
+    "'what time is it' -> 'Checking the time'. Never leave intent empty for command or conversation.",
 ])
 
 _BUSY_CLAUSE = "\n".join([

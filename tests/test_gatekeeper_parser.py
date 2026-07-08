@@ -49,3 +49,14 @@ def test_parses_recovery_decision_embedded_in_prose() -> None:
     decision = parse_recovery_decision('Decision: {"action": "recover", "candidate_id": "u2", "reason": "match"} done.')
     assert decision.action == "recover"
     assert decision.candidate_id == "u2"
+
+
+def test_parses_intent_refrain() -> None:
+    payload = '{"classification": "command", "cleaned_text": "open firefox", "intent": "Opening Firefox"}'
+    result, _ = parse_gate_result(payload)
+    assert result.intent == "Opening Firefox"
+
+
+def test_intent_absent_defaults_empty() -> None:
+    result, _ = parse_gate_result(_PAYLOAD)
+    assert result.intent == ""
