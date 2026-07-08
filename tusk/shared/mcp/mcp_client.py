@@ -3,8 +3,8 @@ import shlex
 import sys
 
 from tusk.shared.mcp.mcp_stdio_transport import MCPStdioTransport
-from tusk.shared.schemas.mcp_tool_result import MCPToolResult
-from tusk.shared.schemas.mcp_tool_schema import MCPToolSchema
+from tusk.shared.schemas.tools.mcp_tool_result import MCPToolResult
+from tusk.shared.schemas.tools.mcp_tool_schema import MCPToolSchema
 
 __all__ = ["MCPClient"]
 
@@ -15,14 +15,19 @@ class MCPClient:
         self._timeout = response_timeout_seconds
         self._next_id = 0
 
-    async def connect_stdio(self, command: list[str], cwd: str, env: dict | None = None) -> None:
+    def connect_stdio(self, command: list[str], cwd: str, env: dict | None = None) -> None:
         self._transport = MCPStdioTransport(self._normalize_command(command), cwd, env, self._timeout)
-        self._request("initialize", {"protocolVersion": "2024-11-05", "capabilities": {}})
+        try:
+            self._request("initialize", {"protocolVersion": "2024-11-05", "capabilities": {}})
+        except RuntimeError:
+            self._transport.stop()
+            self._transport = None
+            raise
 
-    async def connect_http(self, url: str) -> None:
+    def connect_http(self, url: str) -> None:
         raise NotImplementedError(f"HTTP transport is not implemented: {url}")
 
-    async def list_tools(self) -> list[MCPToolSchema]:
+    def list_tools(self) -> list[MCPToolSchema]:
         payload = self._request("tools/list", {})
         return [
             MCPToolSchema(
@@ -33,13 +38,13 @@ class MCPClient:
             for item in payload.get("tools", [])
         ]
 
-    async def call_tool(self, name: str, arguments: dict) -> MCPToolResult:
+    def call_tool(self, name: str, arguments: dict) -> MCPToolResult:
         payload = self._request("tools/call", {"name": name, "arguments": arguments})
         content = payload.get("content", [])
         text = " ".join(item.get("text", "") for item in content if item.get("type") == "text")
         return MCPToolResult(text.strip(), bool(payload.get("isError")), payload.get("data"))
 
-    async def shutdown(self) -> None:
+    def shutdown(self) -> None:
         if self._transport is not None:
             self._transport.stop()
 

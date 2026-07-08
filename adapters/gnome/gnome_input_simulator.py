@@ -2,8 +2,6 @@ import subprocess
 
 __all__ = ["GnomeInputSimulator"]
 
-_BUTTON_MAP = {"left": 1, "right": 3, "middle": 2}
-
 
 class GnomeInputSimulator:
     def press_keys(self, keys: str) -> None:
@@ -60,27 +58,28 @@ class GnomeInputSimulator:
             raise RuntimeError(self._type_text_error(result))
 
     def mouse_click(self, x: int, y: int, button: int, clicks: int) -> None:
-        self.mouse_move(x, y)
-        subprocess.run(
-            ["xdotool", "click", "--repeat", str(clicks), str(button)],
-            check=False,
-        )
+        self._run_mouse(["xdotool", "mousemove", str(x), str(y)], "mouse_click")
+        self._run_mouse(["xdotool", "click", "--repeat", str(clicks), str(button)], "mouse_click")
 
     def mouse_move(self, x: int, y: int) -> None:
-        subprocess.run(["xdotool", "mousemove", str(x), str(y)], check=False)
+        self._run_mouse(["xdotool", "mousemove", str(x), str(y)], "mouse_move")
 
     def mouse_drag(self, from_x: int, from_y: int, to_x: int, to_y: int, button: int) -> None:
-        self.mouse_move(from_x, from_y)
-        subprocess.run(["xdotool", "mousedown", str(button)], check=False)
-        self.mouse_move(to_x, to_y)
-        subprocess.run(["xdotool", "mouseup", str(button)], check=False)
+        self._run_mouse(["xdotool", "mousemove", str(from_x), str(from_y)], "mouse_drag")
+        self._run_mouse(["xdotool", "mousedown", str(button)], "mouse_drag")
+        self._run_mouse(["xdotool", "mousemove", str(to_x), str(to_y)], "mouse_drag")
+        self._run_mouse(["xdotool", "mouseup", str(button)], "mouse_drag")
 
     def mouse_scroll(self, direction: str, clicks: int) -> None:
         button = 4 if direction == "up" else 5
-        subprocess.run(
-            ["xdotool", "click", "--repeat", str(clicks), str(button)],
-            check=False,
-        )
+        self._run_mouse(["xdotool", "click", "--repeat", str(clicks), str(button)], "mouse_scroll")
+
+    def _run_mouse(self, args: list[str], action: str) -> None:
+        result = subprocess.run(args, check=False, capture_output=True, text=True)
+        if result.returncode != 0:
+            stderr = result.stderr.strip()
+            suffix = f": {stderr}" if stderr else ""
+            raise RuntimeError(f"failed {action} (exit={result.returncode}){suffix}")
 
     def _type_text_error(self, result: object) -> str:
         stderr = getattr(result, "stderr", "").strip()

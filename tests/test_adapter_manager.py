@@ -3,7 +3,7 @@ import textwrap
 import types
 
 from tusk.kernel.adapter_manager import AdapterManager
-from tusk.kernel.tool_registry import ToolRegistry
+from tusk.kernel.tools.tool_registry import ToolRegistry
 
 _MANIFEST = {
     "name": "demo",
@@ -38,11 +38,19 @@ for line in sys.stdin:
 def test_adapter_manager_registers_namespaced_tools(tmp_path) -> None:
     _write_adapter(tmp_path / "demo")
     manager = AdapterManager(str(tmp_path), ToolRegistry(), types.SimpleNamespace(log=lambda *a: None))
-    manager.run_async(manager.start_all())
+    manager.start_all()
     assert manager.tool_registry.get("demo.ping").name == "demo.ping"
 
 
-def _write_adapter(adapter_dir) -> None:
+def test_adapter_subprocess_can_import_tusk_shared(tmp_path) -> None:
+    _write_adapter(tmp_path / "demo", imports_tusk=True)
+    manager = AdapterManager(str(tmp_path), ToolRegistry(), types.SimpleNamespace(log=lambda *a: None))
+    manager.start_all()
+    assert manager.tool_registry.get("demo.ping").name == "demo.ping"
+
+
+def _write_adapter(adapter_dir, imports_tusk: bool = False) -> None:
     adapter_dir.mkdir()
     (adapter_dir / "adapter.json").write_text(json.dumps(_MANIFEST))
-    (adapter_dir / "server.py").write_text(textwrap.dedent(_SERVER))
+    prefix = "from tusk.shared.schemas.tools.tool_result import ToolResult\n" if imports_tusk else ""
+    (adapter_dir / "server.py").write_text(prefix + textwrap.dedent(_SERVER))

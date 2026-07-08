@@ -69,10 +69,15 @@ def test_executor_prompt_prefers_clipboard_for_large_text() -> None:
     profiles = build_agent_profiles(_mock_registry())
     prompt = profiles["executor"].system_prompt
     assert "clipboard" in prompt
-    assert "gnome.write_clipboard" in prompt
     assert "intermediate actions before pasting" in prompt.lower()
     assert "do not copy or write to the clipboard again until after a paste" in prompt.lower()
     assert "not for literal text or urls" in prompt.lower()
     assert "tool named `done`" in prompt
     assert "single tool/function call" in prompt
     assert "do not write plain text" in prompt.lower()
+
+
+def test_prompts_name_no_adapter_specific_tools() -> None:
+    profiles = build_agent_profiles(_mock_registry())
+    for profile in profiles.values():
+        assert "gnome." not in profile.system_prompt

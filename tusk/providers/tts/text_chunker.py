@@ -1,3 +1,5 @@
+import textwrap
+
 __all__ = ["TextChunker"]
 
 
@@ -6,13 +8,6 @@ class TextChunker:
         self._limit = limit
 
     def split(self, text: str) -> list[str]:
-        chunks: list[str] = []
-        for word in text.split():
-            self._add(chunks, word)
+        normalized = " ".join(text.split())
+        chunks = textwrap.wrap(normalized, self._limit, break_long_words=False, break_on_hyphens=False)
         return chunks or [text]
-
-    def _add(self, chunks: list[str], word: str) -> None:
-        if chunks and len(chunks[-1]) + 1 + len(word) <= self._limit:
-            chunks[-1] = f"{chunks[-1]} {word}"
-            return
-        chunks.append(word)

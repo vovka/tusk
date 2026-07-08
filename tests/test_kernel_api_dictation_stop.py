@@ -19,7 +19,7 @@ def test_kernel_api_uses_command_mode_when_not_in_dictation() -> None:
 def test_request_dictation_stop_calls_mode_stop() -> None:
     actions: list[str] = []
     api = KernelAPI(_command_mode(), types.SimpleNamespace())
-    api._dictation_mode = _dictation_mode(actions)
+    api._dictation._mode = _dictation_mode(actions)
     result = api.request_dictation_stop()
     assert result == KernelResponse(True, "stopped")
     assert "stop" in actions
@@ -51,7 +51,7 @@ def test_stop_dictation_calls_on_stop_callback() -> None:
 def _submit(text: str) -> tuple[KernelResponse, list[str]]:
     actions: list[str] = []
     api = KernelAPI(_command_mode(), types.SimpleNamespace())
-    api._dictation_mode = _dictation_mode(actions)
+    api._dictation._mode = _dictation_mode(actions)
     return api.submit(text), actions
 
 

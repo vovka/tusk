@@ -1,6 +1,7 @@
 from collections.abc import Callable
 
 from shells.voice.buffered_utterance import BufferedUtterance
+from shells.voice.gate_action import GateAction
 from shells.voice.gate_dispatch import GateDispatch
 from shells.voice.interfaces.gatekeeper import Gatekeeper
 from tusk.shared.schemas.utterance import Utterance
@@ -21,9 +22,6 @@ class PlaybackGate(Gatekeeper):
         self._current_speech_text = current_speech_text
         self._stop_gate = stop_gate
 
-    def evaluate(self, utterance: Utterance, recent: list[Utterance]) -> object:
-        return self._inner.evaluate(utterance, recent)
-
     def process(
         self,
         utterance: Utterance | BufferedUtterance,
@@ -38,5 +36,5 @@ class PlaybackGate(Gatekeeper):
 
     def _interrupt_or_drop(self, text: str, speaking: str) -> GateDispatch:
         if self._stop_gate.should_stop(text, speaking):
-            return GateDispatch("interrupt")
-        return GateDispatch("drop")
+            return GateDispatch(GateAction.INTERRUPT)
+        return GateDispatch(GateAction.DROP)

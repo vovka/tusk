@@ -37,13 +37,12 @@ class AgentBackendFactory:
         return FallbackAgentBackend(backend, TuskAgentBackend(self._agent, self._log_printer))
 
     def _fallback_name(self) -> str:
-        return str(getattr(self._config, "agent_backend_fallback", "")).strip().lower()
+        return self._config.agent_backend_fallback.strip().lower()
 
     def _backend_name(self) -> str:
-        return str(getattr(self._config, "agent_backend", "tusk")).strip().lower()
+        return self._config.agent_backend.strip().lower()
 
     def _selected(self, backend: AgentBackend) -> AgentBackend:
-        backend_name = getattr(backend, "name", "unknown")
-        message = f"Selected agent backend: {backend_name}"
+        message = f"Selected agent backend: {backend.name}"
         self._log_printer.log("agent_backend", message, "agent")
         return backend

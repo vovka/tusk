@@ -15,6 +15,7 @@ class Config:
     executor_agent_llm: LLMSlotConfig
     default_agent_llm: LLMSlotConfig
     utility_llm: LLMSlotConfig
+    stt_engine: str
     whisper_model_size: str
     audio_sample_rate: int
     audio_frame_duration_ms: int
@@ -26,7 +27,6 @@ class Config:
     gate_recovery_candidate_limit: int
     shells: list[str]
     adapter_env_cache_dir: str
-    conversation_log_dir: str
     agent_session_log_dir: str
     tray_icon_theme: str
     tray_show_last_activity: bool

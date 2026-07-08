@@ -1,5 +1,12 @@
 import queue
 import threading
+from collections.abc import Callable
+
+from shells.voice.stages.speech_playback import SpeechPlayback
+from tusk.shared.interrupt.interrupt_token import InterruptToken
+from tusk.shared.logging.interfaces.log_printer import LogPrinter
+from tusk.shared.schemas.kernel_response import KernelResponse
+from tusk.shared.tts.interfaces.tts_engine import TTSEngine
 
 __all__ = ["CommandWorker"]
 
@@ -9,11 +16,11 @@ class CommandWorker:
 
     def __init__(
         self,
-        submit: object,
-        tts_engine: object | None,
-        playback: object,
-        log_printer: object,
-        interrupt_token: object,
+        submit: Callable[[str], KernelResponse],
+        tts_engine: TTSEngine | None,
+        playback: SpeechPlayback,
+        log_printer: LogPrinter,
+        interrupt_token: InterruptToken,
     ) -> None:
         self._submit = submit
         self._tts = tts_engine
@@ -65,7 +72,7 @@ class CommandWorker:
             self._log.log("TUSK", reply)
             self._speak(reply)
 
-    def _reply_for(self, response: object) -> str:
+    def _reply_for(self, response: KernelResponse) -> str:
         # an interrupt during the run means the user wants silence: confirm briefly, never read a stale reply
         if self._token.is_interrupted:
             self._token.clear()
@@ -80,7 +87,7 @@ class CommandWorker:
         except Exception as exc:
             self._log.log("ERROR", f"tts failed: {exc}")
 
-    def _play(self, reply: str, audio: object) -> None:
+    def _play(self, reply: str, audio: bytes) -> None:
         self._speech_text = reply
         try:
             self._playback.play(audio)

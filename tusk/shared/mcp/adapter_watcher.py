@@ -12,4 +12,4 @@ class AdapterWatcher(FileSystemEventHandler):
 
     def on_created(self, event) -> None:
         if event.is_directory:
-            self._manager.run_async(self._manager.start_adapter(event.src_path))
+            self._manager.start_adapter(event.src_path)

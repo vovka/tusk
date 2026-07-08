@@ -152,7 +152,8 @@ All settings are configured via environment variables:
 | `PLANNER_LLM` | `groq/openai/gpt-oss-20b` | Strict-schema planner model for one-shot tool subset selection (`provider/model`) |
 | `AGENT_LLM` | `groq/openai/gpt-oss-120b` | Capable model for the main agent (`provider/model`) |
 | `UTILITY_LLM` | `groq/llama-3.3-70b-versatile` | Model for summaries and text cleanup (`provider/model`) |
-| `WHISPER_MODEL_SIZE` | `base` | Whisper model: `tiny`, `base`, `small`, `medium` |
+| `STT_ENGINE` | `groq` | Speech-to-text engine: `groq` (hosted Whisper API) or `whisper` (local model) |
+| `WHISPER_MODEL_SIZE` | `base` | Local Whisper model (`STT_ENGINE=whisper`): `tiny`, `base`, `small`, `medium` |
 | `AUDIO_SAMPLE_RATE` | `16000` | Microphone sample rate (Hz) |
 | `AUDIO_FRAME_DURATION_MS` | `30` | VAD frame size in ms (`10`, `20`, or `30`) |
 | `VAD_AGGRESSIVENESS` | `2` | VAD sensitivity: `0` (least) to `3` (most aggressive) |
@@ -217,23 +218,59 @@ docker run --rm \
 
 This should list your open windows.
 
+## Testing
+
+All commands run inside Docker.
+
+**Unit tests** (includes style guardrails enforcing file/function size limits):
+
+```bash
+docker compose run --rm --no-deps tusk pytest tests/
+```
+
+**Voice e2e** (`e2e/`) — drives the real voice pipeline, gatekeeper, kernel, and Groq LLMs
+end-to-end; only the microphone, STT, TTS, and speaker are faked. Requires a real
+`GROQ_API_KEY` in `.env`:
+
+```bash
+docker compose run --rm --no-deps tusk python -m e2e.run_voice_e2e
+```
+
+**Pair-coding transcript e2e** (`demos/`) — replays a scripted coding session through the
+emulator shell against `demos/editor_emulator`, a mock desktop MCP adapter that needs no X11:
+
+```bash
+docker compose run --rm --no-deps \
+  -e TUSK_SHELLS=emulator \
+  -e TUSK_TRANSCRIPT=demos/coding_session_emulated.txt \
+  -e TUSK_UTTERANCE_PAUSE=0 \
+  -v ./demos/editor_emulator:/app/adapters/editor_emulator:ro \
+  tusk python main.py
+```
+
+`e2e/` and `demos/` are complementary, not duplicates: `e2e/` exercises the voice-input path
+(utterance → gate → kernel), while `demos/` exercises the desktop-action path (kernel →
+planner → MCP adapter) using the emulator shell and a mock editor.
+
 ## Architecture
 
 ```
 tusk/
 ├── tusk/
-│   ├── kernel/         # Business logic: pipeline, agents, gatekeeper, planner, tool registry
-│   └── lib/            # Infrastructure: LLM providers, STT providers, MCP client, config
-│       ├── llm/        # LLMProxy, LLMRegistry, retry, provider implementations
-│       ├── stt/        # STT ABC, GroqSTT, WhisperSTT
-│       ├── mcp/        # MCPClient (stdio JSON-RPC 2.0)
-│       └── config/     # Config dataclass, ConfigFactory (env vars)
+│   ├── kernel/         # Business logic: KernelAPI, agent orchestrator, planner, modes, tool registry
+│   ├── providers/      # Concrete LLM providers (Groq, OpenRouter) and STT engines (Groq, Whisper)
+│   └── shared/         # Infrastructure: config, schemas, LLM proxy/registry, MCP client, logging
 ├── shells/
-│   ├── voice/          # AudioCapture, UtteranceDetector (VAD), VoiceShell
-│   └── cli/            # CliShell (REPL)
+│   ├── voice/          # AudioCapture, UtteranceDetector (VAD), gatekeeper, VoiceShell
+│   ├── cli/            # CliShell (REPL)
+│   ├── tray/           # System tray status indicator
+│   └── emulator/       # Transcript-driven shell for scripted e2e runs
 ├── adapters/
-│   ├── gnome/          # GNOME desktop MCP server (21 tools: windows, input, mouse, clipboard)
-│   └── dictation/      # Dictation refinement MCP server
+│   ├── gnome/          # GNOME desktop MCP server (windows, input, mouse, clipboard)
+│   ├── dictation/      # Dictation refinement MCP server
+│   └── coding/         # Voice pair-coding MCP server
+├── e2e/                # Voice e2e harness: real pipeline + kernel, fake mic/STT/TTS
+├── demos/              # Pair-coding transcripts + editor_emulator mock desktop adapter
 └── main.py             # Startup wiring: build kernel, attach shells, run adapters
 ```
 

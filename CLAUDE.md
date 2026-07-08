@@ -10,6 +10,13 @@ These rules apply to all code in this repository. Claude must follow them withou
 - **Max 10 lines per function/method**. If logic is longer, extract named helper methods.
 - **One class per file**. Filename must match the class name in snake_case (e.g., `VoiceCapture` → `voice_capture.py`).
 
+## Directory Organization
+
+- **Max 12 Python files per directory** (excluding `__init__.py`). Enforced by `tests/style_guardrails/directory_guardrails.py`.
+- **Max package depth 4** below the repo root (`tusk/kernel/agent/planner` is at the limit).
+- **Create a subpackage only for ≥3 cohesive files.** A shared filename prefix is the signal. Never create a directory holding 1–2 files; existing `interfaces/` packages are the sanctioned exception.
+- **Drop the group prefix on move and rename the class to match** (`planner_result_validator.py` → `planner/result_validator.py`, class `ResultValidator`) — unless the shortened class name would be meaninglessly generic (`Context`, `Result`) or collide with an existing class; then keep the original names.
+
 ## OOP Principles
 
 - **Classes first.** Model every meaningful concept as a class, not a loose collection of functions.

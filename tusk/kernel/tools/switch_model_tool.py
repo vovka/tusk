@@ -1,0 +1,36 @@
+from tusk.shared.schemas.tools.tool_result import ToolResult
+from tusk.shared.llm.llm_registry import LLMRegistry
+from tusk.shared.status.interfaces.status_reporter import StatusReporter
+
+__all__ = ["SwitchModelTool"]
+
+
+class SwitchModelTool:
+    source = "kernel"
+    name = "switch_model"
+    description = "Switch LLM provider/model for a slot"
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "slot": {"type": "string"},
+            "provider": {"type": "string"},
+            "model": {"type": "string"},
+        },
+        "required": ["slot", "provider", "model"],
+    }
+
+    def __init__(self, llm_registry: LLMRegistry, reporter: StatusReporter | None = None) -> None:
+        self._registry = llm_registry
+        self._reporter = reporter
+
+    def execute(self, parameters: dict) -> ToolResult:
+        try:
+            message = self._registry.swap(parameters["slot"], parameters["provider"], parameters["model"])
+        except (KeyError, ValueError) as exc:
+            return ToolResult(False, str(exc))
+        self._report_models()
+        return ToolResult(True, message)
+
+    def _report_models(self) -> None:
+        if self._reporter is not None:
+            self._reporter.set_models(self._registry.model_labels())

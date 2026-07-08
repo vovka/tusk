@@ -63,6 +63,18 @@ def test_config_defaults_gate_recovery_candidate_limit(monkeypatch) -> None:
     assert ConfigFactory().build().gate_recovery_candidate_limit == 6
 
 
+def test_config_defaults_stt_engine_to_groq(monkeypatch) -> None:
+    monkeypatch.setenv("GROQ_API_KEY", "test-key")
+    monkeypatch.delenv("STT_ENGINE", raising=False)
+    assert ConfigFactory().build().stt_engine == "groq"
+
+
+def test_config_reads_stt_engine(monkeypatch) -> None:
+    monkeypatch.setenv("GROQ_API_KEY", "test-key")
+    monkeypatch.setenv("STT_ENGINE", "Whisper")
+    assert ConfigFactory().build().stt_engine == "whisper"
+
+
 def test_tts_enabled_by_default(monkeypatch) -> None:
     monkeypatch.setenv("GROQ_API_KEY", "test-key")
     assert ConfigFactory().build().tts_enabled is True

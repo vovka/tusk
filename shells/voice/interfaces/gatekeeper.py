@@ -9,10 +9,6 @@ __all__ = ["Gatekeeper"]
 
 class Gatekeeper(ABC):
     @abstractmethod
-    def evaluate(self, utterance: Utterance, recent: list[Utterance]) -> object:
-        ...
-
-    @abstractmethod
     def process(
         self,
         utterance: Utterance | BufferedUtterance,

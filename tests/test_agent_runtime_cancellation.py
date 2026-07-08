@@ -2,7 +2,7 @@ import types
 
 from tests.kernel_api_support import HistoryRecorder, make_agent
 from tusk.shared.interrupt import InterruptToken
-from tusk.shared.schemas.tool_call import ToolCall
+from tusk.shared.schemas.tools.tool_call import ToolCall
 
 
 def test_interrupt_cancels_run_at_next_step_boundary() -> None:

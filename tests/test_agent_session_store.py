@@ -1,10 +1,10 @@
 import tempfile
 
-from tusk.kernel.agent.file_agent_session_store import FileAgentSessionStore
+from tusk.kernel.agent.session.file_store import FileStore
 
 
-def _store() -> FileAgentSessionStore:
-    return FileAgentSessionStore(tempfile.mkdtemp(prefix="tusk-test-"))
+def _store() -> FileStore:
+    return FileStore(tempfile.mkdtemp(prefix="tusk-test-"))
 
 
 def test_create_session_id_is_unique() -> None:

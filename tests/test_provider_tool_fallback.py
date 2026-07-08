@@ -1,15 +1,14 @@
-from tusk.providers.llm.groq_llm import _tool_or_done as groq_tool_or_done
-from tusk.providers.llm.open_router_llm import _tool_or_done as openrouter_tool_or_done
+from tusk.providers.llm.tool_response import tool_or_done
 from tusk.shared.llm.tool_use_failed_recovery import ToolUseFailedRecovery
 
 
-def test_groq_tool_fallback_converts_text_to_done() -> None:
-    result = groq_tool_or_done(_response("The text has been entered."))
+def test_tool_fallback_converts_text_to_done() -> None:
+    result = tool_or_done(_response("The text has been entered."))
     assert result.tool_name == "done"
 
 
-def test_openrouter_tool_fallback_converts_text_to_done() -> None:
-    result = openrouter_tool_or_done(_response("Finished."))
+def test_tool_fallback_carries_text_as_done_reply() -> None:
+    result = tool_or_done(_response("Finished."))
     assert result.parameters["reply"] == "Finished."
 
 

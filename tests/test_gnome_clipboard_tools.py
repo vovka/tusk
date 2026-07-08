@@ -1,9 +1,9 @@
-from adapters.gnome.gnome_clipboard_tools import GnomeClipboardTools
+from adapters.gnome.tools.clipboard_tools import ClipboardTools
 
 
 def test_write_clipboard_returns_written_text() -> None:
     clipboard = _clipboard()
-    result = GnomeClipboardTools(clipboard).write_clipboard({"text": "frozen text"})
+    result = ClipboardTools(clipboard).write_clipboard({"text": "frozen text"})
     assert result["message"] == "clipboard written"
     assert result["data"] == {"clipboard_text": "frozen text"}
     assert clipboard.writes == ["frozen text"]

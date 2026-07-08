@@ -6,7 +6,7 @@ from tusk.kernel.agent_backends.agent_request import AgentRequest
 from tusk.kernel.agent_backends.codex_mcp_agent_backend import CodexMcpAgentBackend
 from tests.recording_log_printer import RecordingLogPrinter
 
-_CLIENT = "tusk.kernel.agent_backends.codex_mcp_agent_backend.CodexMcpClient"
+_CLIENT = "tusk.kernel.agent_backends.codex_mcp_agent_backend.Client"
 
 
 class FakeClient:
@@ -38,7 +38,7 @@ class FakeClient:
 
 def backend() -> CodexMcpAgentBackend:
     FakeClient.instances = []
-    config = SimpleNamespace(codex_exec_binary="codex", codex_exec_timeout_seconds=60)
+    config = SimpleNamespace(codex_exec_binary="codex", codex_exec_timeout_seconds=60, codex_exec_workdir="")
     return CodexMcpAgentBackend(config, RecordingLogPrinter())
 
 

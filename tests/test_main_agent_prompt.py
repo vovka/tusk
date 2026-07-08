@@ -1,8 +1,8 @@
 import types
 
 from tests.kernel_api_support import make_agent, make_registry_tool
-from tusk.shared.schemas.tool_call import ToolCall
-from tusk.kernel.tool_registry import ToolRegistry
+from tusk.shared.schemas.tools.tool_call import ToolCall
+from tusk.kernel.tools.tool_registry import ToolRegistry
 
 
 def test_main_agent_prompt_exposes_only_finish_and_run_agent() -> None:

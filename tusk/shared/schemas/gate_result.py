@@ -1,4 +1,6 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+
+from tusk.shared.schemas.gate_classification import GateClassification
 
 __all__ = ["GateResult"]
 
@@ -8,4 +10,4 @@ class GateResult:
     is_directed_at_tusk: bool
     cleaned_command: str
     confidence: float
-    metadata: dict[str, str] = field(default_factory=dict)
+    classification: GateClassification = GateClassification.AMBIENT

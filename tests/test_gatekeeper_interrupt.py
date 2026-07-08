@@ -1,9 +1,9 @@
 import json
 import types
 
-from shells.voice.stages.command_gate_prompt import build_command_gate_prompt
-from shells.voice.stages.gatekeeper import LLMGatekeeper
-from shells.voice.stages.gatekeeper_support import PRIMARY_SCHEMA
+from shells.voice.stages.gate.command_gate_prompt import build_command_gate_prompt
+from shells.voice.stages.gate.gatekeeper import LLMGatekeeper
+from shells.voice.stages.gate.gatekeeper_support import PRIMARY_SCHEMA
 from tusk.shared.schemas.utterance import Utterance
 
 

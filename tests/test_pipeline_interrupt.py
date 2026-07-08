@@ -44,9 +44,7 @@ def _buffer(consumed: list[str]) -> object:
         process=lambda item: entry,
         recent=lambda count: [],
         recoverable=lambda count, window: [],
-        mark_consumed=lambda entry_id: consumed.append(entry_id),
-        mark_forwarded=lambda entry_id: None,
-        mark_dropped=lambda entry_id: None,
+        mark=lambda entry_id, state: consumed.append(entry_id) if state == "consumed" else None,
     )
 
 

@@ -1,6 +1,0 @@
-{
-  "name": "emulator",
-  "description": "Voice-input emulator: replays a scripted transcript into the kernel",
-  "entry_module": "emulator_shell",
-  "entry_class": "EmulatorShell"
-}

@@ -6,12 +6,11 @@ except ImportError:  # pragma: no cover
 from tusk.providers.llm.tool_response import message_content, needs_tool_fallback, tool_or_done
 from tusk.shared.llm.interfaces.llm_provider import LLMProvider
 from tusk.shared.llm.tool_use_failed_recovery import ToolUseFailedRecovery
-from tusk.shared.schemas.tool_call import ToolCall
+from tusk.shared.schemas.tools.tool_call import ToolCall
 
-__all__ = ["GroqLLM", "_tool_or_done"]
+__all__ = ["GroqLLM"]
 
 _STRICT_SCHEMA_MODELS = frozenset({"openai/gpt-oss-20b", "openai/gpt-oss-120b"})
-_tool_or_done = tool_or_done
 
 
 class GroqLLM(LLMProvider):
@@ -31,7 +30,8 @@ class GroqLLM(LLMProvider):
         self._logger = logger
 
     def complete(self, system_prompt: str, user_message: str, max_tokens: int = 256) -> str:
-        return self.complete_messages(system_prompt, [{"role": "user", "content": user_message}])
+        payload = _chat_payload(self._model, system_prompt, [{"role": "user", "content": user_message}], max_tokens)
+        return message_content(self._create(payload))
 
     def complete_messages(self, system_prompt: str, messages: list[dict]) -> str:
         return message_content(self._create(_chat_payload(self._model, system_prompt, messages, 1024)))

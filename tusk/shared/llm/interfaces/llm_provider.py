@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from tusk.shared.schemas.tool_call import ToolCall
+from tusk.shared.schemas.tools.tool_call import ToolCall
 
 __all__ = ["LLMProvider"]
 

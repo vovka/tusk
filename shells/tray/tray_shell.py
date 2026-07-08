@@ -95,10 +95,10 @@ class TrayShell:
 
     def _open_logs(self) -> None:
         if sys.platform == "win32":
-            os.startfile(self._config.conversation_log_dir)
+            os.startfile(self._config.agent_session_log_dir)
             return
         opener = "open" if sys.platform == "darwin" else "xdg-open"
-        subprocess.Popen([opener, self._config.conversation_log_dir])
+        subprocess.Popen([opener, self._config.agent_session_log_dir])
 
     def _restart(self) -> None:
         os.execv(sys.executable, [sys.executable, *sys.argv])

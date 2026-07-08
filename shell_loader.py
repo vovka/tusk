@@ -1,19 +1,20 @@
-import importlib.util
-import json
 import threading
-from pathlib import Path
 
+from shells.cli.cli_shell import CLIShell
+from shells.emulator.emulator_shell import EmulatorShell
+from shells.tray.tray_shell import TrayShell
 from shells.voice.command_worker import CommandWorker
 from shells.voice.gatekeeper_slot import GatekeeperSlot
 from shells.voice.playback_gate import PlaybackGate
-from shells.voice.stages.coding_gatekeeper import CodingGatekeeper
-from shells.voice.stages.dictation_gatekeeper import DictationGatekeeper
-from shells.voice.stages.gatekeeper import LLMGatekeeper
+from shells.voice.stages.gate.stop_gatekeeper import StopGatekeeper
+from shells.voice.stages.gate.gatekeeper import LLMGatekeeper
 from shells.voice.stages.speech_playback import SpeechPlayback
-from shells.voice.stages.speech_stop_gate import SpeechStopGate
-from tusk.kernel.coding_gate import CodingGate
-from tusk.kernel.dictation_gate import DictationGate
-from tusk.providers.stt import GroqSTT
+from shells.voice.stages.gate.speech_stop_gate import SpeechStopGate
+from shells.voice.voice_shell import VoiceShell
+from tusk.kernel.modes.coding_gate_prompt import CODING_GATE_PROMPT
+from tusk.kernel.modes.dictation_gate_prompt import DICTATION_GATE_PROMPT
+from tusk.kernel.modes.mode_gate import ModeGate
+from tusk.providers.stt import STTEngineFactory
 from tusk.providers.tts import GroqTTS
 
 __all__ = ["ShellLoader"]
@@ -54,7 +55,7 @@ class ShellLoader:
         return shell_class()
 
     def _build_voice(self, shell_class: object) -> object:
-        stt_engine = GroqSTT(self._config.groq_api_key)
+        stt_engine = self._stt_engine()
         worker = self._build_worker()
         shell = shell_class(
             self._config, self._log, stt_engine=stt_engine, gatekeeper=self._gatekeeper(worker),
@@ -62,6 +63,10 @@ class ShellLoader:
         )
         self._control = shell
         return shell
+
+    def _stt_engine(self) -> object:
+        factory = STTEngineFactory(self._config.groq_api_key, self._config.whisper_model_size)
+        return factory.create(self._config.stt_engine)
 
     def _build_worker(self) -> CommandWorker:
         tts_engine = GroqTTS(self._config.groq_api_key) if self._config.tts_enabled else None
@@ -81,33 +86,30 @@ class ShellLoader:
             is_busy=lambda: worker.is_busy, current_speech_text=lambda: worker.current_speech_text,
         )
         slot = GatekeeperSlot(llm_gk)
-        self._wire_dictation(slot, llm_gk, gk_llm, worker)
-        self._wire_coding(slot, llm_gk, gk_llm, worker)
+        self._wire_modes(slot, llm_gk, gk_llm, worker)
         return slot
 
-    def _wire_dictation(self, slot: GatekeeperSlot, llm_gk: LLMGatekeeper, gk_llm: object, worker: CommandWorker) -> None:
-        gate = DictationGate(gk_llm, self._log)
-        make = lambda: self._guarded(DictationGatekeeper(gate, self._kernel.request_dictation_stop, self._log), gk_llm, worker)
-        self._kernel.set_dictation_callbacks(on_start=lambda: slot.swap(make()), on_stop=lambda: slot.swap(llm_gk))
+    def _wire_modes(self, slot: GatekeeperSlot, llm_gk: LLMGatekeeper, gk_llm: object, worker: CommandWorker) -> None:
+        self._wire_mode(slot, llm_gk, gk_llm, worker, "dictation", DICTATION_GATE_PROMPT,
+                        self._kernel.set_dictation_callbacks, self._kernel.request_dictation_stop)
+        self._wire_mode(slot, llm_gk, gk_llm, worker, "coding", CODING_GATE_PROMPT,
+                        self._kernel.set_coding_callbacks, self._kernel.request_coding_stop)
 
-    def _wire_coding(self, slot: GatekeeperSlot, llm_gk: LLMGatekeeper, gk_llm: object, worker: CommandWorker) -> None:
-        gate = CodingGate(gk_llm, self._log)
-        make = lambda: self._guarded(CodingGatekeeper(gate, self._kernel.request_coding_stop, self._log), gk_llm, worker)
-        self._kernel.set_coding_callbacks(on_start=lambda: slot.swap(make()), on_stop=lambda: slot.swap(llm_gk))
+    def _wire_mode(self, slot: GatekeeperSlot, llm_gk: LLMGatekeeper, gk_llm: object, worker: CommandWorker,
+                   name: str, prompt: str, set_callbacks: object, request_stop: object) -> None:
+        gate = ModeGate(gk_llm, name, prompt, self._log)
+        make = lambda: self._guarded(StopGatekeeper(gate, request_stop), gk_llm, worker)
+        set_callbacks(on_start=lambda: slot.swap(make()), on_stop=lambda: slot.swap(llm_gk))
 
     def _guarded(self, inner: object, gk_llm: object, worker: CommandWorker) -> PlaybackGate:
         # forward-all mode gates only ever see interrupt-or-drop while TUSK's own voice plays
         return PlaybackGate(inner, lambda: worker.current_speech_text, SpeechStopGate(gk_llm, self._log))
 
     def _load_class(self, name: str) -> object:
-        manifest = json.loads((Path("shells") / name / "shell.json").read_text())
-        module = self._load_module(name, manifest["entry_module"])
-        return getattr(module, manifest["entry_class"])
+        try:
+            return _SHELL_CLASSES[name]
+        except KeyError:
+            raise ValueError(f"unknown shell: {name!r}") from None
 
-    def _load_module(self, name: str, module_name: str) -> object:
-        path = Path("shells") / name / f"{module_name}.py"
-        spec = importlib.util.spec_from_file_location(f"shells.{name}.{module_name}", path)
-        module = importlib.util.module_from_spec(spec)
-        assert spec.loader is not None
-        spec.loader.exec_module(module)
-        return module
+
+_SHELL_CLASSES = {"cli": CLIShell, "emulator": EmulatorShell, "tray": TrayShell, "voice": VoiceShell}

@@ -1,8 +1,8 @@
 import types
 
-from tusk.kernel.coding_router import CodingRouter
+from tusk.kernel.modes.coding_router import CodingRouter
 from tusk.shared.schemas.edit_operation import EditOperation
-from tusk.shared.schemas.tool_result import ToolResult
+from tusk.shared.schemas.tools.tool_result import ToolResult
 
 
 def test_process_applies_each_operation_via_strategy() -> None:
@@ -35,6 +35,24 @@ def test_process_reports_failure_when_adapter_errors() -> None:
     result = router.process(_state(), "do thing")
     assert result.handled is False
     assert result.reply == "planning failed"
+
+
+def test_process_reports_failure_on_malformed_operation() -> None:
+    malformed = ToolResult(True, "ok", {"operations": [{"unexpected": 1}]})
+    registry = types.SimpleNamespace(get=lambda name: _tool([], name, malformed))
+    router = CodingRouter(registry, types.SimpleNamespace(), object(), _strategy([]), _log())
+    result = router.process(_state(), "rename the function")
+    assert result.handled is False
+    assert "couldn't apply" in result.reply.lower()
+
+
+def test_process_reports_failure_when_data_is_not_a_dict() -> None:
+    malformed = ToolResult(True, "ok", ["operations"])
+    registry = types.SimpleNamespace(get=lambda name: _tool([], name, malformed))
+    router = CodingRouter(registry, types.SimpleNamespace(), object(), _strategy([]), _log())
+    result = router.process(_state(), "rename the function")
+    assert result.handled is False
+    assert "couldn't apply" in result.reply.lower()
 
 
 def test_stop_calls_adapter_and_controller() -> None:

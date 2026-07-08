@@ -35,6 +35,34 @@ def test_type_text_presses_return_for_newlines() -> None:
     assert commands[1][:2] == ["xdotool", "key"]
 
 
+def test_mouse_click_raises_on_failure() -> None:
+    _assert_mouse_raises(lambda sim: sim.mouse_click(1, 2, 1, 1), "mouse_click")
+
+
+def test_mouse_move_raises_on_failure() -> None:
+    _assert_mouse_raises(lambda sim: sim.mouse_move(1, 2), "mouse_move")
+
+
+def test_mouse_drag_raises_on_failure() -> None:
+    _assert_mouse_raises(lambda sim: sim.mouse_drag(1, 2, 3, 4, 1), "mouse_drag")
+
+
+def test_mouse_scroll_raises_on_failure() -> None:
+    _assert_mouse_raises(lambda sim: sim.mouse_scroll("up", 2), "mouse_scroll")
+
+
+def _assert_mouse_raises(action: object, name: str) -> None:
+    result = types.SimpleNamespace(returncode=1, stderr="no display")
+    with patch("adapters.gnome.gnome_input_simulator.subprocess.run", return_value=result):
+        try:
+            action(GnomeInputSimulator())
+        except RuntimeError as exc:
+            assert name in str(exc)
+            assert "no display" in str(exc)
+        else:
+            raise AssertionError("expected RuntimeError")
+
+
 def _capture(command: list[str]) -> object:
     def run(args: list[str], check: bool = False, capture_output: bool = False, text: bool = False) -> object:
         command[:] = args

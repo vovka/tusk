@@ -22,6 +22,7 @@ class UtteranceDetector:
         sample_rate: int,
         aggressiveness: int,
         log_printer: LogPrinter,
+        frame_duration_ms: int = 30,
     ) -> None:
         if webrtcvad is None:
             raise RuntimeError("webrtcvad package is not installed")
@@ -29,6 +30,7 @@ class UtteranceDetector:
         self._sample_rate = sample_rate
         self._vad = webrtcvad.Vad(aggressiveness)
         self._log = log_printer
+        self._frame_seconds = frame_duration_ms / 1000
 
     def stream_utterances(self) -> Iterator[Utterance]:
         voiced_frames: list[bytes] = []
@@ -44,7 +46,7 @@ class UtteranceDetector:
 
     def _build_utterance(self, frames: list[bytes]) -> Utterance:
         raw = b"".join(frames)
-        duration = len(frames) * 0.030
+        duration = len(frames) * self._frame_seconds
         return Utterance(text="", audio_frames=raw, duration_seconds=duration)
 
     def _on_speech(self, voiced_frames: list[bytes], frame: bytes) -> tuple[list[bytes], int]:

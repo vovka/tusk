@@ -2,6 +2,7 @@ import time
 from collections import deque
 
 from shells.voice.buffered_utterance import BufferedUtterance
+from shells.voice.gate_state import GateState
 from shells.voice.interfaces.transcription_buffer import TranscriptionBuffer as TranscriptionBufferABC
 from tusk.shared.logging.interfaces.log_printer import LogPrinter
 from tusk.shared.schemas.utterance import Utterance
@@ -37,19 +38,7 @@ class TranscriptionBuffer(TranscriptionBufferABC):
         items = [item for item in self._utterances if _is_recoverable(item, cutoff)]
         return items[-count:]
 
-    def mark_consumed(self, entry_id: str) -> None:
-        self._mark(entry_id, "consumed")
-
-    def mark_dropped(self, entry_id: str) -> None:
-        self._mark(entry_id, "dropped")
-
-    def mark_forwarded(self, entry_id: str) -> None:
-        self._mark(entry_id, "forwarded")
-
-    def mark_recovered(self, entry_id: str) -> None:
-        self._mark(entry_id, "recovered")
-
-    def _mark(self, entry_id: str, state: str) -> None:
+    def mark(self, entry_id: str, state: GateState) -> None:
         entry = self._entry(entry_id)
         if entry is None:
             return
@@ -73,4 +62,4 @@ class TranscriptionBuffer(TranscriptionBufferABC):
 
 
 def _is_recoverable(item: BufferedUtterance, cutoff: float) -> bool:
-    return item.gate_state == "dropped" and item.received_at >= cutoff
+    return item.gate_state == GateState.DROPPED and item.received_at >= cutoff

@@ -1,13 +1,14 @@
 import threading
 import types
 
+from shells.tray import tray_shell
 from shells.tray.tray_shell import TrayShell
 from tusk.shared.status.null_status_sink import NullStatusSink
 from tusk.shared.status.status_reporter_hub import StatusReporterHub
 
 
 def _config() -> object:
-    return types.SimpleNamespace(tray_icon_theme="light", tray_show_last_activity=False, conversation_log_dir="/tmp")
+    return types.SimpleNamespace(tray_icon_theme="light", tray_show_last_activity=False, agent_session_log_dir="/tmp/sessions")
 
 
 def _backend() -> object:
@@ -72,6 +73,14 @@ def test_missing_backend_library_runs_no_op() -> None:
 
 def _raise() -> None:
     raise RuntimeError("gui crashed")
+
+
+def test_open_logs_opens_agent_session_dir(monkeypatch) -> None:
+    opened: list[list[str]] = []
+    monkeypatch.setattr(tray_shell.subprocess, "Popen", lambda args: opened.append(args))
+    shell = TrayShell(StatusReporterHub(NullStatusSink()), _control(), threading.Event(), _config(), _backend())
+    shell._open_logs()
+    assert opened == [["xdg-open", "/tmp/sessions"]]
 
 
 def test_marshal_catches_render_errors() -> None:

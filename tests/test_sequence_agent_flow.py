@@ -2,9 +2,9 @@ import json
 import types
 
 from tests.kernel_api_support import make_agent, make_registry_tool
-from tusk.kernel.tool_registry import ToolRegistry
-from tusk.shared.schemas.tool_call import ToolCall
-from tusk.shared.schemas.tool_result import ToolResult
+from tusk.kernel.tools.tool_registry import ToolRegistry
+from tusk.shared.schemas.tools.tool_call import ToolCall
+from tusk.shared.schemas.tools.tool_result import ToolResult
 
 
 def test_sequence_plan_runs_through_meta_tool() -> None:
