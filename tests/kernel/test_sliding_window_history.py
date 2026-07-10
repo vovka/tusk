@@ -1,4 +1,4 @@
-from tusk.kernel.sliding_window_history import SlidingWindowHistory
+from tusk.kernel.core.sliding_window_history import SlidingWindowHistory
 from tusk.shared.schemas.chat_message import ChatMessage
 
 

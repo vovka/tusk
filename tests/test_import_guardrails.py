@@ -14,10 +14,10 @@ def test_repository_respects_import_boundaries() -> None:
 
 
 def test_import_guardrails_flag_shell_importing_kernel(tmp_path: Path) -> None:
-    _write(tmp_path, "shells/voice/bad.py", "from tusk.kernel.api import KernelAPI")
+    _write(tmp_path, "shells/voice/bad.py", "from tusk.kernel.core.kernel_api import KernelAPI")
     violations = ImportGuardrails(tmp_path).violations()
     assert violations == [
-        f"{Path('shells') / 'voice' / 'bad.py'}: imports tusk.kernel.api (allowed: shells, tusk.shared)"
+        f"{Path('shells') / 'voice' / 'bad.py'}: imports tusk.kernel.core.kernel_api (allowed: shells, tusk.shared)"
     ]
 
 

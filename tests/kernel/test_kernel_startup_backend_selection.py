@@ -1,7 +1,7 @@
 import types
 
 from tests.factory_stub import FactoryStub
-from tusk.kernel import startup
+from tusk.kernel.core import startup
 from tusk.shared.schemas.kernel_response import KernelResponse
 
 

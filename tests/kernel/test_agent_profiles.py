@@ -1,6 +1,6 @@
 import types
 
-from tusk.kernel.agent_profiles import build_agent_profiles
+from tusk.kernel.core.agent_profiles import build_agent_profiles
 
 
 def _mock_registry() -> object:

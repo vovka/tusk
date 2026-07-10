@@ -1,5 +1,5 @@
 from tusk.kernel.agent_backends import AgentRequest
-from tusk.kernel.command_mode import CommandMode
+from tusk.kernel.core.command_mode import CommandMode
 from tests.null_log_printer import NullLogPrinter
 from tests.recording_backend import RecordingBackend
 

@@ -2,7 +2,7 @@ import json
 import textwrap
 import types
 
-from tusk.kernel.adapter_manager import AdapterManager
+from tusk.kernel.core.adapter_manager import AdapterManager
 from tusk.kernel.tools.tool_registry import ToolRegistry
 
 _MANIFEST = {

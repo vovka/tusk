@@ -1,6 +1,6 @@
 import types
 
-from tusk.kernel.api import KernelAPI
+from tusk.kernel.core.kernel_api import KernelAPI
 from tusk.kernel.modes.coding_gate_prompt import CODING_GATE_PROMPT
 from tusk.kernel.modes.dictation_gate_prompt import DICTATION_GATE_PROMPT
 from tusk.kernel.modes.mode_gate import ModeGate

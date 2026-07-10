@@ -263,8 +263,9 @@ tusk/                        (repo root)
 ├── shell_loader.py          # ShellLoader — builds shells from TUSK_SHELLS, wires voice modes, orders tray last
 ├── launcher/                # Host-side launcher daemon (Unix socket) — runs GUI apps as the host user
 ├── tusk/
-│   ├── kernel/              # Thin orchestration layer: KernelAPI, CommandMode, MainAgent,
-│   │   │                    #   AdapterManager, agent profiles, SlidingWindowHistory, startup wiring
+│   ├── kernel/              # Thin orchestration layer
+│   │   ├── core/            # KernelAPI, CommandMode, MainAgent, AdapterManager,
+│   │   │   │                #   agent profiles, SlidingWindowHistory, startup wiring
 │   │   ├── interfaces/      # Agent, Shell, ConversationHistory, EditorDriver, EditApplicationStrategy
 │   │   ├── agent/           # Agentic loop: AgentOrchestrator, AgentRuntime, tool catalog/toolset, dispatcher
 │   │   │   ├── guards/      # AgentRunGuard + turn guards (delegation, failure budget, clipboard, executor tools)

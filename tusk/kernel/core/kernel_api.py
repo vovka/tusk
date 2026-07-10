@@ -5,7 +5,7 @@ from tusk.kernel.modes.coding_gate_prompt import CODING_GATE_PROMPT
 from tusk.kernel.modes.dictation_gate_prompt import DICTATION_GATE_PROMPT
 from tusk.kernel.modes.mode_gate import ModeGate
 from tusk.kernel.modes.mode_slot import ModeSlot
-from tusk.kernel.submit_status_reporter import SubmitStatusReporter
+from tusk.kernel.core.submit_status_reporter import SubmitStatusReporter
 from tusk.shared.schemas.app_mode import AppMode
 from tusk.shared.schemas.kernel_response import KernelResponse
 from tusk.shared.interrupt.interrupt_token import InterruptToken

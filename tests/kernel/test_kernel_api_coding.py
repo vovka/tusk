@@ -1,6 +1,6 @@
 import types
 
-from tusk.kernel.api import KernelAPI
+from tusk.kernel.core.kernel_api import KernelAPI
 from tusk.shared.schemas.kernel_response import KernelResponse
 
 

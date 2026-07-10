@@ -5,7 +5,7 @@ from shells.voice.buffered_utterance import BufferedUtterance
 from shells.voice.gate_dispatch import GateDispatch
 from shells.voice.pipeline import VoicePipeline
 from shells.voice.voice_shell import VoiceShell
-from tusk.kernel.api import KernelAPI
+from tusk.kernel.core.kernel_api import KernelAPI
 from tusk.kernel.tools.switch_model_tool import SwitchModelTool
 from tusk.shared.schemas.app_mode import AppMode
 from tusk.shared.schemas.app_status import AppStatus

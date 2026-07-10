@@ -2,7 +2,7 @@ import json
 import types
 from pathlib import Path
 
-from tusk.kernel.adapter_manager import AdapterManager
+from tusk.kernel.core.adapter_manager import AdapterManager
 
 _GNOME_SEQUENCE_TOOLS = {
     "close_window", "focus_window", "maximize_window", "minimize_window",

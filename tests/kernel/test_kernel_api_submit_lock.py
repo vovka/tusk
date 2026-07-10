@@ -2,7 +2,7 @@ import threading
 import time
 import types
 
-from tusk.kernel.api import KernelAPI
+from tusk.kernel.core.kernel_api import KernelAPI
 
 
 def test_concurrent_submits_do_not_overlap() -> None:
