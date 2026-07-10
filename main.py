@@ -2,7 +2,7 @@ import sys
 
 from shell_loader import ShellLoader
 from tusk.kernel import KernelAPI
-from tusk.kernel.startup import build_kernel
+from tusk.kernel.core.startup import build_kernel
 from tusk.providers.llm import ConfigurableLLMFactory
 from tusk.shared.config import Config, StartupOptions
 from tusk.shared.interrupt import InterruptToken

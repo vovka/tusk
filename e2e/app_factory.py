@@ -1,7 +1,7 @@
 import main as app_main
 from tusk.kernel import CommandMode, KernelAPI, MainAgent, SlidingWindowHistory, ToolRegistry
 from tusk.kernel.agent import AgentOrchestrator, FileStore
-from tusk.kernel.agent_profiles import build_agent_profiles
+from tusk.kernel.core.agent_profiles import build_agent_profiles
 from tusk.shared.config import Config, StartupOptions
 from tusk.shared.interrupt import InterruptToken
 from tusk.shared.llm import LLMRegistry

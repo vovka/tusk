@@ -263,17 +263,18 @@ tusk/                        (repo root)
 ├── shell_loader.py          # ShellLoader — builds shells from TUSK_SHELLS, wires voice modes, orders tray last
 ├── launcher/                # Host-side launcher daemon (Unix socket) — runs GUI apps as the host user
 ├── tusk/
-│   ├── kernel/              # Thin orchestration layer: KernelAPI, CommandMode, MainAgent,
-│   │   │                    #   AdapterManager, agent profiles, SlidingWindowHistory, startup wiring
+│   ├── kernel/              # Thin orchestration layer
+│   │   ├── core/            # KernelAPI, CommandMode, MainAgent, AdapterManager,
+│   │   │   │                #   agent profiles, SlidingWindowHistory, startup wiring
 │   │   ├── interfaces/      # Agent, Shell, ConversationHistory, EditorDriver, EditApplicationStrategy
 │   │   ├── agent/           # Agentic loop: AgentOrchestrator, AgentRuntime, tool catalog/toolset, dispatcher
+│   │   │   ├── backends/    # AgentBackend ABC; tusk / codex_exec / codex_mcp / fallback backends
+│   │   │   │   └── codex_mcp/ # Persistent codex mcp-server session (Client, CallBuilder, ResponseReader, ResultMapper)
 │   │   │   ├── guards/      # AgentRunGuard + turn guards (delegation, failure budget, clipboard, executor tools)
 │   │   │   ├── planner/     # Planner output validation, sequence promotion, runtime tool resolution
 │   │   │   ├── runtime/     # Message history builder, result factory, step recorder, guard composition
 │   │   │   ├── session/     # Store ABC, FileStore event log, event formatter
 │   │   │   └── tool_sequence/ # Compiled sequences: PlanValidator, Executor, Recorder
-│   │   ├── agent_backends/  # AgentBackend ABC; tusk / codex_exec / codex_mcp / fallback backends
-│   │   │   └── codex_mcp/   # Persistent codex mcp-server session (Client, CallBuilder, ResponseReader, ResultMapper)
 │   │   ├── modes/           # Dictation/coding machinery: ModeSlot, AdapterMode, ModeGate, routers,
 │   │   │                    #   states, gate prompts, InputAutomationEditorDriver, FullReplaceEditStrategy
 │   │   └── tools/           # ToolRegistry, RegisteredTool, ToolRuntime, RepeatedToolCallGuard,
@@ -315,6 +316,24 @@ tusk/                        (repo root)
 └── docker/                  # codex-entrypoint.sh
 ```
 
+### Placement map
+
+| You are adding | Put it in |
+|---|---|
+| A new shell (user-facing I/O surface) | `shells/<name>/` |
+| A new desktop/app capability (MCP server) | `adapters/<name>/` + `adapter.json` |
+| Decision logic, routing, agent behavior | `tusk/kernel/` |
+| A data shape crossing layers | `tusk/shared/schemas/` |
+| Cross-layer plumbing (config, logging, MCP, status, interrupt) | `tusk/shared/<area>/` |
+| An engine implementation behind a shared ABC (LLM/STT/TTS) | `tusk/providers/<kind>/` |
+| Tests | `tests/<mirror of source package>`; cross-tree tests and shared helpers at `tests/` root |
+| Composition/wiring | `main.py` / `shell_loader.py` — the only places allowed to import everything |
+| Dev-only tooling | `tools/` |
+
+Each source tree imports only itself plus `tusk.shared`; adapters may also import
+`tusk.providers` because each adapter server is a standalone process entrypoint.
+`tests/style_guardrails/import_guardrails.py` enforces these boundaries.
+
 ---
 
 ## Interfaces
@@ -331,7 +350,7 @@ source files; this table is the index:
 | `ConversationHistory` | `tusk/kernel/interfaces/conversation_history.py` | `SlidingWindowHistory` | `MainAgent` |
 | `EditorDriver` | `tusk/kernel/interfaces/editor_driver.py` | `InputAutomationEditorDriver` | `CodingRouter`, `StartCodingTool`, strategies |
 | `EditApplicationStrategy` | `tusk/kernel/interfaces/edit_application_strategy.py` | `FullReplaceEditStrategy` | `CodingRouter` |
-| `AgentBackend` | `tusk/kernel/agent_backends/agent_backend.py` | `MainAgent`, `TuskAgentBackend`, `CodexExecAgentBackend`, `CodexMcpAgentBackend`, `FallbackAgentBackend` | `CommandMode` |
+| `AgentBackend` | `tusk/kernel/agent/backends/agent_backend.py` | `MainAgent`, `TuskAgentBackend`, `CodexExecAgentBackend`, `CodexMcpAgentBackend`, `FallbackAgentBackend` | `CommandMode` |
 | `Store` (sessions) | `tusk/kernel/agent/session/store.py` | `FileStore` | `AgentRuntime`, `AgentOrchestrator`, recorders |
 | `LLMProvider` | `tusk/shared/llm/interfaces/llm_provider.py` | `GroqLLM`, `OpenRouterLLM`, `LLMProxy` (wrapper) | agent profiles, gatekeepers, `ModeGate` |
 | `LLMProviderFactory` | `tusk/shared/llm/interfaces/llm_provider_factory.py` | `ConfigurableLLMFactory` | `LLMRegistry` |
@@ -433,7 +452,7 @@ stdin (CLI) or scripted transcript (emulator)
 ## Agent Backends
 
 `CommandMode` never talks to the agent pipeline directly — it submits an `AgentRequest` to an
-`AgentBackend` (`tusk/kernel/agent_backends/`). `AgentBackendFactory` picks the implementation
+`AgentBackend` (`tusk/kernel/agent/backends/`). `AgentBackendFactory` picks the implementation
 from `AGENT_BACKEND`. All backends return an `AgentResult` and drive the same
 gnome/dictation MCP tools, so the choice is invisible to the shells.
 

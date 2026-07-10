@@ -1,4 +1,4 @@
-from tusk.kernel.adapter_manager import AdapterManager
+from tusk.kernel.core.adapter_manager import AdapterManager
 from tusk.kernel.modes.edit_strategies.full_replace_edit_strategy import FullReplaceEditStrategy
 from tusk.kernel.modes.input_automation_editor_driver import InputAutomationEditorDriver
 from tusk.kernel.modes.edit_strategies.line_anchored_edit_strategy import LineAnchoredEditStrategy

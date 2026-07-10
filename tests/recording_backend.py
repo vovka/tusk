@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 
-from tusk.kernel.agent_backends import AgentBackend, AgentRequest, AgentResult
+from tusk.kernel.agent.backends import AgentBackend, AgentRequest, AgentResult
 
 
 @dataclass

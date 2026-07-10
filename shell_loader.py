@@ -11,9 +11,6 @@ from shells.voice.stages.gate.gatekeeper import LLMGatekeeper
 from shells.voice.stages.speech_playback import SpeechPlayback
 from shells.voice.stages.gate.speech_stop_gate import SpeechStopGate
 from shells.voice.voice_shell import VoiceShell
-from tusk.kernel.modes.coding_gate_prompt import CODING_GATE_PROMPT
-from tusk.kernel.modes.dictation_gate_prompt import DICTATION_GATE_PROMPT
-from tusk.kernel.modes.mode_gate import ModeGate
 from tusk.providers.stt import STTEngineFactory
 from tusk.providers.tts import GroqTTS
 
@@ -92,14 +89,13 @@ class ShellLoader:
         return slot
 
     def _wire_modes(self, slot: GatekeeperSlot, llm_gk: LLMGatekeeper, gk_llm: object, worker: CommandWorker) -> None:
-        self._wire_mode(slot, llm_gk, gk_llm, worker, "dictation", DICTATION_GATE_PROMPT,
+        self._wire_mode(slot, llm_gk, gk_llm, worker, self._kernel.dictation_gate(),
                         self._kernel.set_dictation_callbacks, self._kernel.request_dictation_stop)
-        self._wire_mode(slot, llm_gk, gk_llm, worker, "coding", CODING_GATE_PROMPT,
+        self._wire_mode(slot, llm_gk, gk_llm, worker, self._kernel.coding_gate(),
                         self._kernel.set_coding_callbacks, self._kernel.request_coding_stop)
 
     def _wire_mode(self, slot: GatekeeperSlot, llm_gk: LLMGatekeeper, gk_llm: object, worker: CommandWorker,
-                   name: str, prompt: str, set_callbacks: object, request_stop: object) -> None:
-        gate = ModeGate(gk_llm, name, prompt, self._log)
+                   gate: object, set_callbacks: object, request_stop: object) -> None:
         make = lambda: self._guarded(StopGatekeeper(gate, request_stop), gk_llm, worker)
         set_callbacks(on_start=lambda: slot.swap(make()), on_stop=lambda: slot.swap(llm_gk))
 

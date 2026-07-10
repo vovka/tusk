@@ -116,4 +116,4 @@ class ConfigFactory:
 
     def _schema_path(self) -> str:
         base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        return os.path.join(base_dir, "kernel", "agent_backends", "codex_agent_result.schema.json")
+        return os.path.join(base_dir, "kernel", "agent", "backends", "codex_agent_result.schema.json")

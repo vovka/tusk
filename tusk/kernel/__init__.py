@@ -1,7 +1,7 @@
-from tusk.kernel.main_agent import MainAgent
-from tusk.kernel.api import KernelAPI
-from tusk.kernel.command_mode import CommandMode
-from tusk.kernel.sliding_window_history import SlidingWindowHistory
+from tusk.kernel.core.main_agent import MainAgent
+from tusk.kernel.core.kernel_api import KernelAPI
+from tusk.kernel.core.command_mode import CommandMode
+from tusk.kernel.core.sliding_window_history import SlidingWindowHistory
 from tusk.kernel.tools.tool_registry import ToolRegistry
 
 __all__ = [
