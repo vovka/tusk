@@ -29,10 +29,20 @@ class StepRecorder:
         if child is not None:
             messages.append({"role": "assistant", "content": child})
             return
-        messages.append({"role": "user", "content": tool_result.message})
+        messages.append({"role": "user", "content": _truncated(tool_result.message)})
         clipboard = _clipboard_message(tool_call, tool_result)
         if clipboard is not None:
             messages.append({"role": "assistant", "content": clipboard})
+
+
+_MESSAGE_LIMIT_CHARS = 500
+
+
+def _truncated(text: str) -> str:
+    # only the in-run LLM transcript is capped; store events keep the full message
+    if len(text) <= _MESSAGE_LIMIT_CHARS:
+        return text
+    return text[:_MESSAGE_LIMIT_CHARS] + "…[truncated]"
 
 
 def _child_result_message(tool_result: ToolResult) -> str | None:
