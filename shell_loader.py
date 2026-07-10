@@ -8,6 +8,7 @@ from shells.voice.gatekeeper_slot import GatekeeperSlot
 from shells.voice.playback_gate import PlaybackGate
 from shells.voice.stages.gate.stop_gatekeeper import StopGatekeeper
 from shells.voice.stages.gate.gatekeeper import LLMGatekeeper
+from shells.voice.stages.chunked_speaker import ChunkedSpeaker
 from shells.voice.stages.speech_playback import SpeechPlayback
 from shells.voice.stages.gate.speech_stop_gate import SpeechStopGate
 from shells.voice.voice_shell import VoiceShell
@@ -68,9 +69,8 @@ class ShellLoader:
     def _build_worker(self) -> CommandWorker:
         tts_engine = GroqTTS(self._config.groq_api_key) if self._config.tts_enabled else None
         token = self._kernel.interrupt_token
-        return CommandWorker(
-            self._kernel.submit, tts_engine, SpeechPlayback(token), self._log, token, self._config.ack_enabled,
-        )
+        speaker = ChunkedSpeaker(tts_engine, SpeechPlayback(token), self._log)
+        return CommandWorker(self._kernel.submit, speaker, self._log, token, self._config.ack_enabled)
 
     def _interrupt_callback(self, worker: CommandWorker) -> object:
         def request_interrupt() -> None:
