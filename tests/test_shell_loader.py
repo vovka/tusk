@@ -56,6 +56,29 @@ def test_command_worker_receives_tts_engine_when_enabled(monkeypatch) -> None:
     assert loader._build("voice").worker._tts is sentinel
 
 
+def _mode_kernel(requested: list[tuple]) -> types.SimpleNamespace:
+    registry = types.SimpleNamespace(
+        get=lambda name: requested.append(("get", name)) or object(),
+        get_with_fallback=lambda name, fallback: requested.append(("fallback", name, fallback)) or object(),
+    )
+    return types.SimpleNamespace(
+        get_llm_registry=lambda: registry, interrupt_token=InterruptToken(), submit=lambda text: None,
+        dictation_gate=lambda: object(), coding_gate=lambda: object(),
+        set_dictation_callbacks=lambda on_start, on_stop: None, set_coding_callbacks=lambda on_start, on_stop: None,
+        request_dictation_stop=lambda: None, request_coding_stop=lambda: None,
+    )
+
+
+def test_gatekeeper_wiring_resolves_stop_gate_slot_with_fallback() -> None:
+    requested: list[tuple] = []
+    loader = _loader(["voice"])
+    loader._kernel = _mode_kernel(requested)
+    worker = types.SimpleNamespace(is_busy=False, current_speech_text=None)
+    loader._gatekeeper(worker)
+    assert ("get", "gatekeeper") in requested
+    assert ("fallback", "stop_gate", "gatekeeper") in requested
+
+
 def test_registry_resolves_every_shell_without_manifests() -> None:
     loader = _loader(["cli"])
     names = {name: loader._load_class(name).__name__ for name in ("cli", "emulator", "tray", "voice")}
