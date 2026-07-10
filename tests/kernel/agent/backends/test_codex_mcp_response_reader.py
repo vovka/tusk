@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from tusk.kernel.agent_backends.codex_mcp.response_reader import ResponseReader
+from tusk.kernel.agent.backends.codex_mcp.response_reader import ResponseReader
 
 
 class ScriptedTransport:

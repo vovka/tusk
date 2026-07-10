@@ -1,6 +1,6 @@
 import json
 
-from tusk.kernel.agent_backends.codex_mcp.response_reader import ResponseReader
+from tusk.kernel.agent.backends.codex_mcp.response_reader import ResponseReader
 from tusk.shared.mcp.mcp_stdio_transport import MCPStdioTransport
 
 __all__ = ["Client"]

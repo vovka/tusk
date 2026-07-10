@@ -2,13 +2,13 @@ import os
 import subprocess
 from pathlib import Path
 
-from tusk.kernel.agent_backends.agent_backend import AgentBackend
-from tusk.kernel.agent_backends.backend_run_logger import BackendRunLogger
-from tusk.kernel.agent_backends.codex_exec_command_builder import CodexExecCommandBuilder
-from tusk.kernel.agent_backends.codex_prompt_builder import CodexPromptBuilder
-from tusk.kernel.agent_backends.codex_result_parser import CodexResultParser
-from tusk.kernel.agent_backends.agent_request import AgentRequest
-from tusk.kernel.agent_backends.agent_result import AgentResult
+from tusk.kernel.agent.backends.agent_backend import AgentBackend
+from tusk.kernel.agent.backends.backend_run_logger import BackendRunLogger
+from tusk.kernel.agent.backends.codex_exec_command_builder import CodexExecCommandBuilder
+from tusk.kernel.agent.backends.codex_prompt_builder import CodexPromptBuilder
+from tusk.kernel.agent.backends.codex_result_parser import CodexResultParser
+from tusk.kernel.agent.backends.agent_request import AgentRequest
+from tusk.kernel.agent.backends.agent_result import AgentResult
 from tusk.shared.logging.interfaces.log_printer import LogPrinter
 
 __all__ = ["CodexExecAgentBackend"]

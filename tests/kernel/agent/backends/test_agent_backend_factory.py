@@ -5,13 +5,13 @@ import pytest
 from tests.backend_config import BackendConfig
 from tests.recording_agent import RecordingAgent
 from tests.recording_log_printer import RecordingLogPrinter
-from tusk.kernel.agent_backends.agent_backend_factory import AgentBackendFactory
-from tusk.kernel.agent_backends.agent_request import AgentRequest
-from tusk.kernel.agent_backends.agent_result import AgentResult
-from tusk.kernel.agent_backends.codex_exec_agent_backend import CodexExecAgentBackend
-from tusk.kernel.agent_backends.codex_mcp_agent_backend import CodexMcpAgentBackend
-from tusk.kernel.agent_backends.fallback_agent_backend import FallbackAgentBackend
-from tusk.kernel.agent_backends.tusk_agent_backend import TuskAgentBackend
+from tusk.kernel.agent.backends.agent_backend_factory import AgentBackendFactory
+from tusk.kernel.agent.backends.agent_request import AgentRequest
+from tusk.kernel.agent.backends.agent_result import AgentResult
+from tusk.kernel.agent.backends.codex_exec_agent_backend import CodexExecAgentBackend
+from tusk.kernel.agent.backends.codex_mcp_agent_backend import CodexMcpAgentBackend
+from tusk.kernel.agent.backends.fallback_agent_backend import FallbackAgentBackend
+from tusk.kernel.agent.backends.tusk_agent_backend import TuskAgentBackend
 
 
 def factory(agent_backend: str, fallback: str = "") -> tuple[AgentBackendFactory, RecordingLogPrinter]:

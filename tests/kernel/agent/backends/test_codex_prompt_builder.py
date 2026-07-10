@@ -1,5 +1,5 @@
-from tusk.kernel.agent_backends.agent_request import AgentRequest
-from tusk.kernel.agent_backends.codex_prompt_builder import CodexPromptBuilder
+from tusk.kernel.agent.backends.agent_request import AgentRequest
+from tusk.kernel.agent.backends.codex_prompt_builder import CodexPromptBuilder
 
 
 def test_codex_prompt_builder_includes_request_fields() -> None:

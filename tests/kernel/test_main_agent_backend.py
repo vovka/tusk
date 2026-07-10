@@ -1,7 +1,7 @@
 import types
 from typing import Any
 
-from tusk.kernel.agent_backends import AgentRequest
+from tusk.kernel.agent.backends import AgentRequest
 from tusk.kernel.core.main_agent import MainAgent
 
 

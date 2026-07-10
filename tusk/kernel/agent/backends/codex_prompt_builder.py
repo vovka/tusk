@@ -1,4 +1,4 @@
-from tusk.kernel.agent_backends.agent_request import AgentRequest
+from tusk.kernel.agent.backends.agent_request import AgentRequest
 
 __all__ = ["CodexPromptBuilder"]
 

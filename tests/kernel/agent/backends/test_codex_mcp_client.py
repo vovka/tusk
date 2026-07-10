@@ -3,7 +3,7 @@ import time
 
 import pytest
 
-from tusk.kernel.agent_backends.codex_mcp.client import Client
+from tusk.kernel.agent.backends.codex_mcp.client import Client
 
 # Fake codex mcp-server: rejects initialize without clientInfo, echoes the
 # methods it has seen inside the tools/call result, and emits two codex/event

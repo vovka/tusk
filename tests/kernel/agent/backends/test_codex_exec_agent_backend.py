@@ -3,8 +3,8 @@ import subprocess
 from types import SimpleNamespace
 from unittest.mock import Mock
 
-from tusk.kernel.agent_backends.agent_request import AgentRequest
-from tusk.kernel.agent_backends.codex_exec_agent_backend import CodexExecAgentBackend
+from tusk.kernel.agent.backends.agent_request import AgentRequest
+from tusk.kernel.agent.backends.codex_exec_agent_backend import CodexExecAgentBackend
 
 
 def stream(payload: str) -> str:

@@ -1,6 +1,6 @@
 from tusk.kernel.agent import AgentOrchestrator, AgentRunRequest
-from tusk.kernel.agent_backends import AgentBackend, AgentRequest
-from tusk.kernel.agent_backends import AgentResult as BackendAgentResult
+from tusk.kernel.agent.backends import AgentBackend, AgentRequest
+from tusk.kernel.agent.backends import AgentResult as BackendAgentResult
 from tusk.kernel.interfaces.conversation_history import ConversationHistory
 from tusk.shared.schemas.chat_message import ChatMessage
 

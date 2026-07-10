@@ -27,8 +27,8 @@ def test_directory_guardrails_flag_oversized_directory(tmp_path) -> None:
 
 
 def test_directory_guardrails_flag_too_deep_package(tmp_path) -> None:
-    package = tmp_path / "tusk" / "a" / "b" / "c" / "d"
+    package = tmp_path / "tusk" / "a" / "b" / "c" / "d" / "e"
     package.mkdir(parents=True)
     (package / "module.py").write_text("x = 1\n")
     violations = DirectoryGuardrails(tmp_path).violations()
-    assert violations == [f"{package.relative_to(tmp_path)}: package depth 5 (max 4)"]
+    assert violations == [f"{package.relative_to(tmp_path)}: package depth 6 (max 5)"]

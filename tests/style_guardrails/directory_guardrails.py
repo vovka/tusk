@@ -3,7 +3,7 @@ from pathlib import Path
 __all__ = ["DirectoryGuardrails"]
 
 _MAX_FILES_PER_DIRECTORY = 12
-_MAX_PACKAGE_DEPTH = 4
+_MAX_PACKAGE_DEPTH = 5
 _SOURCE_ROOTS = ("tusk", "shells", "adapters", "e2e", "demos", "launcher")
 
 

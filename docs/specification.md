@@ -94,7 +94,7 @@ There is **no kernel-side coding LLM slot**: the coding adapter owns its own mod
 | `CODEX_EXEC_WORKDIR` | `str` | `""` | Subprocess cwd when set |
 | `CODEX_EXEC_SANDBOX_MODE` | `str` | `"read-only"` | Passed as `--sandbox` |
 | `CODEX_EXEC_EXTRA_ARGS` | `str` | `""` | Extra CLI args, `shlex`-split |
-| `CODEX_EXEC_OUTPUT_SCHEMA_PATH` | `str` | `tusk/kernel/agent_backends/codex_agent_result.schema.json` | `--output-schema` value |
+| `CODEX_EXEC_OUTPUT_SCHEMA_PATH` | `str` | `tusk/kernel/agent/backends/codex_agent_result.schema.json` | `--output-schema` value |
 | `CODEX_EXEC_LOG_RAW_EVENTS` | `bool` | `false` | Log codex stdout/stderr verbatim |
 
 Boolean parsing accepts `true`, `1`, `yes`, `on` (case-insensitive), except `TUSK_TTS`
@@ -323,7 +323,7 @@ A `recover` decision naming an id outside the candidate list is normalized to `n
 
 ## 8. Agent Backend Specification
 
-**Source:** `tusk/kernel/agent_backends/`
+**Source:** `tusk/kernel/agent/backends/`
 
 `CommandMode` talks to an `AgentBackend` (ABC: `run(AgentRequest) -> AgentResult`), not
 to the agent directly. `AgentBackendFactory` selects the implementation from

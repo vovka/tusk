@@ -14,10 +14,10 @@ from pathlib import Path
 # (top-level pattern, cluster name, fill color, sub-cluster names).
 # A node lands in sub-cluster S when its qualified name contains ".S.".
 RULES = [
-    (r"^tusk\.kernel\.agent_backends\.", "kernel.agent_backends", "#fde8e8", ["codex_mcp"]),
+    (r"^tusk\.kernel\.agent\.backends\.", "kernel.agent.backends", "#fde8e8", ["codex_mcp"]),
     (r"^tusk\.kernel\.agent\.", "kernel.agent", "#f8d9d9",
      ["session", "runtime", "planner", "tool_sequence", "guards"]),
-    (r"^tusk\.kernel\.", "kernel.core", "#fbe5c8", ["interfaces", "modes", "tools"]),
+    (r"^tusk\.kernel\.", "kernel.core", "#fbe5c8", ["core", "interfaces", "modes", "tools"]),
     (r"^tusk\.shared\.schemas\.", "shared.schemas", "#e3f2e1", ["tools", "desktop"]),
     (r"^tusk\.shared\.", "shared.contracts", "#d7f0d3",
      ["status", "logging", "mcp", "llm", "config", "interrupt", "stt", "tts"]),

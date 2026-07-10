@@ -1,4 +1,4 @@
-from tusk.kernel.agent_backends import AgentBackend, AgentRequest
+from tusk.kernel.agent.backends import AgentBackend, AgentRequest
 from tusk.shared.logging.interfaces.log_printer import LogPrinter
 from tusk.shared.schemas.kernel_response import KernelResponse
 

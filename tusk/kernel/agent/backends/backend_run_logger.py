@@ -1,7 +1,7 @@
 import time
 
-from tusk.kernel.agent_backends.agent_request import AgentRequest
-from tusk.kernel.agent_backends.agent_result import AgentResult
+from tusk.kernel.agent.backends.agent_request import AgentRequest
+from tusk.kernel.agent.backends.agent_result import AgentResult
 from tusk.shared.logging.interfaces.log_printer import LogPrinter
 
 __all__ = ["BackendRunLogger"]

@@ -1,4 +1,4 @@
-from tusk.kernel.agent_backends.codex_result_parser import CodexResultParser
+from tusk.kernel.agent.backends.codex_result_parser import CodexResultParser
 
 SUCCESS_STREAM = "\n".join([
     '{"type":"thread.started","thread_id":"t"}',

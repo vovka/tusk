@@ -1,7 +1,7 @@
 import pytest
 
-from tusk.kernel.agent_backends import AgentRequest, AgentResult
-from tusk.kernel.agent_backends.tusk_agent_backend import TuskAgentBackend
+from tusk.kernel.agent.backends import AgentRequest, AgentResult
+from tusk.kernel.agent.backends.tusk_agent_backend import TuskAgentBackend
 
 
 class RecordingAgent:

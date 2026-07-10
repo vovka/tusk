@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 
-from tusk.kernel.agent_backends.codex_mcp.call_builder import CallBuilder
+from tusk.kernel.agent.backends.codex_mcp.call_builder import CallBuilder
 
 
 def builder(model: str = "", sandbox: str = "", workdir: str = "") -> CallBuilder:

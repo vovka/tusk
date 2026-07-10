@@ -1,5 +1,5 @@
-from tusk.kernel.agent_backends.agent_request import AgentRequest
-from tusk.kernel.agent_backends.agent_result import AgentResult
+from tusk.kernel.agent.backends.agent_request import AgentRequest
+from tusk.kernel.agent.backends.agent_result import AgentResult
 
 __all__ = ["ResultMapper"]
 

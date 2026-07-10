@@ -1,5 +1,5 @@
-from tusk.kernel.agent_backends.agent_request import AgentRequest
-from tusk.kernel.agent_backends.codex_mcp.result_mapper import ResultMapper
+from tusk.kernel.agent.backends.agent_request import AgentRequest
+from tusk.kernel.agent.backends.codex_mcp.result_mapper import ResultMapper
 
 
 def mapper() -> ResultMapper:

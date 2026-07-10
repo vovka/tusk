@@ -1,7 +1,7 @@
 from tusk.kernel import CommandMode, KernelAPI, MainAgent, SlidingWindowHistory, ToolRegistry
 from tusk.kernel.core.adapter_manager import AdapterManager
 from tusk.kernel.agent import AgentOrchestrator, FileStore
-from tusk.kernel.agent_backends import AgentBackendFactory
+from tusk.kernel.agent.backends import AgentBackendFactory
 from tusk.kernel.core.agent_profiles import build_agent_profiles
 from tusk.kernel.tools.tool_runtime import ToolRuntime
 from tusk.shared.config import Config

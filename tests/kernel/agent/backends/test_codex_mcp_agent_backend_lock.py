@@ -2,7 +2,7 @@ import threading
 import time
 from unittest.mock import patch
 
-from tusk.kernel.agent_backends.agent_request import AgentRequest
+from tusk.kernel.agent.backends.agent_request import AgentRequest
 from tests.kernel.agent.backends.test_codex_mcp_agent_backend import _CLIENT, FakeClient, backend, success
 
 
