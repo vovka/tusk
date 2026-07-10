@@ -6,6 +6,7 @@ from tusk.kernel.core.agent_profiles import build_agent_profiles
 def _mock_registry() -> object:
     llms = {
         "conversation_agent": types.SimpleNamespace(label="conversation"),
+        "command_agent": types.SimpleNamespace(label="command"),
         "planner_agent": types.SimpleNamespace(label="planner"),
         "executor_agent": types.SimpleNamespace(label="executor"),
         "default_agent": types.SimpleNamespace(label="default"),
@@ -13,9 +14,23 @@ def _mock_registry() -> object:
     return types.SimpleNamespace(get=lambda name: llms[name])
 
 
-def test_build_returns_four_profiles() -> None:
+def test_build_returns_five_profiles() -> None:
     profiles = build_agent_profiles(_mock_registry())
-    assert set(profiles.keys()) == {"conversation", "planner", "executor", "default"}
+    assert set(profiles.keys()) == {"conversation", "command", "planner", "executor", "default"}
+
+
+def test_command_profile_executes_with_all_runtime_tools() -> None:
+    profile = build_agent_profiles(_mock_registry())["command"]
+    assert profile.llm_provider.label == "command"
+    assert "*" in profile.runtime_allowed_tool_names
+    assert "run_agent" in profile.static_tool_names
+    assert profile.max_steps == 8
+
+
+def test_command_prompt_demands_terse_spoken_summary() -> None:
+    prompt = build_agent_profiles(_mock_registry())["command"].system_prompt
+    assert "one spoken desktop command" in prompt
+    assert "terse spoken-style summary" in prompt
 
 
 def test_conversation_profile_has_run_agent() -> None:

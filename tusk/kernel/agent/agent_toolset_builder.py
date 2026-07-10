@@ -45,6 +45,8 @@ class AgentToolsetBuilder:
 
     def _filter_runtime(self, names: tuple[str, ...]) -> set[str]:
         real = self._registry.real_tool_names()
+        if "*" in names:
+            return set(real)
         return {name for name in names if name in real}
 
     def _done_tool(self, profile: AgentProfile) -> dict[str, object]:

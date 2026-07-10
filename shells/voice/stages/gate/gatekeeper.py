@@ -68,7 +68,8 @@ class LLMGatekeeper(Gatekeeper):
     def _command_dispatch(self, result: GateResult, utterance: Utterance) -> GateDispatch | None:
         if result.classification != GateClassification.COMMAND:
             return None
-        forward = GateDispatch(GateAction.FORWARD_CURRENT, result.cleaned_command or utterance.text, intent=result.intent)
+        text = result.cleaned_command or utterance.text
+        forward = GateDispatch(GateAction.FORWARD_CURRENT, text, intent=result.intent, kind="command")
         return self._forward(forward)
 
     def _recovery_dispatch(

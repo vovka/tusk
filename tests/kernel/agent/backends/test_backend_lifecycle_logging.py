@@ -34,7 +34,7 @@ def _stream(payload: str) -> str:
 
 def run_broken_tusk_backend(log_printer: RecordingLogPrinter) -> None:
     class BrokenAgent:
-        def process_command(self, command: str) -> str:
+        def process_command(self, command: str, kind: str = "conversation") -> str:
             raise RuntimeError("boom")
 
     request = AgentRequest("open", "command", metadata={"request_id": "req-1"})

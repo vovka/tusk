@@ -50,7 +50,7 @@ def test_start_and_stop_coding_fire_callbacks() -> None:
 
 
 def _command_mode() -> object:
-    return types.SimpleNamespace(process_command=lambda text: KernelResponse(True, text))
+    return types.SimpleNamespace(process_command=lambda text, kind="conversation": KernelResponse(True, text))
 
 
 def _coding_mode(actions: list[str]) -> object:

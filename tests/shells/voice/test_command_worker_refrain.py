@@ -7,7 +7,7 @@ from tusk.shared.schemas.kernel_response import KernelResponse
 
 
 def _event_submit(events: list[str]):
-    def submit(text: str) -> KernelResponse:
+    def submit(text: str, kind: str = "conversation") -> KernelResponse:
         events.append(f"submit:{text}")
         return KernelResponse(True, "a reply")
     return submit

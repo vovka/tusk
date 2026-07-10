@@ -40,24 +40,25 @@ class KernelAPI:
     def interrupt_token(self) -> object | None:
         return self._interrupt_token
 
-    def submit(self, text: str) -> KernelResponse:
+    def submit(self, text: str, kind: str = "conversation") -> KernelResponse:
         # ponytail: one global lock — commands are serial by design (single user voice stream)
         with self._submit_lock:
             self._log_input(text)
+            route = lambda routed_text: self._route(routed_text, kind)
             if self._submit_reporter is None:
-                return self._route(text)
-            return self._submit_reporter.run(text, self._route)
+                return route(text)
+            return self._submit_reporter.run(text, route)
 
     def _log_input(self, text: str) -> None:
         if self._log is not None:
             self._log.log("KERNELINPUT", f"text={text!r}", "kernel-input")
 
-    def _route(self, text: str) -> KernelResponse:
+    def _route(self, text: str, kind: str) -> KernelResponse:
         if self._coding.active:
             return self._coding.process_text(text)
         if self._dictation.active:
             return self._dictation.process_text(text)
-        return self._command_mode.process_command(text)
+        return self._command_mode.process_command(text, kind)
 
     def _report_mode(self, mode: AppMode) -> None:
         if self._reporter is not None:

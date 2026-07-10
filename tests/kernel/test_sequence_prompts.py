@@ -16,5 +16,5 @@ def test_sequence_prompt_contracts_are_present() -> None:
 
 def _registry() -> object:
     llm = object()
-    items = {name: llm for name in ["conversation_agent", "planner_agent", "executor_agent", "default_agent"]}
+    items = {name: llm for name in ["conversation_agent", "command_agent", "planner_agent", "executor_agent", "default_agent"]}
     return types.SimpleNamespace(get=lambda name: items[name])

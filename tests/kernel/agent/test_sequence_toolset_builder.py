@@ -26,7 +26,7 @@ def test_normal_executor_keeps_runtime_tools() -> None:
 
 def _profiles() -> dict[str, object]:
     llm = object()
-    registry = {"conversation_agent": llm, "planner_agent": llm, "executor_agent": llm, "default_agent": llm}
+    registry = {"conversation_agent": llm, "command_agent": llm, "planner_agent": llm, "executor_agent": llm, "default_agent": llm}
     return build_agent_profiles(type("Registry", (), {"get": lambda self, name: registry[name]})())
 
 

@@ -49,7 +49,7 @@ def _buffer(consumed: list[str]) -> object:
 
 
 def _submit(submits: list[str]):
-    def submit(text: str) -> KernelResponse:
+    def submit(text: str, refrain: str = "", kind: str = "conversation") -> KernelResponse:
         submits.append(text)
         return KernelResponse(True, "done")
     return submit

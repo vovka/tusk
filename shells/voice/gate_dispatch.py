@@ -11,3 +11,4 @@ class GateDispatch:
     text: str | None = None
     recovered_id: str = ""
     intent: str = ""
+    kind: str = "conversation"
