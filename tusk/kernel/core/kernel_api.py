@@ -110,4 +110,5 @@ class KernelAPI:
         return self._mode_gate("coding", CODING_GATE_PROMPT)
 
     def _mode_gate(self, mode_name: str, prompt: str) -> ModeGate:
-        return ModeGate(self._llm_registry.get("gatekeeper"), mode_name, prompt, self._log)
+        gatekeeper = self._llm_registry.get("gatekeeper") if self._llm_registry else None
+        return ModeGate(gatekeeper, mode_name, prompt, self._log)

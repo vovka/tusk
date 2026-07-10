@@ -63,7 +63,7 @@ class ImportGuardrails:
         if node.level == 0:
             return node.module or ""
         package_parts = path.relative_to(self._root).parent.parts
-        base = ".".join(package_parts[: len(package_parts) - node.level + 1])
+        base = ".".join(package_parts[: max(0, len(package_parts) - node.level + 1)])
         return f"{base}.{node.module}" if node.module else base
 
     def _breaks_boundary(self, name: str, allowed: tuple[str, ...]) -> bool:

@@ -37,3 +37,8 @@ def test_import_guardrails_allow_own_tree_shared_and_third_party(tmp_path: Path)
     )
     _write(tmp_path, "tusk/kernel/ok.py", "from tusk.kernel.tools.tool_registry import ToolRegistry")
     assert ImportGuardrails(tmp_path).violations() == []
+
+
+def test_import_guardrails_ignore_relative_import_beyond_repository_root(tmp_path: Path) -> None:
+    _write(tmp_path, "tusk/shared/foo/bad.py", "from ......core.thing import Something")
+    assert ImportGuardrails(tmp_path).violations() == []

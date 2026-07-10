@@ -42,3 +42,8 @@ def test_coding_gate_uses_gatekeeper_slot_and_coding_prompt() -> None:
     assert gate.should_stop("any text") is False
     assert requested == ["gatekeeper"]
     assert llm.prompts == [CODING_GATE_PROMPT]
+
+
+def test_dictation_gate_does_not_crash_without_llm_registry() -> None:
+    kernel = KernelAPI(types.SimpleNamespace(), None)
+    assert isinstance(kernel.dictation_gate(), ModeGate)
