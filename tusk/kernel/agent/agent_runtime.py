@@ -1,6 +1,6 @@
 from collections.abc import Callable
 
-from tusk.kernel.model_failure_reply_builder import ModelFailureReplyBuilder
+from tusk.kernel.agent.runtime.model_failure_reply_builder import ModelFailureReplyBuilder
 from tusk.kernel.tools.repeated_tool_call_guard import RepeatedToolCallGuard
 from tusk.shared.schemas.tools.tool_call import ToolCall
 from tusk.shared.schemas.tools.tool_result import ToolResult

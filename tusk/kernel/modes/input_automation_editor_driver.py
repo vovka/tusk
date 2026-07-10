@@ -1,7 +1,7 @@
 import time
 from collections.abc import Callable
 
-from tusk.kernel.clipboard_guard import ClipboardGuard
+from tusk.kernel.modes.clipboard_guard import ClipboardGuard
 from tusk.kernel.interfaces.editor_driver import EditorDriver
 from tusk.shared.schemas.buffer_selection import BufferSelection
 from tusk.kernel.tools.tool_registry import ToolRegistry
