@@ -315,6 +315,24 @@ tusk/                        (repo root)
 └── docker/                  # codex-entrypoint.sh
 ```
 
+### Placement map
+
+| You are adding | Put it in |
+|---|---|
+| A new shell (user-facing I/O surface) | `shells/<name>/` |
+| A new desktop/app capability (MCP server) | `adapters/<name>/` + `adapter.json` |
+| Decision logic, routing, agent behavior | `tusk/kernel/` |
+| A data shape crossing layers | `tusk/shared/schemas/` |
+| Cross-layer plumbing (config, logging, MCP, status, interrupt) | `tusk/shared/<area>/` |
+| An engine implementation behind a shared ABC (LLM/STT/TTS) | `tusk/providers/<kind>/` |
+| Tests | `tests/<mirror of source package>`; cross-tree tests and shared helpers at `tests/` root |
+| Composition/wiring | `main.py` / `shell_loader.py` — the only places allowed to import everything |
+| Dev-only tooling | `tools/` |
+
+Each source tree imports only itself plus `tusk.shared`; adapters may also import
+`tusk.providers` because each adapter server is a standalone process entrypoint.
+`tests/style_guardrails/import_guardrails.py` enforces these boundaries.
+
 ---
 
 ## Interfaces
