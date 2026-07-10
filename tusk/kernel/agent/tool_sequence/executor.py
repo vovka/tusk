@@ -4,21 +4,19 @@ from tusk.kernel.tools.tool_registry import ToolRegistry
 from tusk.shared.schemas.tools.tool_result import ToolResult
 from tusk.shared.schemas.tools.tool_sequence_plan import ToolSequencePlan
 from tusk.shared.schemas.tools.tool_sequence_step import ToolSequenceStep
+from tusk.shared.tracing.interfaces.tracer import Tracer
+from tusk.shared.tracing.null_tracer import NullTracer
 
 __all__ = ["Executor"]
 
 
 class Executor:
-    def __init__(
-        self,
-        registry: ToolRegistry,
-        session_store: object,
-        interrupt_token: object | None = None,
-    ) -> None:
+    def __init__(self, registry: ToolRegistry, session_store: object, interrupt_token: object | None = None, tracer: Tracer | None = None) -> None:
         self._registry = registry
         self._validator = PlanValidator(registry)
         self._record = Recorder(session_store)
         self._token = interrupt_token
+        self._tracer = tracer or NullTracer()
 
     def execute(self, session_id: str, parameters: dict[str, object], allowed: set[str]) -> ToolResult:
         message = self._validator.validate(parameters, allowed)
@@ -63,7 +61,9 @@ class Executor:
 
     def _step(self, session_id: str, step: ToolSequenceStep) -> ToolResult:
         self._record.requested(session_id, step.step_id, step.tool_name, step.args)
-        result = self._registry.get(step.tool_name).execute(step.args)
+        with self._tracer.span(f"tool.{step.tool_name}", {"tool": step.tool_name, "step_id": step.step_id}) as span:
+            result = self._registry.get(step.tool_name).execute(step.args)
+            span.set_attribute("success", str(result.success))
         self._record.result(session_id, step.step_id, step.tool_name, result)
         return result
 
