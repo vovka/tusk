@@ -50,6 +50,8 @@ class ChunkedSpeaker:
                 return
             self._current_text = text
             self._playback.play(wav_clip)
+            # clear during the silent gap while the next chunk synthesizes, so live speech isn't dropped as echo
+            self._current_text = None
             if self._interrupted():
                 return
 
