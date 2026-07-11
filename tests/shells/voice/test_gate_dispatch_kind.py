@@ -48,3 +48,13 @@ def test_worker_forwards_kind_to_kernel_submit() -> None:
     calls: list[tuple[str, str]] = []
     _worker(calls).enqueue("open gedit", "Opening gedit", "command")
     await_condition(lambda: calls == [("open gedit", "command")])
+
+
+def test_recovered_dispatch_carries_command_kind() -> None:
+    from shells.voice.buffered_utterance import BufferedUtterance
+    from shells.voice.recovery_decision import RecoveryDecision
+    from shells.voice.stages.gate.gatekeeper_support import recovered_dispatch
+
+    candidate = BufferedUtterance("c1", Utterance("open firefox", b"", 1.0), 0.0)
+    dispatch = recovered_dispatch([candidate], RecoveryDecision("recover", candidate_id="c1"))
+    assert dispatch.kind == "command"

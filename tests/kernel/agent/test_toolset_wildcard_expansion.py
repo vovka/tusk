@@ -18,6 +18,20 @@ def _profile() -> AgentProfile:
     return AgentProfile("command", types.SimpleNamespace(label="llm"), "prompt", ("run_agent",), ("*",), 8)
 
 
+def _executor_profile() -> AgentProfile:
+    return AgentProfile("executor", types.SimpleNamespace(label="llm"), "prompt", (), ("*",), 16)
+
+
+def test_executor_wildcard_request_does_not_expand_to_all_tools() -> None:
+    request = AgentRunRequest("x", "executor", runtime_tool_names=("*",))
+    assert _builder().runtime_names(_executor_profile(), request) == set()
+
+
+def test_executor_receives_only_explicitly_selected_real_tools() -> None:
+    request = AgentRunRequest("x", "executor", runtime_tool_names=("gnome.press_keys", "*"))
+    assert _builder().runtime_names(_executor_profile(), request) == {"gnome.press_keys"}
+
+
 def test_wildcard_request_expands_to_all_real_tools() -> None:
     names = _builder().runtime_names(_profile(), AgentRunRequest("open gedit", "command", runtime_tool_names=("*",)))
     assert names == {"gnome.press_keys", "gnome.type_text"}

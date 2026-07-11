@@ -25,7 +25,7 @@ class AgentToolsetBuilder:
         if not profile.runtime_allowed_tool_names:
             return set()
         if "*" in profile.runtime_allowed_tool_names:
-            return self._filter_runtime(request.runtime_tool_names)
+            return self._filter_runtime(request.runtime_tool_names, profile)
         return set(profile.runtime_allowed_tool_names)
 
     def _add_static_tools(self, tools: list[dict[str, object]], profile: AgentProfile, request: AgentRunRequest) -> None:
@@ -43,9 +43,10 @@ class AgentToolsetBuilder:
         if names:
             tools.extend(self._registry.definitions_for(names))
 
-    def _filter_runtime(self, names: tuple[str, ...]) -> set[str]:
+    def _filter_runtime(self, names: tuple[str, ...], profile: AgentProfile) -> set[str]:
         real = self._registry.real_tool_names()
-        if "*" in names:
+        # only the top-level command fast path may request every tool; children stay narrowed
+        if "*" in names and profile.profile_id == "command":
             return set(real)
         return {name for name in names if name in real}
 

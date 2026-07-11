@@ -42,7 +42,8 @@ def to_utterance(item: Utterance | BufferedUtterance) -> Utterance:
 
 def recovered_dispatch(candidates: list[BufferedUtterance], decision: RecoveryDecision) -> GateDispatch:
     item = next(candidate for candidate in candidates if candidate.id == decision.candidate_id)
-    return GateDispatch(GateAction.FORWARD_RECOVERED, item.text, item.id)
+    # recovery rescues a dropped desktop command, so route it through the command fast path
+    return GateDispatch(GateAction.FORWARD_RECOVERED, item.text, item.id, kind="command")
 
 
 def fallback_dispatch(result: GateResult, utterance: Utterance, wake_word: bool) -> GateDispatch:

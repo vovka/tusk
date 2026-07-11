@@ -1,3 +1,5 @@
+from typing import Any
+
 from tusk.kernel.agent import AgentOrchestrator, AgentRunRequest
 from tusk.kernel.agent.backends import AgentBackend, AgentRequest
 from tusk.kernel.agent.backends import AgentResult as BackendAgentResult
@@ -16,7 +18,9 @@ class MainAgent(AgentBackend):
         self._session_id = ""
 
     def run(self, request: AgentRequest) -> BackendAgentResult:
-        self._session_id = request.session_id
+        # a one-shot command must not overwrite the conversation session it is shared into
+        if request.mode != "command":
+            self._session_id = request.session_id
         reply = self.process_command(request.user_text, request.mode)
         return BackendAgentResult(True, reply, self._session_id)
 
@@ -37,7 +41,7 @@ class MainAgent(AgentBackend):
         self._share_with_conversation(command, reply)
         return reply
 
-    def _finished(self, command: str, result: object) -> str:
+    def _finished(self, command: str, result: Any) -> str:
         reply = "Stopped." if result.status == "cancelled" else result.reply_text()
         self._remember(command, reply)
         return reply

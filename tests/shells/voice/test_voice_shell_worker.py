@@ -1,6 +1,20 @@
 import types
 
 from shells.voice.voice_shell import VoiceShell
+from tusk.shared.schemas.kernel_response import KernelResponse
+
+
+def test_voice_shell_without_worker_forwards_kind_to_submit() -> None:
+    calls: list[tuple[str, str]] = []
+
+    def submit(text: str, kind: str = "conversation") -> KernelResponse:
+        calls.append((text, kind))
+        return KernelResponse(True, "")
+
+    pipeline = types.SimpleNamespace(run=lambda target: [target("open gedit", "Opening", "command")])
+    log = types.SimpleNamespace(log=lambda *args: None)
+    VoiceShell(None, log, pipeline=pipeline, worker=None).start(submit)
+    assert calls == [("open gedit", "command")]
 
 
 def test_voice_shell_routes_submits_through_worker() -> None:

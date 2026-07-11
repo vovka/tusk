@@ -56,6 +56,18 @@ def test_fast_command_skips_history_share_without_conversation_session() -> None
     assert events == []
 
 
+def test_run_command_preserves_conversation_session_for_sharing() -> None:
+    from tusk.kernel.agent.backends import AgentRequest
+
+    requests: list[AgentRunRequest] = []
+    events: list[tuple[str, str, dict]] = []
+    agent = _agent(requests, events)
+    agent.process_command("hello")
+    agent.run(AgentRequest("open gedit", "command", ""))
+    lines = [(sid, data["role"], data["content"]) for sid, name, data in events]
+    assert ("conv-1", "user", "open gedit") in lines
+
+
 def test_fast_command_does_not_adopt_the_command_session() -> None:
     requests: list[AgentRunRequest] = []
     agent = _agent(requests)
