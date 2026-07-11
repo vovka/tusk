@@ -18,6 +18,7 @@ from tusk.kernel.agent.planner.result_validator import ResultValidator
 from tusk.kernel.agent.planner.runtime_tool_resolver import RuntimeToolResolver
 from tusk.kernel.agent.tool_sequence.executor import Executor
 from tusk.shared.logging.interfaces.log_printer import LogPrinter
+from tusk.shared.tracing.interfaces.tracer import Tracer
 
 __all__ = ["AgentOrchestrator"]
 
@@ -30,13 +31,14 @@ class AgentOrchestrator:
         session_store: Store,
         log_printer: LogPrinter,
         interrupt_token: object | None = None,
+        tracer: Tracer | None = None,
     ) -> None:
         self._profiles = profiles
         self._registry = tool_registry
         self._log = log_printer
-        self._init_components(session_store, log_printer, tool_registry, interrupt_token)
+        self._init_components(session_store, log_printer, tool_registry, interrupt_token, tracer)
 
-    def _init_components(self, store: Store, log: LogPrinter, registry: ToolRegistry, token: object | None) -> None:
+    def _init_components(self, store: Store, log: LogPrinter, registry: ToolRegistry, token: object | None, tracer: Tracer | None) -> None:
         self._runtime = AgentRuntime(store, log, token)
         self._guard = AgentRunGuard()
         self._children = AgentChildRunner(store)
@@ -45,7 +47,8 @@ class AgentOrchestrator:
         self._planner_results = ResultValidator(log)
         self._resolved_tools = RuntimeToolResolver(store)
         self._tools = AgentToolsetBuilder(registry)
-        self._dispatcher = OrchestratorToolDispatcher(registry, self._catalog, Executor(registry, store, token))
+        sequence_executor = Executor(registry, store, token, tracer=tracer)
+        self._dispatcher = OrchestratorToolDispatcher(registry, self._catalog, sequence_executor, tracer=tracer)
 
     def run(self, request: AgentRunRequest) -> AgentResult:
         return self._run(request, ())

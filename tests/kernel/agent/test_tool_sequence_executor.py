@@ -80,3 +80,36 @@ def _record_then_interrupt(seen: list[dict[str, object]], token: object) -> obje
         token.interrupt()
         return ToolResult(True, "typed")
     return execute
+
+
+def _settle_registry() -> ToolRegistry:
+    registry = ToolRegistry()
+    registry.register(make_registry_tool("gnome.launch_application", "launched", sequence_callable=True, settle_ms=2000))
+    registry.register(make_registry_tool("gnome.type_text", "typed", sequence_callable=True))
+    return registry
+
+
+def _settling_executor(registry: ToolRegistry, sleeps: list[float]) -> Executor:
+    store = FileStore(tempfile.mkdtemp(prefix="tusk-sequence-exec-"))
+    return Executor(registry, store, sleep=sleeps.append)
+
+
+def test_sequence_executor_settles_after_launch_style_steps() -> None:
+    sleeps: list[float] = []
+    steps = [
+        {"id": "s1", "tool_name": "gnome.launch_application", "args": {"text": "gedit"}},
+        {"id": "s2", "tool_name": "gnome.type_text", "args": {"text": "hi"}},
+    ]
+    plan = {"goal": "Open and type", "steps": steps}
+    allowed = {"gnome.launch_application", "gnome.type_text"}
+    result = _settling_executor(_settle_registry(), sleeps).execute("s1", plan, allowed)
+    assert result.success is True
+    assert sleeps == [2.0]
+
+
+def test_sequence_executor_skips_settle_on_last_step() -> None:
+    sleeps: list[float] = []
+    plan = {"goal": "Open app", "steps": [{"id": "s1", "tool_name": "gnome.launch_application", "args": {"text": "gedit"}}]}
+    result = _settling_executor(_settle_registry(), sleeps).execute("s1", plan, {"gnome.launch_application"})
+    assert result.success is True
+    assert sleeps == []

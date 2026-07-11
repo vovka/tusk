@@ -7,6 +7,7 @@ from e2e.fake_playback import FakePlayback
 from e2e.queue_detector import QueueDetector
 from shells.voice.command_worker import CommandWorker
 from shells.voice.pipeline import VoicePipeline
+from shells.voice.stages.chunked_speaker import ChunkedSpeaker
 from shells.voice.stages.gate.gatekeeper import LLMGatekeeper
 from shells.voice.stages.sanitizer import Sanitizer
 from shells.voice.stages.transcription_buffer import TranscriptionBuffer
@@ -48,9 +49,10 @@ class VoiceE2EHarness:
         self.wait(lambda: not self.worker.is_busy, timeout, "worker idle")
 
     def _build_worker(self) -> CommandWorker:
-        tts = types.SimpleNamespace(synthesize=lambda text: b"E2EWAV")
+        tts = types.SimpleNamespace(synthesize_chunks=lambda text: iter([b"E2EWAV"]))
         log = types.SimpleNamespace(log=self._record_log)
-        return CommandWorker(self._kernel.submit, tts, self.playback, log, self.token)
+        speaker = ChunkedSpeaker(tts, self.playback, log)
+        return CommandWorker(self._kernel.submit, speaker, log, self.token)
 
     def _record_log(self, *args: object) -> None:
         if args and args[0] == "TUSK":

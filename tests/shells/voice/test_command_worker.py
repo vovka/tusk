@@ -92,13 +92,22 @@ def test_token_cleared_before_speaking_after_interrupted_submit() -> None:
     await_condition(lambda: interrupted_at_play == [False])
 
 
-def test_stale_reply_replaced_when_interrupt_lands_late() -> None:
+def test_late_interrupt_reports_the_completed_reply() -> None:
+    # a stop that lands after the command already ran must report what happened, not fake cancellation
     token = InterruptToken()
     logs: list[tuple] = []
-    worker = make_worker(interrupting_submit(token, "long stale reply"), token=token, logs=logs)
+    worker = make_worker(interrupting_submit(token, "opened gedit"), token=token, logs=logs)
+    worker.enqueue("hi")
+    await_condition(lambda: ("TUSK", "opened gedit") in logs)
+    assert ("TUSK", "Stopped.") not in logs
+
+
+def test_cancelled_run_speaks_the_kernel_stop_reply() -> None:
+    token = InterruptToken()
+    logs: list[tuple] = []
+    worker = make_worker(interrupting_submit(token, "Stopped."), token=token, logs=logs)
     worker.enqueue("hi")
     await_condition(lambda: ("TUSK", "Stopped.") in logs)
-    assert ("TUSK", "long stale reply") not in logs
 
 
 def test_worker_logs_reply_and_survives_tts_failure() -> None:

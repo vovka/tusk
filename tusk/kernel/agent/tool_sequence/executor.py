@@ -1,24 +1,27 @@
+import time
+from typing import Callable
+
 from tusk.kernel.agent.tool_sequence.plan_validator import PlanValidator
 from tusk.kernel.agent.tool_sequence.recorder import Recorder
 from tusk.kernel.tools.tool_registry import ToolRegistry
 from tusk.shared.schemas.tools.tool_result import ToolResult
 from tusk.shared.schemas.tools.tool_sequence_plan import ToolSequencePlan
 from tusk.shared.schemas.tools.tool_sequence_step import ToolSequenceStep
+from tusk.shared.tracing.interfaces.tracer import Tracer
+from tusk.shared.tracing.null_tracer import NullTracer
 
 __all__ = ["Executor"]
 
 
 class Executor:
-    def __init__(
-        self,
-        registry: ToolRegistry,
-        session_store: object,
-        interrupt_token: object | None = None,
-    ) -> None:
+    def __init__(self, registry: ToolRegistry, session_store: object, interrupt_token: object | None = None,
+                 sleep: Callable[[float], None] = time.sleep, tracer: Tracer | None = None) -> None:
         self._registry = registry
         self._validator = PlanValidator(registry)
         self._record = Recorder(session_store)
         self._token = interrupt_token
+        self._sleep = sleep
+        self._tracer = tracer or NullTracer()
 
     def execute(self, session_id: str, parameters: dict[str, object], allowed: set[str]) -> ToolResult:
         message = self._validator.validate(parameters, allowed)
@@ -59,11 +62,20 @@ class Executor:
         if not result.success:
             return self._failed(session_id, plan, completed, step.step_id, step_results, result.message)
         completed.append(step.step_id)
+        self._settle(plan, step)
         return None
+
+    def _settle(self, plan: ToolSequencePlan, step: ToolSequenceStep) -> None:
+        # ponytail: fixed manifest-declared pause after launch-style steps — swap for a window-ready probe if it flakes
+        settle_ms = self._registry.get(step.tool_name).settle_ms
+        if settle_ms and step is not plan.steps[-1]:
+            self._sleep(settle_ms / 1000)
 
     def _step(self, session_id: str, step: ToolSequenceStep) -> ToolResult:
         self._record.requested(session_id, step.step_id, step.tool_name, step.args)
-        result = self._registry.get(step.tool_name).execute(step.args)
+        with self._tracer.span(f"tool.{step.tool_name}", {"tool": step.tool_name, "step_id": step.step_id}) as span:
+            result = self._registry.get(step.tool_name).execute(step.args)
+            span.set_attribute("success", str(result.success))
         self._record.result(session_id, step.step_id, step.tool_name, result)
         return result
 
@@ -81,10 +93,8 @@ class Executor:
         payload = self._payload("done", plan, completed, "", results)
         return ToolResult(True, summary, payload)
 
-    def _failed(
-        self, session_id: str, plan: ToolSequencePlan, completed: list[str],
-        failed_step_id: str, results: dict[str, object], message: str,
-    ) -> ToolResult:
+    def _failed(self, session_id: str, plan: ToolSequencePlan, completed: list[str],
+                failed_step_id: str, results: dict[str, object], message: str) -> ToolResult:
         summary = f"sequence failed at {failed_step_id}: {message}"
         self._record.finished(session_id, "failed", summary)
         payload = self._payload("failed", plan, completed, failed_step_id, results)
@@ -94,13 +104,8 @@ class Executor:
         self, status: str, plan: ToolSequencePlan, completed: list[str],
         failed_step_id: str, results: dict[str, object],
     ) -> dict[str, object]:
-        return {
-            "status": status,
-            "goal": plan.goal,
-            "completed_step_ids": completed,
-            "failed_step_id": failed_step_id,
-            "step_results": results,
-        }
+        return {"status": status, "goal": plan.goal, "completed_step_ids": completed,
+                "failed_step_id": failed_step_id, "step_results": results}
 
     def _step_data(self, result: ToolResult) -> dict[str, object]:
         data = {"success": result.success, "message": result.message}

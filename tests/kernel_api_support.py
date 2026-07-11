@@ -55,6 +55,7 @@ def make_registry_tool(
     *,
     planner_visible: bool = True,
     sequence_callable: bool = False,
+    settle_ms: int = 0,
     input_schema: dict | None = None,
     execute: object | None = None,
 ) -> object:
@@ -66,4 +67,5 @@ def make_registry_tool(
         source="gnome",
         planner_visible=planner_visible,
         sequence_callable=sequence_callable,
+        settle_ms=settle_ms,
     )

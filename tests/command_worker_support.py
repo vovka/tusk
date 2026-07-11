@@ -3,6 +3,7 @@ import time
 import types
 
 from shells.voice.command_worker import CommandWorker
+from shells.voice.stages.chunked_speaker import ChunkedSpeaker
 from tusk.shared.interrupt import InterruptToken
 from tusk.shared.schemas.kernel_response import KernelResponse
 
@@ -10,7 +11,8 @@ from tusk.shared.schemas.kernel_response import KernelResponse
 def make_worker(submit, tts=None, playback=None, token=None, logs=None, ack_enabled=True) -> CommandWorker:
     log = types.SimpleNamespace(log=lambda *args: logs.append(args) if logs is not None else None)
     playback = playback or types.SimpleNamespace(play=lambda wav: None)
-    worker = CommandWorker(submit, tts, playback, log, token or InterruptToken(), ack_enabled)
+    speaker = ChunkedSpeaker(tts, playback, log)
+    worker = CommandWorker(submit, speaker, log, token or InterruptToken(), ack_enabled)
     worker.start()
     return worker
 
@@ -49,13 +51,15 @@ def interrupting_submit(token: InterruptToken, reply: str):
 
 
 def working_tts() -> object:
-    return types.SimpleNamespace(synthesize=lambda text: b"WAVDATA")
+    return types.SimpleNamespace(synthesize_chunks=lambda text: iter([b"WAVDATA"]))
 
 
 def broken_tts() -> object:
-    def synthesize(text: str) -> bytes:
+    def synthesize_chunks(text: str):
         raise RuntimeError("tts unavailable")
-    return types.SimpleNamespace(synthesize=synthesize)
+        yield b""
+
+    return types.SimpleNamespace(synthesize_chunks=synthesize_chunks)
 
 
 def await_condition(condition, timeout: float = 5.0) -> None:

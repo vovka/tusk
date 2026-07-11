@@ -50,7 +50,7 @@ def test_command_worker_receives_tts_engine_when_enabled(monkeypatch) -> None:
     loader = _loader(["voice"], tts_enabled=True)
     loader._gatekeeper = lambda worker: None
     loader._load_class = lambda name: _voice_class()
-    assert loader._build("voice").worker._tts is sentinel
+    assert loader._build("voice").worker._speaker._tts is sentinel
 
 
 def _mode_kernel(requested: list[tuple]) -> types.SimpleNamespace:
