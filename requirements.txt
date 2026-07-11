@@ -8,3 +8,5 @@ watchdog
 mcp
 pystray
 Pillow
+opentelemetry-sdk
+opentelemetry-exporter-otlp-proto-http
