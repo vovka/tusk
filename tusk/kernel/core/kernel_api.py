@@ -1,4 +1,5 @@
 import threading
+import uuid
 from collections.abc import Callable
 
 from tusk.kernel.modes.coding_gate_prompt import CODING_GATE_PROMPT
@@ -12,8 +13,12 @@ from tusk.shared.interrupt.interrupt_token import InterruptToken
 from tusk.shared.llm.llm_registry import LLMRegistry
 from tusk.shared.logging.interfaces.log_printer import LogPrinter
 from tusk.shared.status.interfaces.status_reporter import StatusReporter
+from tusk.shared.tracing.interfaces.tracer import Tracer
+from tusk.shared.tracing.null_tracer import NullTracer
 
 __all__ = ["KernelAPI"]
+
+_TEXT_PREVIEW_CHARS = 240
 
 
 class KernelAPI:
@@ -21,7 +26,9 @@ class KernelAPI:
         self, command_mode: object, llm_registry: LLMRegistry | None, log: LogPrinter | None = None,
         reporter: StatusReporter | None = None, interrupt_token: InterruptToken | None = None,
         dictation_slot: ModeSlot | None = None, coding_slot: ModeSlot | None = None,
+        tracer: Tracer | None = None,
     ) -> None:
+        self._tracer = tracer or NullTracer()
         self._command_mode = command_mode
         self._llm_registry = llm_registry
         self._log = log
@@ -44,10 +51,16 @@ class KernelAPI:
         # ponytail: one global lock — commands are serial by design (single user voice stream)
         with self._submit_lock:
             self._log_input(text)
-            route = lambda routed_text: self._route(routed_text, kind)
-            if self._submit_reporter is None:
-                return route(text)
-            return self._submit_reporter.run(text, route)
+            attributes = {"request_id": uuid.uuid4().hex, "text_preview": text[:_TEXT_PREVIEW_CHARS]}
+            with self._tracer.span("kernel.request", attributes) as span:
+                response = self._reported_route(text, kind)
+                span.set_attribute("handled", str(response.handled))
+                return response
+
+    def _reported_route(self, text: str, kind: str) -> KernelResponse:
+        if self._submit_reporter is None:
+            return self._route(text, kind)
+        return self._submit_reporter.run(text, lambda routed_text: self._route(routed_text, kind))
 
     def _log_input(self, text: str) -> None:
         if self._log is not None:
@@ -111,5 +124,5 @@ class KernelAPI:
         return self._mode_gate("coding", CODING_GATE_PROMPT)
 
     def _mode_gate(self, mode_name: str, prompt: str) -> ModeGate:
-        gatekeeper = self._llm_registry.get("gatekeeper") if self._llm_registry else None
-        return ModeGate(gatekeeper, mode_name, prompt, self._log)
+        stop_gate_llm = self._llm_registry.get_with_fallback("stop_gate", "gatekeeper") if self._llm_registry else None
+        return ModeGate(stop_gate_llm, mode_name, prompt, self._log)

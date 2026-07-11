@@ -56,7 +56,8 @@ class ConfigFactory:
         }
 
     def _gate_llm_slots(self) -> dict:
-        return {"gatekeeper_llm": self._slot("GATEKEEPER_LLM", "groq/llama-3.1-8b-instant")}
+        return {"gatekeeper_llm": self._slot("GATEKEEPER_LLM", "groq/llama-3.1-8b-instant"),
+                "stop_gate_llm": self._slot("STOP_GATE_LLM", "groq/llama-3.3-70b-versatile")}
 
     def _runtime_values(self, shells: str) -> dict:
         return {

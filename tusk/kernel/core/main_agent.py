@@ -37,7 +37,7 @@ class MainAgent(AgentBackend):
 
     def _fast_command(self, command: str) -> str:
         # fresh session with all runtime tools: tool schemas never enter the conversation context
-        result = self._orchestrator.run(AgentRunRequest(command, "command", "", runtime_tool_names=("*",)))
+        result = self._orchestrator.run(AgentRunRequest(command, "command", "", runtime_tool_names=("*",), gate_command=True))
         reply = self._finished(command, result)
         self._share_with_conversation(command, reply)
         return reply

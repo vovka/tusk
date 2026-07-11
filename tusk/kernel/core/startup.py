@@ -9,28 +9,29 @@ from tusk.shared.interrupt import InterruptToken
 from tusk.shared.llm import LLMRegistry
 from tusk.shared.logging import ColorLogPrinter
 from tusk.shared.status import StatusReporterHub
+from tusk.shared.tracing.interfaces.tracer import Tracer
 from tusk.kernel.interfaces.conversation_history import ConversationHistory
 
 
-def build_kernel(config: Config, log: ColorLogPrinter, llm_registry: LLMRegistry, reporter: StatusReporterHub, token: InterruptToken | None = None) -> KernelAPI:
+def build_kernel(config: Config, log: ColorLogPrinter, llm_registry: LLMRegistry, reporter: StatusReporterHub, token: InterruptToken | None = None, tracer: Tracer | None = None) -> KernelAPI:
     tool_registry = ToolRegistry()
     adapter_manager = build_adapter_manager(config, log, tool_registry)
     history = SlidingWindowHistory(20)
-    agent = build_agent(config, log, llm_registry, tool_registry, history, token)
-    kernel = build_api(agent, config, log, llm_registry, reporter, token)
+    agent = build_agent(config, log, llm_registry, tool_registry, history, token, tracer)
+    kernel = build_api(agent, config, log, llm_registry, reporter, token, tracer)
     ToolRuntime(tool_registry, llm_registry, adapter_manager, log, reporter).register_tools(kernel)
     return kernel
 
 
-def build_api(agent: MainAgent, config: Config, log: ColorLogPrinter, llm_registry: LLMRegistry, reporter: StatusReporterHub, token: InterruptToken | None = None) -> KernelAPI:
+def build_api(agent: MainAgent, config: Config, log: ColorLogPrinter, llm_registry: LLMRegistry, reporter: StatusReporterHub, token: InterruptToken | None = None, tracer: Tracer | None = None) -> KernelAPI:
     backend = AgentBackendFactory(agent, config, log).create()
-    return KernelAPI(CommandMode(backend, log), llm_registry, log, reporter, token)
+    return KernelAPI(CommandMode(backend, log), llm_registry, log, reporter, token, tracer=tracer)
 
 
-def build_agent(config: Config, log: ColorLogPrinter, llm_registry: LLMRegistry, tool_registry: ToolRegistry, history: ConversationHistory, token: InterruptToken | None = None) -> MainAgent:
+def build_agent(config: Config, log: ColorLogPrinter, llm_registry: LLMRegistry, tool_registry: ToolRegistry, history: ConversationHistory, token: InterruptToken | None = None, tracer: Tracer | None = None) -> MainAgent:
     store = FileStore(config.agent_session_log_dir)
     profiles = build_agent_profiles(llm_registry)
-    return MainAgent(AgentOrchestrator(profiles, tool_registry, store, log, token), history, store)
+    return MainAgent(AgentOrchestrator(profiles, tool_registry, store, log, token, tracer), history, store)
 
 
 def build_adapter_manager(config: Config, log: ColorLogPrinter, tool_registry: ToolRegistry) -> AdapterManager:

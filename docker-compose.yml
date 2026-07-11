@@ -29,6 +29,9 @@ services:
       PYTHONUNBUFFERED: "1"
       DBUS_SESSION_BUS_ADDRESS: unix:path=/run/user/1000/bus
       SHOW_LOGS: ${SHOW_LOGS:-}
+      # OTLP endpoint for Arize Phoenix traces; set TRACING_OTLP_ENDPOINT= (empty)
+      # in .env to disable tracing — the no-colon form keeps an empty value empty.
+      TRACING_OTLP_ENDPOINT: ${TRACING_OTLP_ENDPOINT-http://phoenix:6006/v1/traces}
       # Container-local codex home; entrypoint writes config.toml + copies auth here.
       CODEX_HOME: /tmp/.codex
     volumes:
@@ -49,3 +52,14 @@ services:
       - /dev/snd:/dev/snd
     tty: true
     restart: unless-stopped
+
+  phoenix:
+    image: arizephoenix/phoenix:17.25.0
+    ports:
+      - "6006:6006"
+    volumes:
+      - phoenix-data:/mnt/data
+    restart: unless-stopped
+
+volumes:
+  phoenix-data:

@@ -14,9 +14,11 @@ _SCHEMA = {
 _PROMPT = "\n".join([
     "TUSK, a voice assistant, is currently reading a response aloud.",
     "TUSK is saying: {speaking!r}.",
-    "The microphone picked up an utterance. Decide if it expresses intent to stop,",
-    "cancel, silence, or abort what TUSK is doing — in any wording.",
+    "The microphone picked up an utterance. Return stop=true only when the utterance's sole,",
+    "unambiguous meaning is that the user wants TUSK to stop, cancel, or silence what it is doing —",
+    "in any wording, e.g. 'stop it', 'quit it', 'abort', \"let's not do it\", 'be quiet'.",
     "Utterances that repeat or echo fragments of TUSK's own sentence are its own voice: not a stop request.",
+    "Self-talk or narration such as \"I'm going to go\" and anything ambiguous is not a stop request.",
     'Return strict JSON only: {{"stop":true|false,"reason":"..."}}.',
 ])
 

@@ -22,12 +22,18 @@ def _builder_with_hidden() -> AgentToolsetBuilder:
 
 
 def test_command_wildcard_excludes_hidden_adapter_internals() -> None:
-    request = AgentRunRequest("start dictation", "command", runtime_tool_names=("*",))
+    request = AgentRunRequest("start dictation", "command", runtime_tool_names=("*",), gate_command=True)
     assert _builder_with_hidden().runtime_names(_profile(), request) == {"gnome.press_keys"}
 
 
 def test_delegated_command_profile_does_not_expand_wildcard() -> None:
     request = AgentRunRequest("x", "command", runtime_tool_names=("*",), parent_call_id="call-1")
+    assert _builder().runtime_names(_profile(), request) == set()
+
+
+def test_recovered_command_without_gate_flag_does_not_expand_wildcard() -> None:
+    # a recovered ToolCall has call_id="" -> the child's parent_call_id is "" too, but gate_command stays False
+    request = AgentRunRequest("x", "command", runtime_tool_names=("*",), parent_call_id="")
     assert _builder().runtime_names(_profile(), request) == set()
 
 
@@ -50,8 +56,8 @@ def test_executor_receives_only_explicitly_selected_real_tools() -> None:
 
 
 def test_wildcard_request_expands_to_all_real_tools() -> None:
-    names = _builder().runtime_names(_profile(), AgentRunRequest("open gedit", "command", runtime_tool_names=("*",)))
-    assert names == {"gnome.press_keys", "gnome.type_text"}
+    request = AgentRunRequest("open gedit", "command", runtime_tool_names=("*",), gate_command=True)
+    assert _builder().runtime_names(_profile(), request) == {"gnome.press_keys", "gnome.type_text"}
 
 
 def test_explicit_names_still_filter_against_real_tools() -> None:

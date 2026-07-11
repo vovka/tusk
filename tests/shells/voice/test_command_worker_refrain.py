@@ -91,13 +91,15 @@ def test_refrain_logged_with_punctuation_when_tts_off() -> None:
     assert ("TUSK", "Opening gedit.") in logs
 
 
-def test_interrupt_during_refrain_suppresses_the_stale_reply() -> None:
+def test_interrupt_during_ack_does_not_fake_cancellation_of_a_completed_command() -> None:
+    # the ack overlaps the run, so a stop during it cannot undo synchronous side effects;
+    # the command ran, so report its reply rather than falsely confirming "Stopped."
     token = InterruptToken()
     submits: list[str] = []
     logs: list[tuple] = []
     playback = types.SimpleNamespace(play=lambda wav: token.interrupt())
     worker = make_worker(recording_submit(submits), tts=working_tts(), playback=playback, token=token, logs=logs)
-    worker.enqueue("delete everything", "Deleting everything")
-    await_condition(lambda: ("TUSK", "Stopped.") in logs and not worker.is_busy)
-    assert submits == ["delete everything"]
-    assert ("TUSK", "a reply") not in logs
+    worker.enqueue("open gedit", "Opening gedit")
+    await_condition(lambda: ("TUSK", "a reply") in logs and not worker.is_busy)
+    assert submits == ["open gedit"]
+    assert ("TUSK", "Stopped.") not in logs

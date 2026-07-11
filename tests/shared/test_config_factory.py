@@ -20,6 +20,18 @@ def test_config_falls_back_to_agent_llm_for_command_agent(monkeypatch) -> None:
     assert ConfigFactory().build().command_agent_llm.model == "fallback-model"
 
 
+def test_config_reads_stop_gate_llm(monkeypatch) -> None:
+    monkeypatch.setenv("GROQ_API_KEY", "test-key")
+    monkeypatch.setenv("STOP_GATE_LLM", "groq/stop-model")
+    assert ConfigFactory().build().stop_gate_llm.model == "stop-model"
+
+
+def test_config_defaults_stop_gate_llm_to_llama_70b(monkeypatch) -> None:
+    monkeypatch.setenv("GROQ_API_KEY", "test-key")
+    monkeypatch.delenv("STOP_GATE_LLM", raising=False)
+    assert ConfigFactory().build().stop_gate_llm.model == "llama-3.3-70b-versatile"
+
+
 def test_config_reads_planner_agent_llm(monkeypatch) -> None:
     monkeypatch.setenv("GROQ_API_KEY", "test-key")
     monkeypatch.setenv("PLANNER_AGENT_LLM", "groq/openai/gpt-oss-20b")

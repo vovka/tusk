@@ -45,6 +45,18 @@ def test_first_clip_plays_before_later_chunks_are_synthesized() -> None:
     assert played == [b"one", b"two"]
 
 
+def test_current_text_clears_between_chunks() -> None:
+    played: list[bytes] = []
+    gate, first = threading.Event(), threading.Event()
+    speaker = _speaker(_gated_engine(gate), played, on_play=first.set)
+    worker = threading.Thread(target=lambda: speaker.speak("hi"))
+    worker.start()
+    assert first.wait(timeout=5.0)
+    await_condition(lambda: speaker.current_text is None)
+    gate.set()
+    worker.join(timeout=5.0)
+
+
 def test_synthesis_failure_is_logged_and_playback_stops() -> None:
     logs: list[tuple] = []
     played: list[bytes] = []
@@ -69,3 +81,24 @@ def test_speak_without_engine_does_nothing() -> None:
     played: list[bytes] = []
     _speaker(None, played).speak("hello")
     assert played == []
+
+
+def _slow_first_chunk(started: threading.Event, release: threading.Event) -> object:
+    def synthesize_chunks(text: str):
+        started.set()
+        assert release.wait(timeout=5.0)
+        yield b"one"
+
+    return types.SimpleNamespace(synthesize_chunks=synthesize_chunks)
+
+
+def test_current_text_stays_clear_until_first_clip_plays() -> None:
+    started, release = threading.Event(), threading.Event()
+    played: list[bytes] = []
+    speaker = _speaker(_slow_first_chunk(started, release), played)
+    worker = threading.Thread(target=lambda: speaker.speak("hello"))
+    worker.start()
+    assert started.wait(timeout=5.0)
+    assert speaker.current_text is None
+    release.set()
+    worker.join(timeout=5.0)
