@@ -34,6 +34,20 @@ def test_appended_keeps_short_tool_result_message_intact() -> None:
     assert messages[-1]["content"] == "x" * 500
 
 
+def test_appended_keeps_long_successful_message_intact() -> None:
+    messages: list[dict[str, str]] = []
+    result = ToolResult(True, "x" * 2000, None)
+    _recorder().appended(messages, ToolCall("gnome.read_clipboard", {}, "c1"), result)
+    assert messages[-1]["content"] == "x" * 2000
+
+
+def test_appended_tolerates_missing_tool_result_message() -> None:
+    messages: list[dict[str, str]] = []
+    result = ToolResult(False, None, None)
+    _recorder().appended(messages, ToolCall("gnome.press_keys", {}, "c1"), result)
+    assert messages[-1]["content"] == ""
+
+
 def test_result_event_keeps_full_message() -> None:
     events: list[tuple[str, str, dict]] = []
     store = types.SimpleNamespace(append_event=lambda sid, name, data: events.append((sid, name, data)))

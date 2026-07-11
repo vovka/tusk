@@ -29,13 +29,19 @@ class StepRecorder:
         if child is not None:
             messages.append({"role": "assistant", "content": child})
             return
-        messages.append({"role": "user", "content": _truncated(tool_result.message)})
+        messages.append({"role": "user", "content": _transcript_message(tool_result)})
         clipboard = _clipboard_message(tool_call, tool_result)
         if clipboard is not None:
             messages.append({"role": "assistant", "content": clipboard})
 
 
 _MESSAGE_LIMIT_CHARS = 500
+
+
+def _transcript_message(tool_result: ToolResult) -> str:
+    message = tool_result.message or ""
+    # ponytail: only failed-step spam is capped — successful messages can be data (e.g. clipboard reads)
+    return message if tool_result.success else _truncated(message)
 
 
 def _truncated(text: str) -> str:
