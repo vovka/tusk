@@ -56,4 +56,5 @@ class ToolRegistry:
             source=getattr(tool, "source", "kernel"),
             planner_visible=getattr(tool, "planner_visible", True),
             sequence_callable=getattr(tool, "sequence_callable", False),
+            settle_ms=getattr(tool, "settle_ms", 0),
         )

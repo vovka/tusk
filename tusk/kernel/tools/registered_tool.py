@@ -15,3 +15,4 @@ class RegisteredTool:
     source: str
     planner_visible: bool = True
     sequence_callable: bool = False
+    settle_ms: int = 0
