@@ -52,8 +52,10 @@ class KernelAPI:
         with self._submit_lock:
             self._log_input(text)
             attributes = {"request_id": uuid.uuid4().hex, "text_preview": text[:_TEXT_PREVIEW_CHARS]}
-            with self._tracer.span("kernel.request", attributes):
-                return self._reported_route(text)
+            with self._tracer.span("kernel.request", attributes) as span:
+                response = self._reported_route(text)
+                span.set_attribute("handled", str(response.handled))
+                return response
 
     def _reported_route(self, text: str) -> KernelResponse:
         if self._submit_reporter is None:

@@ -19,6 +19,13 @@ def test_submit_opens_root_span_with_request_id() -> None:
     assert len(attributes["request_id"]) == 32
 
 
+def test_submit_records_handled_on_the_request_span() -> None:
+    tracer = RecordingTracer()
+    kernel = KernelAPI(_command_mode(), None, tracer=tracer)
+    kernel.submit("open gedit")
+    assert tracer.spans[0]["attributes"]["handled"] == "True"
+
+
 def test_submit_generates_distinct_request_ids() -> None:
     tracer = RecordingTracer()
     kernel = KernelAPI(_command_mode(), None, tracer=tracer)

@@ -1,3 +1,5 @@
+import atexit
+
 from tusk.shared.tracing.interfaces.tracer import Tracer
 from tusk.shared.tracing.null_tracer import NullTracer
 from tusk.shared.tracing.otel_tracer import OTelTracer
@@ -13,7 +15,6 @@ class TracerFactory:
 
     def _build_otel_tracer(self, otlp_endpoint: str, service_name: str) -> object:
         # imported lazily so the SDK is only required when tracing is enabled
-        from opentelemetry import trace
         from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
         from opentelemetry.sdk.resources import Resource
         from opentelemetry.sdk.trace import TracerProvider
@@ -21,4 +22,6 @@ class TracerFactory:
 
         provider = TracerProvider(resource=Resource.create({"service.name": service_name}))
         provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=otlp_endpoint)))
+        # flush spans still buffered in the batch processor when the app exits
+        atexit.register(provider.shutdown)
         return provider.get_tracer(service_name)

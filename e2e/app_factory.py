@@ -6,6 +6,7 @@ from tusk.shared.config import Config, StartupOptions
 from tusk.shared.interrupt import InterruptToken
 from tusk.shared.llm import LLMRegistry
 from tusk.shared.logging import ColorLogPrinter
+from tusk.shared.tracing.null_tracer import NullTracer
 
 __all__ = ["build_app"]
 
@@ -16,7 +17,7 @@ def build_app() -> tuple[KernelAPI, InterruptToken, ColorLogPrinter]:
     config = Config.from_env()
     log = ColorLogPrinter(options.log_groups, options.hidden_groups)
     token = InterruptToken()
-    registry = app_main._build_llm_registry(config, log, options, token)
+    registry = app_main._build_llm_registry(config, log, options, token, NullTracer())
     return _kernel(config, log, registry, token), token, log
 
 
