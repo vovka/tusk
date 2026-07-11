@@ -26,6 +26,11 @@ def test_command_wildcard_excludes_hidden_adapter_internals() -> None:
     assert _builder_with_hidden().runtime_names(_profile(), request) == {"gnome.press_keys"}
 
 
+def test_delegated_command_profile_does_not_expand_wildcard() -> None:
+    request = AgentRunRequest("x", "command", runtime_tool_names=("*",), parent_call_id="call-1")
+    assert _builder().runtime_names(_profile(), request) == set()
+
+
 def _profile() -> AgentProfile:
     return AgentProfile("command", types.SimpleNamespace(label="llm"), "prompt", ("run_agent",), ("*",), 8)
 
