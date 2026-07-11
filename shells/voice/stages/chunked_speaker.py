@@ -46,6 +46,8 @@ class ChunkedSpeaker:
 
     def _play_clips(self, clips: Iterator[bytes], text: str) -> None:
         for wav_clip in clips:
+            if self._interrupted():
+                return
             self._current_text = text
             self._playback.play(wav_clip)
             if self._interrupted():

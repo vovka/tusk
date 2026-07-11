@@ -112,6 +112,15 @@ def _interrupting_playback(played: list[bytes], token: object) -> object:
     return types.SimpleNamespace(play=play)
 
 
+def test_no_playback_when_interrupt_already_pending() -> None:
+    token = types.SimpleNamespace(is_interrupted=True)
+    played: list[bytes] = []
+    engine = types.SimpleNamespace(synthesize_chunks=lambda text: iter([b"one", b"two"]))
+    log = types.SimpleNamespace(log=lambda *args: None)
+    ChunkedSpeaker(engine, types.SimpleNamespace(play=played.append), log, token).speak("hi")
+    assert played == []
+
+
 def test_interrupt_stops_playback_and_further_synthesis() -> None:
     token = types.SimpleNamespace(is_interrupted=False)
     played: list[bytes] = []

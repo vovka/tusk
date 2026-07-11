@@ -91,8 +91,8 @@ class CommandWorker:
         self._speaker.speak(spoken)
 
     def _reply_for(self, response: KernelResponse) -> str:
-        # an interrupt during the run means the user wants silence: confirm briefly, never read a stale reply
-        if self._token.is_interrupted:
-            self._token.clear()
-            return "Stopped."
+        # the kernel run is interrupt-aware and already replies "Stopped." when it actually cancels;
+        # trust it so a stop that lands after a command ran doesn't falsely confirm cancellation.
+        # clearing the token keeps the reply from self-interrupting its own playback.
+        self._token.clear()
         return getattr(response, "reply", "")
