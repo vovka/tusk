@@ -23,6 +23,21 @@ def test_gnome_manifest_marks_sequence_callable_tools() -> None:
     assert marked == _GNOME_SEQUENCE_TOOLS
 
 
+def test_gnome_manifest_gives_launch_tools_a_settle_pause() -> None:
+    flags = _tool_flags("gnome")
+    settled = {name: entry["settle_ms"] for name, entry in flags.items() if "settle_ms" in entry}
+    assert settled == {"launch_application": 2000, "open_uri": 2000}
+
+
+def test_register_passes_settle_ms_to_proxies() -> None:
+    registered: list[object] = []
+    registry = types.SimpleNamespace(register=registered.append)
+    manager = AdapterManager("adapters", registry, types.SimpleNamespace(log=lambda *a: None))
+    manifest = {"name": "demo", "tools": {"launcher": {"settle_ms": 1500}}}
+    manager._register("demo", types.SimpleNamespace(), manifest, [_schema("launcher")])
+    assert registered[0].settle_ms == 1500
+
+
 def test_dictation_manifest_hides_lifecycle_tools() -> None:
     flags = _tool_flags("dictation")
     hidden = {name for name, entry in flags.items() if entry.get("planner_visible") is False}

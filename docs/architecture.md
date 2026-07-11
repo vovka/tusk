@@ -678,12 +678,14 @@ JSON-RPC request loop.
 | `transport` | `str` | yes | Must be `"stdio"` (HTTP not implemented) |
 | `entry` | `str` | yes | Shell command to start the server (e.g. `"python server.py"`) |
 | `provides_context` | `bool` | no | If true, this adapter becomes the primary desktop source |
-| `tools` | `object` | no | Per-tool flags: `planner_visible`, `sequence_callable` |
+| `tools` | `object` | no | Per-tool flags: `planner_visible`, `sequence_callable`, `settle_ms` |
 
 Per-tool flags are declared in the manifest, not in kernel code. The gnome manifest marks
-window/input/mouse/`write_clipboard` tools `sequence_callable`; `launch_application` and
-`open_uri` are excluded because their success does not guarantee dependent UI state is
-ready, and read-only inspection tools are excluded as pointless in a compiled plan. The
+window/input/mouse/`write_clipboard` tools `sequence_callable`, plus `launch_application`
+and `open_uri` with `settle_ms: 2000` — their success only means the launch was dispatched,
+so the sequence `Executor` pauses that long after them (skipped on the last step) before
+running dependent steps; read-only inspection tools are excluded as pointless in a compiled
+plan. The
 dictation/coding manifests hide their session tools from the planner
 (`planner_visible=false`) — they are driven by kernel tools and routers instead.
 

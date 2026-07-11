@@ -7,10 +7,12 @@
   "provides_context": true,
   "tools": {
     "launch_application": {
-      "sequence_callable": true
+      "sequence_callable": true,
+      "settle_ms": 2000
     },
     "open_uri": {
-      "sequence_callable": true
+      "sequence_callable": true,
+      "settle_ms": 2000
     },
     "close_window": {
       "sequence_callable": true
