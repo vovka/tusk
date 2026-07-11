@@ -97,4 +97,5 @@ class AdapterManager:
             name, tool, client,
             planner_visible=flags.get("planner_visible", True),
             sequence_callable=flags.get("sequence_callable", False),
+            settle_ms=flags.get("settle_ms", 0),
         )

@@ -6,7 +6,7 @@ __all__ = ["MCPToolProxy"]
 class MCPToolProxy:
     def __init__(
         self, source: str, schema: object, client: object,
-        planner_visible: bool = True, sequence_callable: bool = False,
+        planner_visible: bool = True, sequence_callable: bool = False, settle_ms: int = 0,
     ) -> None:
         self.name = f"{source}.{schema.name}"
         self.description = schema.description
@@ -14,6 +14,7 @@ class MCPToolProxy:
         self.source = source
         self.planner_visible = planner_visible
         self.sequence_callable = sequence_callable
+        self.settle_ms = settle_ms
         self._tool_name = schema.name
         self._client = client
 

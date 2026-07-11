@@ -47,7 +47,7 @@ class AgentOrchestrator:
         self._planner_results = ResultValidator(log)
         self._resolved_tools = RuntimeToolResolver(store)
         self._tools = AgentToolsetBuilder(registry)
-        sequence_executor = Executor(registry, store, token, tracer)
+        sequence_executor = Executor(registry, store, token, tracer=tracer)
         self._dispatcher = OrchestratorToolDispatcher(registry, self._catalog, sequence_executor, tracer=tracer)
 
     def run(self, request: AgentRunRequest) -> AgentResult:
