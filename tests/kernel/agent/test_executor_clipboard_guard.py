@@ -1,8 +1,17 @@
 import types
 
 from tests.kernel_api_support import make_agent, make_registry_tool
+from tusk.kernel.agent.guards.executor_clipboard_guard import ExecutorClipboardGuard
 from tusk.shared.schemas.tools.tool_call import ToolCall
+from tusk.shared.schemas.tools.tool_result import ToolResult
 from tusk.kernel.tools.tool_registry import ToolRegistry
+
+
+def test_clipboard_guard_also_covers_the_command_profile() -> None:
+    guard = ExecutorClipboardGuard()
+    guard.observe(ToolCall("gnome.write_clipboard", {"text": "poem"}, "c1"), ToolResult(True, "ok"))
+    violation = guard.violation("command", ToolCall("gnome.press_keys", {"keys": "<ctrl>c"}, "c2"))
+    assert violation is not None and "before paste" in violation
 
 
 def test_executor_blocks_clipboard_rewrite_before_paste() -> None:

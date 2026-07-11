@@ -12,7 +12,10 @@ def _orchestrator(requests: list[AgentRunRequest]) -> types.SimpleNamespace:
 
 
 def _store(events: list[tuple[str, str, dict]]) -> types.SimpleNamespace:
-    return types.SimpleNamespace(append_event=lambda session_id, name, data: events.append((session_id, name, data)))
+    return types.SimpleNamespace(
+        append_event=lambda session_id, name, data: events.append((session_id, name, data)),
+        create_session_id=lambda: "seeded-session",
+    )
 
 
 def _agent(requests: list[AgentRunRequest], events: list | None = None) -> MainAgent:
@@ -50,10 +53,28 @@ def test_fast_command_appends_exchange_to_conversation_session() -> None:
     assert ("conv-1", "assistant", "[did: opened gedit]") in lines
 
 
-def test_fast_command_skips_history_share_without_conversation_session() -> None:
+def test_fast_command_seeds_conversation_session_when_none_exists() -> None:
     events: list[tuple[str, str, dict]] = []
     _agent([], events).process_command("open gedit", "command")
-    assert events == []
+    lines = [(sid, data["role"], data["content"]) for sid, name, data in events]
+    assert ("seeded-session", "user", "open gedit") in lines
+    assert ("seeded-session", "assistant", "[did: opened gedit]") in lines
+
+
+def test_fast_command_without_store_does_not_share() -> None:
+    reply = _agent([]).process_command("open gedit", "command")
+    assert reply == "opened gedit"
+
+
+def test_first_command_then_conversation_resumes_seeded_session() -> None:
+    from tusk.kernel.agent.backends import AgentRequest
+
+    requests: list[AgentRunRequest] = []
+    agent = _agent(requests, [])
+    agent.run(AgentRequest("open gedit", "command", ""))
+    agent.run(AgentRequest("what did you open?", "conversation", ""))
+    conversation = next(request for request in requests if request.profile_id == "conversation")
+    assert conversation.session_id == "seeded-session"
 
 
 def test_run_command_preserves_conversation_session_for_sharing() -> None:

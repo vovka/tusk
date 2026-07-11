@@ -10,12 +10,12 @@ class ExecutorClipboardGuard:
         self._text = ""
 
     def violation(self, profile_id: str, tool_call: ToolCall) -> str | None:
-        if profile_id != "executor" or not self._dirty or tool_call.tool_name == "done":
+        if profile_id not in ("executor", "command") or not self._dirty or tool_call.tool_name == "done":
             return None
         if tool_call.tool_name == "gnome.write_clipboard":
             return self._write_violation(tool_call)
         if self._is_copy(tool_call):
-            return "executor must not copy to clipboard again before paste"
+            return "agent must not copy to clipboard again before paste"
         return None
 
     def observe(self, tool_call: ToolCall, tool_result: ToolResult) -> None:
@@ -33,8 +33,8 @@ class ExecutorClipboardGuard:
     def _write_violation(self, tool_call: ToolCall) -> str:
         text = str(tool_call.parameters.get("text", ""))
         if self._text and text != self._text:
-            return "executor must not change clipboard text before paste"
-        return "executor must not copy to clipboard again before paste"
+            return "agent must not change clipboard text before paste"
+        return "agent must not copy to clipboard again before paste"
 
     def _is_copy(self, tool_call: ToolCall) -> bool:
         if tool_call.tool_name != "gnome.press_keys":

@@ -18,8 +18,9 @@ class MainAgent(AgentBackend):
         self._session_id = ""
 
     def run(self, request: AgentRequest) -> BackendAgentResult:
-        # a one-shot command must not overwrite the conversation session it is shared into
-        if request.mode != "command":
+        # keep our conversation session unless a non-empty one is supplied; a one-shot
+        # command must not wipe the session its summary is shared into
+        if request.mode != "command" and request.session_id:
             self._session_id = request.session_id
         reply = self.process_command(request.user_text, request.mode)
         return BackendAgentResult(True, reply, self._session_id)
@@ -47,9 +48,11 @@ class MainAgent(AgentBackend):
         return reply
 
     def _share_with_conversation(self, command: str, reply: str) -> None:
-        # one plain line per side keeps the conversation agent aware of fast-path commands
-        if self._store is None or not self._session_id:
+        # seed a conversation session if none exists yet so a first-turn command is remembered
+        if self._store is None:
             return
+        if not self._session_id:
+            self._session_id = self._store.create_session_id()
         self._append_line("user", command)
         self._append_line("assistant", f"[did: {reply}]" if reply else "[did: completed]")
 

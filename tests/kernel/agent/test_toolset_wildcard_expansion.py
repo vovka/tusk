@@ -14,6 +14,18 @@ def _builder() -> AgentToolsetBuilder:
     return AgentToolsetBuilder(registry)
 
 
+def _builder_with_hidden() -> AgentToolsetBuilder:
+    registry = ToolRegistry()
+    registry.register(make_registry_tool("gnome.press_keys", "pressed"))
+    registry.register(make_registry_tool("dictation.start_dictation", "started", planner_visible=False))
+    return AgentToolsetBuilder(registry)
+
+
+def test_command_wildcard_excludes_hidden_adapter_internals() -> None:
+    request = AgentRunRequest("start dictation", "command", runtime_tool_names=("*",))
+    assert _builder_with_hidden().runtime_names(_profile(), request) == {"gnome.press_keys"}
+
+
 def _profile() -> AgentProfile:
     return AgentProfile("command", types.SimpleNamespace(label="llm"), "prompt", ("run_agent",), ("*",), 8)
 

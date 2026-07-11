@@ -44,10 +44,11 @@ class AgentToolsetBuilder:
             tools.extend(self._registry.definitions_for(names))
 
     def _filter_runtime(self, names: tuple[str, ...], profile: AgentProfile) -> set[str]:
-        real = self._registry.real_tool_names()
-        # only the top-level command fast path may request every tool; children stay narrowed
+        # only the top-level command fast path may request every tool, and only the
+        # agent-visible ones — never planner_visible=False adapter internals; children stay narrowed
         if "*" in names and profile.profile_id == "command":
-            return set(real)
+            return {tool.name for tool in self._registry.planner_tools()}
+        real = self._registry.real_tool_names()
         return {name for name in names if name in real}
 
     def _done_tool(self, profile: AgentProfile) -> dict[str, object]:
