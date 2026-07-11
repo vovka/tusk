@@ -12,6 +12,7 @@ class Config:
     gatekeeper_llm: LLMSlotConfig
     stop_gate_llm: LLMSlotConfig
     conversation_agent_llm: LLMSlotConfig
+    command_agent_llm: LLMSlotConfig
     planner_agent_llm: LLMSlotConfig
     executor_agent_llm: LLMSlotConfig
     default_agent_llm: LLMSlotConfig

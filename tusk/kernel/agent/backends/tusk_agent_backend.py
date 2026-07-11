@@ -36,6 +36,6 @@ class TuskAgentBackend(AgentBackend):
         return result
 
     def _result(self, request: AgentRequest) -> AgentResult:
-        reply = self._agent.process_command(request.user_text)
+        reply = self._agent.process_command(request.user_text, request.mode)
         metadata = {**(request.metadata or {}), "backend": self.name, "mode": request.mode}
         return AgentResult(True, reply, request.session_id, metadata)

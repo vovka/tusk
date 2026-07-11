@@ -17,7 +17,7 @@ def test_concurrent_submits_do_not_overlap() -> None:
 
 
 def _slow_command_mode(events: list[str]) -> object:
-    def process_command(text: str) -> object:
+    def process_command(text: str, kind: str = "conversation") -> object:
         events.append("enter")
         time.sleep(0.05)
         events.append("exit")

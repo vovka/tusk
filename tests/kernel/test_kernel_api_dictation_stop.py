@@ -56,7 +56,7 @@ def _submit(text: str) -> tuple[KernelResponse, list[str]]:
 
 
 def _command_mode() -> object:
-    return types.SimpleNamespace(process_command=lambda text: KernelResponse(True, text))
+    return types.SimpleNamespace(process_command=lambda text, kind="conversation": KernelResponse(True, text))
 
 
 def _dictation_mode(actions: list[str]) -> object:

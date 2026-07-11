@@ -38,6 +38,7 @@ def _register_slots(factory: ConfigurableLLMFactory, config: Config, log: ColorL
     registry.register_slot("gatekeeper", _slot_proxy(factory, config.gatekeeper_llm, log, "gatekeeper", options, tracer))
     registry.register_slot("stop_gate", _slot_proxy(factory, config.stop_gate_llm, log, "stop_gate", options, tracer))
     registry.register_slot("conversation_agent", _slot_proxy(factory, config.conversation_agent_llm, log, "conversation_agent", options, tracer, token))
+    registry.register_slot("command_agent", _slot_proxy(factory, config.command_agent_llm, log, "command_agent", options, tracer, token))
     registry.register_slot("planner_agent", _slot_proxy(factory, config.planner_agent_llm, log, "planner_agent", options, tracer, token))
     registry.register_slot("executor_agent", _slot_proxy(factory, config.executor_agent_llm, log, "executor_agent", options, tracer, token))
     registry.register_slot("default_agent", _slot_proxy(factory, config.default_agent_llm, log, "default_agent", options, tracer, token))

@@ -31,7 +31,7 @@ def build_api(agent: MainAgent, config: Config, log: ColorLogPrinter, llm_regist
 def build_agent(config: Config, log: ColorLogPrinter, llm_registry: LLMRegistry, tool_registry: ToolRegistry, history: ConversationHistory, token: InterruptToken | None = None, tracer: Tracer | None = None) -> MainAgent:
     store = FileStore(config.agent_session_log_dir)
     profiles = build_agent_profiles(llm_registry)
-    return MainAgent(AgentOrchestrator(profiles, tool_registry, store, log, token, tracer), history)
+    return MainAgent(AgentOrchestrator(profiles, tool_registry, store, log, token, tracer), history, store)
 
 
 def build_adapter_manager(config: Config, log: ColorLogPrinter, tool_registry: ToolRegistry) -> AdapterManager:

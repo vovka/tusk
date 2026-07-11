@@ -5,5 +5,5 @@ __all__ = ["Agent"]
 
 class Agent(ABC):
     @abstractmethod
-    def process_command(self, command: str) -> str:
+    def process_command(self, command: str, kind: str = "conversation") -> str:
         ...

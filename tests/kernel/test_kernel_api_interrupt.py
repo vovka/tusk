@@ -21,5 +21,5 @@ def test_interrupt_token_is_exposed() -> None:
 
 
 def _kernel(token: InterruptToken | None) -> KernelAPI:
-    command_mode = types.SimpleNamespace(process_command=lambda text: None)
+    command_mode = types.SimpleNamespace(process_command=lambda text, kind="conversation": None)
     return KernelAPI(command_mode, llm_registry=None, interrupt_token=token)

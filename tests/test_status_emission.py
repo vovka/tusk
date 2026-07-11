@@ -22,14 +22,14 @@ def _hub() -> tuple[StatusReporterHub, list]:
 def test_kernel_submit_emits_reacting_then_restores_prior_status() -> None:
     hub, published = _hub()
     hub.set_status(AppStatus.LISTENING)
-    command_mode = types.SimpleNamespace(process_command=lambda text: KernelResponse(True, "ok"))
+    command_mode = types.SimpleNamespace(process_command=lambda text, kind="conversation": KernelResponse(True, "ok"))
     KernelAPI(command_mode, types.SimpleNamespace(), None, hub).submit("open Firefox")
     assert [s.status for s in published] == [AppStatus.LISTENING, AppStatus.REACTING, AppStatus.LISTENING]
 
 
 def test_start_and_stop_dictation_toggle_mode() -> None:
     hub, _ = _hub()
-    api = KernelAPI(types.SimpleNamespace(process_command=lambda t: None), types.SimpleNamespace(), None, hub)
+    api = KernelAPI(types.SimpleNamespace(process_command=lambda t, kind="conversation": None), types.SimpleNamespace(), None, hub)
     api.start_dictation(types.SimpleNamespace())
     assert hub.status == AppStatus.STARTING and _mode(hub) == AppMode.DICTATION
     api.stop_dictation()
@@ -39,7 +39,7 @@ def test_start_and_stop_dictation_toggle_mode() -> None:
 def test_pipeline_emits_listening_then_reacting_around_submit() -> None:
     hub, published = _hub()
     pipeline = _pipeline(hub)
-    list(pipeline.run(lambda text, refrain="": KernelResponse(True, "done")))
+    list(pipeline.run(lambda text, refrain="", kind="conversation": KernelResponse(True, "done")))
     assert [s.status for s in published] == [AppStatus.LISTENING, AppStatus.REACTING, AppStatus.LISTENING]
 
 
@@ -134,7 +134,7 @@ class _BlockingCommandMode:
         self.release = threading.Event()
         self.calls = 0
 
-    def process_command(self, text: str) -> KernelResponse:
+    def process_command(self, text: str, kind: str = "conversation") -> KernelResponse:
         self.calls += 1
         if text == "first":
             self.started.set()

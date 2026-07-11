@@ -25,7 +25,7 @@ class AgentToolsetBuilder:
         if not profile.runtime_allowed_tool_names:
             return set()
         if "*" in profile.runtime_allowed_tool_names:
-            return self._filter_runtime(request.runtime_tool_names)
+            return self._filter_runtime(request.runtime_tool_names, request)
         return set(profile.runtime_allowed_tool_names)
 
     def _add_static_tools(self, tools: list[dict[str, object]], profile: AgentProfile, request: AgentRunRequest) -> None:
@@ -43,7 +43,11 @@ class AgentToolsetBuilder:
         if names:
             tools.extend(self._registry.definitions_for(names))
 
-    def _filter_runtime(self, names: tuple[str, ...]) -> set[str]:
+    def _filter_runtime(self, names: tuple[str, ...], request: AgentRunRequest) -> set[str]:
+        # only the kernel-minted gate command may request every visible (planner-visible) tool;
+        # a delegated or recovered child never carries gate_command, so it stays narrowed
+        if "*" in names and request.gate_command:
+            return {tool.name for tool in self._registry.planner_tools()}
         real = self._registry.real_tool_names()
         return {name for name in names if name in real}
 

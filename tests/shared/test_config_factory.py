@@ -7,6 +7,19 @@ def test_config_reads_conversation_agent_llm(monkeypatch) -> None:
     assert ConfigFactory().build().conversation_agent_llm.model == "my-model"
 
 
+def test_config_reads_command_agent_llm(monkeypatch) -> None:
+    monkeypatch.setenv("GROQ_API_KEY", "test-key")
+    monkeypatch.setenv("COMMAND_AGENT_LLM", "groq/command-model")
+    assert ConfigFactory().build().command_agent_llm.model == "command-model"
+
+
+def test_config_falls_back_to_agent_llm_for_command_agent(monkeypatch) -> None:
+    monkeypatch.setenv("GROQ_API_KEY", "test-key")
+    monkeypatch.setenv("AGENT_LLM", "groq/fallback-model")
+    monkeypatch.delenv("COMMAND_AGENT_LLM", raising=False)
+    assert ConfigFactory().build().command_agent_llm.model == "fallback-model"
+
+
 def test_config_reads_stop_gate_llm(monkeypatch) -> None:
     monkeypatch.setenv("GROQ_API_KEY", "test-key")
     monkeypatch.setenv("STOP_GATE_LLM", "groq/stop-model")

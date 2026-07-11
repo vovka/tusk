@@ -6,7 +6,7 @@ from tusk.shared.schemas.kernel_response import KernelResponse
 
 
 def _command_mode() -> object:
-    return types.SimpleNamespace(process_command=lambda text: KernelResponse(True, "done"))
+    return types.SimpleNamespace(process_command=lambda text, kind="conversation": KernelResponse(True, "done"))
 
 
 def test_submit_opens_root_span_with_request_id() -> None:

@@ -40,10 +40,10 @@ class VoiceShell:
         self._log = log_printer
         self._running = True
 
-    def start(self, submit: Callable[[str], KernelResponse]) -> None:
+    def start(self, submit: Callable[..., KernelResponse]) -> None:
         if self._worker is not None:
             self._worker.start()
-        target = self._worker.enqueue if self._worker is not None else lambda text, refrain="": submit(text)
+        target = self._worker.enqueue if self._worker is not None else lambda text, refrain="", kind="conversation": submit(text, kind)
         for result in self._pipeline.run(target):
             if not self._running:
                 return

@@ -43,6 +43,7 @@ def make_agent(
 def _llm_map(llm: object, planner: object | None, executor: object | None, default: object | None) -> dict[str, object]:
     return {
         "conversation_agent": llm,
+        "command_agent": llm,
         "planner_agent": planner or llm,
         "executor_agent": executor or llm,
         "default_agent": default or llm,

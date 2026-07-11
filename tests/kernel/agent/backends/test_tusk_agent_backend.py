@@ -6,10 +6,10 @@ from tusk.kernel.agent.backends.tusk_agent_backend import TuskAgentBackend
 
 class RecordingAgent:
     def __init__(self) -> None:
-        self.commands: list[str] = []
+        self.commands: list[tuple[str, str]] = []
 
-    def process_command(self, command: str) -> str:
-        self.commands.append(command)
+    def process_command(self, command: str, kind: str = "conversation") -> str:
+        self.commands.append((command, kind))
         return "Done."
 
 
@@ -23,7 +23,7 @@ def test_tusk_agent_backend_normalizes_legacy_reply() -> None:
     agent = RecordingAgent()
     request = AgentRequest("open browser", "command", "session-1", metadata={"trace_id": "abc"})
     result = TuskAgentBackend(agent).run(request)
-    assert agent.commands == ["open browser"]
+    assert agent.commands == [("open browser", "command")]
     assert result.status == "success"
     assert result.final_text == "Done."
     assert result.reply == "Done."
@@ -43,7 +43,7 @@ def test_tusk_agent_backend_rejects_missing_request() -> None:
 
 def test_tusk_agent_backend_lets_programmer_errors_surface() -> None:
     class BrokenAgent:
-        def process_command(self, command: str) -> str:
+        def process_command(self, command: str, kind: str = "conversation") -> str:
             raise RuntimeError("boom")
 
     with pytest.raises(RuntimeError, match="boom"):

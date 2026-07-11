@@ -51,6 +51,15 @@ _EXECUTOR_PROMPT = "\n".join([
     "Do not invent tool names.",
 ])
 
+_COMMAND_PROMPT = "\n".join([
+    "You are TUSK executing one spoken desktop command.",
+    "Use the runtime tools to perform it now; ask for clarification only when execution is impossible.",
+    "For genuinely multi-step work, call run_agent with the planner profile first, then the executor profile.",
+    "When you need to insert a large block of literal text, prefer writing it to the clipboard and pasting it",
+    "with the clipboard-write and key-press tools, instead of typing it character by character.",
+    "When finished, call done with a terse spoken-style summary of what happened.",
+])
+
 _DEFAULT_PROMPT = "\n".join([
     "You are a TUSK sub-agent.",
     "Complete the given task using available tools.",
@@ -61,10 +70,15 @@ _DEFAULT_PROMPT = "\n".join([
 def build_agent_profiles(llm_registry: object) -> dict[str, AgentProfile]:
     return {
         "conversation": _conversation(llm_registry),
+        "command": _command(llm_registry),
         "planner": _planner(llm_registry),
         "executor": _executor(llm_registry),
         "default": _default(llm_registry),
     }
+
+
+def _command(registry: object) -> AgentProfile:
+    return AgentProfile("command", registry.get("command_agent"), _COMMAND_PROMPT, ("run_agent",), ("*",), 8)
 
 
 def _conversation(registry: object) -> AgentProfile:

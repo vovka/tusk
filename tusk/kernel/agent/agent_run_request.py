@@ -17,3 +17,4 @@ class AgentRunRequest:
     execution_mode: str = "normal"
     sequence_plan: ToolSequencePlan | None = None
     metadata: dict[str, object] = field(default_factory=dict)
+    gate_command: bool = False

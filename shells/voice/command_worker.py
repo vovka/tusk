@@ -15,7 +15,7 @@ class CommandWorker:
 
     def __init__(
         self,
-        submit: Callable[[str], KernelResponse],
+        submit: Callable[[str, str], KernelResponse],
         speaker: ChunkedSpeaker,
         log_printer: LogPrinter,
         interrupt_token: InterruptToken,
@@ -26,15 +26,15 @@ class CommandWorker:
         self._log = log_printer
         self._token = interrupt_token
         self._ack_enabled = ack_enabled
-        self._queue: queue.Queue[tuple[str, str]] = queue.Queue()
+        self._queue: queue.Queue[tuple[str, str, str]] = queue.Queue()
         self._busy = threading.Event()
 
     def start(self) -> None:
         # ponytail: daemon thread, no shutdown protocol — the app runs until process exit
         threading.Thread(target=self._run, daemon=True).start()
 
-    def enqueue(self, text: str, refrain: str = "") -> None:
-        self._queue.put((text, refrain))
+    def enqueue(self, text: str, refrain: str = "", kind: str = "conversation") -> None:
+        self._queue.put((text, refrain, kind))
 
     def flush(self) -> None:
         while True:
@@ -53,28 +53,28 @@ class CommandWorker:
 
     def _run(self) -> None:
         while True:
-            text, refrain = self._queue.get()
+            text, refrain, kind = self._queue.get()
             self._busy.set()
             try:
-                self._execute(text, refrain)
+                self._execute(text, refrain, kind)
             except Exception as exc:
                 self._log.log("ERROR", f"command failed: {exc}")
             finally:
                 self._busy.clear()
 
-    def _execute(self, text: str, refrain: str) -> None:
+    def _execute(self, text: str, refrain: str, kind: str) -> None:
         self._token.clear()
-        response = self._submitted_over_ack(text, refrain)
+        response = self._submitted_over_ack(text, refrain, kind)
         reply = self._reply_for(response)
         if reply:
             self._log.log("TUSK", reply)
             self._speaker.speak(reply)
 
-    def _submitted_over_ack(self, text: str, refrain: str) -> KernelResponse:
+    def _submitted_over_ack(self, text: str, refrain: str, kind: str) -> KernelResponse:
         # the ack plays over the kernel run; a stop during it lands via the interrupt token
         ack_playback = self._start_announce(refrain)
         try:
-            return self._submit(text)
+            return self._submit(text, kind)
         finally:
             ack_playback.join()
 

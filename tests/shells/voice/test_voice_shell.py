@@ -11,7 +11,7 @@ def test_voice_shell_logs_reply_from_submitter(monkeypatch) -> None:
     monkeypatch.setattr(voice_shell, "VoicePipeline", lambda *args: _pipeline())
     log = types.SimpleNamespace(log=lambda *args: logged.append(args))
     shell = voice_shell.VoiceShell(_config(), log, stt_engine=object(), gatekeeper=object())
-    shell.start(lambda text: KernelResponse(True, f"Hello from TUSK: {text}"))
+    shell.start(lambda text, kind="conversation": KernelResponse(True, f"Hello from TUSK: {text}"))
     assert logged == [("TUSK", "Hello from TUSK: open Firefox")]
 
 

@@ -71,11 +71,11 @@ def _sanitizer() -> object:
 
 
 def _submitter(submits: list[str]) -> object:
-    return lambda text, refrain="": submits.append(text) or KernelResponse(True, "done")
+    return lambda text, refrain="", kind="conversation": submits.append(text) or KernelResponse(True, "done")
 
 
 def _refrain_submitter(forwarded: list[tuple[str, str]]) -> object:
-    return lambda text, refrain="": forwarded.append((text, refrain)) or KernelResponse(True, "done")
+    return lambda text, refrain="", kind="conversation": forwarded.append((text, refrain)) or KernelResponse(True, "done")
 
 
 def _transcriber(text: str) -> object:

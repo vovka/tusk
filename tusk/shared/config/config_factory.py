@@ -48,6 +48,7 @@ class ConfigFactory:
         return {
             **self._gate_llm_slots(),
             "conversation_agent_llm": self._slot("CONVERSATION_AGENT_LLM", agent),
+            "command_agent_llm": self._slot("COMMAND_AGENT_LLM", agent),
             "planner_agent_llm": self._slot("PLANNER_AGENT_LLM", os.environ.get("PLANNER_LLM", "groq/openai/gpt-oss-20b")),
             "executor_agent_llm": self._slot("EXECUTOR_AGENT_LLM", agent),
             "default_agent_llm": self._slot("DEFAULT_AGENT_LLM", agent),
@@ -55,10 +56,8 @@ class ConfigFactory:
         }
 
     def _gate_llm_slots(self) -> dict:
-        return {
-            "gatekeeper_llm": self._slot("GATEKEEPER_LLM", "groq/llama-3.1-8b-instant"),
-            "stop_gate_llm": self._slot("STOP_GATE_LLM", "groq/llama-3.3-70b-versatile"),
-        }
+        return {"gatekeeper_llm": self._slot("GATEKEEPER_LLM", "groq/llama-3.1-8b-instant"),
+                "stop_gate_llm": self._slot("STOP_GATE_LLM", "groq/llama-3.3-70b-versatile")}
 
     def _runtime_values(self, shells: str) -> dict:
         return {
