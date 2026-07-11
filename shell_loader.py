@@ -79,8 +79,9 @@ class ShellLoader:
         return request_interrupt
 
     def _gatekeeper(self, worker: CommandWorker) -> GatekeeperSlot:
-        gk_llm = self._kernel.get_llm_registry().get("gatekeeper")
-        stop_llm = self._kernel.get_llm_registry().get_with_fallback("stop_gate", "gatekeeper")
+        registry = self._kernel.get_llm_registry()
+        gk_llm = registry.get("gatekeeper") if registry else None
+        stop_llm = registry.get_with_fallback("stop_gate", "gatekeeper") if registry else None
         llm_gk = LLMGatekeeper(
             gk_llm, self._log, follow_up_window_seconds=self._config.follow_up_timeout_seconds,
             is_busy=lambda: worker.is_busy, current_speech_text=lambda: worker.current_speech_text,

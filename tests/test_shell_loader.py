@@ -20,11 +20,8 @@ def _loader(shells: list[str], log: object | None = None, tts_enabled: bool = Fa
     return ShellLoader(config, kernel, log or types.SimpleNamespace(log=lambda *a: None), reporter=object())
 
 
-def test_orders_tray_last_regardless_of_env_position() -> None:
+def test_ordering_puts_tray_last_without_disturbing_the_rest() -> None:
     assert _loader(["tray", "cli", "voice"])._ordered_names() == ["cli", "voice", "tray"]
-
-
-def test_no_tray_keeps_original_order() -> None:
     assert _loader(["voice", "cli"])._ordered_names() == ["voice", "cli"]
 
 
@@ -79,9 +76,15 @@ def test_gatekeeper_wiring_resolves_stop_gate_slot_with_fallback() -> None:
     assert ("fallback", "stop_gate", "gatekeeper") in requested
 
 
+def test_gatekeeper_tolerates_missing_registry() -> None:
+    loader = _loader(["voice"])
+    loader._kernel = _mode_kernel([])
+    loader._kernel.get_llm_registry = lambda: None
+    loader._gatekeeper(types.SimpleNamespace(is_busy=False, current_speech_text=None))
+
+
 def test_registry_resolves_every_shell_without_manifests() -> None:
-    loader = _loader(["cli"])
-    names = {name: loader._load_class(name).__name__ for name in ("cli", "emulator", "tray", "voice")}
+    names = {name: _loader(["cli"])._load_class(name).__name__ for name in ("cli", "emulator", "tray", "voice")}
     assert names == {"cli": "CLIShell", "emulator": "EmulatorShell", "tray": "TrayShell", "voice": "VoiceShell"}
 
 
@@ -118,8 +121,7 @@ def _built_voice_shell(monkeypatch, requested: list[bool]) -> object:
 
 
 def _patch_stt(monkeypatch, engine: object) -> None:
-    factory = lambda key, size: types.SimpleNamespace(create=lambda name: engine)
-    monkeypatch.setattr(shell_loader, "STTEngineFactory", factory)
+    monkeypatch.setattr(shell_loader, "STTEngineFactory", lambda key, size: types.SimpleNamespace(create=lambda name: engine))
 
 
 def _voice_class() -> object:
