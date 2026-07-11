@@ -71,9 +71,9 @@ def test_gatekeeper_wiring_resolves_stop_gate_slot_with_fallback() -> None:
     loader = _loader(["voice"])
     loader._kernel = _mode_kernel(requested)
     worker = types.SimpleNamespace(is_busy=False, current_speech_text=None)
-    loader._gatekeeper(worker)
-    assert ("get", "gatekeeper") in requested
-    assert ("fallback", "stop_gate", "gatekeeper") in requested
+    slot = loader._gatekeeper(worker)
+    assert ("get", "gatekeeper") in requested and ("fallback", "stop_gate", "gatekeeper") in requested
+    assert isinstance(slot._inner, shell_loader.PlaybackGate)
 
 
 def test_gatekeeper_tolerates_missing_registry() -> None:
