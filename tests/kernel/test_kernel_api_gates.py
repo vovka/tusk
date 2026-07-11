@@ -15,32 +15,32 @@ class RecordingLLM:
         return '{"directed": false, "cleaned_command": "", "metadata_stop": null}'
 
 
-def _registry(llm: RecordingLLM, requested: list[str]) -> types.SimpleNamespace:
-    def get(name: str) -> RecordingLLM:
-        requested.append(name)
+def _registry(llm: RecordingLLM, requested: list[tuple[str, str]]) -> types.SimpleNamespace:
+    def get_with_fallback(name: str, fallback_name: str) -> RecordingLLM:
+        requested.append((name, fallback_name))
         return llm
-    return types.SimpleNamespace(get=get)
+    return types.SimpleNamespace(get_with_fallback=get_with_fallback)
 
 
-def _kernel(llm: RecordingLLM, requested: list[str]) -> KernelAPI:
+def _kernel(llm: RecordingLLM, requested: list[tuple[str, str]]) -> KernelAPI:
     return KernelAPI(types.SimpleNamespace(), _registry(llm, requested))
 
 
-def test_dictation_gate_uses_gatekeeper_slot_and_dictation_prompt() -> None:
+def test_dictation_gate_uses_stop_gate_slot_and_dictation_prompt() -> None:
     llm, requested = RecordingLLM(), []
     gate = _kernel(llm, requested).dictation_gate()
     assert isinstance(gate, ModeGate)
     assert gate.should_stop("any text") is False
-    assert requested == ["gatekeeper"]
+    assert requested == [("stop_gate", "gatekeeper")]
     assert llm.prompts == [DICTATION_GATE_PROMPT]
 
 
-def test_coding_gate_uses_gatekeeper_slot_and_coding_prompt() -> None:
+def test_coding_gate_uses_stop_gate_slot_and_coding_prompt() -> None:
     llm, requested = RecordingLLM(), []
     gate = _kernel(llm, requested).coding_gate()
     assert isinstance(gate, ModeGate)
     assert gate.should_stop("any text") is False
-    assert requested == ["gatekeeper"]
+    assert requested == [("stop_gate", "gatekeeper")]
     assert llm.prompts == [CODING_GATE_PROMPT]
 
 

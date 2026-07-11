@@ -10,6 +10,7 @@ class Config:
     groq_api_key: str
     openrouter_api_key: str
     gatekeeper_llm: LLMSlotConfig
+    stop_gate_llm: LLMSlotConfig
     conversation_agent_llm: LLMSlotConfig
     planner_agent_llm: LLMSlotConfig
     executor_agent_llm: LLMSlotConfig

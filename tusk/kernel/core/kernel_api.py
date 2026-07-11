@@ -124,5 +124,5 @@ class KernelAPI:
         return self._mode_gate("coding", CODING_GATE_PROMPT)
 
     def _mode_gate(self, mode_name: str, prompt: str) -> ModeGate:
-        gatekeeper = self._llm_registry.get("gatekeeper") if self._llm_registry else None
-        return ModeGate(gatekeeper, mode_name, prompt, self._log)
+        stop_gate_llm = self._llm_registry.get_with_fallback("stop_gate", "gatekeeper") if self._llm_registry else None
+        return ModeGate(stop_gate_llm, mode_name, prompt, self._log)

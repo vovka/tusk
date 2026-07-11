@@ -16,6 +16,11 @@ class LLMRegistry:
     def get(self, name: str) -> LLMProvider:
         return self._slots[name]
 
+    def get_with_fallback(self, name: str, fallback_name: str) -> LLMProvider:
+        if name in self._slots:
+            return self._slots[name]
+        return self._slots[fallback_name]
+
     def swap(self, slot_name: str, provider_name: str, model: str) -> str:
         new_provider = self._factory.create(provider_name, model)
         self._slots[slot_name].swap(new_provider)

@@ -21,8 +21,11 @@ _BASE_PROMPT = "\n".join([
 
 _BUSY_CLAUSE = "\n".join([
     "TUSK is currently busy executing a task.",
-    "If the utterance expresses intent to stop, cancel, abort, or dismiss the current activity — in any wording — classify it as interrupt.",
     'While TUSK is busy, "interrupt" is also a valid classification value.',
+    "Classify as interrupt only when the utterance's sole, unambiguous meaning is to stop, cancel, or abort",
+    "TUSK's current activity — in any wording, e.g. 'stop it', 'quit it', 'abort', \"let's not do it\".",
+    "Self-talk or narration such as \"I'm going to go\" is not an interrupt.",
+    "If there is any doubt, do not classify as interrupt.",
 ])
 
 _SPEAKING_CLAUSE = "\n".join([
