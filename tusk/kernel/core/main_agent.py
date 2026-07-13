@@ -95,4 +95,4 @@ def _spoken_from_json(text: str) -> str | None:
     except (ValueError, TypeError):
         return None
     value = data.get("summary") or data.get("reply") if isinstance(data, dict) else None
-    return str(value) if value else None
+    return value if isinstance(value, str) and value else None

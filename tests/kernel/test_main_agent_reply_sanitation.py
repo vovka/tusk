@@ -25,6 +25,11 @@ def test_plain_reply_is_spoken_unchanged() -> None:
     assert reply == "Opening gedit with a poem."
 
 
+def test_non_string_json_summary_is_not_spoken_as_repr() -> None:
+    reply = _agent("done", '{"summary": ["a", "b"]}').process_command("x", "command")
+    assert reply != "['a', 'b']"
+
+
 def test_command_prompt_forbids_tool_syntax_in_the_reply() -> None:
     prompt = build_agent_profiles(_registry()).get("command").system_prompt
     assert "plain spoken sentence" in prompt
