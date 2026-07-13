@@ -27,13 +27,16 @@ class ChunkedSpeaker:
         self._token = interrupt_token
         self._current_text: str | None = None
         self._recent: deque[tuple[str, float]] = deque(maxlen=_RECENT_MAX)
+        self._recent_lock = threading.Lock()
 
     @property
     def current_text(self) -> str | None:
         return self._current_text
 
     def recent_speech(self) -> list[tuple[str, float]]:
-        return list(self._recent)
+        # the append runs on the worker thread while this reads on the pipeline thread
+        with self._recent_lock:
+            return list(self._recent)
 
     def speak(self, text: str) -> None:
         if self._tts is None:
@@ -50,7 +53,8 @@ class ChunkedSpeaker:
         finally:
             clips.close()
             self._current_text = None
-            self._recent.append((text, time.monotonic()))
+            with self._recent_lock:
+                self._recent.append((text, time.monotonic()))
 
     def _play_clips(self, clips: Iterator[bytes], text: str) -> None:
         for wav_clip in clips:

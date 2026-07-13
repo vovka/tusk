@@ -38,3 +38,13 @@ def test_speech_outside_window_passes() -> None:
 
 def test_no_recent_speech_passes() -> None:
     assert _filter([]).process(_utterance("Switching to PowerPoint.")) is not None
+
+
+def test_short_command_similar_to_recent_speech_is_kept() -> None:
+    echo = _filter([("step", 100.0)])
+    assert echo.process(_utterance("stop")) is not None
+
+
+def test_short_exact_echo_is_still_dropped() -> None:
+    echo = _filter([("Stop.", 100.0)])
+    assert echo.process(_utterance("stop")) is None

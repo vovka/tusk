@@ -9,6 +9,8 @@ __all__ = ["EchoFilter"]
 
 _WINDOW_SECONDS = 12.0
 _SIMILARITY = 0.75
+_SHORT_SIMILARITY = 0.95
+_SHORT_LENGTH = 10
 
 
 class EchoFilter:
@@ -52,4 +54,6 @@ def _normalize(text: str) -> str:
 def _similar(text: str, candidate: str) -> bool:
     if not text or not candidate:
         return False
-    return difflib.SequenceMatcher(None, text, candidate).ratio() >= _SIMILARITY
+    # short commands (stop, yes, play) collide easily, so demand a near-exact match before dropping one
+    threshold = _SHORT_SIMILARITY if min(len(text), len(candidate)) < _SHORT_LENGTH else _SIMILARITY
+    return difflib.SequenceMatcher(None, text, candidate).ratio() >= threshold
