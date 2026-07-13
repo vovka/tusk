@@ -40,11 +40,20 @@ class EchoFilter:
         return [_normalize(text) for text, ended_at in self._recent_speech() if ended_at >= cutoff]
 
     def _matches(self, text: str, spoken: list[str]) -> bool:
-        return any(_similar(text, candidate) for candidate in [*spoken, " ".join(spoken)])
+        return any(_similar(text, candidate) for candidate in _contiguous_runs(spoken))
 
     def _log_drop(self, text: str) -> None:
         if self._log is not None:
             self._log.log("ECHOFLT", f"dropped reason=self-echo text={text!r}", "echo-filter")
+
+
+def _contiguous_runs(spoken: list[str]) -> list[str]:
+    # VAD/STT can merge adjacent spoken clips into one echo, so match every contiguous run, not just each clip
+    runs: list[str] = []
+    for start in range(len(spoken)):
+        for end in range(start + 1, len(spoken) + 1):
+            runs.append(" ".join(spoken[start:end]))
+    return runs
 
 
 def _normalize(text: str) -> str:

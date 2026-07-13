@@ -26,6 +26,16 @@ def test_concatenated_recent_texts_are_dropped() -> None:
     assert _filter(recent).process(_utterance(merged)) is None
 
 
+def test_merge_of_recent_clips_is_dropped_even_with_older_speech() -> None:
+    recent = [
+        ("Blindness is a lack of visual perception affecting millions of people.", 90.0),
+        ("PowerPoint is now the active window.", 98.0),
+        ("Switching to PowerPoint.", 99.0),
+    ]
+    merged = "PowerPoint is now the active window. Switching to PowerPoint."
+    assert _filter(recent).process(_utterance(merged)) is None
+
+
 def test_unrelated_utterance_passes() -> None:
     echo = _filter([("Switching to PowerPoint.", 100.0)])
     assert echo.process(_utterance("open gedit and write a poem")) is not None
