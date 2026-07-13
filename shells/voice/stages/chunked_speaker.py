@@ -53,19 +53,27 @@ class ChunkedSpeaker:
         finally:
             clips.close()
             self._current_text = None
-            with self._recent_lock:
-                self._recent.append((text, time.monotonic()))
 
     def _play_clips(self, clips: Iterator[bytes], text: str) -> None:
-        for wav_clip in clips:
+        for index, wav_clip in enumerate(clips):
             if self._interrupted():
                 return
-            self._current_text = text
-            self._playback.play(wav_clip)
-            # clear during the silent gap while the next chunk synthesizes, so live speech isn't dropped as echo
-            self._current_text = None
+            self._play_one(wav_clip, text, index)
             if self._interrupted():
                 return
+
+    def _play_one(self, wav_clip: bytes, text: str, index: int) -> None:
+        self._current_text = text
+        self._playback.play(wav_clip)
+        # clear during the silent gap while the next chunk synthesizes, so live speech isn't dropped as echo
+        self._current_text = None
+        # record only after a clip actually played, and by the first clip so inter-chunk gaps are still covered
+        if index == 0:
+            self._remember_spoken(text)
+
+    def _remember_spoken(self, text: str) -> None:
+        with self._recent_lock:
+            self._recent.append((text, time.monotonic()))
 
     def _prefetched(self, chunks: Iterator[bytes]) -> Generator[bytes, None, None]:
         buffered: "queue.Queue[object]" = queue.Queue(maxsize=2)
