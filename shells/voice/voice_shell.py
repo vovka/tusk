@@ -5,6 +5,7 @@ from shells.voice.command_worker import CommandWorker
 from shells.voice.interfaces.gatekeeper import Gatekeeper
 from shells.voice.pipeline import VoicePipeline
 from shells.voice.stages.audio_capture import AudioCapture
+from shells.voice.stages.echo_filter import EchoFilter
 from shells.voice.stages.sanitizer import Sanitizer
 from shells.voice.stages.transcriber import Transcriber
 from shells.voice.stages.transcription_buffer import TranscriptionBuffer
@@ -30,12 +31,14 @@ class VoiceShell:
         worker: CommandWorker | None = None,
         reporter: StatusReporter | None = None,
         on_interrupt: Callable[[], None] | None = None,
+        echo_filter: EchoFilter | None = None,
     ) -> None:
         self._reporter = reporter
         self._pause_gate = threading.Event()
         self._pause_gate.set()
         self._worker = worker
         self._on_interrupt = on_interrupt
+        self._echo_filter = echo_filter
         self._pipeline = pipeline or self._build_pipeline(config, log_printer, stt_engine, gatekeeper)
         self._log = log_printer
         self._running = True
@@ -79,7 +82,7 @@ class VoiceShell:
             Sanitizer(log_printer),
             TranscriptionBuffer(log_printer),
             gatekeeper,
-            settings[0], settings[1], self._reporter, self._on_interrupt,
+            settings[0], settings[1], self._reporter, self._on_interrupt, self._echo_filter,
         )
 
     def _detector(self, config: Config, log_printer: LogPrinter) -> UtteranceDetector:

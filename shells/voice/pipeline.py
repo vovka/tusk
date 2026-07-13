@@ -7,6 +7,7 @@ from shells.voice.gate_dispatch import GateDispatch
 from shells.voice.gate_state import GateState
 from shells.voice.interfaces.gatekeeper import Gatekeeper
 from shells.voice.interfaces.transcription_buffer import TranscriptionBuffer
+from shells.voice.stages.echo_filter import EchoFilter
 from shells.voice.stages.sanitizer import Sanitizer
 from shells.voice.stages.transcriber import Transcriber
 from shells.voice.stages.utterance_detector import UtteranceDetector
@@ -30,15 +31,14 @@ class VoicePipeline:
         recovery_candidate_limit: int = 6,
         reporter: StatusReporter | None = None,
         on_interrupt: Callable[[], None] | None = None,
+        echo_filter: EchoFilter | None = None,
     ) -> None:
-        self._detector = detector
-        self._transcriber = transcriber
-        self._sanitizer = sanitizer
-        self._buffer = buffer
+        self._detector, self._transcriber = detector, transcriber
+        self._sanitizer, self._buffer = sanitizer, buffer
         self._gatekeeper = gatekeeper
         self._recovery_window, self._recovery_limit = recovery_window_seconds, recovery_candidate_limit
-        self._reporter = reporter
-        self._on_interrupt = on_interrupt
+        self._reporter, self._on_interrupt = reporter, on_interrupt
+        self._echo_filter = echo_filter
 
     def run(self, submit: Callable[[str, str, str], KernelResponse | None]) -> Iterator[KernelResponse]:
         self._report(AppStatus.LISTENING)
@@ -84,7 +84,7 @@ class VoicePipeline:
     def _handle_utterance(self, utterance: Utterance, submit: Callable[[str, str, str], KernelResponse | None]) -> KernelResponse | None:
         transcribed = self._transcriber.process(utterance)
         sanitized = self._sanitizer.process(transcribed)
-        if sanitized is None:
+        if sanitized is None or (self._echo_filter is not None and self._echo_filter.process(sanitized) is None):
             return None
         buffered = self._buffer.process(sanitized)
         if buffered is None:

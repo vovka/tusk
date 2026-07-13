@@ -25,6 +25,15 @@ def test_pipeline_drops_ambient_speech() -> None:
     assert list(pipeline.run(_submitter([]))) == []
 
 
+def test_pipeline_drops_self_echo_before_buffering() -> None:
+    marks: list[tuple[str, str]] = []
+    echo_filter = types.SimpleNamespace(process=lambda utterance: None)
+    pipeline = VoicePipeline(_detector("audio"), _transcriber("Switching to PowerPoint."), _sanitizer(),
+                             _buffer(marks), _gatekeeper(GateDispatch("forward_current", "x")), echo_filter=echo_filter)
+    assert list(pipeline.run(_submitter([]))) == []
+    assert marks == []
+
+
 def test_pipeline_forwards_intent_refrain() -> None:
     forwarded: list[tuple[str, str]] = []
     dispatch = GateDispatch("forward_current", "open Firefox", intent="Opening Firefox")

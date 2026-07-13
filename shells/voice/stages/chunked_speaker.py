@@ -1,5 +1,7 @@
 import queue
 import threading
+import time
+from collections import deque
 from collections.abc import Generator, Iterator
 
 from shells.voice.stages.speech_playback import SpeechPlayback
@@ -9,6 +11,7 @@ from tusk.shared.tts.interfaces.tts_engine import TTSEngine
 __all__ = ["ChunkedSpeaker"]
 
 _END_OF_CHUNKS = object()
+_RECENT_MAX = 8
 
 
 class ChunkedSpeaker:
@@ -23,10 +26,14 @@ class ChunkedSpeaker:
         self._log = log_printer
         self._token = interrupt_token
         self._current_text: str | None = None
+        self._recent: deque[tuple[str, float]] = deque(maxlen=_RECENT_MAX)
 
     @property
     def current_text(self) -> str | None:
         return self._current_text
+
+    def recent_speech(self) -> list[tuple[str, float]]:
+        return list(self._recent)
 
     def speak(self, text: str) -> None:
         if self._tts is None:
@@ -43,6 +50,7 @@ class ChunkedSpeaker:
         finally:
             clips.close()
             self._current_text = None
+            self._recent.append((text, time.monotonic()))
 
     def _play_clips(self, clips: Iterator[bytes], text: str) -> None:
         for wav_clip in clips:

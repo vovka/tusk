@@ -51,6 +51,10 @@ class CommandWorker:
     def current_speech_text(self) -> str | None:
         return self._speaker.current_text
 
+    @property
+    def recent_speech(self) -> list[tuple[str, float]]:
+        return self._speaker.recent_speech()
+
     def _run(self) -> None:
         while True:
             text, refrain, kind = self._queue.get()
