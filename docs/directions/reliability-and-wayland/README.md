@@ -8,7 +8,7 @@ is the cautionary tale; the winner is "OS-resilient" with health checks and self
 implementation work plus one genuinely new host-side component (Wayland bridge). The
 kernel and shells don't change shape; `AdapterManager` gains a supervision responsibility.
 
-**Diagram:** [Wayland backends & host bridge](wayland-backends.md)
+**Diagram:** [Wayland backends & host bridge](wayland-backends.md) · **Plan:** [PLAN.md](PLAN.md)
 
 ## What the architecture already provides
 

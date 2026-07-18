@@ -8,7 +8,7 @@ with a factory, and one local engine (`WhisperSTT`) already exists. The work is 
 provider classes, config plumbing, and — the actual hard part — empirical validation of
 latency and structured-output quality on local models.
 
-**Diagram:** [engine seams — cloud vs local](engine-seams.md)
+**Diagram:** [engine seams — cloud vs local](engine-seams.md) · **Plan:** [PLAN.md](PLAN.md)
 
 ## What the architecture already provides
 

@@ -8,7 +8,7 @@ two choke points; the mode machinery already solves "route the next utterance to
 consumer". No layer boundaries move. `docs/architecture.md` § Notes currently declares
 dangerous-action confirmation out of scope — this direction reverses that.
 
-**Diagram:** [approval flow](approval-flow.md)
+**Diagram:** [approval flow](approval-flow.md) · **Plan:** [PLAN.md](PLAN.md)
 
 ## What the architecture already provides
 

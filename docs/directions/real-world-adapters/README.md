@@ -9,7 +9,7 @@ stdio with manifest discovery and hot-plug. The real risk is dialect compatibili
 third-party MCP servers, not architecture. The first wrapped server will surface every gap
 cheaply; approvals (separate direction) are a prerequisite for enabling send/delete tools.
 
-**Diagram:** [third-party adapter integration path](adapter-integration.md)
+**Diagram:** [third-party adapter integration path](adapter-integration.md) · **Plan:** [PLAN.md](PLAN.md)
 
 ## What the architecture already provides
 

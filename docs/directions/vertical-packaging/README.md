@@ -9,7 +9,7 @@ expressible as an env preset *today*; the only structural touch is adapter filte
 `AdapterManager`. The architecture's env-driven factories make bundles cheap — the real
 work is choosing and tuning them, not enabling them.
 
-**Diagram:** [profile layering](profile-layering.md)
+**Diagram:** [profile layering](profile-layering.md) · **Plan:** [PLAN.md](PLAN.md)
 
 ## What the architecture already provides
 

@@ -10,7 +10,7 @@ architecture doc itself names "a future VS Code extension implementing `EditorDr
 the drift fix. Work concentrates in one new editor bridge and the coding adapter; the only
 shared-schema touch is extending `EditOperation`.
 
-**Diagram:** [editor driver seam](editor-driver-seam.md)
+**Diagram:** [editor driver seam](editor-driver-seam.md) · **Plan:** [PLAN.md](PLAN.md)
 
 ## What the architecture already provides
 
