@@ -1,6 +1,10 @@
 services:
   tusk:
     build: .
+    # Stop tusk before phoenix on `compose down` so the OTLP span exporter can
+    # flush against a live collector instead of spamming name-resolution retries.
+    depends_on:
+      - phoenix
     # Run as the host user so the X server (SI:localuser) and the D-Bus session
     # bus (owned by uid 1000) authorize the tray; as root both reject it.
     user: "1000:1000"
