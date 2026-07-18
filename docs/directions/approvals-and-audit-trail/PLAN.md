@@ -8,6 +8,11 @@ Three PR-sized milestones. A ships flag plumbing with zero behavior change; B sh
 approval turn boundary; C ships the journal. Each leaves main releasable. TDD throughout:
 every step lists its failing tests first (`docker compose exec tusk pytest tests/...`).
 
+**Fine-grained execution detail:** [PLAN-DETAILS.md](PLAN-DETAILS.md) — commit-by-commit
+breakdown grounded in the current code; where its design differs from the milestone steps
+below (exception-based propagation, deterministic resume, journal as a Store decorator),
+the detailed plan wins.
+
 ## Milestone A — `requires_approval` plumbing (no behavior change)
 
 ### A1. Flag: manifest → registry
