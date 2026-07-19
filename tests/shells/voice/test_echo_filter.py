@@ -75,3 +75,13 @@ def test_wake_word_command_about_same_object_is_not_dropped() -> None:
 def test_wake_word_short_command_about_same_object_is_not_dropped() -> None:
     echo = _filter([("Maximized the gedit window", 100.0)])
     assert echo.process(_utterance("Tusk, minimize the gedit window")) is not None
+
+
+def test_wake_word_followed_by_colon_is_not_dropped() -> None:
+    echo = _filter([("Maximized the gedit window", 100.0)])
+    assert echo.process(_utterance("Tusk: minimize the gedit window")) is not None
+
+
+def test_mid_sentence_wake_word_does_not_bypass_echo_drop() -> None:
+    echo = _filter([("Completing the task.", 100.0)])
+    assert echo.process(_utterance("Completing the task.")) is None
