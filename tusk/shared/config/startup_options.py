@@ -5,7 +5,7 @@ from dataclasses import dataclass
 __all__ = ["StartupOptions", "build_parser"]
 
 _GROUPS = (
-    "ready", "tusk", "error", "detector", "transcriber", "sanitizer", "buffer", "gatekeeper",
+    "ready", "tusk", "error", "detector", "transcriber", "sanitizer", "echo-filter", "buffer", "gatekeeper",
     "gate-recovery", "kernel-input", "llm-request", "llm-payload", "llm-tools", "llm-response",
     "llm-wait", "llm-payload-full", "llm-tools-full", "llm-response-full", "agent", "tool",
     "pipeline", "dictation", "vad", "stt", "gate", "llm", "llm-tool", "llm-tool-full",
