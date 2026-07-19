@@ -58,6 +58,7 @@ _COMMAND_PROMPT = "\n".join([
     "When you need to insert a large block of literal text, prefer writing it to the clipboard and pasting it",
     "with the clipboard-write and key-press tools, instead of typing it character by character.",
     "When finished, call done with a terse spoken-style summary of what happened.",
+    "The done reply must be one plain spoken sentence — never tool syntax, brackets, or JSON.",
 ])
 
 _DEFAULT_PROMPT = "\n".join([

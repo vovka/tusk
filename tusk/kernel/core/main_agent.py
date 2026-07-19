@@ -1,3 +1,5 @@
+import json
+import re
 from typing import Any
 
 from tusk.kernel.agent import AgentOrchestrator, AgentRunRequest
@@ -38,12 +40,15 @@ class MainAgent(AgentBackend):
     def _fast_command(self, command: str) -> str:
         # fresh session with all runtime tools: tool schemas never enter the conversation context
         result = self._orchestrator.run(AgentRunRequest(command, "command", "", runtime_tool_names=("*",), gate_command=True))
-        reply = self._finished(command, result)
+        reply = self._remembered(command, _spoken_command_reply(result))
         self._share_with_conversation(command, reply)
         return reply
 
     def _finished(self, command: str, result: Any) -> str:
         reply = "Stopped." if result.status == "cancelled" else result.reply_text()
+        return self._remembered(command, reply)
+
+    def _remembered(self, command: str, reply: str) -> str:
         self._remember(command, reply)
         return reply
 
@@ -63,3 +68,31 @@ class MainAgent(AgentBackend):
         self._history.append(ChatMessage("user", f"Command: {command}"))
         if reply:
             self._history.append(ChatMessage("assistant", reply))
+
+
+_TOOL_PREFIX = re.compile(r"^\[tool:[^\]]+\]\s*")
+
+
+def _spoken_command_reply(result: Any) -> str:
+    # a one-shot command is spoken aloud, so never leak an internal failure summary or tool/JSON syntax
+    if result.status == "cancelled":
+        return "Stopped."
+    if result.status == "failed":
+        return "I couldn't complete that."
+    return _plain_reply(result.reply_text())
+
+
+def _plain_reply(text: str) -> str:
+    # an agent sometimes emits its internal [tool:done] {json} transcript form as the reply; speak the sentence, not the syntax
+    unwrapped = _TOOL_PREFIX.sub("", text.strip())
+    spoken = _spoken_from_json(unwrapped)
+    return spoken if spoken is not None else unwrapped
+
+
+def _spoken_from_json(text: str) -> str | None:
+    try:
+        data = json.loads(text)
+    except (ValueError, TypeError):
+        return None
+    value = data.get("summary") or data.get("reply") if isinstance(data, dict) else None
+    return value if isinstance(value, str) and value else None
