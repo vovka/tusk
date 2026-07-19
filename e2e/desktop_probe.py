@@ -14,15 +14,21 @@ class DesktopProbe:
         self._tools = tool_registry
 
     def windows(self) -> str:
-        return self._tools.get("gnome.list_windows").execute({}).message
+        result = self._tools.get("gnome.list_windows").execute({})
+        assert result.success, f"probe tool failed: {result.message}"
+        return result.message
 
     def active_window(self) -> str:
-        return self._tools.get("gnome.get_active_window").execute({}).message
+        result = self._tools.get("gnome.get_active_window").execute({})
+        assert result.success, f"probe tool failed: {result.message}"
+        return result.message
 
     def geometry(self, title_fragment: str) -> tuple[int, int, int, int] | None:
         for line in self.windows().splitlines():
             if title_fragment.lower() in line.lower():
-                return self._parse(line)
+                geom = self._parse(line)
+                if geom is not None:
+                    return geom
         return None
 
     def _parse(self, line: str) -> tuple[int, int, int, int] | None:

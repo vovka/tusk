@@ -20,8 +20,8 @@ def scenario_reply_echo_is_ignored(h: VoiceE2EHarness, probe: DesktopProbe) -> s
     enqueued_before = len(h.enqueued)
     h.say(" ".join(echo.split()[:12]), duration=3.0)
     time.sleep(10.0)
-    assert len(h.enqueued) == enqueued_before, f"own speech echoed back was enqueued: {h.enqueued[-1]!r}"
     h.wait_idle()
+    assert len(h.enqueued) == enqueued_before, f"own speech echoed back was enqueued: {h.enqueued[-1]!r}"
     return "echoed reply was not treated as a command"
 
 
@@ -43,7 +43,9 @@ def scenario_move_gedit_left(h: VoiceE2EHarness, probe: DesktopProbe) -> str:
 
 
 def scenario_move_gedit_right(h: VoiceE2EHarness, probe: DesktopProbe) -> str:
-    left_x = (probe.geometry("gedit") or (0, 0, 0, 0))[0]
+    left_geom = probe.geometry("gedit")
+    assert left_geom is not None, "gedit window not found before moving right"
+    left_x = left_geom[0]
     h.say("Tusk, now move the gedit window to the right half of the screen")
     _await_command(h)
     geometry = probe.geometry("gedit")
@@ -54,11 +56,12 @@ def scenario_move_gedit_right(h: VoiceE2EHarness, probe: DesktopProbe) -> str:
 
 def scenario_maximize_gedit(h: VoiceE2EHarness, probe: DesktopProbe) -> str:
     before = probe.geometry("gedit")
+    assert before is not None, "gedit window not found before maximizing"
     h.say("Tusk, maximize the gedit window")
     _await_command(h)
     after = probe.geometry("gedit")
     assert after is not None, "gedit window disappeared"
-    assert before is None or after[2] > before[2], f"width did not grow: {before} -> {after}"
+    assert after[2] > before[2], f"width did not grow: {before} -> {after}"
     return f"gedit maximized to {after[2]}x{after[3]}; reply: {_speakable(_last_reply(h))!r}"
 
 
