@@ -1,7 +1,9 @@
 import difflib
+import string
 import time
 from collections.abc import Callable
 
+from shells.voice.stages.gate.gatekeeper_support import WAKE_WORDS
 from tusk.shared.logging.interfaces.log_printer import LogPrinter
 from tusk.shared.schemas.utterance import Utterance
 
@@ -30,6 +32,10 @@ class EchoFilter:
         self._now = now
 
     def process(self, utterance: Utterance) -> Utterance | None:
+        # A leading wake word marks speech addressed to TUSK; matching any position would let
+        # TTS replies containing the ordinary word "task" bypass echo-dropping when echoed back.
+        if _starts_with_wake_word(utterance.text):
+            return utterance
         spoken = self._recent_texts()
         if spoken and self._matches(_normalize(utterance.text), spoken):
             self._log_drop(utterance.text)
@@ -46,6 +52,14 @@ class EchoFilter:
     def _log_drop(self, text: str) -> None:
         if self._log is not None:
             self._log.log("ECHOFLT", f"dropped reason=self-echo text={text!r}", "echo-filter")
+
+
+def _starts_with_wake_word(text: str) -> bool:
+    tokens = text.split()
+    if not tokens:
+        return False
+    leading_word = tokens[0].strip(string.punctuation).lower()
+    return leading_word in WAKE_WORDS
 
 
 def _contiguous_runs(spoken: list[str]) -> list[str]:
