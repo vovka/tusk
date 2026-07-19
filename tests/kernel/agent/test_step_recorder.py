@@ -4,6 +4,8 @@ from tusk.kernel.agent.runtime.step_recorder import StepRecorder
 from tusk.shared.schemas.tools.tool_call import ToolCall
 from tusk.shared.schemas.tools.tool_result import ToolResult
 
+_DONE_NUDGE = " Call the done tool now if the command is complete."
+
 
 def test_appended_tolerates_non_dict_child_result_data() -> None:
     messages: list[dict[str, str]] = []
@@ -48,13 +50,39 @@ def test_appended_tolerates_missing_tool_result_message() -> None:
     assert messages[-1]["content"] == ""
 
 
+def test_appended_nudges_done_after_successful_actuator() -> None:
+    messages: list[dict[str, str]] = []
+    result = ToolResult(True, "maximized", None)
+    recorder = _recorder({"gnome.maximize_window"})
+    recorder.appended(messages, ToolCall("gnome.maximize_window", {}, "c1"), result)
+    assert messages[-1] == {"role": "user", "content": "maximized" + _DONE_NUDGE}
+
+
+def test_appended_skips_nudge_for_read_only_tool() -> None:
+    messages: list[dict[str, str]] = []
+    result = ToolResult(True, "desktop context", None)
+    recorder = _recorder({"gnome.maximize_window"})
+    recorder.appended(messages, ToolCall("gnome.get_desktop_context", {}, "c1"), result)
+    assert messages[-1] == {"role": "user", "content": "desktop context"}
+
+
+def test_appended_skips_nudge_for_failed_actuator() -> None:
+    messages: list[dict[str, str]] = []
+    result = ToolResult(False, "boom", None)
+    recorder = _recorder({"gnome.maximize_window"})
+    recorder.appended(messages, ToolCall("gnome.maximize_window", {}, "c1"), result)
+    assert messages[-1] == {"role": "user", "content": "boom"}
+
+
 def test_result_event_keeps_full_message() -> None:
     events: list[tuple[str, str, dict]] = []
     store = types.SimpleNamespace(append_event=lambda sid, name, data: events.append((sid, name, data)))
+    registry = types.SimpleNamespace(sequence_tool_names=lambda: set())
     result = ToolResult(False, "x" * 2000, None)
-    StepRecorder(store).result("s1", 1, ToolCall("gnome.press_keys", {}, "c1"), result)
+    StepRecorder(store, registry).result("s1", 1, ToolCall("gnome.press_keys", {}, "c1"), result)
     assert events[0][2]["message"] == "x" * 2000
 
 
-def _recorder() -> StepRecorder:
-    return StepRecorder(types.SimpleNamespace())
+def _recorder(sequence_tools: set[str] | None = None) -> StepRecorder:
+    registry = types.SimpleNamespace(sequence_tool_names=lambda: sequence_tools or set())
+    return StepRecorder(types.SimpleNamespace(), registry)
