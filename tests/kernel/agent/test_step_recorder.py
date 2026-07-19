@@ -74,6 +74,19 @@ def test_appended_skips_nudge_for_failed_actuator() -> None:
     assert messages[-1] == {"role": "user", "content": "boom"}
 
 
+def test_appended_skips_nudge_for_unknown_tool() -> None:
+    messages: list[dict[str, str]] = []
+    result = ToolResult(True, "ok", None)
+    registry = types.SimpleNamespace(get=_raise_key_error)
+    recorder = StepRecorder(types.SimpleNamespace(), registry)
+    recorder.appended(messages, ToolCall("gnome.unregistered_tool", {}, "c1"), result)
+    assert messages[-1] == {"role": "user", "content": "ok"}
+
+
+def _raise_key_error(name: str) -> object:
+    raise KeyError(name)
+
+
 def test_result_event_keeps_full_message() -> None:
     events: list[tuple[str, str, dict]] = []
     store = types.SimpleNamespace(append_event=lambda sid, name, data: events.append((sid, name, data)))
@@ -84,5 +97,6 @@ def test_result_event_keeps_full_message() -> None:
 
 
 def _recorder(sequence_tools: set[str] | None = None) -> StepRecorder:
-    registry = types.SimpleNamespace(sequence_tool_names=lambda: sequence_tools or set())
+    tools = sequence_tools or set()
+    registry = types.SimpleNamespace(get=lambda name: types.SimpleNamespace(sequence_callable=name in tools))
     return StepRecorder(types.SimpleNamespace(), registry)
