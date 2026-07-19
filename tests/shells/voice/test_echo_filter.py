@@ -58,3 +58,9 @@ def test_short_command_similar_to_recent_speech_is_kept() -> None:
 def test_short_exact_echo_is_still_dropped() -> None:
     echo = _filter([("Stop.", 100.0)])
     assert echo.process(_utterance("stop")) is None
+
+
+def test_echo_merged_with_live_command_is_not_dropped() -> None:
+    echo = _filter([("Switching to PowerPoint.", 100.0)])
+    utterance = _utterance("Switching to PowerPoint open Firefox")
+    assert echo.process(utterance) is not None

@@ -11,6 +11,7 @@ _WINDOW_SECONDS = 12.0
 _SIMILARITY = 0.75
 _SHORT_SIMILARITY = 0.95
 _SHORT_LENGTH = 10
+_MAX_ECHO_LENGTH_RATIO = 1.25
 
 
 class EchoFilter:
@@ -62,6 +63,9 @@ def _normalize(text: str) -> str:
 
 def _similar(text: str, candidate: str) -> bool:
     if not text or not candidate:
+        return False
+    # a much longer utterance is an echo merged with live speech, not a pure echo — let it through
+    if len(text) > len(candidate) * _MAX_ECHO_LENGTH_RATIO:
         return False
     # short commands (stop, yes, play) collide easily, so demand a near-exact match before dropping one
     threshold = _SHORT_SIMILARITY if min(len(text), len(candidate)) < _SHORT_LENGTH else _SIMILARITY
