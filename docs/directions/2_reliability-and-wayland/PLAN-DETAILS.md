@@ -113,6 +113,9 @@ Tests: `docker compose exec tusk pytest tests/kernel/ tests/shells/ tests/adapte
   `adapter_env_builder.py:22-31` handles install). Uses `NotifyKeyboardKeysym` (xkb
   keysyms — no layout/keycode mapping table needed for latin input; unicode →
   `0x01000000 + codepoint` rule for the rest).
+- **Cross-DE note:** the portal is a freedesktop standard — this backend serves KDE and
+  wlroots Wayland sessions unchanged; of the whole phase, only the D1 window extension is
+  GNOME-specific.
 - **Mouse on Wayland:** the four `mouse_*` methods return a failed result
   ("pointer control requires X11 on this session") — absolute pointer needs a paired
   ScreenCast stream; deferred per PLAN.md C3. Update the four tool descriptions in the

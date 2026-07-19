@@ -28,9 +28,11 @@ cheaply; approvals (separate direction) are a prerequisite for enabling send/del
 ## Gaps
 
 - **Minimal MCP dialect.** `MCPClient` implements line-delimited JSON-RPC with
-  `initialize`/`tools/list`/`tools/call` and `MCPToolResult.content` as a single string.
-  Real-world servers send multi-part/typed content arrays, notifications, capability
-  negotiation, sometimes resources/prompts. Tolerance is unverified.
+  `initialize`/`tools/list`/`tools/call`. Multi-part text content is already joined
+  (`call_tool`), but responses are read as "next stdout line" without id-matching — a
+  server-initiated notification desyncs the pairing — the post-`initialize`
+  `notifications/initialized` is never sent, and JSON-RPC `error` responses are silently
+  flattened (see PLAN-DETAILS corrections).
 - **No Node/uvx runtime.** The Docker image has Python only; most popular MCP servers are
   npm or uvx packages. No npm equivalent of the venv builder.
 - **No HTTP/SSE transport.** `connect_http()` raises `NotImplementedError` — hosted/remote
@@ -42,9 +44,10 @@ cheaply; approvals (separate direction) are a prerequisite for enabling send/del
 
 ## Required changes
 
-1. **[shared/mcp]** Harden `MCPClient`/`MCPToolResult` against spec-compliant servers:
-   join multi-part text content, ignore notifications, tolerate unknown capabilities.
-   Test against 2–3 popular OSS servers and fix what breaks — cheapest discovery path.
+1. **[shared/mcp]** Harden `MCPClient` against spec-compliant servers: id-matched reads
+   that skip notifications and noise, send `notifications/initialized`, surface JSON-RPC
+   `error` responses. Test against 2–3 popular OSS servers and fix what breaks —
+   cheapest discovery path.
 2. **[docker]** Add Node (and `uv`) to the image; extend `AdapterEnvironmentBuilder` with a
    `package.json` → `npm install` path mirroring the venv pattern.
 3. **[new adapters]** Thin manifest wrappers for chosen servers (start: one email, one

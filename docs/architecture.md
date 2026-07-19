@@ -2,7 +2,10 @@
 
 ## System Overview
 
-TUSK is an always-listening desktop AI voice assistant for Linux/GNOME. It captures
+TUSK is an always-listening desktop AI voice assistant with an OS-agnostic core: desktop
+integration is adapter-based, and the first shipped desktop adapter targets GNOME on
+Linux — further desktop environments and OSes are added as new adapters, never as core
+changes (`docs/brief.md`, design principle 6). It captures
 microphone audio continuously, detects speech boundaries, transcribes speech to text,
 filters ambient noise and hallucinations, passes confirmed commands to a conversation
 agent, and executes desktop actions via hot-pluggable MCP adapters. The agent step itself is

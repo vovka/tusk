@@ -1,6 +1,9 @@
 # TUSK — Task Unified Speech Kernel
 
-An always-listening desktop AI voice assistant for Linux/GNOME.
+An always-listening desktop AI voice assistant. The core is OS-agnostic — desktop
+control lives in hot-pluggable adapters. The first shipped desktop adapter targets GNOME
+on Linux; other desktop environments and OSes arrive as additional adapters, with no core
+changes (see [docs/brief.md](docs/brief.md), design principle 6).
 
 ## Demo
 
@@ -46,7 +49,8 @@ See [docs/architecture.md § Agent Backends](docs/architecture.md#agent-backends
 
 - Docker
 - A [Groq](https://groq.com) API key
-- Linux with GNOME desktop
+- Linux with GNOME desktop — required by the current `gnome` desktop adapter, not by
+  TUSK itself; other desktops/OSes are planned as additional adapters
 - PulseAudio or PipeWire-PulseAudio (standard on modern GNOME)
 
 ### Display server support

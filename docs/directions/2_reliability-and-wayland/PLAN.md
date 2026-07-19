@@ -103,12 +103,15 @@ natively. One paragraph in README + tool descriptions updated so the planner kno
 - Window management on Wayland with the extension; graceful degradation without.
 
 ## Out of scope
-- ydotool/uinput path (portal chosen); non-GNOME compositors; pointer on Wayland (C3);
-  automated GNOME-version CI matrix (manual checklist per GNOME release instead).
+- ydotool/uinput path (portal chosen); non-GNOME window backends (the portal *input*
+  backend already serves KDE/wlroots sessions — per-DE window control lands as future
+  backends behind the same seam); pointer on Wayland (C3); automated GNOME-version CI
+  matrix (manual checklist per GNOME release instead).
 
 ## Risks
-- Portal dialects vary by distro/version — validate on Ubuntu GNOME (the dev machine)
-  first, keep the backend probe-then-fallback (portal init failure → X11/XWayland path +
-  status warning, never a crash).
+- Portal dialects vary by distro/version — validate on the reference GNOME setup (the
+  dev machine) first, keep the backend probe-then-fallback (portal init failure →
+  X11/XWayland path + status warning, never a crash). Portals are freedesktop standards,
+  so the validated backend carries to other distros and DEs rather than being rebuilt.
 - Supervisor/watcher interaction — single-owner rule above; add one integration test
   covering "manifest edited while adapter down".

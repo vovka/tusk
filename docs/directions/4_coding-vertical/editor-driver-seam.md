@@ -1,8 +1,8 @@
 # Editor Driver Seam — from GUI automation to editor-native
 
-`CodingRouter` and the coding adapter don't change. Growth happens below the two ABCs:
-a feedback-capable driver unlocks the dormant line-anchored strategy and automatic drift
-resync. Green = exists, yellow = new.
+`CodingRouter` doesn't change. Growth happens in the adapter (targeted operations from a
+diff step) and below the `EditorDriver` ABC (a bridge driver that makes read-back and
+drift resync cheap). Green = exists, yellow = new.
 
 ```mermaid
 flowchart TD
@@ -10,13 +10,11 @@ flowchart TD
     CR -->|process_intent| CAD["coding adapter ✓<br/>BufferModel + CodingEditPlanner"]
     CAD -->|"EditOperation(s)"| CR
     TS["tree-sitter symbol map (new)<br/>grounds 'delete this function'"] -.-> CAD
+    DIF["edit-operation differ (new)<br/>difflib → targeted per-range ops"] -.-> CAD
 
-    CR --> STRAT{EditApplicationStrategy}
-    STRAT -->|"driver w/o readback"| FR[FullReplaceEditStrategy ✓<br/>select-all + paste full_buffer]
-    STRAT -->|"driver w/ readback"| LA["LineAnchoredEditStrategy<br/>✓ exists, unwired"]
+    CR --> VS["VerifiedEditStrategy ✓ wired<br/>line-anchored apply → read-back →<br/>full-replace repair on drift"]
 
-    FR --> DRV{EditorDriver}
-    LA --> DRV
+    VS --> DRV{EditorDriver}
     DRV -->|universal fallback| IA["InputAutomationEditorDriver ✓<br/>gnome.* keys + clipboard<br/>fire-and-forget"]
     DRV -->|focused window = VS Code| VSD["VsCodeEditorDriver (new)"]
 
@@ -27,12 +25,13 @@ flowchart TD
     SYNC -.-> CAD
 
     style TS fill:#fdf3d8,stroke:#b90
+    style DIF fill:#fdf3d8,stroke:#b90
     style VSD fill:#fdf3d8,stroke:#b90
     style EXT fill:#fdf3d8,stroke:#b90
     style SYNC fill:#fdf3d8,stroke:#b90
-    style LA fill:#e8f4e8,stroke:#2a7,stroke-dasharray: 5 5
 ```
 
-Strategy choice becomes a function of driver capability (`supports_readback`), wired in
-`ToolRuntime`; driver choice a function of the focused window class. Both decisions live in
-existing wiring code — no new layer.
+Driver choice happens once per session — focused window class + bridge ping
+(`DriverSelector` in the wiring, `TUSK_CODING_DRIVER` override). The strategy chain is
+unchanged; the bridge driver just makes its read-back verification a cheap socket call
+instead of a clipboard round-trip. No new layer.
