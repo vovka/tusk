@@ -64,3 +64,14 @@ def test_echo_merged_with_live_command_is_not_dropped() -> None:
     echo = _filter([("Switching to PowerPoint.", 100.0)])
     utterance = _utterance("Switching to PowerPoint open Firefox")
     assert echo.process(utterance) is not None
+
+
+def test_wake_word_command_about_same_object_is_not_dropped() -> None:
+    recent = [("Moved the gedit window to the left half of the screen.", 100.0)]
+    utterance = _utterance("Tusk, now move the gedit window to the right half of the screen")
+    assert _filter(recent).process(utterance) is not None
+
+
+def test_wake_word_short_command_about_same_object_is_not_dropped() -> None:
+    echo = _filter([("Maximized the gedit window", 100.0)])
+    assert echo.process(_utterance("Tusk, minimize the gedit window")) is not None

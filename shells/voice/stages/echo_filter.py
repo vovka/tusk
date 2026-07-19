@@ -2,6 +2,7 @@ import difflib
 import time
 from collections.abc import Callable
 
+from shells.voice.stages.gate.gatekeeper_support import has_wake_word
 from tusk.shared.logging.interfaces.log_printer import LogPrinter
 from tusk.shared.schemas.utterance import Utterance
 
@@ -30,6 +31,10 @@ class EchoFilter:
         self._now = now
 
     def process(self, utterance: Utterance) -> Utterance | None:
+        # Spoken confirmations mirror the follow-up command about the same object, so a wake
+        # word — which TUSK's own TTS never speaks — proves this is live speech, not an echo.
+        if has_wake_word(utterance.text):
+            return utterance
         spoken = self._recent_texts()
         if spoken and self._matches(_normalize(utterance.text), spoken):
             self._log_drop(utterance.text)
