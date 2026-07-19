@@ -30,10 +30,42 @@ def test_launch_application_reports_no_new_window_within_budget(monkeypatch) -> 
 
 
 def test_launch_application_reports_launcher_error_without_polling(monkeypatch) -> None:
-    monkeypatch.setattr(application_tools.subprocess, "run", _unexpected_wmctrl_call)
+    monkeypatch.setattr(application_tools.subprocess, "run", _wmctrl_sequence([_EXISTING_WINDOW]))
     tools = _tools(_unexpected_sleep, launch_response="error: launcher offline\n")
     result = tools.launch_application({"application_name": "gedit"})
     assert result == {"success": False, "message": "error: launcher offline"}
+
+
+# Regression: warm/fast apps can map a window between the launcher ack and a
+# post-ack snapshot, so the baseline must be taken before the launch call.
+def test_launch_application_captures_window_baseline_before_launching(monkeypatch) -> None:
+    call_order: list[str] = []
+    stdout_values = [_EXISTING_WINDOW, f"{_EXISTING_WINDOW}\n{_NEW_WINDOW}"]
+    monkeypatch.setattr(application_tools.subprocess, "run", _recording_wmctrl(call_order, stdout_values))
+    tools = _tools(_unexpected_sleep)
+    tools._launch = _recording_launch(call_order)
+    tools.launch_application({"application_name": "gedit"})
+    assert call_order == ["wmctrl", "launch", "wmctrl"]
+
+
+# Regression: a non-zero wmctrl returncode can carry error text on stdout;
+# that must not be misparsed as a real window.
+def test_launch_application_treats_wmctrl_failure_as_no_windows(monkeypatch) -> None:
+    monkeypatch.setattr(application_tools.subprocess, "run", _failing_wmctrl_after_baseline())
+    sleeps: list[float] = []
+    tools = _tools(sleeps.append)
+    result = tools.launch_application({"application_name": "gedit"})
+    assert result == {"success": True, "message": "launched: gedit (no new window appeared within 10s)"}
+    assert len(sleeps) == 20
+
+
+def test_launch_application_treats_missing_wmctrl_as_no_windows(monkeypatch) -> None:
+    monkeypatch.setattr(application_tools.subprocess, "run", _missing_wmctrl)
+    sleeps: list[float] = []
+    tools = _tools(sleeps.append)
+    result = tools.launch_application({"application_name": "gedit"})
+    assert result == {"success": True, "message": "launched: gedit (no new window appeared within 10s)"}
+    assert len(sleeps) == 20
 
 
 def _wmctrl_sequence(stdout_values: list[str]) -> object:
@@ -46,8 +78,38 @@ def _wmctrl_sequence(stdout_values: list[str]) -> object:
     return fake_run
 
 
-def _unexpected_wmctrl_call(command: list[str], **kwargs: object) -> subprocess.CompletedProcess:
-    raise AssertionError("wmctrl should not be called on launcher error")
+def _recording_wmctrl(call_order: list[str], stdout_values: list[str]) -> object:
+    inner = _wmctrl_sequence(stdout_values)
+
+    def fake_run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess:
+        call_order.append("wmctrl")
+        return inner(command, **kwargs)
+
+    return fake_run
+
+
+def _recording_launch(call_order: list[str]) -> object:
+    def fake_launch(application_name: str) -> str:
+        call_order.append("launch")
+        return "ok\n"
+
+    return fake_launch
+
+
+def _failing_wmctrl_after_baseline() -> object:
+    calls: list[int] = []
+
+    def fake_run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess:
+        calls.append(1)
+        if len(calls) == 1:
+            return subprocess.CompletedProcess(command, 0, "", "")
+        return subprocess.CompletedProcess(command, 1, "Error: Cannot connect to X server", "")
+
+    return fake_run
+
+
+def _missing_wmctrl(command: list[str], **kwargs: object) -> subprocess.CompletedProcess:
+    raise FileNotFoundError("wmctrl: command not found")
 
 
 def _unexpected_sleep(seconds: float) -> None:

@@ -21,10 +21,11 @@ class ApplicationTools:
         command = self._resolve(requested)
         if command is None:
             return {"success": False, "message": f"no applications found for: {requested}"}
+        before_ids = self._window_ids()
         response = self._launch(command)
         if not response.startswith("ok"):
             return {"success": False, "message": self._message(requested, response)}
-        return {"success": True, "message": self._launched_message(requested)}
+        return {"success": True, "message": self._launched_message(requested, before_ids)}
 
     def open_uri(self, arguments: dict) -> dict:
         subprocess.Popen(["xdg-open", arguments["uri"]])
@@ -56,8 +57,8 @@ class ApplicationTools:
         lines = "\n".join(f"{item.name} -> {item.exec_cmd}" for item in matches)
         return f"application matches for {query!r}:\n{lines}"
 
-    def _launched_message(self, requested: str) -> str:
-        title = self._poll_for_new_window(self._window_ids())
+    def _launched_message(self, requested: str, before_ids: set[str]) -> str:
+        title = self._poll_for_new_window(before_ids)
         if title is None:
             return f"launched: {requested} (no new window appeared within 10s)"
         return f'launched: {requested}, window "{title}" open'
@@ -80,7 +81,12 @@ class ApplicationTools:
         return None
 
     def _list_windows(self) -> list[tuple[str, str]]:
-        result = subprocess.run(["wmctrl", "-l"], capture_output=True, text=True, check=False)
+        try:
+            result = subprocess.run(["wmctrl", "-l"], capture_output=True, text=True, check=False)
+        except FileNotFoundError:
+            return []
+        if result.returncode != 0:
+            return []
         return [self._parse_window_line(line) for line in result.stdout.splitlines() if line.strip()]
 
     def _parse_window_line(self, line: str) -> tuple[str, str]:
