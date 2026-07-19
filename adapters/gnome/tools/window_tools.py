@@ -4,7 +4,7 @@ import subprocess
 __all__ = ["WindowTools"]
 
 _COMMA_GEOMETRY = re.compile(r"^-?\d+,-?\d+,\d+,\d+$")
-_X11_GEOMETRY = re.compile(r"^(\d+)x(\d+)\+(-?\d+)\+(-?\d+)$")
+_X11_GEOMETRY = re.compile(r"^(\d+)x(\d+)([+-]\d+)([+-]\d+)$")
 
 
 class WindowTools:
@@ -40,9 +40,9 @@ class WindowTools:
         title = self._present_title(arguments)
         if isinstance(title, dict):
             return title
-        geometry = self._wmctrl_geometry(str(arguments["geometry"]).strip())
-        if geometry is None:
-            return {"success": False, "message": f"bad geometry {arguments['geometry']!r}: use X,Y,WIDTH,HEIGHT in pixels"}
+        geometry = self._parsed_geometry(arguments)
+        if isinstance(geometry, dict):
+            return geometry
         result = subprocess.run(["wmctrl", "-r", title, "-e", f"0,{geometry}"], check=False)
         if result.returncode != 0:
             return {"success": False, "message": f"wmctrl rejected geometry {geometry!r}"}
@@ -66,7 +66,16 @@ class WindowTools:
         if match is None:
             return None
         width, height, x, y = match.groups()
-        return f"{x},{y},{width},{height}"
+        return f"{int(x)},{int(y)},{width},{height}"
+
+    def _parsed_geometry(self, arguments: dict) -> str | dict:
+        raw_geometry = arguments.get("geometry")
+        if not raw_geometry:
+            return {"success": False, "message": "missing argument: geometry"}
+        geometry = self._wmctrl_geometry(str(raw_geometry).strip())
+        if geometry is None:
+            return {"success": False, "message": f"bad geometry {raw_geometry!r}: use X,Y,WIDTH,HEIGHT in pixels"}
+        return geometry
 
     def _present_title(self, arguments: dict) -> str | dict:
         title = self._title(arguments)

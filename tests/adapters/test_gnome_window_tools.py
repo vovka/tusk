@@ -26,6 +26,30 @@ def test_move_resize_converts_x11_geometry_to_wmctrl_form(monkeypatch: object) -
     assert calls[-1][-1] == "0,1440,0,1440,1800"
 
 
+def test_move_resize_converts_negative_x11_offset_to_wmctrl_form(monkeypatch: object) -> None:
+    calls: list[list[str]] = []
+    _patch_run(monkeypatch, calls)
+    result = WindowTools().move_resize_window({"window_title": "gedit", "geometry": "1440x1800-1440+0"})
+    assert result["success"] is True
+    assert calls[-1][-1] == "0,-1440,0,1440,1800"
+
+
+def test_move_resize_strips_leading_plus_from_x11_offset(monkeypatch: object) -> None:
+    calls: list[list[str]] = []
+    _patch_run(monkeypatch, calls)
+    result = WindowTools().move_resize_window({"window_title": "gedit", "geometry": "1440x1800+1440+0"})
+    assert result["success"] is True
+    assert calls[-1][-1] == "0,1440,0,1440,1800"
+
+
+def test_move_resize_fails_when_geometry_missing(monkeypatch: object) -> None:
+    calls: list[list[str]] = []
+    _patch_run(monkeypatch, calls)
+    result = WindowTools().move_resize_window({"window_title": "gedit"})
+    assert result["success"] is False
+    assert result["message"] == "missing argument: geometry"
+
+
 def test_move_resize_passes_comma_geometry_through(monkeypatch: object) -> None:
     calls: list[list[str]] = []
     _patch_run(monkeypatch, calls)
