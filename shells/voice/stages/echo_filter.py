@@ -11,7 +11,7 @@ __all__ = ["EchoFilter"]
 
 _WINDOW_SECONDS = 12.0
 _SIMILARITY = 0.75
-_SHORT_SIMILARITY = 0.95
+_IDENTITY_SIMILARITY = 0.95
 _SHORT_LENGTH = 10
 _MAX_ECHO_LENGTH_RATIO = 1.25
 
@@ -32,22 +32,24 @@ class EchoFilter:
         self._now = now
 
     def process(self, utterance: Utterance) -> Utterance | None:
-        # A leading wake word marks speech addressed to TUSK; matching any position would let
-        # TTS replies containing the ordinary word "task" bypass echo-dropping when echoed back.
-        if _starts_with_wake_word(utterance.text):
+        # A leading wake word forgives an utterance that merely mirrors recent speech, but not
+        # one that is near-identical to it — a self-echoed TTS reply must still be dropped.
+        match_ratio = self._best_match_ratio(_normalize(utterance.text))
+        if match_ratio is None:
             return utterance
+        if match_ratio < _IDENTITY_SIMILARITY and _starts_with_wake_word(utterance.text):
+            return utterance
+        self._log_drop(utterance.text)
+        return None
+
+    def _best_match_ratio(self, text: str) -> float | None:
         spoken = self._recent_texts()
-        if spoken and self._matches(_normalize(utterance.text), spoken):
-            self._log_drop(utterance.text)
-            return None
-        return utterance
+        ratios = [ratio for run in _contiguous_runs(spoken) if (ratio := _match_ratio(text, run)) is not None]
+        return max(ratios, default=None)
 
     def _recent_texts(self) -> list[str]:
         cutoff = self._now() - _WINDOW_SECONDS
         return [_normalize(text) for text, ended_at in self._recent_speech() if ended_at >= cutoff]
-
-    def _matches(self, text: str, spoken: list[str]) -> bool:
-        return any(_similar(text, candidate) for candidate in _contiguous_runs(spoken))
 
     def _log_drop(self, text: str) -> None:
         if self._log is not None:
@@ -75,12 +77,13 @@ def _normalize(text: str) -> str:
     return " ".join(text.lower().split()).strip(".,!?")
 
 
-def _similar(text: str, candidate: str) -> bool:
+def _match_ratio(text: str, candidate: str) -> float | None:
     if not text or not candidate:
-        return False
+        return None
     # a much longer utterance is an echo merged with live speech, not a pure echo — let it through
     if len(text) > len(candidate) * _MAX_ECHO_LENGTH_RATIO:
-        return False
+        return None
     # short commands (stop, yes, play) collide easily, so demand a near-exact match before dropping one
-    threshold = _SHORT_SIMILARITY if min(len(text), len(candidate)) < _SHORT_LENGTH else _SIMILARITY
-    return difflib.SequenceMatcher(None, text, candidate).ratio() >= threshold
+    threshold = _IDENTITY_SIMILARITY if min(len(text), len(candidate)) < _SHORT_LENGTH else _SIMILARITY
+    ratio = difflib.SequenceMatcher(None, text, candidate).ratio()
+    return ratio if ratio >= threshold else None
