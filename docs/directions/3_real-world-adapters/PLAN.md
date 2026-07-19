@@ -1,14 +1,19 @@
 # Plan: "Actually Does Things" Adapters (email, calendar)
 
 **Branch:** `feature/mcp-hardening`, then `feature/pim-adapters` · **Depends on:**
-[approvals](../approvals-and-audit-trail/README.md) Milestone A (the `requires_approval`
+[approvals](../1_approvals-and-audit-trail/README.md) Milestone A (the `requires_approval`
 flag) before any *write* tool ships; read-only tools can ship earlier ·
 **Unblocks:** back-office/assistant presets in
-[vertical-packaging](../vertical-packaging/README.md).
+[vertical-packaging](../6_vertical-packaging/README.md).
 
 Strategy: harden the MCP client against real-world servers first (cheap, pure tests),
 then add runtimes, then wrap one email and one calendar server read-only, then enable
 writes behind approvals. Every write tool ships flagged `requires_approval` from day one.
+
+**Fine-grained execution detail:** [PLAN-DETAILS.md](PLAN-DETAILS.md) — commit-by-commit
+with code anchors; multi-part content handling turned out to already exist, and the real
+dialect gaps are id-matching/notifications (see its corrections section) — it wins where
+the two differ.
 
 ## Milestone A — MCP dialect hardening
 

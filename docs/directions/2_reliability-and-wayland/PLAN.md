@@ -9,6 +9,10 @@ reliability (no new host components) and can land immediately. C and D introduce
 Wayland bridge. Keyboard/typing comes before mouse — dictation and coding are the
 verticals that need Wayland first, and they don't need pointer control.
 
+**Fine-grained execution detail:** [PLAN-DETAILS.md](PLAN-DETAILS.md) — commit-by-commit
+with code anchors; A1/A2 as written below are already covered by existing code (see its
+corrections section), so the details file wins where they differ.
+
 ## Phase A — Adapter supervision
 
 ### A1. Liveness primitive

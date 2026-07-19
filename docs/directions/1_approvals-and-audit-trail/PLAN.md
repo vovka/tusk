@@ -1,8 +1,8 @@
 # Plan: Approvals & Action Audit Trail
 
 **Branch:** `feature/approvals` · **Depends on:** nothing · **Unblocks:** write tools in
-[real-world-adapters](../real-world-adapters/README.md), accessibility preset in
-[vertical-packaging](../vertical-packaging/README.md).
+[real-world-adapters](../3_real-world-adapters/README.md), accessibility preset in
+[vertical-packaging](../6_vertical-packaging/README.md).
 
 Three PR-sized milestones. A ships flag plumbing with zero behavior change; B ships the
 approval turn boundary; C ships the journal. Each leaves main releasable. TDD throughout:

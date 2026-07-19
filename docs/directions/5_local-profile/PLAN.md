@@ -1,13 +1,17 @@
 # Plan: Fully-Local Privacy Profile
 
 **Branch:** `feature/local-llm`, `feature/local-tts` (parallel) · **Depends on:** nothing ·
-**Unblocks:** `local-private` preset in [vertical-packaging](../vertical-packaging/README.md).
+**Unblocks:** `local-private` preset in [vertical-packaging](../6_vertical-packaging/README.md).
 
 Two small provider PRs, a compose PR, then a validation campaign. The plumbing is
 deliberately boring — the deciding work is Milestone D's measurements, which produce the
 shippable "known-good local config". Intermediate deliverable after A alone: *local speech*
 profile (local STT + local gatekeeper, cloud agents) — private audio without waiting for
 local agent quality.
+
+**Fine-grained execution detail:** [PLAN-DETAILS.md](PLAN-DETAILS.md) — commit-by-commit
+with code anchors (including the second factory call site inside the coding adapter that
+a constructor change must follow).
 
 ## Milestone A — Local LLM provider
 

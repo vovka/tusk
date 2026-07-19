@@ -2,14 +2,19 @@
 
 **Branch:** `feature/coding-symbols`, then `feature/vscode-bridge` · **Depends on:**
 nothing (Milestone A); B benefits from
-[reliability](../reliability-and-wayland/README.md) landing first but doesn't require it ·
+[reliability](../2_reliability-and-wayland/README.md) landing first but doesn't require it ·
 **Unblocks:** the "hands-free coding" preset in
-[vertical-packaging](../vertical-packaging/README.md).
+[vertical-packaging](../6_vertical-packaging/README.md).
 
 Milestone A is adapter-only and improves *today's* experience with the existing
 input-automation driver. B is the editor-native bridge — the strategic piece. C grows the
 command language on top of both. Ship A before B: it derisks the planner prompt work and
 delivers user-visible value in days, not weeks.
+
+**Fine-grained execution detail:** [PLAN-DETAILS.md](PLAN-DETAILS.md) — commit-by-commit
+with code anchors. Important: `LineAnchoredEditStrategy` is no longer dormant (a
+`VerifiedEditStrategy` already wires it with read-back repair), so the real Milestone A
+gap is the adapter emitting whole-buffer ops — the details file supersedes B3/C1 below.
 
 ## Milestone A — Semantic grounding (adapter-only)
 

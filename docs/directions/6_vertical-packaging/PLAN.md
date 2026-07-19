@@ -2,9 +2,9 @@
 
 **Branch:** `feature/adapter-allowlist`, then `feature/profiles` · **Depends on:** nothing
 for the mechanism; individual presets mature as their directions land
-([local-profile](../local-profile/README.md) → `local-private`,
-[approvals](../approvals-and-audit-trail/README.md) → `accessibility`,
-[coding-vertical](../coding-vertical/README.md) → `coding` at full strength) ·
+([local-profile](../5_local-profile/README.md) → `local-private`,
+[approvals](../1_approvals-and-audit-trail/README.md) → `accessibility`,
+[coding-vertical](../4_coding-vertical/README.md) → `coding` at full strength) ·
 **Unblocks:** per-vertical positioning ("TUSK for hands-free coding") the research calls
 the fastest PMF path.
 
@@ -12,6 +12,10 @@ The mechanism is deliberately dumb: a profile **is** an env file layered under t
 `.env`. One code change (adapter allowlist), one compose change, presets as data, a
 guardrail test to stop drift. Ship the mechanism with two presets that work *today*
 (coding, dictation); grow the list as other directions land.
+
+**Fine-grained execution detail:** [PLAN-DETAILS.md](PLAN-DETAILS.md) — commit-by-commit
+with code anchors, concrete preset contents, and the guardrail test's source-scraping
+approach.
 
 ## Milestone A — Adapter allowlist
 
