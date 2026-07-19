@@ -6,7 +6,7 @@ _DEFINITIONS = [
     ("focus_window", "Focus a window", {"window_title": "string"}),
     ("maximize_window", "Maximize a window", {"window_title": "string"}),
     ("minimize_window", "Minimize a window", {"window_title": "string"}),
-    ("move_resize_window", "Move and resize a window", {"window_title": "string", "geometry": "string"}),
+    ("move_resize_window", "Move and resize a window. geometry is X,Y,WIDTH,HEIGHT in desktop pixels, e.g. 0,0,1440,1800", {"window_title": "string", "geometry": "string"}),
     ("switch_workspace", "Switch workspace", {"workspace_number": "string"}),
     ("press_keys", "Press keys", {"keys": "string"}),
     ("type_text", "Type text", {"text": "string"}),
