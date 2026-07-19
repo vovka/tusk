@@ -85,3 +85,8 @@ def test_wake_word_followed_by_colon_is_not_dropped() -> None:
 def test_mid_sentence_wake_word_does_not_bypass_echo_drop() -> None:
     echo = _filter([("Completing the task.", 100.0)])
     assert echo.process(_utterance("Completing the task.")) is None
+
+
+def test_leading_wake_word_does_not_rescue_near_exact_echo() -> None:
+    echo = _filter([("Task completed.", 100.0)])
+    assert echo.process(_utterance("Task completed.")) is None
