@@ -65,6 +65,13 @@ def test_current_speech_text_set_only_while_speaking() -> None:
     await_condition(lambda: worker.current_speech_text is None)
 
 
+def test_recent_speech_exposes_spoken_replies() -> None:
+    worker = make_worker(recording_submit([]), tts=working_tts(), playback=types.SimpleNamespace(play=lambda wav: None))
+    worker.enqueue("hi")
+    await_condition(lambda: bool(worker.recent_speech))
+    assert [text for text, _ended in worker.recent_speech] == ["a reply"]
+
+
 def test_token_cleared_when_job_starts() -> None:
     token = InterruptToken()
     token.interrupt()

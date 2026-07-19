@@ -83,6 +83,36 @@ def test_speak_without_engine_does_nothing() -> None:
     assert played == []
 
 
+def test_recent_speech_records_spoken_text() -> None:
+    engine = types.SimpleNamespace(synthesize_chunks=lambda text: iter([b"one"]))
+    speaker = _speaker(engine, [])
+    speaker.speak("Switching to PowerPoint.")
+    assert [text for text, _ended in speaker.recent_speech()] == ["Switching to PowerPoint."]
+
+
+def test_recent_speech_stays_empty_without_engine() -> None:
+    speaker = _speaker(None, [])
+    speaker.speak("hello")
+    assert speaker.recent_speech() == []
+
+
+def test_recent_speech_records_once_per_reply() -> None:
+    engine = types.SimpleNamespace(synthesize_chunks=lambda text: iter([b"one", b"two"]))
+    speaker = _speaker(engine, [])
+    speaker.speak("Opening gedit with a poem.")
+    assert [text for text, _ended in speaker.recent_speech()] == ["Opening gedit with a poem."]
+
+
+def test_recent_speech_empty_when_interrupted_before_playback() -> None:
+    engine = types.SimpleNamespace(synthesize_chunks=lambda text: iter([b"one"]))
+    token = types.SimpleNamespace(is_interrupted=True)
+    played: list[bytes] = []
+    log = types.SimpleNamespace(log=lambda *args: None)
+    speaker = ChunkedSpeaker(engine, types.SimpleNamespace(play=played.append), log, token)
+    speaker.speak("Switching to PowerPoint.")
+    assert played == [] and speaker.recent_speech() == []
+
+
 def _slow_first_chunk(started: threading.Event, release: threading.Event) -> object:
     def synthesize_chunks(text: str):
         started.set()

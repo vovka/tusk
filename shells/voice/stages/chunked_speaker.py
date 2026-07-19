@@ -1,5 +1,7 @@
 import queue
 import threading
+import time
+from collections import deque
 from collections.abc import Generator, Iterator
 
 from shells.voice.stages.speech_playback import SpeechPlayback
@@ -9,6 +11,7 @@ from tusk.shared.tts.interfaces.tts_engine import TTSEngine
 __all__ = ["ChunkedSpeaker"]
 
 _END_OF_CHUNKS = object()
+_RECENT_MAX = 8
 
 
 class ChunkedSpeaker:
@@ -23,10 +26,17 @@ class ChunkedSpeaker:
         self._log = log_printer
         self._token = interrupt_token
         self._current_text: str | None = None
+        self._recent: deque[tuple[str, float]] = deque(maxlen=_RECENT_MAX)
+        self._recent_lock = threading.Lock()
 
     @property
     def current_text(self) -> str | None:
         return self._current_text
+
+    def recent_speech(self) -> list[tuple[str, float]]:
+        # the append runs on the worker thread while this reads on the pipeline thread
+        with self._recent_lock:
+            return list(self._recent)
 
     def speak(self, text: str) -> None:
         if self._tts is None:
@@ -48,12 +58,25 @@ class ChunkedSpeaker:
         for wav_clip in clips:
             if self._interrupted():
                 return
-            self._current_text = text
-            self._playback.play(wav_clip)
-            # clear during the silent gap while the next chunk synthesizes, so live speech isn't dropped as echo
-            self._current_text = None
+            self._play_one(wav_clip, text)
             if self._interrupted():
                 return
+
+    def _play_one(self, wav_clip: bytes, text: str) -> None:
+        self._current_text = text
+        self._playback.play(wav_clip)
+        # clear during the silent gap while the next chunk synthesizes, so live speech isn't dropped as echo
+        self._current_text = None
+        # refresh after every clip so a late clip in a long reply keeps the echo window from expiring
+        self._remember_spoken(text)
+
+    def _remember_spoken(self, text: str) -> None:
+        with self._recent_lock:
+            # one entry per reply: refresh the timestamp on repeats instead of piling up per chunk
+            if self._recent and self._recent[-1][0] == text:
+                self._recent[-1] = (text, time.monotonic())
+            else:
+                self._recent.append((text, time.monotonic()))
 
     def _prefetched(self, chunks: Iterator[bytes]) -> Generator[bytes, None, None]:
         buffered: "queue.Queue[object]" = queue.Queue(maxsize=2)

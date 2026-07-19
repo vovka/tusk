@@ -9,6 +9,7 @@ from shells.voice.playback_gate import PlaybackGate
 from shells.voice.stages.gate.stop_gatekeeper import StopGatekeeper
 from shells.voice.stages.gate.gatekeeper import LLMGatekeeper
 from shells.voice.stages.chunked_speaker import ChunkedSpeaker
+from shells.voice.stages.echo_filter import EchoFilter
 from shells.voice.stages.speech_playback import SpeechPlayback
 from shells.voice.stages.gate.speech_stop_gate import SpeechStopGate
 from shells.voice.voice_shell import VoiceShell
@@ -55,9 +56,11 @@ class ShellLoader:
     def _build_voice(self, shell_class: object) -> object:
         stt_engine = self._stt_engine()
         worker = self._build_worker()
+        echo_filter = EchoFilter(lambda: worker.recent_speech, self._log)
         shell = shell_class(
             self._config, self._log, stt_engine=stt_engine, gatekeeper=self._gatekeeper(worker),
             worker=worker, reporter=self._reporter, on_interrupt=self._interrupt_callback(worker),
+            echo_filter=echo_filter,
         )
         self._control = shell
         return shell

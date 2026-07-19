@@ -15,6 +15,16 @@ def test_startup_options_expand_groups_and_preview_config() -> None:
     assert "llm-payload-full" in help_text
 
 
+def test_echo_filter_drop_log_group_is_selectable() -> None:
+    options = StartupOptions.from_sources(["--show-logs", "echo-filter"], {})
+    assert "echo-filter" in options.log_groups
+
+
+def test_show_logs_all_includes_echo_filter_drops() -> None:
+    options = StartupOptions.from_sources(["--show-logs", "all"], {})
+    assert "echo-filter" in options.log_groups
+
+
 def test_startup_options_support_exclusions() -> None:
     options = StartupOptions.from_sources(["--show-logs", "all,-buffer", "--llm-log-preview-chars", "240"], {})
     assert "buffer" not in options.log_groups
