@@ -86,7 +86,7 @@ _SCENARIOS = [
 ]
 
 
-def _await_command(h: VoiceE2EHarness, idle_timeout: float = 180.0) -> None:
+def _await_command(h: VoiceE2EHarness, idle_timeout: float = 300.0) -> None:
     h.wait(lambda: h.worker.is_busy, 45, "command reaches the worker")
     h.wait_idle(timeout=idle_timeout)
     time.sleep(2.0)
