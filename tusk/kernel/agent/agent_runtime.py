@@ -17,7 +17,8 @@ from tusk.shared.logging.interfaces.log_printer import LogPrinter
 
 class AgentRuntime:
     def __init__(
-        self, session_store: Store, log_printer: LogPrinter, interrupt_token: object | None = None,
+        self, session_store: Store, log_printer: LogPrinter,
+        step_recorder: StepRecorder, interrupt_token: object | None = None,
     ) -> None:
         self._store = session_store
         self._log = log_printer
@@ -25,7 +26,7 @@ class AgentRuntime:
         self._failure = ModelFailureReplyBuilder()
         self._history = MessageHistoryBuilder(session_store)
         self._results = ResultFactory(session_store)
-        self._record = StepRecorder(session_store)
+        self._record = step_recorder
 
     def run(
         self, request: AgentRunRequest, profile: AgentProfile,

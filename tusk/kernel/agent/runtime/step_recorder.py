@@ -2,13 +2,15 @@ from tusk.shared.schemas.tools.tool_call import ToolCall
 from tusk.shared.schemas.tools.tool_result import ToolResult
 import json
 from tusk.kernel.agent.session.store import Store
+from tusk.kernel.tools.tool_registry import ToolRegistry
 
 __all__ = ["StepRecorder"]
 
 
 class StepRecorder:
-    def __init__(self, session_store: Store) -> None:
+    def __init__(self, session_store: Store, tool_registry: ToolRegistry) -> None:
         self._store = session_store
+        self._registry = tool_registry
 
     def append_message(self, session_id: str, role: str, content: str) -> None:
         self._store.append_event(session_id, "message_appended", {"role": role, "content": content})
@@ -29,13 +31,28 @@ class StepRecorder:
         if child is not None:
             messages.append({"role": "assistant", "content": child})
             return
-        messages.append({"role": "user", "content": _transcript_message(tool_result)})
+        messages.append({"role": "user", "content": self._user_message(tool_call, tool_result)})
         clipboard = _clipboard_message(tool_call, tool_result)
         if clipboard is not None:
             messages.append({"role": "assistant", "content": clipboard})
 
+    def _user_message(self, tool_call: ToolCall, tool_result: ToolResult) -> str:
+        message = _transcript_message(tool_result)
+        if tool_result.success and self._is_actuator(tool_call.tool_name):
+            return message + _DONE_NUDGE
+        return message
+
+    def _is_actuator(self, tool_name: str) -> bool:
+        # Only actuators (sequence_callable) finish a command; read-only probes must keep probing.
+        try:
+            return self._registry.get(tool_name).sequence_callable
+        except KeyError:
+            return False
+
 
 _MESSAGE_LIMIT_CHARS = 500
+
+_DONE_NUDGE = " Call the done tool now if the command is complete."
 
 
 def _transcript_message(tool_result: ToolResult) -> str:

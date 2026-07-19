@@ -9,6 +9,7 @@ from tusk.kernel.agent.agent_result import AgentResult
 from tusk.kernel.agent.guards.agent_run_guard import AgentRunGuard
 from tusk.kernel.agent.agent_run_request import AgentRunRequest
 from tusk.kernel.agent.agent_runtime import AgentRuntime
+from tusk.kernel.agent.runtime.step_recorder import StepRecorder
 from tusk.kernel.agent.session.store import Store
 from tusk.kernel.agent.agent_tool_catalog import AgentToolCatalog
 from tusk.kernel.agent.agent_toolset_builder import AgentToolsetBuilder
@@ -39,7 +40,7 @@ class AgentOrchestrator:
         self._init_components(session_store, log_printer, tool_registry, interrupt_token, tracer)
 
     def _init_components(self, store: Store, log: LogPrinter, registry: ToolRegistry, token: object | None, tracer: Tracer | None) -> None:
-        self._runtime = AgentRuntime(store, log, token)
+        self._runtime = AgentRuntime(store, log, StepRecorder(store, registry), token)
         self._guard = AgentRunGuard()
         self._children = AgentChildRunner(store)
         self._executor_tools = ExecutorToolGuard()
