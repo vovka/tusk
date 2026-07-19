@@ -91,7 +91,8 @@ class Executor:
         summary = self._summary(plan, "completed")
         self._record.finished(session_id, "done", summary)
         payload = self._payload("done", plan, completed, "", results)
-        return ToolResult(True, summary, payload)
+        # the directive ends the wrapper LLM's transcript so it calls done instead of re-running the sequence
+        return ToolResult(True, f"{summary}. Call the done tool now to finish.", payload)
 
     def _failed(self, session_id: str, plan: ToolSequencePlan, completed: list[str],
                 failed_step_id: str, results: dict[str, object], message: str) -> ToolResult:
