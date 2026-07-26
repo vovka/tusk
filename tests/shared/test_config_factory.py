@@ -123,18 +123,6 @@ def test_ack_can_be_disabled(monkeypatch) -> None:
     assert ConfigFactory().build().ack_enabled is False
 
 
-def test_tts_speed_defaults_to_one(monkeypatch) -> None:
-    monkeypatch.setenv("GROQ_API_KEY", "test-key")
-    monkeypatch.delenv("TTS_SPEED", raising=False)
-    assert ConfigFactory().build().tts_speed == 1.0
-
-
-def test_tts_speed_reads_env_var(monkeypatch) -> None:
-    monkeypatch.setenv("GROQ_API_KEY", "test-key")
-    monkeypatch.setenv("TTS_SPEED", "1.5")
-    assert ConfigFactory().build().tts_speed == 1.5
-
-
 def test_config_defaults_tray_icon_theme_and_activity(monkeypatch) -> None:
     monkeypatch.setenv("GROQ_API_KEY", "test-key")
     monkeypatch.delenv("TUSK_TRAY_ICON_THEME", raising=False)

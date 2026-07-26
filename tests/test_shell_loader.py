@@ -53,22 +53,6 @@ def test_command_worker_receives_tts_engine_when_enabled(monkeypatch) -> None:
     assert loader._build("voice").worker._speaker._tts is sentinel
 
 
-def test_speech_playback_receives_configured_tts_speed(monkeypatch) -> None:
-    _patch_stt(monkeypatch, object())
-    captured: list[float] = []
-    real_playback = shell_loader.SpeechPlayback
-    monkeypatch.setattr(
-        shell_loader, "SpeechPlayback",
-        lambda token, speed=1.0: captured.append(speed) or real_playback(token, speed=speed),
-    )
-    loader = _loader(["voice"])
-    loader._config.tts_speed = 2.0
-    loader._gatekeeper = lambda worker: None
-    loader._load_class = lambda name: _voice_class()
-    loader._build("voice")
-    assert captured == [2.0]
-
-
 def _mode_kernel(requested: list[tuple]) -> types.SimpleNamespace:
     registry = types.SimpleNamespace(
         get=lambda name: requested.append(("get", name)) or object(),

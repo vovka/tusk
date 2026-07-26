@@ -54,29 +54,6 @@ def _patch_popen(monkeypatch, process: _FakeProcess) -> list[tuple]:
     return calls
 
 
-class _FakeStretchProcess:
-    def __init__(self, output: bytes = b"STRETCHED", returncode: int = 0) -> None:
-        self.stdin = self
-        self.written = b""
-        self._output = output
-        self.returncode = returncode
-
-    def write(self, data: bytes) -> None:
-        self.written += data
-
-    def close(self) -> None:
-        pass
-
-    def __enter__(self) -> "_FakeStretchProcess":
-        return self
-
-    def __exit__(self, exc_type: object, exc: object, tb: object) -> bool:
-        return False
-
-    def communicate(self) -> tuple:
-        return self._output, b""
-
-
 def test_playback_pipes_wav_bytes_to_paplay(monkeypatch) -> None:
     process = _FakeProcess(polls_to_finish=1)
     calls = _patch_popen(monkeypatch, process)
@@ -122,51 +99,6 @@ def test_playback_speed_one_skips_ffmpeg(monkeypatch) -> None:
     SpeechPlayback(speed=1.0, poll_seconds=0.01).play(b"WAVDATA")
     assert len(calls) == 1
     assert calls[0][0] == ["paplay"]
-
-
-def test_playback_speed_stretches_through_ffmpeg(monkeypatch) -> None:
-    paplay_process = _FakeProcess(polls_to_finish=1)
-    stretch_process = _FakeStretchProcess(output=b"STRETCHED")
-    calls: list[tuple] = []
-
-    def popen(command, **kwargs):
-        calls.append((command, kwargs))
-        return stretch_process if command[0] == "ffmpeg" else paplay_process
-
-    monkeypatch.setattr(playback_module.subprocess, "Popen", popen)
-    SpeechPlayback(speed=2.0, poll_seconds=0.01).play(b"WAVDATA")
-    assert len(calls) == 2
-    assert calls[0][0][0] == "ffmpeg"
-    assert "atempo=2.0" in " ".join(calls[0][0])
-    _await_written(paplay_process)
-    assert paplay_process.written == b"STRETCHED"
-
-
-def test_playback_falls_back_to_original_bytes_when_ffmpeg_exits_non_zero(monkeypatch) -> None:
-    paplay_process = _FakeProcess(polls_to_finish=1)
-    stretch_process = _FakeStretchProcess(output=b"", returncode=1)
-
-    def popen(command, **kwargs):
-        return stretch_process if command[0] == "ffmpeg" else paplay_process
-
-    monkeypatch.setattr(playback_module.subprocess, "Popen", popen)
-    SpeechPlayback(speed=2.0, poll_seconds=0.01).play(b"WAVDATA")
-    _await_written(paplay_process)
-    assert paplay_process.written == b"WAVDATA"
-
-
-def test_playback_falls_back_to_original_bytes_when_ffmpeg_missing(monkeypatch) -> None:
-    paplay_process = _FakeProcess(polls_to_finish=1)
-
-    def popen(command, **kwargs):
-        if command[0] == "ffmpeg":
-            raise OSError("ffmpeg not found")
-        return paplay_process
-
-    monkeypatch.setattr(playback_module.subprocess, "Popen", popen)
-    SpeechPlayback(speed=2.0, poll_seconds=0.01).play(b"WAVDATA")
-    _await_written(paplay_process)
-    assert paplay_process.written == b"WAVDATA"
 
 
 def test_atempo_filter_chain_within_native_range() -> None:

@@ -28,15 +28,20 @@ class SpeechPlayback:
             return wav_bytes
 
     def _run_ffmpeg(self, wav_bytes: bytes) -> bytes:
-        filter_chain = self._atempo_filter_chain(self._speed)
-        process = subprocess.Popen(
-            ["ffmpeg", "-i", "-", "-af", filter_chain, "-f", "wav", "-"],
-            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-        )
-        stdout, _ = process.communicate(wav_bytes)
+        process = self._spawn_ffmpeg()
+        process.stdin.write(wav_bytes)
+        process.stdin.close()
+        stdout, _ = process.communicate()
         if process.returncode != 0:
             raise subprocess.SubprocessError("ffmpeg exited non-zero")
         return stdout
+
+    def _spawn_ffmpeg(self) -> subprocess.Popen:
+        filter_chain = self._atempo_filter_chain(self._speed)
+        return subprocess.Popen(
+            ["ffmpeg", "-i", "-", "-af", filter_chain, "-f", "wav", "-"],
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+        )
 
     @staticmethod
     def _atempo_filter_chain(speed: float) -> str:

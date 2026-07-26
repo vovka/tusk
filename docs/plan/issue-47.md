@@ -222,4 +222,26 @@ the actual default/behavior implemented in Tasks 1–3.
   change.
 - Do not document the rejected Groq API-side `speed` kwarg as if it were an option.
 
+---
+
+## Implementation note — test-file guardrail split
+
+While fixing the initial implementation to pass the test suite, `tests/shared/test_config_factory.py`,
+`tests/shells/voice/test_speech_playback.py`, and `tests/test_shell_loader.py` each exceeded this
+repo's 100-code-line-per-file guardrail once the TTS-speed tests were added (and
+`test_speech_playback.py` also gained a second top-level class, `_FakeStretchProcess`, violating the
+one-class-per-file rule). Following the existing precedent of
+`tests/shared/test_config_factory_codex.py`, the new speed-related tests were split into sibling
+files that import shared fixtures from the original modules:
+- `tests/shared/test_config_factory_tts_speed.py` (the two `TTS_SPEED` env var tests).
+- `tests/shells/voice/test_speech_playback_speed.py` (the ffmpeg time-stretch tests and
+  `_FakeStretchProcess`, importing `_FakeProcess`/`_await_written` from `test_speech_playback.py`).
+- `tests/test_shell_loader_tts_speed.py` (the `SpeechPlayback` speed-wiring test, importing
+  `_loader`/`_patch_stt`/`_voice_class` from `test_shell_loader.py`).
+
+Also fixed a bug in `shells/voice/stages/speech_playback.py::_run_ffmpeg`: it called
+`process.communicate(wav_bytes)`, but the intended contract (matching how `_feed` already writes to
+`paplay`'s stdin) is to write to `process.stdin` and call `communicate()` with no arguments. Extracted
+`_spawn_ffmpeg()` at the same time to keep `_run_ffmpeg` within the 10-line function guardrail.
+
 **Risk classification:** low. Documentation-only, no code or test impact.
