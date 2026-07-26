@@ -64,9 +64,10 @@ following an existing pattern exactly; no behavioral change to any existing fiel
 ## Task 2 — Add speed-aware playback to `SpeechPlayback`
 
 **Goal:** `SpeechPlayback` accepts a `speed` setting at construction and, when it is not
-`1.0`, time-stretches WAV bytes through `ffmpeg -af atempo=<speed>` before handing them
-to `paplay`. At `speed == 1.0` playback is byte-for-byte identical to today (no `ffmpeg`
-process spawned at all).
+`1.0`, time-stretches WAV bytes through `ffmpeg -af <atempo-filter-chain>` (chaining
+`atempo` stages as needed for speeds outside `0.5`–`2.0`) before handing them to
+`paplay`, falling back to the unstretched bytes if that step fails. At `speed == 1.0`
+playback is byte-for-byte identical to today (no `ffmpeg` process spawned at all).
 
 **Affected paths:**
 - `shells/voice/stages/speech_playback.py`
@@ -85,13 +86,24 @@ constructor parameter, not the `Config` wiring) and can proceed in parallel.
   `subprocess.Popen(["paplay"], stdin=subprocess.PIPE)` call, raw bytes fed directly.
   No `ffmpeg` process is spawned.
 - At `speed != 1.0`: `play(wav_bytes)` first pipes `wav_bytes` through
-  `ffmpeg -af atempo=<speed> -f wav -` (via `subprocess.Popen`, consistent with the
+  `ffmpeg -af <atempo-filter-chain> -f wav -` (via `subprocess.Popen`, consistent with the
   existing `paplay` integration style), and the stretched stdout is what gets fed to
   `paplay`. The existing interrupt/timeout guard (`_await`, 30 s cap, `InterruptToken`
   polling) continues to govern the `paplay` process exactly as before.
+- Because `ffmpeg`'s single `atempo` filter only accepts `0.5`–`2.0`, a small helper
+  (e.g. `_atempo_filter_chain(speed) -> str`) decomposes any requested `speed` into a
+  chain of factors each within `0.5`–`2.0` and joins them with commas — e.g. `1.5` →
+  `"atempo=1.5"`, `2.0` → `"atempo=2.0"`, `3.0` → `"atempo=2.0,atempo=1.5"`, `4.0` →
+  `"atempo=2.0,atempo=2.0"`. This closes the failure mode where a documented, in-scope
+  speed value (the issue's "x2, and so on" covers values above `2.0`) would otherwise be
+  rejected by `ffmpeg` outright.
+- If the `ffmpeg` stretch step fails for any reason (non-zero exit, `OSError`, or any
+  other error obtaining stretched bytes), `play()` falls back to feeding the original,
+  unstretched `wav_bytes` to `paplay` and logs the failure — it must never result in no
+  audio being played at all.
 - Each new unit of logic stays within the 10-line-per-method guideline in this
-  repo's `CLAUDE.md`; extract a helper (e.g. `_stretch(wav_bytes)`) rather than growing
-  `play()` past that.
+  repo's `CLAUDE.md`; extract helpers (e.g. `_stretch(wav_bytes)`,
+  `_atempo_filter_chain(speed)`) rather than growing `play()` past that.
 
 **Tests expected to pass:**
 - Existing tests in `tests/shells/voice/test_speech_playback.py`
@@ -106,21 +118,24 @@ constructor parameter, not the `Config` wiring) and can proceed in parallel.
 - New test: at `speed == 2.0` (or similar), two `subprocess.Popen` calls are made — one
   for `ffmpeg` with `atempo=2.0` in its argument list, one for `paplay` — and the bytes
   fed to `paplay`'s stdin are the `ffmpeg` process's stdout, not the raw input bytes.
-- New test: an `ffmpeg` subprocess failure (non-zero exit / `OSError` on write) is
-  handled the same defensive way `_feed`'s `OSError` is handled today — it must not
-  raise out of `play()`.
+- New unit tests for `_atempo_filter_chain(speed)` covering `1.5` (`"atempo=1.5"`), `2.0`
+  (`"atempo=2.0"`), `3.0` (`"atempo=2.0,atempo=1.5"`), and `4.0`
+  (`"atempo=2.0,atempo=2.0"`).
+- New test: when the `ffmpeg` stretch step fails (non-zero exit / `OSError`), `play()`
+  does not raise, and `paplay`'s stdin still receives the original, unstretched
+  `wav_bytes` (not empty bytes, not a raised exception) — asserting the fallback path,
+  not a swallowed failure.
 
 **Explicit exclusions:**
 - Do not read `TTS_SPEED` or `Config` from this file — `speed` arrives purely as a
   constructor parameter; wiring it from config is Task 3.
-- Do not implement chained/multi-stage `atempo` filters for speeds above `2.0`
-  (`ffmpeg`'s native single-filter range is `0.5`–`2.0`) — the issue's examples are
-  `1.0`/`1.5`/`2.0`, and the architecture doc explicitly flags chaining as a future
-  concern, not a blocker for this task.
-- Do not add speed validation/clamping (e.g. rejecting `0` or negative values) beyond
-  whatever `ffmpeg` itself does — out of scope per the architecture doc's "left to
-  implementation" note; do not gold-plate this task with range-checking not requested
-  by the issue.
+- Do not add speed validation/clamping for values `ffmpeg` cannot represent at all (e.g.
+  `0` or negative) beyond whatever `ffmpeg` itself does — out of scope per the
+  architecture doc's "left to implementation" note. This is distinct from the
+  `atempo` chain-decomposition above: chaining is required so that in-range positive
+  speeds (including anything above `2.0`, which the issue's "x2, and so on" covers) are
+  actually played, not silently dropped; do not gold-plate beyond that with rejecting
+  values the issue never asks for.
 - Do not change `ChunkedSpeaker` or any other caller of `SpeechPlayback`.
 - Do not touch `GroqTTS` or send any `speed` kwarg to the Groq SDK.
 
