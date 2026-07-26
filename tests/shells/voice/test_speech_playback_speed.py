@@ -5,18 +5,12 @@ from tests.shells.voice.test_speech_playback import _FakeProcess, _await_written
 
 class _FakeStretchProcess:
     def __init__(self, output: bytes = b"STRETCHED", returncode: int = 0) -> None:
-        self.stdin = self
         self.written = b""
         self._output = output
         self.returncode = returncode
 
-    def write(self, data: bytes) -> None:
-        self.written += data
-
-    def close(self) -> None:
-        pass
-
-    def communicate(self) -> tuple:
+    def communicate(self, input: bytes | None = None) -> tuple:
+        self.written = input
         return self._output, b""
 
 
@@ -39,6 +33,7 @@ def test_playback_speed_stretches_through_ffmpeg(monkeypatch) -> None:
     assert len(calls) == 2
     assert calls[0][0][0] == "ffmpeg"
     assert "atempo=2.0" in " ".join(calls[0][0])
+    assert stretch_process.written == b"WAVDATA"
     _await_written(paplay_process)
     assert paplay_process.written == b"STRETCHED"
 

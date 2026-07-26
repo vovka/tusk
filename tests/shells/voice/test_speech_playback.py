@@ -106,6 +106,11 @@ def test_atempo_filter_chain_within_native_range() -> None:
     assert SpeechPlayback._atempo_filter_chain(2.0) == "atempo=2.0"
 
 
+def test_atempo_filter_chain_terminates_for_non_positive_speed() -> None:
+    assert SpeechPlayback._atempo_filter_chain(0.0) == "atempo=0.0"
+    assert SpeechPlayback._atempo_filter_chain(-1.0) == "atempo=-1.0"
+
+
 def test_atempo_filter_chain_above_native_range() -> None:
     assert SpeechPlayback._atempo_filter_chain(3.0) == "atempo=2.0,atempo=1.5"
     assert SpeechPlayback._atempo_filter_chain(4.0) == "atempo=2.0,atempo=2.0"

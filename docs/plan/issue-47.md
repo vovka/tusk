@@ -239,9 +239,19 @@ files that import shared fixtures from the original modules:
 - `tests/test_shell_loader_tts_speed.py` (the `SpeechPlayback` speed-wiring test, importing
   `_loader`/`_patch_stt`/`_voice_class` from `test_shell_loader.py`).
 
-Also fixed a bug in `shells/voice/stages/speech_playback.py::_run_ffmpeg`: it called
-`process.communicate(wav_bytes)`, but the intended contract (matching how `_feed` already writes to
-`paplay`'s stdin) is to write to `process.stdin` and call `communicate()` with no arguments. Extracted
-`_spawn_ffmpeg()` at the same time to keep `_run_ffmpeg` within the 10-line function guardrail.
+`_run_ffmpeg` keeps `process.communicate(wav_bytes)`. An earlier repair round replaced it with a
+manual `stdin.write()` / `stdin.close()` / `communicate()` sequence to satisfy a test double whose
+`communicate()` was missing the `input` parameter that real `subprocess.Popen.communicate` accepts.
+That was backwards: the double was wrong, not the production code. Writing stdin on the calling
+thread while nothing drains `ffmpeg`'s `stdout=PIPE` deadlocks once the pipe buffers fill (64 KiB
+each on Linux, against WAV chunks of several hundred KB), and `_stretch()` runs synchronously inside
+`play()` before `paplay` is spawned, so neither the 30 s cap nor the `InterruptToken` poll would
+recover. The double now mirrors the real signature and asserts the bytes reach `ffmpeg`.
+`_spawn_ffmpeg()` stays extracted to keep `_run_ffmpeg` within the 10-line function guardrail.
+
+`_atempo_filter_chain` guards its lower loop with `0.0 < remaining < 0.5` so that `TTS_SPEED=0` or a
+negative value terminates instead of looping forever (`remaining /= 0.5` never escapes from `0.0`,
+and diverges for negatives). This is not the range validation Task 2 excludes: the guard simply lets
+the value reach `ffmpeg`, which rejects it, so `play()` falls back to normal-speed audio as designed.
 
 **Risk classification:** low. Documentation-only, no code or test impact.

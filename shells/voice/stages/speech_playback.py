@@ -29,9 +29,9 @@ class SpeechPlayback:
 
     def _run_ffmpeg(self, wav_bytes: bytes) -> bytes:
         process = self._spawn_ffmpeg()
-        process.stdin.write(wav_bytes)
-        process.stdin.close()
-        stdout, _ = process.communicate()
+        # communicate() pumps stdin and stdout concurrently; writing stdin ourselves deadlocks
+        # once ffmpeg's stdout pipe buffer fills and it stops draining stdin
+        stdout, _ = process.communicate(wav_bytes)
         if process.returncode != 0:
             raise subprocess.SubprocessError("ffmpeg exited non-zero")
         return stdout
@@ -45,12 +45,14 @@ class SpeechPlayback:
 
     @staticmethod
     def _atempo_filter_chain(speed: float) -> str:
+        # The 0.0 lower bound keeps zero/negative speeds out of the second loop, which would never
+        # terminate for them; they reach ffmpeg instead, which rejects them so play() falls back.
         factors = []
         remaining = speed
         while remaining > 2.0:
             factors.append(2.0)
             remaining /= 2.0
-        while remaining < 0.5:
+        while 0.0 < remaining < 0.5:
             factors.append(0.5)
             remaining /= 0.5
         factors.append(remaining)
