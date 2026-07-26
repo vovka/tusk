@@ -74,6 +74,7 @@ class ConfigFactory:
             "audio_frame_duration_ms": self._int("AUDIO_FRAME_DURATION_MS", "30"),
             "vad_aggressiveness": self._int("VAD_AGGRESSIVENESS", "2"),
             "tts_enabled": os.environ.get("TUSK_TTS", "on").lower() not in ("off", "0", "false"),
+            "tts_speed": self._float("TTS_SPEED", "1.0"),
             "ack_enabled": os.environ.get("TUSK_ACK", "on").lower() not in ("off", "0", "false"),
         }
 

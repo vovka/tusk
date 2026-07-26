@@ -72,7 +72,7 @@ class ShellLoader:
     def _build_worker(self) -> CommandWorker:
         tts_engine = GroqTTS(self._config.groq_api_key) if self._config.tts_enabled else None
         token = self._kernel.interrupt_token
-        speaker = ChunkedSpeaker(tts_engine, SpeechPlayback(token), self._log, token)
+        speaker = ChunkedSpeaker(tts_engine, SpeechPlayback(token, speed=self._config.tts_speed), self._log, token)
         return CommandWorker(self._kernel.submit, speaker, self._log, token, self._config.ack_enabled)
 
     def _interrupt_callback(self, worker: CommandWorker) -> object:
