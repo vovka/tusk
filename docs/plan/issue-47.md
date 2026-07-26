@@ -222,4 +222,36 @@ the actual default/behavior implemented in Tasks 1–3.
   change.
 - Do not document the rejected Groq API-side `speed` kwarg as if it were an option.
 
+---
+
+## Implementation note — test-file guardrail split
+
+While fixing the initial implementation to pass the test suite, `tests/shared/test_config_factory.py`,
+`tests/shells/voice/test_speech_playback.py`, and `tests/test_shell_loader.py` each exceeded this
+repo's 100-code-line-per-file guardrail once the TTS-speed tests were added (and
+`test_speech_playback.py` also gained a second top-level class, `_FakeStretchProcess`, violating the
+one-class-per-file rule). Following the existing precedent of
+`tests/shared/test_config_factory_codex.py`, the new speed-related tests were split into sibling
+files that import shared fixtures from the original modules:
+- `tests/shared/test_config_factory_tts_speed.py` (the two `TTS_SPEED` env var tests).
+- `tests/shells/voice/test_speech_playback_speed.py` (the ffmpeg time-stretch tests and
+  `_FakeStretchProcess`, importing `_FakeProcess`/`_await_written` from `test_speech_playback.py`).
+- `tests/test_shell_loader_tts_speed.py` (the `SpeechPlayback` speed-wiring test, importing
+  `_loader`/`_patch_stt`/`_voice_class` from `test_shell_loader.py`).
+
+`_run_ffmpeg` keeps `process.communicate(wav_bytes)`. An earlier repair round replaced it with a
+manual `stdin.write()` / `stdin.close()` / `communicate()` sequence to satisfy a test double whose
+`communicate()` was missing the `input` parameter that real `subprocess.Popen.communicate` accepts.
+That was backwards: the double was wrong, not the production code. Writing stdin on the calling
+thread while nothing drains `ffmpeg`'s `stdout=PIPE` deadlocks once the pipe buffers fill (64 KiB
+each on Linux, against WAV chunks of several hundred KB), and `_stretch()` runs synchronously inside
+`play()` before `paplay` is spawned, so neither the 30 s cap nor the `InterruptToken` poll would
+recover. The double now mirrors the real signature and asserts the bytes reach `ffmpeg`.
+`_spawn_ffmpeg()` stays extracted to keep `_run_ffmpeg` within the 10-line function guardrail.
+
+`_atempo_filter_chain` guards its lower loop with `0.0 < remaining < 0.5` so that `TTS_SPEED=0` or a
+negative value terminates instead of looping forever (`remaining /= 0.5` never escapes from `0.0`,
+and diverges for negatives). This is not the range validation Task 2 excludes: the guard simply lets
+the value reach `ffmpeg`, which rejects it, so `play()` falls back to normal-speed audio as designed.
+
 **Risk classification:** low. Documentation-only, no code or test impact.

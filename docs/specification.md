@@ -76,6 +76,7 @@ There is **no kernel-side coding LLM slot**: the coding adapter owns its own mod
 | `AUDIO_FRAME_DURATION_MS` | `int` | `30` | `10`, `20`, or `30` (WebRTC VAD constraint) |
 | `VAD_AGGRESSIVENESS` | `int` | `2` | `0`–`3` |
 | `TUSK_TTS` | `bool` | on | Disabled by `off`, `0`, or `false` |
+| `TTS_SPEED` | `float` | `1.0` | Playback speed multiplier for spoken replies; `1.0` leaves playback unchanged |
 | `TUSK_ACK` | `bool` | on | Speak a brief refrain of the request before running it. Disabled by `off`, `0`, or `false` |
 | `FOLLOW_UP_TIMEOUT_SECONDS` | `float` | `30` | Gatekeeper follow-up window |
 | `MAX_FOLLOW_UP_TIMEOUT_SECONDS` | `float` | `120` | Parsed into `Config`; currently unused |
@@ -1153,7 +1154,9 @@ between the pipeline and the kernel:
 `paplay` subprocess fed WAV bytes from a daemon writer thread. The waiter polls every
 **100 ms**: a set `InterruptToken` → `terminate()`; a hard **30 s cap** → `kill()` (a
 wedged audio daemon cannot hang the worker). A closed-stdin `OSError` in the feeder is
-swallowed.
+swallowed. When `TTS_SPEED` is not `1.0`, WAV bytes are first time-stretched through
+`ffmpeg -af atempo=...` (chained for speeds outside `0.5`–`2.0`) before being piped to
+`paplay`; a failed stretch falls back to the original, unstretched bytes.
 
 ---
 

@@ -86,8 +86,31 @@ def test_feed_closes_stdin_when_write_fails() -> None:
     assert process.closed
 
 
-def _await_written(process: _FakeProcess) -> None:
+def _await_written(process: object) -> None:
     for _ in range(100):
         if process.written:
             return
         time.sleep(0.01)
+
+
+def test_playback_speed_one_skips_ffmpeg(monkeypatch) -> None:
+    process = _FakeProcess(polls_to_finish=1)
+    calls = _patch_popen(monkeypatch, process)
+    SpeechPlayback(speed=1.0, poll_seconds=0.01).play(b"WAVDATA")
+    assert len(calls) == 1
+    assert calls[0][0] == ["paplay"]
+
+
+def test_atempo_filter_chain_within_native_range() -> None:
+    assert SpeechPlayback._atempo_filter_chain(1.5) == "atempo=1.5"
+    assert SpeechPlayback._atempo_filter_chain(2.0) == "atempo=2.0"
+
+
+def test_atempo_filter_chain_terminates_for_non_positive_speed() -> None:
+    assert SpeechPlayback._atempo_filter_chain(0.0) == "atempo=0.0"
+    assert SpeechPlayback._atempo_filter_chain(-1.0) == "atempo=-1.0"
+
+
+def test_atempo_filter_chain_above_native_range() -> None:
+    assert SpeechPlayback._atempo_filter_chain(3.0) == "atempo=2.0,atempo=1.5"
+    assert SpeechPlayback._atempo_filter_chain(4.0) == "atempo=2.0,atempo=2.0"
