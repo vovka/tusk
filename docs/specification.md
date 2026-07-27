@@ -77,6 +77,7 @@ There is **no kernel-side coding LLM slot**: the coding adapter owns its own mod
 | `VAD_AGGRESSIVENESS` | `int` | `2` | `0`–`3` |
 | `TUSK_TTS` | `bool` | on | Disabled by `off`, `0`, or `false` |
 | `TUSK_ACK` | `bool` | on | Speak a brief refrain of the request before running it. Disabled by `off`, `0`, or `false` |
+| `TUSK_TTS_SPEED` | `float` | `1.0` | Playback speed of spoken replies; at `1.0` no `speed` parameter is sent |
 | `FOLLOW_UP_TIMEOUT_SECONDS` | `float` | `30` | Gatekeeper follow-up window |
 | `MAX_FOLLOW_UP_TIMEOUT_SECONDS` | `float` | `120` | Parsed into `Config`; currently unused |
 | `GATE_RECOVERY_WINDOW_SECONDS` | `float` | `60` | Age limit for recoverable dropped utterances |
@@ -1132,6 +1133,9 @@ which also refreshes the tray's model list). `model_labels()` feeds the tray men
 - Orpheus caps input at **200 chars**: `TextChunker` splits the reply, each chunk is
   synthesized separately, and `WavConcatenator` merges the clips into one WAV
 - Enabled by `TUSK_TTS` (on by default); when off, replies are logged but not spoken
+- `TUSK_TTS_SPEED` (default `1.0`) is passed to the speech API as `speed`; at `1.0` the
+  parameter is omitted, so the default request is byte-for-byte the one sent before the
+  setting existed
 
 ### 22.2 CommandWorker — `shells/voice/command_worker.py`
 
