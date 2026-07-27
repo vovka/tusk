@@ -833,6 +833,9 @@ Spoken replies are controlled by `TUSK_TTS` (`on` default). **`GroqTTS`** synthe
 via `canopylabs/orpheus-v1-english` (voice `daniel`); `TextChunker` splits replies at the
 200-char Orpheus cap and `WavConcatenator` merges the clips (copying channel/width/rate
 individually because Orpheus streams a placeholder frame count in headers).
+`TUSK_TTS_SPEED` (default `1.0`) reaches `GroqTTS` as a constructor argument and is sent to
+the speech API as `speed`; at `1.0` the parameter is omitted entirely, so the default path is
+the request that was sent before the setting existed.
 `SpeechPlayback` plays via `paplay`, polling the `InterruptToken` every 100 ms and
 terminating the process on interrupt. TTS + playback run on the `CommandWorker` thread —
 off the STT → gatekeeper hot path entirely. The acknowledgment refrain (`TUSK_ACK`) rides

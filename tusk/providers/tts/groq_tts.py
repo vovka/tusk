@@ -14,12 +14,14 @@ _MAX_INPUT_CHARS = 200
 
 
 class GroqTTS(TTSEngine):
-    def __init__(self, api_key: str, model: str = "canopylabs/orpheus-v1-english", voice: str = "daniel") -> None:
+    def __init__(self, api_key: str, model: str = "canopylabs/orpheus-v1-english", voice: str = "daniel",
+                 speed: float = 1.0) -> None:
         if Groq is None:
             raise RuntimeError("groq package is not installed")
         self._client = Groq(api_key=api_key)
         self._model = model
         self._voice = voice
+        self._speed = speed
         self._chunker = TextChunker(_MAX_INPUT_CHARS)
 
     def synthesize_chunks(self, text: str) -> Iterator[bytes]:
@@ -29,10 +31,10 @@ class GroqTTS(TTSEngine):
             yield self._synthesize_chunk(chunk)
 
     def _synthesize_chunk(self, text: str) -> bytes:
-        response = self._client.audio.speech.create(
-            model=self._model,
-            voice=self._voice,
-            input=text,
-            response_format="wav",
-        )
-        return response.read()
+        return self._client.audio.speech.create(**self._request(text)).read()
+
+    def _request(self, text: str) -> dict:
+        # ponytail: at the default speed the request is the one sent before speed existed,
+        # so `speed` is omitted rather than sent as 1.0.
+        base = {"model": self._model, "voice": self._voice, "input": text, "response_format": "wav"}
+        return base if self._speed == 1.0 else {**base, "speed": self._speed}

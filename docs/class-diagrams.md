@@ -702,6 +702,7 @@ classDiagram
     transcribe(audio_frames: bytes, sample_rate: int) Utterance
   }
   class GroqTTS {
+    speed : float
     synthesize(text: str) bytes
   }
   class OpenRouterLLM {

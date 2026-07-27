@@ -111,6 +111,13 @@ def test_tts_can_be_disabled(monkeypatch) -> None:
     assert ConfigFactory().build().tts_enabled is False
 
 
+def test_tts_speed_defaults_to_normal_and_reads_an_override(monkeypatch) -> None:
+    monkeypatch.setenv("GROQ_API_KEY", "test-key")
+    assert ConfigFactory().build().tts_speed == 1.0
+    monkeypatch.setenv("TUSK_TTS_SPEED", "1.5")
+    assert ConfigFactory().build().tts_speed == 1.5
+
+
 def test_ack_enabled_by_default(monkeypatch) -> None:
     monkeypatch.setenv("GROQ_API_KEY", "test-key")
     monkeypatch.delenv("TUSK_ACK", raising=False)

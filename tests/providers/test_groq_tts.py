@@ -19,6 +19,20 @@ def test_groq_tts_uses_supported_model_and_wav_format() -> None:
     assert captured["voice"] in _VOICES
 
 
+def test_groq_tts_omits_speed_at_the_default() -> None:
+    captured: dict[str, object] = {}
+    with patch("tusk.providers.tts.groq_tts.Groq", return_value=_recording_client(captured)):
+        list(GroqTTS("test-key").synthesize_chunks("hello there"))
+    assert set(captured) == {"model", "voice", "input", "response_format"}
+
+
+def test_groq_tts_sends_configured_speed() -> None:
+    captured: dict[str, object] = {}
+    with patch("tusk.providers.tts.groq_tts.Groq", return_value=_recording_client(captured)):
+        list(GroqTTS("test-key", speed=1.5).synthesize_chunks("hello there"))
+    assert captured["speed"] == 1.5
+
+
 def test_groq_tts_yields_one_clip_per_chunk_under_orpheus_limit() -> None:
     inputs: list[str] = []
     with patch("tusk.providers.tts.groq_tts.Groq", return_value=_chunk_client(inputs, b"CLIP")):

@@ -10,7 +10,7 @@ from tusk.shared.interrupt import InterruptToken
 def _loader(shells: list[str], log: object | None = None, tts_enabled: bool = False, stt_engine: str = "groq") -> ShellLoader:
     config = types.SimpleNamespace(
         shells=shells, groq_api_key="k", follow_up_timeout_seconds=30, tts_enabled=tts_enabled,
-        ack_enabled=True, stt_engine=stt_engine, whisper_model_size="base",
+        ack_enabled=True, stt_engine=stt_engine, whisper_model_size="base", tts_speed=1.0,
     )
     kernel = types.SimpleNamespace(
         submit=lambda text: None,
@@ -43,14 +43,14 @@ def test_tray_receives_voice_shell_as_pipeline_control(monkeypatch) -> None:
     assert shells[1].control is shells[0]
 
 
-def test_command_worker_receives_tts_engine_when_enabled(monkeypatch) -> None:
+def test_command_worker_receives_tts_engine_built_at_the_configured_speed(monkeypatch) -> None:
     _patch_stt(monkeypatch, object())
-    sentinel = object()
-    monkeypatch.setattr(shell_loader, "GroqTTS", lambda key: sentinel)
+    monkeypatch.setattr(shell_loader, "GroqTTS", lambda key, speed: "engine" if speed == 1.5 else None)
     loader = _loader(["voice"], tts_enabled=True)
+    loader._config.tts_speed = 1.5
     loader._gatekeeper = lambda worker: None
     loader._load_class = lambda name: _voice_class()
-    assert loader._build("voice").worker._speaker._tts is sentinel
+    assert loader._build("voice").worker._speaker._tts == "engine"
 
 
 def _mode_kernel(requested: list[tuple]) -> types.SimpleNamespace:

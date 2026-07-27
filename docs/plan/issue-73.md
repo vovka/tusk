@@ -278,3 +278,67 @@ interaction in criterion 0.
 Voice and model selection; per-utterance speed overrides; anything touching STT, VAD, or
 microphone capture; a tray or runtime control for speed; and repairing the pre-existing
 documentation staleness noted in T4's exclusions.
+
+---
+
+## Implementation notes (written during the implementation stage)
+
+T1–T4 are done as specified except where noted below. **T5 was not performed — see the
+blocker.** T6 was not started: it is gated on a negative T5, and T5 has no outcome yet.
+
+### The 100-code-line file guardrail forced three deviations
+
+`tests/style_guardrails/file_guardrails.py` caps every non-hidden `.py` file — including
+files under `tests/` — at 100 code lines (blank and comment-only lines excluded). Neither
+the architecture nor this plan checked the three files T1 and T3 had to touch. They were at
+**100, 100 and 95** code lines respectively, so the planned edits would have broken
+`tests/test_style_guardrails.py`. The mechanism, the env var, the `Config` field, the `1.0`
+omission and the docs are all exactly as planned; only the shape of the edits changed.
+
+1. **`shell_loader.py` (was at exactly 100).** The planned wrap of the `GroqTTS(...)` line
+   under 120 chars (T3 criterion 1) costs a physical line, which the cap does not allow. The
+   local `tts_engine` is renamed to `engine`, keeping the statement on one 119-char line at
+   zero net cost. This is why the diff touches the `ChunkedSpeaker(...)` line too.
+2. **`tests/test_shell_loader.py` (was at exactly 100).** T3 criterion 4's *new* test could
+   not be added — any new test is ≥8 lines. The existing
+   `test_command_worker_receives_tts_engine_when_enabled` is instead rewritten in place, at
+   the same line count, as
+   `test_command_worker_receives_tts_engine_built_at_the_configured_speed`: the `GroqTTS`
+   stub returns the engine only when it is called with `speed == 1.5`, so a speed that never
+   arrives, or arrives wrong, puts `None` on the speaker and fails the assertion. It still
+   asserts the wiring rather than the absence of a crash, but as one test rather than two.
+   For the same reason `_loader` keeps its signature: its config namespace carries
+   `tts_speed=1.0` (T3 criterion 2, on an existing line) and the test mutates
+   `loader._config.tts_speed`, rather than paying a line for a wrapped signature.
+3. **`tests/shared/test_config_factory.py` (was at 95, so 5 lines of headroom).** T1's
+   planned default/override *pair* costs 8 lines. They are merged into one 5-line
+   `test_tts_speed_defaults_to_normal_and_reads_an_override`, which still asserts both
+   acceptance criteria 2 and 3. **The `monkeypatch.delenv("TUSK_TTS_SPEED", raising=False)`
+   guard was dropped to fit**: the default half of the test therefore trusts that
+   `TUSK_TTS_SPEED` is unset in the environment, exactly as the neighbouring
+   `test_tts_enabled_by_default` trusts it for `TUSK_TTS`. If a container ever sets
+   `TUSK_TTS_SPEED`, this test fails spuriously — the honest fix is to split the file, which
+   was outside this task's allowed paths.
+
+`shell_loader.py`, `tests/test_shell_loader.py`, `tests/shared/test_config_factory.py` and
+`tusk/shared/config/config_factory.py` now all sit at **exactly 100** code lines. The next
+change to any of them has to split the file first.
+
+### Blocker: T5 could not be run, and neither could the unit suite
+
+The implementation stage runs non-interactively with `Bash` behind an approval prompt that
+cannot be answered. `docker compose exec tusk pytest tests/`, `docker compose ps` and a
+direct `python3 -m pytest` were each attempted and each was refused. So:
+
+- **T5 (the gate) was not performed.** There are no Groq credentials, no network and no
+  audio sink in this stage, and the live listening checks are the only thing that can
+  distinguish "honoured" from "silently ignored". Its finding is **unrecorded**, not
+  negative. Architecture §5.1 is explicit that this is a blocker to report rather than a
+  step to skip, and T5 criterion 7 says the same.
+- **T1–T4 have not been executed either.** The line counts above were verified by hand;
+  everything else — that the new tests pass, that the four existing `GroqTTS` tests still
+  pass, that the guardrail suite is green — is **unverified**.
+
+Both need doing before this change ships. Run the suite first; then run T5's listening
+checks at `1.0`, `1.5` and `2.0`, including the `EchoFilter` check at `2.0` (architecture
+§5.2). If Orpheus rejects or silently ignores `speed`, T6 is pre-approved and unchanged.
