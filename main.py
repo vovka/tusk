@@ -52,11 +52,15 @@ def _slot_proxy(factory: ConfigurableLLMFactory, slot: object, log: ColorLogPrin
     return LLMProxy(provider, log, name, enabled_log_groups=options.log_groups, preview_chars=options.llm_log_preview_chars, interrupt_token=token, tracer=tracer)
 
 
-def main() -> None:
-    options = StartupOptions.from_sources(sys.argv[1:])
+def _check_version_flag(options: StartupOptions) -> None:
     if getattr(options, "version", False):
         print(__version__)
         sys.exit(0)
+
+
+def main() -> None:
+    options = StartupOptions.from_sources(sys.argv[1:])
+    _check_version_flag(options)
     config = Config.from_env()
     log = _build_log(options)
     tracer = _build_tracer()
