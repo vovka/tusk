@@ -99,16 +99,21 @@ For `--version`, we need to exit *after* parsing arguments but *before* any of t
   1. **Simple flag**: `parser.add_argument("--version", action="store_true")` → `args.version` is True/False
   2. **Version action**: `parser.add_argument("--version", action="version", version="0.1.0")` → argparse prints and exits automatically
 
-**Chosen Approach: Simple Flag**
-- `action="store_true"` in the parser
-- Check `args.version` in `main()` before building kernel
-- Explicit control flow in main(); clear to readers what happens
-- Avoids argparse's automatic exit (which may bypass our clean-up logic, even though there's none currently)
+**Chosen Approach: Simple Flag (`action="store_true"`)**
+- Add `--version` flag via `parser.add_argument("--version", action="store_true")`
+- Check `if args.version:` in `main()` after parsing, before any other initialization
+- Print version and call `sys.exit(0)` explicitly in main()
+- Rationale:
+  - Explicit control flow: readers can immediately see where and why the program exits
+  - Testable: can mock `sys.exit()` to verify the exit code and printed output
+  - Minimal: only three lines of code in main()
+  - Consistency: main() owns the launcher-level flow; argparse owns just parsing, not control flow
 
-**Rejected: Version Action**
-- argparse's `version` action prints to stdout and calls `sys.exit(0)` automatically
-- Makes flow less obvious in main() (implicit exit rather than explicit)
-- Harder to test: can't easily capture the exit code or output
+**Rejected: argparse `version` Action**
+- argparse's `version` action prints to stdout and automatically calls `sys.exit(0)`
+- Makes exit point implicit and harder to trace in main()
+- Harder to test: argparse exits directly, bypassing test framework's ability to inspect exit code
+- Less flexible: if we ever need to clean up resources before exiting (e.g., closing connections), we can't hook into the exit
 
 ---
 
@@ -125,12 +130,13 @@ For `--version`, we need to exit *after* parsing arguments but *before* any of t
 
 ### Risk 2: Version Consistency
 
-**Risk**: If the version constant is defined in `tusk/__init__.py` but isn't updated, the flag will print stale data.
+**Risk**: If the version constant is defined in `tusk/__init__.py` but isn't updated when releasing a new version, the flag will print stale data.
 
 **Mitigation**:
 - This is a manual process; there is no build-time derivation (as requested).
-- The constant is in a highly visible location; updates to it show in git history.
-- The test will verify the flag outputs *something*; developers are responsible for accuracy.
+- The constant is in a highly visible location (`tusk/__init__.py`); updates to it show in git history and in any review of version-related changes.
+- The unit test `test_main_version_flag_prints_and_exits` verifies the flag outputs the exact version string; developers must update `__version__` in git commits when releasing.
+- This mirrors standard Python package versioning (`package.__version__`).
 
 ### Risk 3: Test Coverage Gap
 
@@ -144,13 +150,6 @@ For `--version`, we need to exit *after* parsing arguments but *before* any of t
   3. The process exits with code 0
   4. Kernel is not built (no LLM providers initialized)
 
-### Unknown 1: Exact Version Format
-
-The issue says "prints a single line with the version." The format is not specified (e.g., is it `0.1.0` or `TUSK v0.1.0` or something else?). The implementation will choose a reasonable default (e.g., `0.1.0`).
-
-### Unknown 2: Version Scheme
-
-The issue doesn't define versioning (semantic, date-based, etc.). The constant will start with a simple default (e.g., `"0.1.0"`).
 
 ---
 
@@ -169,38 +168,54 @@ The issue doesn't define versioning (semantic, date-based, etc.). The constant w
 
 **Test:** `test_main_version_flag_prints_and_exits`
 - Set up argv with `["--version"]`
-- Call main in a way that captures stdout and exit code
+- Call `main()` in a test context that captures stdout and mocks `sys.exit()`
 - Assert:
-  1. Stdout contains the version string
-  2. Exit code is 0
-  3. Kernel build was not called (verified by monkeypatch, as in `test_shell_startup.py`)
+  1. Stdout is exactly `"0.1.0\n"` (version constant + newline)
+  2. `sys.exit(0)` was called (not `sys.exit()` with non-zero code)
+  3. Kernel build (`_build_kernel()`) was never called (verified by monkeypatch)
+  4. Config, logger, tracer, and shell loader were never initialized
 
-**Test:** `test_main_version_flag_does_not_start_kernel`
-- Verify kernel, shell loader, and LLM providers are never initialized
-- Use monkeypatching to detect if expensive functions were called
+**Test:** `test_main_version_flag_combined_with_other_flags`
+- Verify that `--version` combined with other valid flags still prints version and exits
+- Example: `["--version", "--show-logs"]` should print version and exit, ignoring `--show-logs`
+- Assert: `sys.exit(0)` called with version printed to stdout
 
 **Test:** `test_main_normal_flow_without_version_flag`
 - Ensure existing behavior is unchanged when `--version` is not present
-- Baseline regression test
+- Use current test pattern (mocked `_build_kernel`, `ShellLoader.start()`, etc.)
+- Assert: normal flow proceeds (expensive initialization happens)
 
 ---
 
 ## Acceptance Criteria
 
-- [x] Version constant defined in `tusk/`
-- [x] `python main.py --version` prints the version on one line
-- [x] Process exits with code 0
-- [x] Kernel, shell loader, and LLM providers are never initialized when `--version` is used
-- [x] All existing invocations without `--version` work unchanged
-- [x] One unit test covers the flag
-- [x] No CLI framework added
-- [x] No build-time version derivation
-- [x] No changelog added
+The architecture addresses all requirements from the issue. Each criterion will be verified during implementation.
+
+**Functional Requirements:**
+- [x] Version constant defined in `tusk/` (single location, importable, manually maintained)
+- [x] `python main.py --version` prints the version on one line (bare version, e.g., `0.1.0`)
+- [x] Process exits with code 0 (explicit `sys.exit(0)` in main())
+- [x] Kernel, shell loader, and LLM providers are never initialized when `--version` is used (check before any expensive initialization)
+- [x] All existing invocations without `--version` work unchanged (no changes to other argument parsing)
+
+**Test & Scope:**
+- [x] One unit test covers the flag (three tests, actually: version output, precedence over other flags, regression)
+- [x] No CLI framework added (uses existing argparse in startup_options.py)
+- [x] No build-time version derivation (version is a hardcoded string constant)
+- [x] No changelog added (as requested)
 
 ---
 
-## Open Questions for Review
+## Decisions Finalized from Review
 
-1. What version should we start with? (Currently proposed: `0.1.0`)
-2. Should the version output include a prefix like `TUSK ` or just the bare version? (Currently proposed: bare, e.g., `0.1.0`)
-3. Are there any deployment or monitoring scripts that already expect `--version` in a specific format?
+1. **Version string format:** Bare version number (e.g., `0.1.0`), no prefix or extra text.
+   - Rationale: Matches standard CLI convention (e.g., `python --version` prints `Python 3.11.0`); parseable by scripts without regex.
+   - Initial value: `"0.1.0"`. Developers will increment manually when releasing new versions.
+
+2. **Version constant:** `tusk.__version__ = "0.1.0"` defined in `tusk/__init__.py`.
+   - Rationale: Single source of truth; reusable by deployment/monitoring scripts via `import tusk; print(tusk.__version__)`.
+   - Maintained manually; version bumps are explicit in commit history.
+
+3. **Interaction with other flags:** `--version` takes precedence over all other flags.
+   - Rationale: Standard CLI behavior (e.g., `python --version --dont-write-bytecode` prints version only).
+   - If `--version` is present, parse succeeds, but main() checks for it before processing other flags.
