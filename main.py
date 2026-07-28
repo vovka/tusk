@@ -2,6 +2,7 @@ import os
 import sys
 
 from shell_loader import ShellLoader
+from tusk import __version__
 from tusk.kernel import KernelAPI
 from tusk.kernel.core.startup import build_kernel
 from tusk.providers.llm import ConfigurableLLMFactory
@@ -53,6 +54,9 @@ def _slot_proxy(factory: ConfigurableLLMFactory, slot: object, log: ColorLogPrin
 
 def main() -> None:
     options = StartupOptions.from_sources(sys.argv[1:])
+    if getattr(options, "version", False):
+        print(__version__)
+        sys.exit(0)
     config = Config.from_env()
     log = _build_log(options)
     tracer = _build_tracer()

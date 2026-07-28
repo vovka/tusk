@@ -29,19 +29,21 @@ class StartupOptions:
     log_groups: frozenset[str]
     hidden_groups: frozenset[str] = frozenset()
     llm_log_preview_chars: int = 120
+    version: bool = False
 
     @classmethod
     def from_sources(cls, argv: list[str] | None = None, environ: dict[str, str] | None = None) -> "StartupOptions":
         env = os.environ if environ is None else environ
         args = build_parser().parse_args(argv)
         shown, hidden = _groups(args.show_logs, env.get("SHOW_LOGS", ""))
-        return cls(frozenset(shown), frozenset(hidden), _preview(args.llm_log_preview_chars, env))
+        return cls(frozenset(shown), frozenset(hidden), _preview(args.llm_log_preview_chars, env), args.version)
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run the TUSK voice assistant.")
     parser.add_argument("--show-logs", default="", help="Extra log groups to show. Supported values: " + ", ".join((*_GROUPS, "all")))
     parser.add_argument("--llm-log-preview-chars", type=int, default=None, help="Compact LLM log preview length.")
+    parser.add_argument("--version", action="store_true")
     return parser
 
 
