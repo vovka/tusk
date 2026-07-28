@@ -274,3 +274,13 @@ These items are NOT part of this implementation plan:
 
 Execute tasks in the order listed (1 → 2 → 3 → 4). Each task is small enough to be completed and verified independently, yet each depends on the previous one being correct.
 
+---
+
+## Review Status
+
+**Feedback Received:** "Address codex review comments"
+
+**Note:** The feedback block did not include specific review comments or details about what "codex review comments" refers to. This plan document is for adding a `--version` flag to the main launcher and does not involve Codex (the agent backend) directly. If there are specific codex-related concerns or other review feedback, please provide them explicitly so they can be addressed in this plan or, if outside scope, recorded separately.
+
+The plan as currently written follows all project guidelines from CLAUDE.md and the implementation plan template from `docs/plan/` and is ready for implementation pending clarification on the referenced review feedback.
+
