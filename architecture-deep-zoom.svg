@@ -1,0 +1,733 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" width="7200" height="4400" viewBox="0 0 7200 4400" role="img" aria-labelledby="diagram-title diagram-desc">
+<title id="diagram-title">TUSK deep-zoom software architecture recovered from source code</title>
+<desc id="diagram-desc">A recursively nested architecture map of the TUSK desktop assistant. Zoom into the main process, shells, kernel, agent engine, MCP adapters, host integration, providers, persistence, and implementation details.</desc>
+<metadata>
+Repository: https://github.com/vovka/tusk
+Source revision inspected: 0e8f2d7760ea98ed28f5e78462b9adc5c536cb09
+Generated from production code, manifests, deployment files, and tests. Existing architecture documentation and diagrams were intentionally excluded from evidence.
+</metadata>
+<defs>
+  <marker id="arrow" markerWidth="14" markerHeight="14" refX="11" refY="5" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L12,5 L0,10 z" fill="context-stroke"/></marker>
+  <style>
+    svg { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    .canvas-title { font-size:86px; font-weight:800; fill:#14213d; letter-spacing:-2px; }
+    .canvas-subtitle { font-size:28px; fill:#52616b; }
+    .node rect { stroke-width:4; fill:#fff; stroke:#334155; }
+    .system rect { fill:#f8fbff; stroke:#1d4ed8; stroke-width:8; }
+    .application rect { fill:#edf5ff; stroke:#2563eb; }
+    .process rect { fill:#eefcf6; stroke:#16865a; }
+    .module rect { fill:#ffffff; stroke:#64748b; }
+    .shell rect { fill:#fff8e8; stroke:#b7791f; }
+    .kernel rect { fill:#f4efff; stroke:#7048b8; }
+    .agent rect { fill:#eef8ff; stroke:#1677a6; }
+    .provider rect { fill:#fff1f1; stroke:#c24141; }
+    .adapter rect { fill:#eefcf6; stroke:#16865a; }
+    .class rect { fill:#ffffff; stroke:#64748b; stroke-width:2.4; }
+    .detail rect { fill:#ffffff; stroke:#94a3b8; stroke-width:1.5; }
+    .datastore rect { fill:#fff7db; stroke:#b7791f; }
+    .external rect { fill:#f2f4f8; stroke:#475569; }
+    .queue rect { fill:#f7f0ff; stroke:#7c3aed; }
+    .summarized rect { stroke-dasharray:14 10; fill:#fafafa; }
+    .inferred rect { stroke:#8b5cf6; stroke-dasharray:14 9; fill:#faf7ff; }
+    .label { fill:#172033; font-weight:750; dominant-baseline:middle; }
+    .l1 { font-size:120px; }
+    .l2 { font-size:30px; }
+    .l3 { font-size:7.5px; }
+    .l4 { font-size:1.875px; }
+    .l5 { font-size:0.46875px; }
+    .subtitle { fill:#556272; }
+    .s1 { font-size:28px; }
+    .s2 { font-size:9px; }
+    .s3 { font-size:2.3px; }
+    .s4 { font-size:0.6px; }
+    .s5 { font-size:0.16px; }
+    .micro { font-size:1.4px; fill:#334155; }
+    .nano { font-size:0.35px; fill:#475569; }
+    .badge { font-size:2.4px; font-weight:700; fill:#7c3aed; }
+    .edge { fill:none; stroke:#475569; stroke-width:6; opacity:.9; }
+    .edge.call { stroke:#475569; }
+    .edge.data { stroke:#b7791f; }
+    .edge.mcp { stroke:#16865a; }
+    .edge.audio { stroke:#b45309; }
+    .edge.http { stroke:#c24141; }
+    .edge.control { stroke:#7048b8; }
+    .edge-label { font-size:18px; font-weight:650; fill:#334155; paint-order:stroke; stroke:#f6f8fb; stroke-width:8; stroke-linejoin:round; }
+    .micro-edge { fill:none; stroke:#64748b; stroke-width:2; marker-end:url(#arrow); }
+    .micro-edge-label { font-size:0.8px; fill:#475569; paint-order:stroke; stroke:white; stroke-width:0.4; }
+    .inferred-edge { stroke:#8b5cf6; stroke-dasharray:18 12; }
+    .actor-shape { fill:#fff; stroke:#14213d; stroke-width:8; }
+    .actor-label { font-size:58px; font-weight:800; fill:#14213d; }
+    .actor-detail { font-size:22px; fill:#52616b; }
+    .legend-text { font-size:17px; fill:#334155; }
+    .legend-title { font-size:26px; font-weight:800; fill:#14213d; }
+    .scope-note { font-size:15px; fill:#64748b; }
+  
+    .low-level-edge { stroke-width:3; opacity:.58; }
+    .low-level-label { font-size:12px; opacity:.68; }
+</style>
+</defs>
+<rect width="7200" height="4400" fill="#f6f8fb"/>
+<text x="180" y="125" class="canvas-title">TUSK — source-recovered architecture</text>
+<text x="185" y="185" class="canvas-subtitle">One deployment, one central kernel, configurable interaction shells, MCP child-process adapters, optional Codex backends, and explicit host integration.</text>
+
+<g id="actor-user" transform="translate(80 1510)">
+<title>Human user interacting through microphone, CLI, tray controls, and the GNOME desktop. Evidence: shells/voice, shells/cli, shells/tray.</title>
+<circle cx="290" cy="145" r="95" class="actor-shape"/><path d="M115 570 Q290 300 465 570 Z" class="actor-shape"/>
+<text x="290" y="690" text-anchor="middle" class="actor-label">User</text>
+<text x="290" y="735" text-anchor="middle" class="actor-detail">voice • text • tray</text>
+</g>
+<g id="system-tusk" class="node system level-1" transform="translate(850 250)">
+<title>docker-compose.yml; main.py; shell_loader.py; tusk/kernel/core/startup.py; adapters/*/adapter.json</title>
+<rect x="0" y="0" width="5500" height="3900" rx="54"/>
+<text x="2750.0" y="55" class="label l1" text-anchor="middle">TUSK desktop-assistant system</text>
+<text x="2750.0" y="88" class="subtitle s1" text-anchor="middle">single application deployment + child processes + observability service</text>
+<g id="deployable-tusk-container" class="node application level-2" transform="translate(250 260)">
+<title>Dockerfile; docker-compose.yml; main.py</title>
+<rect x="0" y="0" width="3500" height="3050" rx="40"/>
+<text x="1750.0" y="55" class="label l2" text-anchor="middle">TUSK application container</text>
+<text x="1750.0" y="88" class="subtitle s2" text-anchor="middle">Python 3.11 process; default shell: voice</text>
+<g id="module-composition-root" class="node module level-3" transform="translate(100 150)">
+<title>main.py; shell_loader.py; tusk/kernel/core/startup.py; tests/test_shell_loader.py</title>
+<rect x="0" y="0" width="3300" height="330" rx="24"/>
+<text x="1650.0" y="32" class="label l3" text-anchor="middle">Composition root</text>
+<text x="1650.0" y="54" class="subtitle s3" text-anchor="middle">configuration → providers → kernel → shells</text>
+<g id="class-main-entry" class="node class level-4" transform="translate(40 95)">
+<title>main.py</title>
+<rect x="0" y="0" width="470" height="175" rx="14"/>
+<text x="235.0" y="32" class="label l4" text-anchor="middle">main.py</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">main()</tspan><tspan x="14" dy="14">_build_llm_registry()</tspan><tspan x="14" dy="14">_build_kernel()</tspan></text>
+</g>
+<g id="class-shell-loader" class="node class level-4" transform="translate(570 95)">
+<title>shell_loader.py; tests/test_shell_loader.py</title>
+<rect x="0" y="0" width="650" height="175" rx="14"/>
+<text x="325.0" y="32" class="label l4" text-anchor="middle">ShellLoader</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">start(); _run()</tspan><tspan x="14" dy="14">_build_voice()</tspan><tspan x="14" dy="14">_gatekeeper(); _wire_modes()</tspan></text>
+</g>
+<g id="class-startup" class="node class level-4" transform="translate(1280 95)">
+<title>tusk/kernel/core/startup.py</title>
+<rect x="0" y="0" width="600" height="175" rx="14"/>
+<text x="300.0" y="32" class="label l4" text-anchor="middle">startup.py</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">build_kernel()</tspan><tspan x="14" dy="14">build_agent()</tspan><tspan x="14" dy="14">build_adapter_manager()</tspan></text>
+</g>
+<g id="class-config" class="node class level-4" transform="translate(1940 95)">
+<title>tusk/shared/config/config_factory.py; .env.example</title>
+<rect x="0" y="0" width="560" height="175" rx="14"/>
+<text x="280.0" y="32" class="label l4" text-anchor="middle">ConfigFactory</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">env → Config</tspan><tspan x="14" dy="14">LLM slots; shells</tspan><tspan x="14" dy="14">audio; backend selection</tspan></text>
+</g>
+<g id="class-status-tracer" class="node class level-4" transform="translate(2560 95)">
+<title>main.py; tusk/shared/tracing/tracer_factory.py</title>
+<rect x="0" y="0" width="680" height="175" rx="14"/>
+<text x="340.0" y="32" class="label l4" text-anchor="middle">Cross-cutting bootstrap</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">StatusReporterHub</tspan><tspan x="14" dy="14">InterruptToken</tspan><tspan x="14" dy="14">TracerFactory → OTel / Null</tspan></text>
+</g>
+</g>
+<g id="module-shells" class="node shell level-3" transform="translate(100 550)">
+<title>shells/; shell_loader.py</title>
+<rect x="0" y="0" width="950" height="2000" rx="24"/>
+<text x="475.0" y="32" class="label l3" text-anchor="middle">Interaction shells</text>
+<text x="475.0" y="54" class="subtitle s3" text-anchor="middle">all call KernelAPI.submit</text>
+<g id="shell-voice" class="node shell level-4" transform="translate(35 100)">
+<title>shells/voice/voice_shell.py; shells/voice/pipeline.py; shells/voice/command_worker.py</title>
+<rect x="0" y="0" width="880" height="1280" rx="18"/>
+<text x="440.0" y="32" class="label l4" text-anchor="middle">VoiceShell</text>
+<text x="440.0" y="54" class="subtitle s4" text-anchor="middle">real-time capture + queued command execution</text>
+<g id="voice-audio-capture" class="node detail level-5" transform="translate(35 95)">
+<title>shells/voice/stages/audio_capture.py</title>
+<rect x="0" y="0" width="115" height="120" rx="9"/>
+<text x="57.5" y="32" class="label l5" text-anchor="middle">AudioCapture</text>
+</g>
+<g id="voice-utterance-detector" class="node detail level-5" transform="translate(170 95)">
+<title>shells/voice/stages/utterance_detector.py</title>
+<rect x="0" y="0" width="125" height="120" rx="9"/>
+<text x="62.5" y="32" class="label l5" text-anchor="middle">UtteranceDetector</text>
+</g>
+<g id="voice-transcriber" class="node detail level-5" transform="translate(315 95)">
+<title>shells/voice/stages/transcriber.py</title>
+<rect x="0" y="0" width="115" height="120" rx="9"/>
+<text x="57.5" y="32" class="label l5" text-anchor="middle">Transcriber</text>
+</g>
+<g id="voice-sanitizer" class="node detail level-5" transform="translate(450 95)">
+<title>shells/voice/stages/sanitizer.py</title>
+<rect x="0" y="0" width="105" height="120" rx="9"/>
+<text x="52.5" y="32" class="label l5" text-anchor="middle">Sanitizer</text>
+</g>
+<g id="voice-buffer" class="node detail level-5" transform="translate(575 95)">
+<title>shells/voice/stages/transcription_buffer.py</title>
+<rect x="0" y="0" width="120" height="120" rx="9"/>
+<text x="60.0" y="32" class="label l5" text-anchor="middle">TranscriptionBuffer</text>
+</g>
+<g id="voice-gatekeeper" class="node detail level-5" transform="translate(715 95)">
+<title>shells/voice/stages/gate/gatekeeper.py; shells/voice/playback_gate.py</title>
+<rect x="0" y="0" width="125" height="120" rx="9"/>
+<text x="62.5" y="32" class="label l5" text-anchor="middle">Gatekeeper</text>
+</g>
+<line class="micro-edge" x1="150" y1="155" x2="170" y2="155"/>
+<line class="micro-edge" x1="295" y1="155" x2="315" y2="155"/>
+<line class="micro-edge" x1="430" y1="155" x2="450" y2="155"/>
+<line class="micro-edge" x1="555" y1="155" x2="575" y2="155"/>
+<line class="micro-edge" x1="695" y1="155" x2="715" y2="155"/>
+<g id="voice-capture-thread" class="node queue level-5" transform="translate(35 270)">
+<title>VoicePipeline._capture_into()</title>
+<rect x="0" y="0" width="185" height="140" rx="9"/>
+<text x="92.5" y="32" class="label l5" text-anchor="middle">capture thread</text>
+</g>
+<g id="voice-utterance-queue" class="node queue level-5" transform="translate(255 270)">
+<title>queue.Queue</title>
+<rect x="0" y="0" width="180" height="140" rx="9"/>
+<text x="90.0" y="32" class="label l5" text-anchor="middle">Queue[Utterance]</text>
+</g>
+<g id="voice-consumer" class="node queue level-5" transform="translate(470 270)">
+<title>_consume(); _dispatch()</title>
+<rect x="0" y="0" width="170" height="140" rx="9"/>
+<text x="85.0" y="32" class="label l5" text-anchor="middle">pipeline consumer</text>
+</g>
+<g id="voice-command-worker" class="node queue level-5" transform="translate(675 270)">
+<title>enqueue(); _run(); _execute()</title>
+<rect x="0" y="0" width="165" height="140" rx="9"/>
+<text x="82.5" y="32" class="label l5" text-anchor="middle">CommandWorker</text>
+</g>
+<line class="micro-edge" x1="220" y1="340" x2="255" y2="340"/><line class="micro-edge" x1="435" y1="340" x2="470" y2="340"/><line class="micro-edge" x1="640" y1="340" x2="675" y2="340"/>
+<g id="voice-chunked-speaker" class="node detail level-5" transform="translate(100 480)">
+<title>shells/voice/stages/chunked_speaker.py</title>
+<rect x="0" y="0" width="190" height="145" rx="9"/>
+<text x="95.0" y="32" class="label l5" text-anchor="middle">ChunkedSpeaker</text>
+</g>
+<g id="voice-speech-playback" class="node detail level-5" transform="translate(345 480)">
+<title>shells/voice/stages/speech_playback.py</title>
+<rect x="0" y="0" width="190" height="145" rx="9"/>
+<text x="95.0" y="32" class="label l5" text-anchor="middle">SpeechPlayback</text>
+</g>
+<g id="voice-echo-filter" class="node detail level-5" transform="translate(590 480)">
+<title>shells/voice/stages/echo_filter.py</title>
+<rect x="0" y="0" width="190" height="145" rx="9"/>
+<text x="95.0" y="32" class="label l5" text-anchor="middle">EchoFilter</text>
+</g>
+<line class="micro-edge" x1="290" y1="552" x2="345" y2="552"/><line class="micro-edge" x1="535" y1="552" x2="590" y2="552"/>
+<g id="voice-gatekeeper-slot" class="node detail level-5" transform="translate(100 705)">
+<title>swap base / mode gate</title>
+<rect x="0" y="0" width="190" height="145" rx="9"/>
+<text x="95.0" y="32" class="label l5" text-anchor="middle">GatekeeperSlot</text>
+</g>
+<g id="voice-stop-gatekeeper" class="node detail level-5" transform="translate(345 705)">
+<title>dictation/coding stop routing</title>
+<rect x="0" y="0" width="190" height="145" rx="9"/>
+<text x="95.0" y="32" class="label l5" text-anchor="middle">StopGatekeeper</text>
+</g>
+<g id="voice-playback-gate" class="node detail level-5" transform="translate(590 705)">
+<title>speech-only interruption gate</title>
+<rect x="0" y="0" width="190" height="145" rx="9"/>
+<text x="95.0" y="32" class="label l5" text-anchor="middle">PlaybackGate</text>
+</g>
+<line class="micro-edge" x1="290" y1="778" x2="345" y2="778"/><line class="micro-edge" x1="535" y1="778" x2="590" y2="778"/>
+<text x="45" y="970" class="micro" text-anchor="start"><tspan x="45" dy="0">VoicePipeline.run(): capture thread → queue → STT → sanitize → buffer → gate → submit</tspan><tspan x="45" dy="16">CommandWorker runs KernelAPI.submit and TTS on a daemon worker; interrupt flushes queued work.</tspan></text>
+</g>
+<g id="shell-cli" class="node class level-4" transform="translate(35 1420)">
+<title>shells/cli/cli_shell.py</title>
+<rect x="0" y="0" width="250" height="420" rx="14"/>
+<text x="125.0" y="32" class="label l4" text-anchor="middle">CLIShell</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">input("tusk&gt; ")</tspan><tspan x="14" dy="14">submit(text)</tspan><tspan x="14" dy="14">print(reply)</tspan></text>
+</g>
+<g id="shell-emulator" class="node class level-4" transform="translate(315 1420)">
+<title>shells/emulator/emulator_shell.py</title>
+<rect x="0" y="0" width="250" height="420" rx="14"/>
+<text x="125.0" y="32" class="label l4" text-anchor="middle">EmulatorShell</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">read TUSK_TRANSCRIPT</tspan><tspan x="14" dy="14">replay utterances</tspan><tspan x="14" dy="14">submit(utterance)</tspan></text>
+</g>
+<g id="shell-tray" class="node class level-4" transform="translate(595 1420)">
+<title>shells/tray/tray_shell.py; shells/tray/tray_status_sink.py</title>
+<rect x="0" y="0" width="320" height="420" rx="14"/>
+<text x="160.0" y="32" class="label l4" text-anchor="middle">TrayShell</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">AppIndicator backend</tspan><tspan x="14" dy="14">attach TrayStatusSink</tspan><tspan x="14" dy="14">pause/resume/restart/stop</tspan></text>
+</g>
+<text x="45" y="1910" class="micro" text-anchor="start"><tspan x="45" dy="0">ShellLoader starts every shell except the final one on daemon threads; tray is deliberately last/main-thread.</tspan></text>
+</g>
+<g id="module-kernel" class="node kernel level-3" transform="translate(1120 550)">
+<title>tusk/kernel/core; tusk/kernel/modes; tests/kernel/test_kernel_api_gates.py</title>
+<rect x="0" y="0" width="1050" height="2000" rx="24"/>
+<text x="525.0" y="32" class="label l3" text-anchor="middle">Kernel + modes</text>
+<text x="525.0" y="54" class="subtitle s3" text-anchor="middle">serialized routing and mode state</text>
+<g id="class-kernel-api" class="node class level-4" transform="translate(40 100)">
+<title>tusk/kernel/core/kernel_api.py; tests/kernel/test_kernel_api_gates.py</title>
+<rect x="0" y="0" width="970" height="360" rx="14"/>
+<text x="485.0" y="32" class="label l4" text-anchor="middle">KernelAPI</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">submit(text, kind) — global lock</tspan><tspan x="14" dy="14">_route(): coding → dictation → command</tspan><tspan x="14" dy="14">request_interrupt(); start/stop modes</tspan><tspan x="14" dy="14">dictation_gate(); coding_gate()</tspan></text>
+</g>
+<g id="class-command-mode" class="node class level-4" transform="translate(40 510)">
+<title>tusk/kernel/core/command_mode.py</title>
+<rect x="0" y="0" width="440" height="300" rx="14"/>
+<text x="220.0" y="32" class="label l4" text-anchor="middle">CommandMode</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">AgentBackend.run(AgentRequest)</tspan><tspan x="14" dy="14">conversation session continuity</tspan><tspan x="14" dy="14">one-shot command session</tspan></text>
+</g>
+<g id="class-mode-slot" class="node class level-4" transform="translate(530 510)">
+<title>tusk/kernel/modes/mode_slot.py; tusk/kernel/modes/mode_gate.py</title>
+<rect x="0" y="0" width="480" height="300" rx="14"/>
+<text x="240.0" y="32" class="label l4" text-anchor="middle">ModeSlot + ModeGate</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">active state + router</tspan><tspan x="14" dy="14">start/process/stop callbacks</tspan><tspan x="14" dy="14">stop_gate LLM classification</tspan></text>
+</g>
+<g id="class-tool-runtime" class="node class level-4" transform="translate(40 860)">
+<title>tusk/kernel/tools/tool_runtime.py</title>
+<rect x="0" y="0" width="440" height="330" rx="14"/>
+<text x="220.0" y="32" class="label l4" text-anchor="middle">ToolRuntime</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">attach DictationRouter</tspan><tspan x="14" dy="14">attach CodingRouter</tspan><tspan x="14" dy="14">register Start* + SwitchModel</tspan></text>
+</g>
+<g id="class-dictation-router" class="node class level-4" transform="translate(530 860)">
+<title>tusk/kernel/modes/dictation_router.py</title>
+<rect x="0" y="0" width="480" height="330" rx="14"/>
+<text x="240.0" y="32" class="label l4" text-anchor="middle">DictationRouter</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">dictation.process_segment</tspan><tspan x="14" dy="14">desktop.type_text / replace</tspan><tspan x="14" dy="14">stop_dictation</tspan></text>
+</g>
+<g id="class-coding-router" class="node class level-4" transform="translate(40 1240)">
+<title>tusk/kernel/modes/coding_router.py</title>
+<rect x="0" y="0" width="440" height="360" rx="14"/>
+<text x="220.0" y="32" class="label l4" text-anchor="middle">CodingRouter</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">coding.process_intent</tspan><tspan x="14" dy="14">EditApplicationStrategy.apply</tspan><tspan x="14" dy="14">EditorDriver automation</tspan><tspan x="14" dy="14">stop_coding_session</tspan></text>
+</g>
+<g id="class-edit-strategies" class="node class level-4" transform="translate(530 1240)">
+<title>tusk/kernel/modes/input_automation_editor_driver.py; tusk/kernel/modes/edit_strategies/</title>
+<rect x="0" y="0" width="480" height="360" rx="14"/>
+<text x="240.0" y="32" class="label l4" text-anchor="middle">Coding edit path</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">InputAutomationEditorDriver</tspan><tspan x="14" dy="14">VerifiedEditStrategy</tspan><tspan x="14" dy="14">LineAnchored → FullReplace fallback</tspan></text>
+</g>
+<line class="micro-edge" x1="525" y1="280" x2="525" y2="510"/>
+<line class="micro-edge" x1="260" y1="810" x2="260" y2="860"/>
+<line class="micro-edge" x1="770" y1="810" x2="770" y2="860"/>
+<line class="micro-edge" x1="260" y1="1190" x2="260" y2="1240"/>
+<text x="525" y="1710" class="micro" text-anchor="middle">Mode routers intentionally reuse adapter tools through ToolRegistry; they are not direct adapter clients.</text>
+</g>
+<g id="module-agent-engine" class="node agent level-3" transform="translate(2240 550)">
+<title>tusk/kernel/agent; tusk/kernel/core/main_agent.py</title>
+<rect x="0" y="0" width="1150" height="2000" rx="24"/>
+<text x="575.0" y="32" class="label l3" text-anchor="middle">Agent execution engine</text>
+<text x="575.0" y="54" class="subtitle s3" text-anchor="middle">pluggable backend + built-in orchestrator</text>
+<g id="class-backend-factory" class="node class level-4" transform="translate(40 100)">
+<title>tusk/kernel/agent/backends/agent_backend_factory.py; tusk/shared/config/config_factory.py</title>
+<rect x="0" y="0" width="1070" height="260" rx="14"/>
+<text x="535.0" y="32" class="label l4" text-anchor="middle">AgentBackendFactory</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">AGENT_BACKEND = tusk | codex_exec | codex_mcp</tspan><tspan x="14" dy="14">optional fallback → TuskAgentBackend</tspan></text>
+</g>
+<g id="agent-built-in" class="node agent level-4" transform="translate(40 410)">
+<title>tusk/kernel/core/main_agent.py; tusk/kernel/agent/agent_orchestrator.py; tusk/kernel/agent/agent_runtime.py</title>
+<rect x="0" y="0" width="710" height="1430" rx="18"/>
+<text x="355.0" y="32" class="label l4" text-anchor="middle">Built-in TUSK backend</text>
+<text x="355.0" y="54" class="subtitle s4" text-anchor="middle">multi-profile recursive agent runtime</text>
+<g id="class-main-agent" class="node class level-4" transform="translate(25 75)">
+<title>tusk/kernel/core/main_agent.py</title>
+<rect x="0" y="0" width="660" height="210" rx="14"/>
+<text x="330.0" y="32" class="label l4" text-anchor="middle">MainAgent</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">conversation vs one-shot command</tspan><tspan x="14" dy="14">AgentOrchestrator.run()</tspan><tspan x="14" dy="14">share command results into conversation</tspan></text>
+</g>
+<g id="class-orchestrator" class="node class level-4" transform="translate(25 330)">
+<title>tusk/kernel/agent/agent_orchestrator.py</title>
+<rect x="0" y="0" width="660" height="260" rx="14"/>
+<text x="330.0" y="32" class="label l4" text-anchor="middle">AgentOrchestrator</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">profiles + ToolRegistry + Store</tspan><tspan x="14" dy="14">planner enrichment / runtime tool resolution</tspan><tspan x="14" dy="14">child run_agent delegation</tspan><tspan x="14" dy="14">tool sequence dispatcher</tspan></text>
+</g>
+<g id="class-agent-runtime" class="node class level-4" transform="translate(25 635)">
+<title>tusk/kernel/agent/agent_runtime.py</title>
+<rect x="0" y="0" width="660" height="250" rx="14"/>
+<text x="330.0" y="32" class="label l4" text-anchor="middle">AgentRuntime</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">session event history</tspan><tspan x="14" dy="14">LLM tool-call loop</tspan><tspan x="14" dy="14">turn/repeat guards</tspan><tspan x="14" dy="14">done / failed / cancelled</tspan></text>
+</g>
+<g id="class-agent-profiles" class="node class level-4" transform="translate(25 930)">
+<title>tusk/kernel/core/agent_profiles.py</title>
+<rect x="0" y="0" width="310" height="330" rx="14"/>
+<text x="155.0" y="32" class="label l4" text-anchor="middle">AgentProfiles</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">conversation</tspan><tspan x="14" dy="14">command</tspan><tspan x="14" dy="14">planner</tspan><tspan x="14" dy="14">executor</tspan><tspan x="14" dy="14">default</tspan></text>
+</g>
+<g id="class-agent-support" class="node class level-4" transform="translate(375 930)">
+<title>tusk/kernel/agent/</title>
+<rect x="0" y="0" width="310" height="330" rx="14"/>
+<text x="155.0" y="32" class="label l4" text-anchor="middle">Support components</text>
+<text x="294" y="18" class="badge" text-anchor="end">summarized</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">AgentChildRunner</tspan><tspan x="14" dy="14">AgentToolsetBuilder</tspan><tspan x="14" dy="14">OrchestratorToolDispatcher</tspan><tspan x="14" dy="14">Sequence Executor</tspan><tspan x="14" dy="14">ResultValidator</tspan></text>
+</g>
+<line class="micro-edge" x1="355" y1="285" x2="355" y2="330"/><line class="micro-edge" x1="355" y1="590" x2="355" y2="635"/>
+</g>
+<g id="class-codex-exec-backend" class="node class level-4" transform="translate(790 410)">
+<title>tusk/kernel/agent/backends/codex_exec_agent_backend.py</title>
+<rect x="0" y="0" width="320" height="430" rx="14"/>
+<text x="160.0" y="32" class="label l4" text-anchor="middle">CodexExecBackend</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">subprocess.run(codex exec …)</tspan><tspan x="14" dy="14">JSON result schema</tspan><tspan x="14" dy="14">timeout / exit handling</tspan></text>
+</g>
+<g id="class-codex-mcp-backend" class="node class level-4" transform="translate(790 890)">
+<title>tusk/kernel/agent/backends/codex_mcp_agent_backend.py</title>
+<rect x="0" y="0" width="320" height="430" rx="14"/>
+<text x="160.0" y="32" class="label l4" text-anchor="middle">CodexMcpBackend</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">persistent codex mcp-server</tspan><tspan x="14" dy="14">serialized turns</tspan><tspan x="14" dy="14">thread-id continuity</tspan><tspan x="14" dy="14">restart on stale thread</tspan></text>
+</g>
+<g id="class-fallback-backend" class="node class level-4" transform="translate(790 1370)">
+<title>tusk/kernel/agent/backends/fallback_agent_backend.py</title>
+<rect x="0" y="0" width="320" height="260" rx="14"/>
+<text x="160.0" y="32" class="label l4" text-anchor="middle">FallbackBackend</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">primary failure → built-in</tspan><tspan x="14" dy="14">selected at composition time</tspan></text>
+</g>
+<line class="micro-edge" x1="575" y1="360" x2="575" y2="410"/>
+<line class="micro-edge" x1="950" y1="360" x2="950" y2="410"/>
+</g>
+<g id="module-shared-infrastructure" class="node provider level-3" transform="translate(100 2630)">
+<title>tusk/providers; tusk/shared; requirements.txt</title>
+<rect x="0" y="0" width="3290" height="300" rx="22"/>
+<text x="1645.0" y="32" class="label l3" text-anchor="middle">Providers + shared infrastructure</text>
+<text x="1645.0" y="54" class="subtitle s3" text-anchor="middle">factories, registries, MCP plumbing, status, logging, tracing, schemas</text>
+<text x="3274" y="18" class="badge" text-anchor="end">representative</text>
+<g id="infra-llm" class="node class level-4" transform="translate(30 80)">
+<title>main.py; tusk/shared/llm; tusk/providers/llm</title>
+<rect x="0" y="0" width="620" height="170" rx="14"/>
+<text x="310.0" y="32" class="label l4" text-anchor="middle">LLM slots</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">LLMRegistry → LLMProxy</tspan><tspan x="14" dy="14">ConfigurableLLMFactory</tspan><tspan x="14" dy="14">GroqLLM | OpenRouterLLM</tspan></text>
+</g>
+<g id="infra-audio" class="node class level-4" transform="translate(690 80)">
+<title>tusk/providers/stt; tusk/providers/tts</title>
+<rect x="0" y="0" width="560" height="170" rx="14"/>
+<text x="280.0" y="32" class="label l4" text-anchor="middle">Audio providers</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">STTEngineFactory</tspan><tspan x="14" dy="14">GroqSTT | local WhisperSTT</tspan><tspan x="14" dy="14">GroqTTS</tspan></text>
+</g>
+<g id="infra-mcp" class="node class level-4" transform="translate(1290 80)">
+<title>tusk/shared/mcp</title>
+<rect x="0" y="0" width="600" height="170" rx="14"/>
+<text x="300.0" y="32" class="label l4" text-anchor="middle">MCP client plumbing</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">MCPClient</tspan><tspan x="14" dy="14">MCPStdioTransport</tspan><tspan x="14" dy="14">MCPToolProxy</tspan><tspan x="14" dy="14">AdapterEnvironmentBuilder</tspan></text>
+</g>
+<g id="infra-status" class="node class level-4" transform="translate(1930 80)">
+<title>tusk/shared/status; tusk/shared/logging; tusk/shared/interrupt; tusk/shared/config</title>
+<rect x="0" y="0" width="620" height="170" rx="14"/>
+<text x="310.0" y="32" class="label l4" text-anchor="middle">Runtime services</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">StatusReporterHub</tspan><tspan x="14" dy="14">ColorLogPrinter</tspan><tspan x="14" dy="14">InterruptToken</tspan><tspan x="14" dy="14">Config</tspan></text>
+</g>
+<g id="infra-tracing" class="node class level-4" transform="translate(2590 80)">
+<title>tusk/shared/tracing; docker-compose.yml</title>
+<rect x="0" y="0" width="660" height="170" rx="14"/>
+<text x="330.0" y="32" class="label l4" text-anchor="middle">Observability</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">TracerFactory</tspan><tspan x="14" dy="14">OTelTracer / NullTracer</tspan><tspan x="14" dy="14">OTLPSpanExporter</tspan></text>
+</g>
+</g>
+</g>
+<g id="deployable-adapter-processes" class="node process level-2" transform="translate(3900 260)">
+<title>tusk/kernel/core/adapter_manager.py; adapters/*/adapter.json; tusk/shared/mcp/mcp_client.py</title>
+<rect x="0" y="0" width="1250" height="2500" rx="40"/>
+<text x="625.0" y="55" class="label l2" text-anchor="middle">Adapter child processes</text>
+<text x="625.0" y="88" class="subtitle s2" text-anchor="middle">hot-pluggable directories; MCP JSON-RPC 2.0 over stdio</text>
+<g id="process-adapter-gnome" class="node adapter level-3" transform="translate(50 120)">
+<title>adapters/gnome/adapter.json; adapters/gnome/server.py; tests/adapters/test_gnome_server_mcp.py</title>
+<rect x="0" y="0" width="1150" height="900" rx="22"/>
+<text x="575.0" y="32" class="label l3" text-anchor="middle">GNOME adapter</text>
+<text x="575.0" y="54" class="subtitle s3" text-anchor="middle">context + application + input + window tools</text>
+<g id="gnome-mcp-server" class="node class level-4" transform="translate(30 90)">
+<title>adapters/gnome/server.py; tusk/shared/mcp/mcp_stdio_server.py</title>
+<rect x="0" y="0" width="300" height="180" rx="14"/>
+<text x="150.0" y="32" class="label l4" text-anchor="middle">MCPStdioServer</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">initialize</tspan><tspan x="14" dy="14">tools/list</tspan><tspan x="14" dy="14">tools/call</tspan></text>
+</g>
+<g id="gnome-router" class="node class level-4" transform="translate(365 90)">
+<title>adapters/gnome/gnome_tool_router.py</title>
+<rect x="0" y="0" width="735" height="180" rx="14"/>
+<text x="367.5" y="32" class="label l4" text-anchor="middle">GnomeToolRouter</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">ApplicationTools • ClipboardTools • ContextTools</tspan><tspan x="14" dy="14">InputTools • WindowTools</tspan><tspan x="14" dy="14">ToolSchemaCatalog</tspan></text>
+</g>
+<g id="gnome-app-tools" class="node class level-4" transform="translate(30 320)">
+<title>adapters/gnome/app_catalog.py; adapters/gnome/tools/application_tools.py</title>
+<rect x="0" y="0" width="250" height="250" rx="14"/>
+<text x="125.0" y="32" class="label l4" text-anchor="middle">Applications</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">search .desktop files</tspan><tspan x="14" dy="14">Unix socket launch</tspan><tspan x="14" dy="14">xdg-open URI</tspan><tspan x="14" dy="14">poll wmctrl windows</tspan></text>
+</g>
+<g id="gnome-context" class="node class level-4" transform="translate(310 320)">
+<title>adapters/gnome/gnome_context_provider.py</title>
+<rect x="0" y="0" width="250" height="250" rx="14"/>
+<text x="125.0" y="32" class="label l4" text-anchor="middle">Desktop context</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">wmctrl -l -G</tspan><tspan x="14" dy="14">xdotool active window</tspan><tspan x="14" dy="14">available applications</tspan></text>
+</g>
+<g id="gnome-input" class="node class level-4" transform="translate(590 320)">
+<title>adapters/gnome/gnome_input_simulator.py</title>
+<rect x="0" y="0" width="250" height="250" rx="14"/>
+<text x="125.0" y="32" class="label l4" text-anchor="middle">Input automation</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">xdotool key/type</tspan><tspan x="14" dy="14">mouse move/click/drag/scroll</tspan></text>
+</g>
+<g id="gnome-clipboard" class="node class level-4" transform="translate(870 320)">
+<title>adapters/gnome/gnome_clipboard_provider.py; adapters/gnome/gnome_text_paster.py</title>
+<rect x="0" y="0" width="230" height="250" rx="14"/>
+<text x="115.0" y="32" class="label l4" text-anchor="middle">Text + clipboard</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">xclip or wl-copy/paste</tspan><tspan x="14" dy="14">replace recent text</tspan><tspan x="14" dy="14">BackSpace + type</tspan></text>
+</g>
+<line class="micro-edge" x1="330" y1="180" x2="365" y2="180"/>
+<line class="micro-edge" x1="155" y1="270" x2="155" y2="320"/>
+<line class="micro-edge" x1="435" y1="270" x2="435" y2="320"/>
+<line class="micro-edge" x1="715" y1="270" x2="715" y2="320"/>
+<line class="micro-edge" x1="985" y1="270" x2="985" y2="320"/>
+<text x="575" y="700" class="micro" text-anchor="middle">Manifest marks GNOME as the primary desktop context source and exposes sequence-callable tools.</text>
+</g>
+<g id="process-adapter-coding" class="node adapter level-3" transform="translate(50 1070)">
+<title>adapters/coding/adapter.json; adapters/coding/server.py</title>
+<rect x="0" y="0" width="1150" height="430" rx="22"/>
+<text x="575.0" y="32" class="label l3" text-anchor="middle">Coding adapter</text>
+<text x="575.0" y="54" class="subtitle s3" text-anchor="middle">session-scoped whole-buffer edit planning</text>
+<g id="coding-server" class="node class level-4" transform="translate(30 80)">
+<title>adapters/coding/server.py</title>
+<rect x="0" y="0" width="360" height="260" rx="14"/>
+<text x="180.0" y="32" class="label l4" text-anchor="middle">CodingServer</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">start_coding_session</tspan><tspan x="14" dy="14">process_intent</tspan><tspan x="14" dy="14">stop_coding_session</tspan><tspan x="14" dy="14">in-memory session buffers</tspan></text>
+</g>
+<g id="coding-planner" class="node class level-4" transform="translate(430 80)">
+<title>adapters/coding/coding_edit_planner.py; adapters/coding/server.py</title>
+<rect x="0" y="0" width="330" height="260" rx="14"/>
+<text x="165.0" y="32" class="label l4" text-anchor="middle">CodingEditPlanner</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">LLM plans new buffer</tspan><tspan x="14" dy="14">returns replace operation</tspan></text>
+</g>
+<g id="coding-schema" class="node class level-4" transform="translate(800 80)">
+<title>adapters/coding/coding_tool_schema_catalog.py</title>
+<rect x="0" y="0" width="300" height="260" rx="14"/>
+<text x="150.0" y="32" class="label l4" text-anchor="middle">Tool schema catalog</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">3 hidden internal tools</tspan><tspan x="14" dy="14">MCP response payload</tspan></text>
+</g>
+<line class="micro-edge" x1="390" y1="210" x2="430" y2="210"/>
+</g>
+<g id="process-adapter-dictation" class="node adapter level-3" transform="translate(50 1540)">
+<title>adapters/dictation/adapter.json; adapters/dictation/server.py</title>
+<rect x="0" y="0" width="1150" height="430" rx="22"/>
+<text x="575.0" y="32" class="label l3" text-anchor="middle">Dictation adapter</text>
+<text x="575.0" y="54" class="subtitle s3" text-anchor="middle">session-scoped segment accumulation</text>
+<g id="dictation-server" class="node class level-4" transform="translate(30 80)">
+<title>adapters/dictation/server.py</title>
+<rect x="0" y="0" width="430" height="260" rx="14"/>
+<text x="215.0" y="32" class="label l4" text-anchor="middle">DictationServer</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">start_dictation</tspan><tspan x="14" dy="14">process_segment</tspan><tspan x="14" dy="14">stop_dictation</tspan><tspan x="14" dy="14">insert/replace edit payload</tspan></text>
+</g>
+<g id="dictation-store" class="node class level-4" transform="translate(500 80)">
+<title>adapters/dictation/dictation_session_store.py</title>
+<rect x="0" y="0" width="280" height="260" rx="14"/>
+<text x="140.0" y="32" class="label l4" text-anchor="middle">Session store</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">UUID session ids</tspan><tspan x="14" dy="14">prune_stale()</tspan><tspan x="14" dy="14">in-memory text</tspan></text>
+</g>
+<g id="dictation-schema" class="node class level-4" transform="translate(820 80)">
+<title>adapters/dictation/dictation_tool_schema_catalog.py</title>
+<rect x="0" y="0" width="280" height="260" rx="14"/>
+<text x="140.0" y="32" class="label l4" text-anchor="middle">Tool schema catalog</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">start / process / stop</tspan><tspan x="14" dy="14">MCP response payload</tspan></text>
+</g>
+<line class="micro-edge" x1="460" y1="210" x2="500" y2="210"/>
+</g>
+<g id="process-codex" class="node process level-3" transform="translate(50 2010)">
+<title>tusk/kernel/agent/backends/codex_exec_agent_backend.py; tusk/kernel/agent/backends/codex_mcp_agent_backend.py; docker/codex-entrypoint.sh</title>
+<rect x="0" y="0" width="1150" height="400" rx="22"/>
+<text x="575.0" y="32" class="label l3" text-anchor="middle">Optional Codex process</text>
+<text x="575.0" y="54" class="subtitle s3" text-anchor="middle">one-shot exec OR persistent mcp-server (mutually exclusive backend)</text>
+<g id="codex-exec-process" class="node class level-4" transform="translate(40 90)">
+<title>tusk/kernel/agent/backends/codex_exec_agent_backend.py</title>
+<rect x="0" y="0" width="500" height="220" rx="14"/>
+<text x="250.0" y="32" class="label l4" text-anchor="middle">codex exec</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">spawn per command</tspan><tspan x="14" dy="14">structured JSON output</tspan><tspan x="14" dy="14">configured sandbox/workdir</tspan></text>
+</g>
+<g id="codex-mcp-process" class="node class level-4" transform="translate(610 90)">
+<title>tusk/kernel/agent/backends/codex_mcp_agent_backend.py</title>
+<rect x="0" y="0" width="500" height="220" rx="14"/>
+<text x="250.0" y="32" class="label l4" text-anchor="middle">codex mcp-server</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">single persistent subprocess</tspan><tspan x="14" dy="14">MCP tool call</tspan><tspan x="14" dy="14">thread-id conversation continuity</tspan></text>
+</g>
+</g>
+</g>
+<g id="process-host-launcher" class="node process level-2" transform="translate(3900 2900)">
+<title>launcher/tusk_host_launcher.py; adapters/gnome/tools/application_tools.py</title>
+<rect x="0" y="0" width="1250" height="400" rx="32"/>
+<text x="625.0" y="55" class="label l2" text-anchor="middle">Host launcher</text>
+<text x="625.0" y="88" class="subtitle s2" text-anchor="middle">Unix-domain command bridge for GUI application spawning</text>
+<g id="host-launcher-server" class="node class level-4" transform="translate(50 100)">
+<title>launcher/tusk_host_launcher.py</title>
+<rect x="0" y="0" width="1150" height="230" rx="14"/>
+<text x="575.0" y="32" class="label l4" text-anchor="middle">tusk_host_launcher.py</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">listen /tmp/tusk/launch.sock (0700)</tspan><tspan x="14" dy="14">receive command → subprocess.Popen</tspan><tspan x="14" dy="14">strip Snap-specific environment leaks</tspan></text>
+</g>
+</g>
+<g id="service-phoenix" class="node process level-2" transform="translate(3900 3400)">
+<title>docker-compose.yml; tusk/shared/tracing/tracer_factory.py</title>
+<rect x="0" y="0" width="1250" height="360" rx="32"/>
+<text x="625.0" y="55" class="label l2" text-anchor="middle">Arize Phoenix</text>
+<text x="625.0" y="88" class="subtitle s2" text-anchor="middle">OTLP trace collector + UI</text>
+<g id="phoenix-runtime" class="node class level-4" transform="translate(50 95)">
+<title>docker-compose.yml</title>
+<rect x="0" y="0" width="780" height="190" rx="14"/>
+<text x="390.0" y="32" class="label l4" text-anchor="middle">phoenix:17.25.0</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">port 6006</tspan><tspan x="14" dy="14">OTLP HTTP /v1/traces</tspan><tspan x="14" dy="14">persistent phoenix-data volume</tspan></text>
+</g>
+<g id="phoenix-volume" class="node datastore level-4" transform="translate(870 95)">
+<title>docker-compose.yml</title>
+<rect x="0" y="0" width="300" height="190" rx="14"/>
+<text x="150.0" y="32" class="label l4" text-anchor="middle">phoenix-data</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">Docker named volume</tspan><tspan x="14" dy="14">/mnt/data</tspan></text>
+</g>
+</g>
+<g id="datastore-agent-sessions" class="node datastore level-2" transform="translate(250 3390)">
+<title>tusk/kernel/agent/session/file_store.py; tusk/shared/config/config_factory.py</title>
+<rect x="0" y="0" width="1500" height="360" rx="32"/>
+<text x="750.0" y="55" class="label l2" text-anchor="middle">Agent session event store</text>
+<text x="750.0" y="88" class="subtitle s2" text-anchor="middle">one JSONL file per session</text>
+<g id="class-file-store" class="node class level-4" transform="translate(40 100)">
+<title>tusk/kernel/agent/session/file_store.py</title>
+<rect x="0" y="0" width="700" height="190" rx="14"/>
+<text x="350.0" y="32" class="label l4" text-anchor="middle">FileStore</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">append_event()</tspan><tspan x="14" dy="14">conversation_messages()</tspan><tspan x="14" dy="14">session_digest()</tspan><tspan x="14" dy="14">final_result()</tspan></text>
+</g>
+<g id="data-jsonl" class="node datastore level-4" transform="translate(790 100)">
+<title>tusk/kernel/agent/session/file_store.py</title>
+<rect x="0" y="0" width="660" height="190" rx="14"/>
+<text x="330.0" y="32" class="label l4" text-anchor="middle">.tusk_runtime/agent_sessions/*.jsonl</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">session_started</tspan><tspan x="14" dy="14">message_appended</tspan><tspan x="14" dy="14">tool steps</tspan><tspan x="14" dy="14">final result</tspan></text>
+</g>
+</g>
+<g id="datastore-adapter-cache" class="node datastore level-2" transform="translate(1850 3390)">
+<title>tusk/shared/mcp/adapter_env_builder.py; tusk/shared/config/config_factory.py</title>
+<rect x="0" y="0" width="1800" height="360" rx="32"/>
+<text x="900.0" y="55" class="label l2" text-anchor="middle">Adapter environment cache</text>
+<text x="900.0" y="88" class="subtitle s2" text-anchor="middle">per-adapter/version Python virtual environments</text>
+<g id="adapter-env-builder" class="node class level-4" transform="translate(40 100)">
+<title>tusk/shared/mcp/adapter_env_builder.py</title>
+<rect x="0" y="0" width="800" height="190" rx="14"/>
+<text x="400.0" y="32" class="label l4" text-anchor="middle">AdapterEnvironmentBuilder</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">try base PYTHONPATH first</tspan><tspan x="14" dy="14">on failure: create venv</tspan><tspan x="14" dy="14">pip install adapter requirements</tspan></text>
+</g>
+<g id="adapter-cache-data" class="node datastore level-4" transform="translate(890 100)">
+<title>tusk/shared/mcp/adapter_env_builder.py</title>
+<rect x="0" y="0" width="860" height="190" rx="14"/>
+<text x="430.0" y="32" class="label l4" text-anchor="middle">.tusk_runtime/adapters/{name}/{version}</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">bin/python</tspan><tspan x="14" dy="14">installed dependencies</tspan><tspan x="14" dy="14">PATH + VIRTUAL_ENV</tspan></text>
+</g>
+</g>
+<line id="edge-shells-kernel" class="edge call" x1="1300" y1="1700" x2="1370" y2="1700" marker-end="url(#arrow)"/>
+<text x="1335.0" y="1690.0" class="edge-label" text-anchor="middle">submit(text, kind)</text>
+<line id="edge-kernel-agent" class="edge call" x1="2420" y1="1700" x2="2490" y2="1700" marker-end="url(#arrow)"/>
+<text x="2455.0" y="1690.0" class="edge-label" text-anchor="middle">AgentBackend.run</text>
+<line id="edge-agent-adapters" class="edge mcp" x1="3640" y1="1780" x2="3900" y2="1780" marker-end="url(#arrow)"/>
+<text x="3770.0" y="1770.0" class="edge-label" text-anchor="middle">ToolRegistry → MCP tools</text>
+<path id="edge-main-codex" class="edge mcp" d="M 3640 2100 C 3720 2100, 3820 2470, 3950 2470" marker-end="url(#arrow)"/>
+<text x="3782.5" y="2277.0" class="edge-label" text-anchor="middle">subprocess / MCP</text>
+<path id="edge-agent-sessions" class="edge data" d="M 2800 2550 C 2700 3000, 1900 3200, 1400 3390" marker-end="url(#arrow)"/>
+<text x="2200.0" y="3027.0" class="edge-label" text-anchor="middle">append/read JSONL events</text>
+<path id="edge-adapter-cache" class="edge data low-level-edge" d="M 1930 680 C 1150 820, 180 900, 180 1750 C 180 2580, 620 3140, 1220 3290 C 1680 3400, 2320 3340, 2750 3390" marker-end="url(#arrow)"><title>Direct support: AdapterManager uses AdapterEnvironmentBuilder; on initial adapter import failure it creates a versioned venv and installs adapter requirements. Evidence: tusk/kernel/core/adapter_manager.py and tusk/shared/mcp/adapter_env_builder.py.</title></path>
+<text x="870" y="3190" class="edge-label low-level-label" text-anchor="middle">AdapterEnvironmentBuilder: cached venv on import failure</text>
+<path id="edge-main-phoenix" class="edge http" d="M 3500 2950 C 3700 3050, 3800 3400, 3900 3575" marker-end="url(#arrow)"/>
+<text x="3725.0" y="3235.75" class="edge-label" text-anchor="middle">OTLP/HTTP</text>
+<path id="edge-gnome-launcher" class="edge control" marker-end="url(#arrow)" d="M 5100 1130 C 5320 1220, 5380 1780, 5360 2350 C 5350 2690, 5230 2890, 5100 3000"><title>Direct support: GNOME ApplicationTools connects to /tmp/tusk/launch.sock; launcher/tusk_host_launcher.py accepts and executes the command.</title></path>
+<text x="5390" y="2070" class="edge-label" text-anchor="middle" transform="rotate(90 5390 2070)">Unix socket /tmp/tusk/launch.sock</text>
+</g>
+<g id="external-cloud-services" class="node external level-2" transform="translate(6450 480)">
+<title>Provider client implementations and Codex CLI configuration</title>
+<rect x="0" y="0" width="650" height="1500" rx="38"/>
+<text x="325.0" y="55" class="label l2" text-anchor="middle">Cloud model/audio APIs</text>
+<text x="325.0" y="88" class="subtitle s2" text-anchor="middle">network services outside the repository</text>
+<g id="external-groq" class="node provider level-3" transform="translate(50 140)">
+<title>tusk/providers/llm/groq_llm.py; tusk/providers/stt/groq_stt.py; tusk/providers/tts/groq_tts.py</title>
+<rect x="0" y="0" width="550" height="430" rx="24"/>
+<text x="275.0" y="32" class="label l3" text-anchor="middle">Groq</text>
+<text x="275.0" y="54" class="subtitle s3" text-anchor="middle">LLM chat + STT + TTS</text>
+<g id="groq-apis" class="node class level-4" transform="translate(40 100)">
+<title>tusk/providers/llm/groq_llm.py; tusk/providers/stt/groq_stt.py; tusk/providers/tts/groq_tts.py</title>
+<rect x="0" y="0" width="470" height="240" rx="14"/>
+<text x="235.0" y="32" class="label l4" text-anchor="middle">Groq SDK calls</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">chat.completions.create</tspan><tspan x="14" dy="14">audio.transcriptions.create</tspan><tspan x="14" dy="14">audio.speech.create</tspan></text>
+</g>
+</g>
+<g id="external-openrouter" class="node provider level-3" transform="translate(50 630)">
+<title>tusk/providers/llm/open_router_llm.py</title>
+<rect x="0" y="0" width="550" height="350" rx="24"/>
+<text x="275.0" y="32" class="label l3" text-anchor="middle">OpenRouter</text>
+<text x="275.0" y="54" class="subtitle s3" text-anchor="middle">OpenAI-compatible LLM API</text>
+<g id="openrouter-api" class="node class level-4" transform="translate(40 100)">
+<title>tusk/providers/llm/open_router_llm.py</title>
+<rect x="0" y="0" width="470" height="190" rx="14"/>
+<text x="235.0" y="32" class="label l4" text-anchor="middle">https://openrouter.ai/api/v1</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">OpenAI client</tspan><tspan x="14" dy="14">chat.completions</tspan><tspan x="14" dy="14">tool calls</tspan></text>
+</g>
+</g>
+<g id="external-openai-codex" class="node external level-3 inferred" transform="translate(50 1040)">
+<title>Inferred from invoking an authenticated Codex CLI; the repository does not implement its network client.</title>
+<rect x="0" y="0" width="550" height="350" rx="24"/>
+<text x="275.0" y="32" class="label l3" text-anchor="middle">OpenAI model service</text>
+<text x="275.0" y="54" class="subtitle s3" text-anchor="middle">used by the Codex CLI runtime</text>
+<text x="534" y="18" class="badge" text-anchor="end">inferred</text>
+<g id="codex-cloud-inference" class="node class level-4 inferred" transform="translate(40 100)">
+<title>docker/codex-entrypoint.sh; .env.example</title>
+<rect x="0" y="0" width="470" height="190" rx="14"/>
+<text x="235.0" y="32" class="label l4" text-anchor="middle">Codex upstream</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">exact endpoint/protocol hidden inside binary</tspan><tspan x="14" dy="14">OAuth auth.json mounted into container</tspan></text>
+</g>
+</g>
+</g>
+<g id="external-host-environment" class="node external level-2" transform="translate(6450 2140)">
+<title>docker-compose.yml; Dockerfile; adapters/gnome/*; launcher/tusk_host_launcher.py</title>
+<rect x="0" y="0" width="650" height="1530" rx="38"/>
+<text x="325.0" y="55" class="label l2" text-anchor="middle">Host GNOME session</text>
+<text x="325.0" y="88" class="subtitle s2" text-anchor="middle">desktop, sound, display, D-Bus, application files</text>
+<g id="external-gnome-desktop" class="node external level-3" transform="translate(50 130)">
+<title>adapters/gnome/gnome_context_provider.py; adapters/gnome/gnome_input_simulator.py</title>
+<rect x="0" y="0" width="550" height="480" rx="24"/>
+<text x="275.0" y="32" class="label l3" text-anchor="middle">GNOME desktop</text>
+<text x="275.0" y="54" class="subtitle s3" text-anchor="middle">windows, focused editor, applications</text>
+<g id="host-window-system" class="node class level-4" transform="translate(40 110)">
+<title>Dockerfile; adapters/gnome/</title>
+<rect x="0" y="0" width="470" height="270" rx="14"/>
+<text x="235.0" y="32" class="label l4" text-anchor="middle">Host commands</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">wmctrl</tspan><tspan x="14" dy="14">xdotool</tspan><tspan x="14" dy="14">xclip / wl-copy</tspan><tspan x="14" dy="14">xdg-open</tspan></text>
+</g>
+</g>
+<g id="external-audio-session" class="node external level-3" transform="translate(50 670)">
+<title>docker-compose.yml; docker/pipewire-echo-cancel.conf</title>
+<rect x="0" y="0" width="550" height="330" rx="24"/>
+<text x="275.0" y="32" class="label l3" text-anchor="middle">Audio session</text>
+<text x="275.0" y="54" class="subtitle s3" text-anchor="middle">microphone + playback + echo cancellation</text>
+<g id="host-audio-endpoints" class="node class level-4" transform="translate(40 105)">
+<title>docker-compose.yml; docker/pipewire-echo-cancel.conf</title>
+<rect x="0" y="0" width="470" height="170" rx="14"/>
+<text x="235.0" y="32" class="label l4" text-anchor="middle">PulseAudio / PipeWire</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">/dev/snd</tspan><tspan x="14" dy="14">pulse native socket</tspan><tspan x="14" dy="14">echo-cancel source/sink</tspan></text>
+</g>
+</g>
+<g id="external-display-bus" class="node external level-3" transform="translate(50 1060)">
+<title>docker-compose.yml; shells/tray/tray_shell.py</title>
+<rect x="0" y="0" width="550" height="360" rx="24"/>
+<text x="275.0" y="32" class="label l3" text-anchor="middle">Display + desktop buses</text>
+<text x="275.0" y="54" class="subtitle s3" text-anchor="middle">container access to host session</text>
+<g id="host-display-mounts" class="node class level-4" transform="translate(40 105)">
+<title>docker-compose.yml</title>
+<rect x="0" y="0" width="470" height="200" rx="14"/>
+<text x="235.0" y="32" class="label l4" text-anchor="middle">X11 + D-Bus + .desktop dirs</text>
+<text x="14" y="46" class="micro" text-anchor="start"><tspan x="14" dy="0">DISPLAY / XAUTHORITY</tspan><tspan x="14" dy="14">session bus socket</tspan><tspan x="14" dy="14">application directories mounted read-only</tspan></text>
+</g>
+</g>
+</g>
+<path id="edge-user-voice" class="edge audio" d="M 640 1830 C 760 1750, 850 1750, 950 1830" marker-end="url(#arrow)"/>
+<text x="800.0" y="1782.0" class="edge-label" text-anchor="middle">voice / CLI / tray</text>
+<path id="edge-main-groq" class="edge http" d="M 4200 3200 C 4480 3200, 4620 3200, 4620 430 C 5200 370, 6000 390, 6200 650 C 6270 760, 6360 850, 6500 900" marker-end="url(#arrow)"/>
+<text x="5550" y="405" class="edge-label" text-anchor="middle">HTTPS via Groq SDK</text>
+<path id="edge-main-openrouter" class="edge http" d="M 4300 3250 C 4540 3300, 4680 3300, 4680 465 C 5400 405, 6070 430, 6210 760 C 6280 980, 6360 1260, 6500 1420" marker-end="url(#arrow)"/>
+<text x="5750" y="455" class="edge-label" text-anchor="middle">HTTPS OpenAI-compatible</text>
+<path id="edge-coding-groq" class="edge http" d="M 5900 1820 C 6080 1800, 6200 1260, 6500 1050" marker-end="url(#arrow)"/>
+<text x="6240" y="1225" class="edge-label" text-anchor="middle">LLM edit planner</text>
+<path id="edge-codex-cloud" class="edge http inferred-edge" d="M 5900 2780 C 6100 2700, 6200 1920, 6500 1690" marker-end="url(#arrow)"/>
+<text x="6250" y="1905" class="edge-label" text-anchor="middle">model API (inferred)</text>
+<path id="edge-gnome-host" class="edge control" d="M 5900 1050 C 6100 1200, 6200 2300, 6500 2500" marker-end="url(#arrow)"/>
+<text x="6250" y="2315" class="edge-label" text-anchor="middle">wmctrl / xdotool / clipboard</text>
+<path id="edge-launcher-host" class="edge control" d="M 5900 3360 C 6100 3350, 6200 2860, 6500 2700" marker-end="url(#arrow)"/>
+<text x="6250" y="2865" class="edge-label" text-anchor="middle">spawn host GUI process</text>
+<path id="edge-container-audio" class="edge audio" d="M 4300 1900 C 4520 1900, 4640 900, 4640 400 C 5300 350, 6000 390, 6180 700 C 6240 1250, 6200 2500, 6500 3000" marker-end="url(#arrow)"/>
+<text x="5300" y="365" class="edge-label" text-anchor="middle">PulseAudio + /dev/snd</text>
+<path id="edge-container-display" class="edge control" d="M 4300 1150 C 4500 1150, 4700 760, 4700 445 C 5450 390, 6070 430, 6220 820 C 6290 1600, 6220 3000, 6500 3500" marker-end="url(#arrow)"/>
+<text x="5500" y="430" class="edge-label" text-anchor="middle">X11 + D-Bus mounts</text>
+<g id="legend" transform="translate(120 3520)">
+<rect x="0" y="0" width="650" height="720" rx="30" fill="#fff" stroke="#cbd5e1" stroke-width="4"/>
+<text x="35" y="55" class="legend-title">Legend</text>
+<rect x="35" y="90" width="70" height="34" rx="8" fill="#edf5ff" stroke="#2563eb" stroke-width="3"/><text x="125" y="114" class="legend-text">Application / container</text>
+<rect x="35" y="148" width="70" height="34" rx="8" fill="#eefcf6" stroke="#16865a" stroke-width="3"/><text x="125" y="172" class="legend-text">Process / service</text>
+<rect x="35" y="206" width="70" height="34" rx="8" fill="#ffffff" stroke="#64748b" stroke-width="3"/><text x="125" y="230" class="legend-text">Module / component</text>
+<rect x="35" y="264" width="70" height="34" rx="8" fill="#fff1f1" stroke="#c24141" stroke-width="3"/><text x="125" y="288" class="legend-text">Provider / external API</text>
+<rect x="35" y="322" width="70" height="34" rx="8" fill="#fff7db" stroke="#b7791f" stroke-width="3"/><text x="125" y="346" class="legend-text">Data store / persistent files</text>
+<rect x="35" y="400" width="70" height="34" rx="8" fill="#faf7ff" stroke="#8b5cf6" stroke-width="3" stroke-dasharray="10 7"/><text x="125" y="424" class="legend-text">Inferred, not directly declared</text>
+<line x1="35" y1="474" x2="105" y2="474" stroke="#16865a" stroke-width="6" marker-end="url(#arrow)"/><text x="125" y="481" class="legend-text">MCP / JSON-RPC stdio</text>
+<line x1="35" y1="530" x2="105" y2="530" stroke="#c24141" stroke-width="6" marker-end="url(#arrow)"/><text x="125" y="537" class="legend-text">HTTP / external API</text>
+<line x1="35" y1="586" x2="105" y2="586" stroke="#b7791f" stroke-width="6" marker-end="url(#arrow)"/><text x="125" y="593" class="legend-text">Audio or persisted data</text>
+<text x="35" y="655" class="scope-note">Deep levels show representative implementation details.</text>
+<text x="35" y="680" class="scope-note">Schemas, prompts, guards, and small helpers are summarized.</text>
+</g>
+<g id="source-note" transform="translate(815 4210)">
+<text x="0" y="0" class="scope-note">Evidence basis: production source, adapter manifests, requirements, Docker deployment, and tests. Existing architecture docs/diagrams were ignored. Hover nodes for source paths.</text>
+</g>
+</svg>

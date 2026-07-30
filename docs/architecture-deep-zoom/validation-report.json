@@ -1,0 +1,82 @@
+{
+  "adjacent_text_scale_ratios": {
+    "l1/l2": 4.0,
+    "l2/l3": 4.0,
+    "l3/l4": 4.0,
+    "l4/l5": 4.0
+  },
+  "architecture_node_count": 98,
+  "bytes": 58627,
+  "checks": {
+    "adjacent_scale_ratios_between_4x_and_8x": true,
+    "all_architecture_nodes_titled": true,
+    "five_text_levels_present": true,
+    "standalone_no_external_hrefs": true,
+    "standalone_no_external_images": true,
+    "standalone_no_scripts": true,
+    "svg_root": true,
+    "unique_ids": true,
+    "viewbox_expected": true,
+    "well_formed_xml": true
+  },
+  "duplicate_ids": [],
+  "element_count": 766,
+  "external_references": [],
+  "file": "architecture-deep-zoom.svg",
+  "group_count": 101,
+  "id_count": 121,
+  "included_preview_files": [
+    {
+      "reason": "Pillow not installed",
+      "status": "skipped"
+    }
+  ],
+  "nodes_with_title": 98,
+  "passed": true,
+  "rendered_views": [
+    {
+      "area": "0:0:7200:4400",
+      "name": "overview",
+      "output": "/tmp/tusk-architecture-validation/architecture-preview-overview.png",
+      "status": "passed",
+      "stderr": ""
+    },
+    {
+      "area": "800:180:6200:4230",
+      "name": "system",
+      "output": "/tmp/tusk-architecture-validation/architecture-preview-system.png",
+      "status": "passed",
+      "stderr": ""
+    },
+    {
+      "area": "4680:470:6110:2920",
+      "name": "adapters",
+      "output": "/tmp/tusk-architecture-validation/architecture-preview-adapters.png",
+      "status": "passed",
+      "stderr": ""
+    },
+    {
+      "area": "4800:600:5950:1430",
+      "name": "class",
+      "output": "/tmp/tusk-architecture-validation/architecture-preview-class.png",
+      "status": "passed",
+      "stderr": ""
+    },
+    {
+      "area": "1210:1110:2200:2290",
+      "name": "level5",
+      "output": "/tmp/tusk-architecture-validation/architecture-preview-level5.png",
+      "status": "passed",
+      "stderr": ""
+    }
+  ],
+  "rendering_passed": true,
+  "sha256": "0a81172fb07ec116848739282a52266aa1b4e2323c7748fa074863e090586351",
+  "text_level_sizes_px": {
+    "1": 120.0,
+    "2": 30.0,
+    "3": 7.5,
+    "4": 1.875,
+    "5": 0.46875
+  }
+}
