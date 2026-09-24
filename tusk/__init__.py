@@ -1,3 +1,5 @@
 from tusk import kernel, providers, shared
 
-__all__ = ["kernel", "providers", "shared"]
+__version__ = "0.1.0"
+
+__all__ = ["__version__", "kernel", "providers", "shared"]
