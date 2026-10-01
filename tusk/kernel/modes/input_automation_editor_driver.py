@@ -11,6 +11,8 @@ __all__ = ["InputAutomationEditorDriver"]
 # xdotool returns before the target app consumes a copy/paste keystroke, so the
 # clipboard must settle before we read or restore it, or we lose the round-trip.
 _CLIPBOARD_SETTLE_SECONDS = 0.2
+# Written before copying so an empty buffer (copy is a no-op) is not mistaken for stale clipboard text.
+_EMPTY_BUFFER_SENTINEL = "\x00tusk-empty-buffer\x00"
 
 
 class InputAutomationEditorDriver(EditorDriver):
@@ -21,10 +23,11 @@ class InputAutomationEditorDriver(EditorDriver):
 
     def read_buffer(self) -> str:
         with ClipboardGuard(self._registry, self._source):
+            self._exec("write_clipboard", {"text": _EMPTY_BUFFER_SENTINEL})
             self._press("<ctrl>a")
             self._press("<ctrl>c")
             self._sleep(_CLIPBOARD_SETTLE_SECONDS)
-            return self._read_clipboard()
+            return self._read_copied_buffer()
 
     def goto_line(self, line_number: int) -> None:
         self._press("<ctrl>g")
@@ -57,8 +60,11 @@ class InputAutomationEditorDriver(EditorDriver):
             self._press("<shift>Down")
         self._press("<shift>End")
 
-    def _read_clipboard(self) -> str:
-        return (self._exec("read_clipboard", {}).data or {}).get("text", "")
+    def _read_copied_buffer(self) -> str:
+        # The gnome tool reports an empty clipboard as a failure, which here just means an empty buffer.
+        result = self._registry.get(f"{self._source}.read_clipboard").execute({})
+        text = (result.data or {}).get("text", "")
+        return "" if text == _EMPTY_BUFFER_SENTINEL else text
 
     def _press(self, keys: str) -> None:
         self._exec("press_keys", {"keys": keys})
