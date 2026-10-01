@@ -55,8 +55,11 @@ exceed 2^31. `ActiveWindow` from the first draft was dropped: the focused flag i
 - `GnomeToolRouter` takes optional `window_tools`; when it has `list_windows()`, `ApplicationTools`
   uses it (`window_lister`) to detect the launched app's window instead of `wmctrl`.
 - `docker-compose.yml` passes `XDG_SESSION_TYPE`, `WAYLAND_DISPLAY`, `XDG_RUNTIME_DIR` and mounts
-  the Wayland socket (`/dev/null` stands in on X11 hosts), and sets `apparmor=unconfined`: the host
-  dbus-daemon rejects clients confined by Docker's default AppArmor profile.
+  the Wayland socket (`/dev/null` stands in on X11 hosts). `apparmor=unconfined` lives in the opt-in
+  `docker-compose.wayland.yml`: the host dbus-daemon rejects clients confined by Docker's default
+  AppArmor profile (`scripts/host_bus_check.sh` shows both cases). Absolute `WAYLAND_DISPLAY` is unsupported.
+- Window titles resolve to one id: exact case-insensitive match first, else a unique substring;
+  several matches fail with the candidate list. X11 then acts by id (`wmctrl -i`).
 
 ## Pitfalls
 
@@ -70,13 +73,17 @@ exceed 2^31. `ActiveWindow` from the first draft was dropped: the focused flag i
 1. Extension + install script (`scripts/install-gnome-extension.sh`).
 2. Wayland adapter classes with unit tests mirroring `tests/adapters/test_gnome_*`.
 3. Docker/compose: Wayland socket and session bus are reachable; X11 mounts kept.
-4. End-to-end: `scripts/wayland_e2e.sh` starts `gnome-shell --headless --virtual-monitor 1280x800
-   --wayland` on a private dbus-daemon with temporary HOME/XDG dirs (the user's session is never
-   touched), spawns gedit there (the host launcher socket would open apps on the real desktop),
-   and runs `scripts/wayland_e2e_driver.py` in the Docker image, which drives everything through
-   `GnomeToolRouter.call`. Evidence in `docs/features/wayland-e2e/` (`tool_calls.log`, screenshots
-   after type/tile/maximize, `shell.log`). Screenshots use `org.gnome.Shell.Screenshot`, which
-   GNOME only serves to allow-listed names, so the driver owns `org.gnome.Screenshot` on the
-   private bus. Result: "Hello from Tusk on Wayland\nПривіт" read back exactly via
-   `read_clipboard` and via the saved file; tile left -> 640x768 at 0,32; maximize -> 1280x768.
+4. End-to-end (evidence in `docs/features/wayland-e2e/`, all scripts rerunnable):
+   - `scripts/wayland_e2e.sh`: headless `gnome-shell --wayland` on a private dbus-daemon and temp
+     HOME; the host launcher runs on a private socket (module constant overridden) so
+     `launch_application` opens gedit in the nested shell; `scripts/e2e_driver.py wayland` runs in the
+     Docker image and uses only `GnomeToolRouter.call` (`wayland_tool_calls.log`, screenshots).
+     Screenshots go through `scripts/shell_screenshot.py`, which owns `org.gnome.Screenshot`
+     (GNOME allow-lists it). Results: launch detected the new window; typed
+     "Hello from Tusk on Wayland\nПривіт" read back exactly (clipboard and saved file); tile left
+     640x768 at 0,32; maximize 1280x768; maximize then tile right 640x768 at 640,32 (no snap-back);
+     two gedit windows -> ambiguity error; close by exact title.
+   - `scripts/x11_e2e.sh`: Xvfb :99 + openbox + two xterms in a disposable container
+     (`x11_tool_calls.log`, `x11_*.png`).
+   - `scripts/host_bus_check.sh`, `scripts/install_extension_check.sh`: see their logs.
 5. README "Display server support" and setup steps (done).

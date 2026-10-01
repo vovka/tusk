@@ -64,8 +64,12 @@ or `WAYLAND_DISPLAY` is set, X11 otherwise.
   active keyboard layout (e.g. Cyrillic on a US layout) are pasted via the clipboard with
   Ctrl+V, which overwrites the clipboard and does not work in terminals.
 
-> **Security note:** any process on your session bus can call `org.tusk.Shell` to type,
-> click, and move or close windows — the same exposure as `xdotool` on X11.
+> **Trust model (Wayland):** any client on your session bus — including the TUSK container —
+> can call `org.tusk.Shell` to type, click, and move or close windows, the same exposure as
+> `xdotool` on X11. The container reaches the bus only with the opt-in
+> `docker-compose.wayland.yml` override, which runs it with `apparmor=unconfined` and so
+> loosens container isolation; a custom AppArmor profile allowing just the session bus would
+> be tighter, but loading one needs root.
 
 ## Setup
 
@@ -91,11 +95,17 @@ in** (GNOME Shell on Wayland only loads new extensions at login):
 scripts/install-gnome-extension.sh
 ```
 
-`docker-compose.yml` passes `XDG_SESSION_TYPE` and `WAYLAND_DISPLAY` into the container,
+`docker-compose.yml` passes `XDG_SESSION_TYPE` and `WAYLAND_DISPLAY` into the container and
 mounts the session bus (`/run/user/1000/bus`) and the Wayland socket
-(`/run/user/1000/$WAYLAND_DISPLAY`), and runs the container with
-`apparmor=unconfined` because the host D-Bus daemon rejects AppArmor-confined Docker
-clients. The X11 mounts stay in place, so the same file works on both.
+(`/run/user/1000/$WAYLAND_DISPLAY`; `/dev/null` stands in on X11). The X11 mounts stay in
+place. On Wayland, add the AppArmor override, because the host D-Bus daemon rejects
+AppArmor-confined Docker clients:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.wayland.yml up
+```
+
+An absolute `WAYLAND_DISPLAY` (a socket path instead of a name like `wayland-0`) is not supported.
 
 ### 3. Create your `.env` file
 
