@@ -1,6 +1,8 @@
 from tusk.kernel import CommandMode, KernelAPI, MainAgent, SlidingWindowHistory, ToolRegistry
 from tusk.kernel.core.adapter_manager import AdapterManager
 from tusk.kernel.agent import AgentOrchestrator, FileStore
+from tusk.kernel.agent.confirmation import ConfirmationGate, ConfirmingCommandMode
+from tusk.kernel.interfaces.action_confirmation import ActionConfirmation
 from tusk.kernel.agent.backends import AgentBackendFactory
 from tusk.kernel.core.agent_profiles import build_agent_profiles
 from tusk.kernel.tools.tool_runtime import ToolRuntime
@@ -17,21 +19,25 @@ def build_kernel(config: Config, log: ColorLogPrinter, llm_registry: LLMRegistry
     tool_registry = ToolRegistry()
     adapter_manager = build_adapter_manager(config, log, tool_registry)
     history = SlidingWindowHistory(20)
-    agent = build_agent(config, log, llm_registry, tool_registry, history, token, tracer)
-    kernel = build_api(agent, config, log, llm_registry, reporter, token, tracer)
+    confirmation = ConfirmationGate(tool_registry)
+    agent = build_agent(config, log, llm_registry, tool_registry, history, token, tracer, confirmation)
+    kernel = build_api(agent, config, log, llm_registry, reporter, token, tracer, confirmation)
     ToolRuntime(tool_registry, llm_registry, adapter_manager, log, reporter).register_tools(kernel)
     return kernel
 
 
-def build_api(agent: MainAgent, config: Config, log: ColorLogPrinter, llm_registry: LLMRegistry, reporter: StatusReporterHub, token: InterruptToken | None = None, tracer: Tracer | None = None) -> KernelAPI:
+def build_api(agent: MainAgent, config: Config, log: ColorLogPrinter, llm_registry: LLMRegistry, reporter: StatusReporterHub, token: InterruptToken | None = None, tracer: Tracer | None = None, confirmation: ActionConfirmation | None = None) -> KernelAPI:
     backend = AgentBackendFactory(agent, config, log).create()
-    return KernelAPI(CommandMode(backend, log), llm_registry, log, reporter, token, tracer=tracer)
+    command_mode = CommandMode(backend, log)
+    if confirmation is not None:
+        command_mode = ConfirmingCommandMode(command_mode, confirmation)
+    return KernelAPI(command_mode, llm_registry, log, reporter, token, tracer=tracer)
 
 
-def build_agent(config: Config, log: ColorLogPrinter, llm_registry: LLMRegistry, tool_registry: ToolRegistry, history: ConversationHistory, token: InterruptToken | None = None, tracer: Tracer | None = None) -> MainAgent:
+def build_agent(config: Config, log: ColorLogPrinter, llm_registry: LLMRegistry, tool_registry: ToolRegistry, history: ConversationHistory, token: InterruptToken | None = None, tracer: Tracer | None = None, confirmation: ActionConfirmation | None = None) -> MainAgent:
     store = FileStore(config.agent_session_log_dir)
     profiles = build_agent_profiles(llm_registry)
-    return MainAgent(AgentOrchestrator(profiles, tool_registry, store, log, token, tracer), history, store)
+    return MainAgent(AgentOrchestrator(profiles, tool_registry, store, log, token, tracer, confirmation), history, store)
 
 
 def build_adapter_manager(config: Config, log: ColorLogPrinter, tool_registry: ToolRegistry) -> AdapterManager:

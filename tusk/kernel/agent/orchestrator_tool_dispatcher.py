@@ -6,6 +6,8 @@ from tusk.kernel.tools.tool_registry import ToolRegistry
 from tusk.kernel.agent.agent_tool_catalog import AgentToolCatalog
 from tusk.kernel.agent.simple_schema_validator import SimpleSchemaValidator
 from tusk.kernel.agent.tool_sequence.executor import Executor
+from tusk.kernel.agent.confirmation.confirmation_gate import ConfirmationGate
+from tusk.kernel.interfaces.action_confirmation import ActionConfirmation
 from tusk.shared.schemas.tools.tool_sequence_plan import ToolSequencePlan
 from tusk.shared.tracing.interfaces.tracer import Tracer
 from tusk.shared.tracing.null_tracer import NullTracer
@@ -14,12 +16,13 @@ __all__ = ["OrchestratorToolDispatcher"]
 
 
 class OrchestratorToolDispatcher:
-    def __init__(self, tool_registry: ToolRegistry, catalog: AgentToolCatalog, sequence_executor: Executor, validator: SimpleSchemaValidator | None = None, tracer: Tracer | None = None) -> None:
+    def __init__(self, tool_registry: ToolRegistry, catalog: AgentToolCatalog, sequence_executor: Executor, validator: SimpleSchemaValidator | None = None, tracer: Tracer | None = None, confirmation: ActionConfirmation | None = None) -> None:
         self._registry = tool_registry
         self._catalog = catalog
         self._sequence = sequence_executor
         self._validator = validator or SimpleSchemaValidator()
         self._tracer = tracer or NullTracer()
+        self._confirmation = confirmation or ConfirmationGate(tool_registry)
 
     def dispatch(
         self,
@@ -57,6 +60,6 @@ class OrchestratorToolDispatcher:
 
     def _traced_execute(self, tool: object, tool_call: ToolCall) -> ToolResult:
         with self._tracer.span(f"tool.{tool_call.tool_name}", {"tool": tool_call.tool_name}) as span:
-            result = tool.execute(tool_call.parameters)
+            result = self._confirmation.execute(tool_call.tool_name, tool_call.parameters)
             span.set_attribute("success", str(result.success))
         return result

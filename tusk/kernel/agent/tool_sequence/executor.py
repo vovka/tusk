@@ -1,6 +1,8 @@
 import time
 from typing import Callable
 
+from tusk.kernel.agent.confirmation.confirmation_gate import ConfirmationGate
+from tusk.kernel.interfaces.action_confirmation import ActionConfirmation
 from tusk.kernel.agent.tool_sequence.plan_validator import PlanValidator
 from tusk.kernel.agent.tool_sequence.recorder import Recorder
 from tusk.kernel.tools.tool_registry import ToolRegistry
@@ -15,13 +17,15 @@ __all__ = ["Executor"]
 
 class Executor:
     def __init__(self, registry: ToolRegistry, session_store: object, interrupt_token: object | None = None,
-                 sleep: Callable[[float], None] = time.sleep, tracer: Tracer | None = None) -> None:
+                 sleep: Callable[[float], None] = time.sleep, tracer: Tracer | None = None,
+                 confirmation: ActionConfirmation | None = None) -> None:
         self._registry = registry
         self._validator = PlanValidator(registry)
         self._record = Recorder(session_store)
         self._token = interrupt_token
         self._sleep = sleep
         self._tracer = tracer or NullTracer()
+        self._confirmation = confirmation or ConfirmationGate(registry)
 
     def execute(self, session_id: str, parameters: dict[str, object], allowed: set[str]) -> ToolResult:
         message = self._validator.validate(parameters, allowed)
@@ -74,7 +78,7 @@ class Executor:
     def _step(self, session_id: str, step: ToolSequenceStep) -> ToolResult:
         self._record.requested(session_id, step.step_id, step.tool_name, step.args)
         with self._tracer.span(f"tool.{step.tool_name}", {"tool": step.tool_name, "step_id": step.step_id}) as span:
-            result = self._registry.get(step.tool_name).execute(step.args)
+            result = self._confirmation.execute(step.tool_name, step.args)
             span.set_attribute("success", str(result.success))
         self._record.result(session_id, step.step_id, step.tool_name, result)
         return result
@@ -88,7 +92,7 @@ class Executor:
         return ToolResult(False, summary, self._payload("cancelled", plan, completed, "", results))
 
     def _done(self, session_id: str, plan: ToolSequencePlan, completed: list[str], results: dict[str, object]) -> ToolResult:
-        summary = self._summary(plan, "completed")
+        summary = f"{plan.goal or 'sequence'} completed"
         self._record.finished(session_id, "done", summary)
         payload = self._payload("done", plan, completed, "", results)
         # the directive ends the wrapper LLM's transcript so it calls done instead of re-running the sequence
@@ -113,7 +117,3 @@ class Executor:
         if result.data is not None:
             data["data"] = result.data
         return data
-
-    def _summary(self, plan: ToolSequencePlan, outcome: str) -> str:
-        goal = plan.goal or "sequence"
-        return f"{goal} {outcome}"

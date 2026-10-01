@@ -113,3 +113,14 @@ def test_sequence_executor_skips_settle_on_last_step() -> None:
     result = _settling_executor(_settle_registry(), sleeps).execute("s1", plan, {"gnome.launch_application"})
     assert result.success is True
     assert sleeps == []
+
+
+def test_sequence_executor_stops_at_destructive_step() -> None:
+    seen: list[dict[str, object]] = []
+    registry = ToolRegistry()
+    registry.register(make_registry_tool("gnome.close_window", "closed", sequence_callable=True, execute=_record(seen)))
+    plan = {"goal": "Close", "steps": [{"id": "s1", "tool_name": "gnome.close_window", "args": {"window_title": "X"}}]}
+    result = _executor(registry).execute("s1", plan, {"gnome.close_window"})
+    assert result.success is False
+    assert "needs_confirmation" in result.message
+    assert seen == []

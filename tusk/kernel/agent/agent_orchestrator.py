@@ -20,6 +20,7 @@ from tusk.kernel.agent.planner.runtime_tool_resolver import RuntimeToolResolver
 from tusk.kernel.agent.tool_sequence.executor import Executor
 from tusk.shared.logging.interfaces.log_printer import LogPrinter
 from tusk.shared.tracing.interfaces.tracer import Tracer
+from tusk.kernel.interfaces.action_confirmation import ActionConfirmation
 
 __all__ = ["AgentOrchestrator"]
 
@@ -33,13 +34,15 @@ class AgentOrchestrator:
         log_printer: LogPrinter,
         interrupt_token: object | None = None,
         tracer: Tracer | None = None,
+        confirmation: ActionConfirmation | None = None,
     ) -> None:
         self._profiles = profiles
         self._registry = tool_registry
         self._log = log_printer
-        self._init_components(session_store, log_printer, tool_registry, interrupt_token, tracer)
+        self._init_components(session_store, log_printer, tool_registry, interrupt_token, tracer, confirmation)
 
-    def _init_components(self, store: Store, log: LogPrinter, registry: ToolRegistry, token: object | None, tracer: Tracer | None) -> None:
+    def _init_components(self, store: Store, log: LogPrinter, registry: ToolRegistry, token: object | None, tracer: Tracer | None,
+                         confirmation: ActionConfirmation | None) -> None:
         self._runtime = AgentRuntime(store, log, StepRecorder(store, registry), token)
         self._guard = AgentRunGuard()
         self._children = AgentChildRunner(store)
@@ -48,8 +51,8 @@ class AgentOrchestrator:
         self._planner_results = ResultValidator(log)
         self._resolved_tools = RuntimeToolResolver(store)
         self._tools = AgentToolsetBuilder(registry)
-        sequence_executor = Executor(registry, store, token, tracer=tracer)
-        self._dispatcher = OrchestratorToolDispatcher(registry, self._catalog, sequence_executor, tracer=tracer)
+        sequence_executor = Executor(registry, store, token, tracer=tracer, confirmation=confirmation)
+        self._dispatcher = OrchestratorToolDispatcher(registry, self._catalog, sequence_executor, tracer=tracer, confirmation=confirmation)
 
     def run(self, request: AgentRunRequest) -> AgentResult:
         return self._run(request, ())
