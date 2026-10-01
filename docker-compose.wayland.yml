@@ -1,0 +1,10 @@
+# Opt-in override for GNOME Wayland hosts:
+#   docker compose -f docker-compose.yml -f docker-compose.wayland.yml up
+# The host's dbus-daemon mediates AppArmor and rejects clients confined by Docker's
+# default profile ("An AppArmor policy prevents this sender..."), so without this the
+# container cannot reach org.tusk.Shell on the session bus. Unconfined AppArmor loosens
+# container isolation; see README "Display server support" for the trust model.
+services:
+  tusk:
+    security_opt:
+      - apparmor=unconfined

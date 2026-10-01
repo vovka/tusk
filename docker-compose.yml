@@ -61,11 +61,6 @@ services:
       - .:/app
     devices:
       - /dev/snd:/dev/snd
-    # The host's dbus-daemon mediates AppArmor and rejects clients confined by
-    # docker-default ("An AppArmor policy prevents this sender..."), which blocks
-    # org.tusk.Shell (Wayland input/windows) and the tray on the session bus.
-    security_opt:
-      - apparmor=unconfined
     tty: true
     restart: unless-stopped
 
