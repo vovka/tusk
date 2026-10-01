@@ -1,3 +1,5 @@
+import types
+
 from tests.kernel_api_support import make_registry_tool
 from tusk.kernel.agent.confirmation.confirmation_gate import ConfirmationGate
 from tusk.kernel.tools.tool_registry import ToolRegistry
@@ -106,3 +108,12 @@ def test_refuses_without_target_window() -> None:
     result = gate.execute("gnome.press_keys", {"keys": "Delete"})
     assert result.success is False and "target window" in result.message
     assert gate.resolve("yes") is None
+
+
+def test_every_tool_call_is_reported_to_latency_meter() -> None:
+    marks: list[str] = []
+    meter = types.SimpleNamespace(mark_tool_call=lambda: marks.append("tool"))
+    gate = ConfirmationGate(_Desktop().registry(), latency_meter=meter)
+    gate.execute("gnome.focus_window", {"window_title": "Code"})
+    gate.execute("gnome.close_window", {"window_title": "Terminal"})
+    assert marks == ["tool", "tool"]

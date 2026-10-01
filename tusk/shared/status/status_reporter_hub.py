@@ -16,6 +16,7 @@ class StatusReporterHub(StatusReporter):
         self._detail = ""
         self._mic_device = ""
         self._models: tuple[tuple[str, str], ...] = ()
+        self._latency_median_ms: int | None = None
 
     @property
     def status(self) -> AppStatus:
@@ -50,6 +51,10 @@ class StatusReporterHub(StatusReporter):
         self._mic_device = device
         self._emit()
 
+    def set_latency_median_ms(self, median_ms: int) -> None:
+        self._latency_median_ms = median_ms
+        self._emit()
+
     def _emit(self) -> None:
         try:
             self._sink.publish(self._snapshot())
@@ -57,7 +62,8 @@ class StatusReporterHub(StatusReporter):
             self._log_failure(exc)
 
     def _snapshot(self) -> StatusSnapshot:
-        return StatusSnapshot(self._status, self._mode, self._detail, self._mic_device, self._models)
+        return StatusSnapshot(self._status, self._mode, self._detail, self._mic_device, self._models,
+                              self._latency_median_ms)
 
     def _log_failure(self, exc: Exception) -> None:
         if self._log is not None:

@@ -57,3 +57,9 @@ def test_unchanged_status_is_not_published_again() -> None:
     hub.set_status(AppStatus.LISTENING)
     hub.set_status(AppStatus.LISTENING)
     assert len(published) == 1
+
+
+def test_latency_median_flows_into_snapshot() -> None:
+    sink, published = _recording_sink()
+    StatusReporterHub(sink).set_latency_median_ms(1400)
+    assert published[-1].latency_median_ms == 1400

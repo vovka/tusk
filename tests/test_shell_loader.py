@@ -125,7 +125,7 @@ def _patch_stt(monkeypatch, engine: object) -> None:
 
 
 def _voice_class() -> object:
-    def make(config, log, stt_engine=None, gatekeeper=None, worker=None, reporter=None, on_interrupt=None, echo_filter=None):
+    def make(config, log, stt_engine=None, gatekeeper=None, worker=None, reporter=None, on_interrupt=None, echo_filter=None, on_speech_end=None):
         return types.SimpleNamespace(kind="voice", worker=worker, on_interrupt=on_interrupt, stt=stt_engine, echo_filter=echo_filter)
     return make
 

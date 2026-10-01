@@ -27,3 +27,7 @@ class StatusReporter(ABC):
     @abstractmethod
     def set_mic_device(self, device: str) -> None:
         ...
+
+    @abstractmethod
+    def set_latency_median_ms(self, median_ms: int) -> None:
+        ...

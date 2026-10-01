@@ -20,11 +20,12 @@ __all__ = ["ShellLoader"]
 
 
 class ShellLoader:
-    def __init__(self, config: object, kernel: object, log: object, reporter: object) -> None:
+    def __init__(self, config: object, kernel: object, log: object, reporter: object, on_speech_end: object = None) -> None:
         self._config = config
         self._kernel = kernel
         self._log = log
         self._reporter = reporter
+        self._on_speech_end = on_speech_end
         self._shutdown_event = threading.Event()
         self._control: object | None = None
 
@@ -60,7 +61,7 @@ class ShellLoader:
         shell = shell_class(
             self._config, self._log, stt_engine=stt_engine, gatekeeper=self._gatekeeper(worker),
             worker=worker, reporter=self._reporter, on_interrupt=self._interrupt_callback(worker),
-            echo_filter=echo_filter,
+            echo_filter=echo_filter, on_speech_end=self._on_speech_end,
         )
         self._control = shell
         return shell

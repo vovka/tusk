@@ -8,6 +8,7 @@ from tusk.kernel.interfaces.action_confirmation import ActionConfirmation
 from tusk.kernel.tools.tool_registry import ToolRegistry
 from tusk.shared.schemas.kernel_response import KernelResponse
 from tusk.shared.schemas.tools.tool_result import ToolResult
+from tusk.shared.status.latency_meter import LatencyMeter
 
 __all__ = ["ConfirmationGate"]
 
@@ -18,7 +19,7 @@ _DECLINE_WORDS = {"no", "cancel", "stop", "no thanks"}
 class ConfirmationGate(ActionConfirmation):
     def __init__(self, registry: ToolRegistry, policy: DestructiveActionPolicy | None = None,
                  probe: ActiveWindowProbe | None = None, clock: Callable[[], float] = time.monotonic,
-                 ttl_seconds: float = 30.0) -> None:
+                 ttl_seconds: float = 30.0, latency_meter: LatencyMeter | None = None) -> None:
         self._registry = registry
         self._policy = policy or DestructiveActionPolicy()
         self._probe = probe or ActiveWindowProbe(registry)
@@ -26,8 +27,11 @@ class ConfirmationGate(ActionConfirmation):
         self._ttl_seconds = ttl_seconds
         self._pending: PendingAction | None = None
         self._question: str | None = None
+        self._latency_meter = latency_meter
 
     def execute(self, tool_name: str, arguments: dict[str, object]) -> ToolResult:
+        if self._latency_meter is not None:
+            self._latency_meter.mark_tool_call()
         action = self._policy.describe(tool_name, arguments)
         if action is None:
             return self._registry.get(tool_name).execute(arguments)
