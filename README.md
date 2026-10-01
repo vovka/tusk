@@ -12,6 +12,9 @@ EXECUTOR_AGENT_LLM=groq/openai/gpt-oss-20b
 
 https://github.com/user-attachments/assets/ff5d81a0-2a9c-4eb4-beff-795700454733
 
+
+Website: https://tusk.shcherbyna.me
+
 ## How it works
 
 1. The **voice shell** captures microphone audio, runs VAD, and feeds speech segments to the kernel. The **CLI shell** accepts typed text directly.
@@ -93,6 +96,12 @@ docker compose build
 
 ```bash
 docker compose up
+```
+
+Or via the Makefile:
+
+```bash
+make demo
 ```
 
 To run in the background:
@@ -248,6 +257,12 @@ docker compose run --rm --no-deps \
   tusk python main.py
 ```
 
+Or via the Makefile:
+
+```bash
+make demo-emulated
+```
+
 `e2e/` and `demos/` are complementary, not duplicates: `e2e/` exercises the voice-input path
 (utterance → gate → kernel), while `demos/` exercises the desktop-action path (kernel →
 planner → MCP adapter) using the emulator shell and a mock editor.
@@ -294,7 +309,13 @@ yet implemented:
 - **Dangerous action registry / confirmation prompts** — no safety confirmation before destructive actions
 - **Configurable master prompt / personality** — the agent system prompt is hardcoded
 - **Cross-session memory** — conversation history is in-memory only, lost on restart
+- **Non-Linux/X11 platforms** — window management and input simulation require Linux with X11
+  (directly or via XWayland); there is no macOS/Windows or native Wayland support
 
 The following items from the original vision have been resolved:
 
 - **Extension API / runtime discovery** — resolved via MCP adapter model (`adapter.json` manifests, stdio JSON-RPC, hot-plug at startup)
+
+## License
+
+Apache License 2.0 — see [LICENSE](LICENSE) and [NOTICE](NOTICE).
