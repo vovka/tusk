@@ -33,14 +33,15 @@ class VoiceShell:
         on_interrupt: Callable[[], None] | None = None,
         echo_filter: EchoFilter | None = None,
         on_speech_end: Callable[[float], None] | None = None,
+        sanitizer: Sanitizer | None = None,
     ) -> None:
         self._reporter = reporter
         self._pause_gate = threading.Event()
         self._pause_gate.set()
         self._worker = worker
         self._on_interrupt = on_interrupt
-        self._echo_filter = echo_filter
-        self._on_speech_end = on_speech_end
+        self._echo_filter, self._on_speech_end = echo_filter, on_speech_end
+        self._sanitizer = sanitizer or Sanitizer(log_printer)
         self._pipeline = pipeline or self._build_pipeline(config, log_printer, stt_engine, gatekeeper)
         self._log = log_printer
         self._running = True
@@ -77,14 +78,13 @@ class VoiceShell:
         gatekeeper: Gatekeeper | None,
     ) -> VoicePipeline:
         _require_pipeline_inputs(stt_engine, gatekeeper)
-        settings = _pipeline_settings(config)
         return VoicePipeline(
             self._detector(config, log_printer),
             Transcriber(stt_engine, config.audio_sample_rate, log_printer),
-            Sanitizer(log_printer),
+            self._sanitizer,
             TranscriptionBuffer(log_printer),
             gatekeeper,
-            settings[0], settings[1], self._reporter, self._on_interrupt, self._echo_filter,
+            config.gate_recovery_window_seconds, config.gate_recovery_candidate_limit, self._reporter, self._on_interrupt, self._echo_filter,
         )
 
     def _detector(self, config: Config, log_printer: LogPrinter) -> UtteranceDetector:
@@ -110,7 +110,3 @@ def _require_pipeline_inputs(stt_engine: STTEngine | None, gatekeeper: Gatekeepe
         raise ValueError("voice shell requires an STT engine")
     if gatekeeper is None:
         raise ValueError("voice shell requires a gatekeeper")
-
-
-def _pipeline_settings(config: Config) -> tuple[float, int]:
-    return config.gate_recovery_window_seconds, config.gate_recovery_candidate_limit

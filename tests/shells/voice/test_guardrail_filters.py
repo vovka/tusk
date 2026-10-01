@@ -39,3 +39,17 @@ def test_sanitizer_logs_passed_text() -> None:
 
 def _log(logs: list[tuple[str, str, str]]) -> object:
     return types.SimpleNamespace(log=lambda *args: logs.append(args))
+
+
+_VOCABULARY = "TUSK, gedit, Thunar File Manager, xfce4-settings-manager"
+
+
+# Regression: on silence Whisper "transcribed" its own vocabulary prompt and the junk reached the gatekeeper.
+def test_sanitizer_drops_vocabulary_prompt_echo() -> None:
+    echo = "xfce4-settings-manager, xfce4-settings-manager, gedit, Thunar File Manager."
+    assert Sanitizer(vocabulary=_VOCABULARY).process(_utterance(echo)) is None
+
+
+def test_sanitizer_keeps_command_naming_vocabulary_apps() -> None:
+    utterance = _utterance("Tusk, open the Thunar file manager")
+    assert Sanitizer(vocabulary=_VOCABULARY).process(utterance) == utterance

@@ -2,7 +2,7 @@ import types
 
 import pytest
 
-import shell_loader
+import voice_gatekeeper_builder
 from shell_loader import ShellLoader
 from tusk.shared.interrupt import InterruptToken
 
@@ -73,7 +73,7 @@ def test_gatekeeper_wiring_resolves_stop_gate_slot_with_fallback() -> None:
     worker = types.SimpleNamespace(is_busy=False, current_speech_text=None)
     slot = loader._gatekeeper(worker)
     assert ("get", "gatekeeper") in requested and ("fallback", "stop_gate", "gatekeeper") in requested
-    assert isinstance(slot._inner, shell_loader.PlaybackGate)
+    assert isinstance(slot._inner, voice_gatekeeper_builder.PlaybackGate)
 
 
 def test_gatekeeper_tolerates_missing_registry() -> None:
@@ -125,7 +125,7 @@ def _patch_stt(monkeypatch, engine: object) -> None:
 
 
 def _voice_class() -> object:
-    def make(config, log, stt_engine=None, gatekeeper=None, worker=None, reporter=None, on_interrupt=None, echo_filter=None, on_speech_end=None):
+    def make(config, log, stt_engine=None, gatekeeper=None, worker=None, reporter=None, on_interrupt=None, echo_filter=None, on_speech_end=None, sanitizer=None):
         return types.SimpleNamespace(kind="voice", worker=worker, on_interrupt=on_interrupt, stt=stt_engine, echo_filter=echo_filter)
     return make
 
