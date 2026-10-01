@@ -121,3 +121,11 @@ def _tools(sleep: object, launch_response: str = "ok\n") -> ApplicationTools:
     tools = ApplicationTools(apps, sleep=sleep)
     tools._launch = lambda application_name: launch_response  # type: ignore[method-assign]
     return tools
+
+
+def test_launch_uses_injected_window_lister() -> None:
+    listings = iter([[("1", "Old")], [("1", "Old"), ("2", "New")]])
+    apps = types.SimpleNamespace(search=lambda query, limit=1: [types.SimpleNamespace(exec_cmd="gedit")])
+    tools = ApplicationTools(apps, sleep=lambda seconds: None, window_lister=lambda: next(listings))
+    tools._launch = lambda application_name: "ok\n"  # type: ignore[method-assign]
+    assert tools.launch_application({"application_name": "gedit"})["message"] == 'launched: gedit, window "New" open'

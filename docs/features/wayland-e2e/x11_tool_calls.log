@@ -1,0 +1,13 @@
+{"tool": "list_windows", "arguments": {}, "result": {"content": [{"type": "text", "text": "open windows:\n  Beta term -> Beta term [484x316 at 399,269]\n  Alpha term -> Alpha term [484x316 at 2,499]"}], "isError": false, "data": null}}
+{"tool": "tile_window", "arguments": {"window_title": "Alpha", "side": "left"}, "result": {"content": [{"type": "text", "text": "tiled left: Alpha"}], "isError": false, "data": null}}
+{"tool": "list_windows", "arguments": {}, "result": {"content": [{"type": "text", "text": "open windows:\n  Beta term -> Beta term [484x316 at 399,269]\n  Alpha term -> Alpha term [640x797 at 2,40]"}], "isError": false, "data": null}}
+screenshot x11_after_tile_left: exit=0 
+{"tool": "maximize_window", "arguments": {"window_title": "alpha"}, "result": {"content": [{"type": "text", "text": "maximized: alpha"}], "isError": false, "data": null}}
+{"tool": "list_windows", "arguments": {}, "result": {"content": [{"type": "text", "text": "open windows:\n  Beta term -> Beta term [484x316 at 399,269]\n  Alpha term -> Alpha term [1280x781 at 0,38]"}], "isError": false, "data": null}}
+screenshot x11_after_maximize: exit=0 
+{"tool": "tile_window", "arguments": {"window_title": "Alpha", "side": "right"}, "result": {"content": [{"type": "text", "text": "tiled right: Alpha"}], "isError": false, "data": null}}
+{"tool": "list_windows", "arguments": {}, "result": {"content": [{"type": "text", "text": "open windows:\n  Beta term -> Beta term [484x316 at 399,269]\n  Alpha term -> Alpha term [640x797 at 642,40]"}], "isError": false, "data": null}}
+screenshot x11_after_tile_right: exit=0 
+{"tool": "maximize_window", "arguments": {"window_title": "term"}, "result": {"content": [{"type": "text", "text": "ambiguous window title 'term': Beta term; Alpha term"}], "isError": true, "data": null}}
+{"tool": "close_window", "arguments": {"window_title": "ALPHA TERM"}, "result": {"content": [{"type": "text", "text": "closed: ALPHA TERM"}], "isError": false, "data": null}}
+{"tool": "list_windows", "arguments": {}, "result": {"content": [{"type": "text", "text": "open windows:\n  Beta term -> Beta term [484x316 at 399,269]"}], "isError": false, "data": null}}

@@ -1,0 +1,28 @@
+{"tool": "press_keys", "arguments": {"keys": "Escape"}, "result": {"content": [{"type": "text", "text": "pressed: Escape"}], "isError": false, "data": null}}
+{"tool": "launch_application", "arguments": {"application_name": "gedit"}, "result": {"content": [{"type": "text", "text": "launched: gedit, window \"Untitled Document 1 - gedit\" open"}], "isError": false, "data": null}}
+{"tool": "get_active_window", "arguments": {}, "result": {"content": [{"type": "text", "text": "active window: Untitled Document 1 - gedit -> gedit [900x747 at 189,38]"}], "isError": false, "data": null}}
+{"tool": "type_text", "arguments": {"text": "Hello from Tusk on Wayland\nПривіт"}, "result": {"content": [{"type": "text", "text": "typed literal text (33 chars)"}], "isError": false, "data": null}}
+screenshot after_type: (True, '/home/vova/dev/tusk/tusk-wayland/docs/features/wayland-e2e/after_type.png')
+{"tool": "tile_window", "arguments": {"window_title": "gedit", "side": "left"}, "result": {"content": [{"type": "text", "text": "tiled left: gedit"}], "isError": false, "data": null}}
+{"tool": "list_windows", "arguments": {}, "result": {"content": [{"type": "text", "text": "open windows:\n  *Untitled Document 1 - gedit -> gedit [640x768 at 0,32]"}], "isError": false, "data": null}}
+screenshot after_tile_left: (True, '/home/vova/dev/tusk/tusk-wayland/docs/features/wayland-e2e/after_tile_left.png')
+{"tool": "maximize_window", "arguments": {"window_title": "gedit"}, "result": {"content": [{"type": "text", "text": "maximized: gedit"}], "isError": false, "data": null}}
+{"tool": "list_windows", "arguments": {}, "result": {"content": [{"type": "text", "text": "open windows:\n  *Untitled Document 1 - gedit -> gedit [1280x768 at 0,32]"}], "isError": false, "data": null}}
+screenshot after_maximize: (True, '/home/vova/dev/tusk/tusk-wayland/docs/features/wayland-e2e/after_maximize.png')
+{"tool": "tile_window", "arguments": {"window_title": "gedit", "side": "right"}, "result": {"content": [{"type": "text", "text": "tiled right: gedit"}], "isError": false, "data": null}}
+{"tool": "list_windows", "arguments": {}, "result": {"content": [{"type": "text", "text": "open windows:\n  *Untitled Document 1 - gedit -> gedit [640x768 at 640,32]"}], "isError": false, "data": null}}
+screenshot after_maximize_tile_right: (True, '/home/vova/dev/tusk/tusk-wayland/docs/features/wayland-e2e/after_maximize_tile_right.png')
+{"tool": "press_keys", "arguments": {"keys": "ctrl+a"}, "result": {"content": [{"type": "text", "text": "pressed: ctrl+a"}], "isError": false, "data": null}}
+{"tool": "press_keys", "arguments": {"keys": "ctrl+c"}, "result": {"content": [{"type": "text", "text": "pressed: ctrl+c"}], "isError": false, "data": null}}
+{"tool": "read_clipboard", "arguments": {}, "result": {"content": [{"type": "text", "text": "Hello from Tusk on Wayland\nПривіт"}], "isError": false, "data": {"text": "Hello from Tusk on Wayland\nПривіт"}}}
+{"tool": "press_keys", "arguments": {"keys": "ctrl+s"}, "result": {"content": [{"type": "text", "text": "pressed: ctrl+s"}], "isError": false, "data": null}}
+{"tool": "type_text", "arguments": {"text": "/tmp/tmp.Q4qYsfTeIO/typed.txt"}, "result": {"content": [{"type": "text", "text": "typed literal text (29 chars)"}], "isError": false, "data": null}}
+{"tool": "press_keys", "arguments": {"keys": "Return"}, "result": {"content": [{"type": "text", "text": "pressed: Return"}], "isError": false, "data": null}}
+saved text MATCH: 'Hello from Tusk on Wayland\nПривіт\n'
+{"tool": "press_keys", "arguments": {"keys": "ctrl+n"}, "result": {"content": [{"type": "text", "text": "pressed: ctrl+n"}], "isError": false, "data": null}}
+{"tool": "list_windows", "arguments": {}, "result": {"content": [{"type": "text", "text": "open windows:\n  typed.txt (/tmp/tmp.Q4qYsfTeIO) - gedit -> gedit [640x768 at 640,32]\n  Untitled Document 1 - gedit -> gedit [900x747 at 0,32]"}], "isError": false, "data": null}}
+{"tool": "tile_window", "arguments": {"window_title": "gedit", "side": "left"}, "result": {"content": [{"type": "text", "text": "ambiguous window title 'gedit': typed.txt (/tmp/tmp.Q4qYsfTeIO) - gedit; Untitled Document 1 - gedit"}], "isError": true, "data": null}}
+screenshot ambiguous_two_windows: (True, '/home/vova/dev/tusk/tusk-wayland/docs/features/wayland-e2e/ambiguous_two_windows.png')
+{"tool": "close_window", "arguments": {"window_title": "Untitled Document 1 - gedit"}, "result": {"content": [{"type": "text", "text": "closed: Untitled Document 1 - gedit"}], "isError": false, "data": null}}
+{"tool": "close_window", "arguments": {"window_title": "typed.txt"}, "result": {"content": [{"type": "text", "text": "closed: typed.txt"}], "isError": false, "data": null}}
+{"tool": "list_windows", "arguments": {}, "result": {"content": [{"type": "text", "text": "open windows:\n  none"}], "isError": false, "data": null}}

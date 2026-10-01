@@ -54,11 +54,22 @@ See [docs/architecture.md § Agent Backends](docs/architecture.md#agent-backends
 
 ### Display server support
 
-Clipboard read/write works natively on both X11 and Wayland — the GNOME adapter
-selects `wl-clipboard` on a Wayland session (`XDG_SESSION_TYPE=wayland` or
-`WAYLAND_DISPLAY` set) and `xclip` on X11. Input simulation and window management
-still rely on `xdotool`/`wmctrl`, which require X11; on Wayland they work only
-through XWayland and cannot drive native Wayland windows.
+The GNOME adapter picks its backend at start-up: Wayland when `XDG_SESSION_TYPE=wayland`
+or `WAYLAND_DISPLAY` is set, X11 otherwise.
+
+- **X11:** input and windows go through `xdotool`/`wmctrl`, the clipboard through `xclip`.
+- **GNOME Wayland (GNOME Shell 46 only):** input and windows go through the bundled
+  `tusk-shell@tusk` GNOME Shell extension, which TUSK calls over the session D-Bus
+  (`org.tusk.Shell`); the clipboard goes through `wl-clipboard`. Characters outside the
+  active keyboard layout (e.g. Cyrillic on a US layout) are pasted via the clipboard with
+  Ctrl+V, which overwrites the clipboard and does not work in terminals.
+
+> **Trust model (Wayland):** any client on your session bus — including the TUSK container —
+> can call `org.tusk.Shell` to type, click, and move or close windows, the same exposure as
+> `xdotool` on X11. The container reaches the bus only with the opt-in
+> `docker-compose.wayland.yml` override, which runs it with `apparmor=unconfined` and so
+> loosens container isolation; a custom AppArmor profile allowing just the session bus would
+> be tighter, but loading one needs root.
 
 ## Setup
 
@@ -69,11 +80,32 @@ git clone https://github.com/vovka/tusk.git
 cd tusk
 ```
 
-### 2. Allow Docker to connect to your X11 display
+### 2. Allow Docker to reach your display
+
+On X11:
 
 ```bash
 xhost +local:docker
 ```
+
+On GNOME Wayland, install and enable the shell extension, then **log out and log back
+in** (GNOME Shell on Wayland only loads new extensions at login):
+
+```bash
+scripts/install-gnome-extension.sh
+```
+
+`docker-compose.yml` passes `XDG_SESSION_TYPE` and `WAYLAND_DISPLAY` into the container and
+mounts the session bus (`/run/user/1000/bus`) and the Wayland socket
+(`/run/user/1000/$WAYLAND_DISPLAY`; `/dev/null` stands in on X11). The X11 mounts stay in
+place. On Wayland, add the AppArmor override, because the host D-Bus daemon rejects
+AppArmor-confined Docker clients:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.wayland.yml up
+```
+
+An absolute `WAYLAND_DISPLAY` (a socket path instead of a name like `wayland-0`) is not supported.
 
 ### 3. Create your `.env` file
 

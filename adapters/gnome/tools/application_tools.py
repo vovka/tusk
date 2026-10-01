@@ -11,9 +11,15 @@ _POLL_TIMEOUT_SECONDS = 10.0
 
 
 class ApplicationTools:
-    def __init__(self, app_catalog: object, sleep: Callable[[float], None] = time.sleep) -> None:
+    def __init__(
+        self,
+        app_catalog: object,
+        sleep: Callable[[float], None] = time.sleep,
+        window_lister: Callable[[], list[tuple[str, str]]] | None = None,
+    ) -> None:
         self._apps = app_catalog
         self._sleep = sleep
+        self._window_lister = window_lister
 
     # Latency: bounded worst case, adds up to 10s to the launch path while polling for the new window.
     def launch_application(self, arguments: dict) -> dict:
@@ -81,6 +87,8 @@ class ApplicationTools:
         return None
 
     def _list_windows(self) -> list[tuple[str, str]]:
+        if self._window_lister is not None:
+            return self._window_lister()
         try:
             result = subprocess.run(["wmctrl", "-l"], capture_output=True, text=True, check=False)
         except FileNotFoundError:

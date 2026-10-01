@@ -1,0 +1,7 @@
+{
+  "uuid": "tusk-shell@tusk",
+  "name": "TUSK Shell Bridge",
+  "description": "Exposes window control and virtual keyboard/pointer input to TUSK over the session bus (org.tusk.Shell).",
+  "shell-version": ["46"],
+  "url": "https://github.com/vovka/tusk"
+}
