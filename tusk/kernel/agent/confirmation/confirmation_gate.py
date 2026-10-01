@@ -56,7 +56,8 @@ class ConfirmationGate(ActionConfirmation):
         if not target:
             return ToolResult(False, f"refused: {action} needs an explicit target window")
         self._pending = PendingAction(tool_name, dict(arguments), target, not explicit_target, self._clock())
-        self._question = f"{action} '{target}'? Say yes to confirm."
+        # a bare "yes" is dropped by the voice sanitizer as a likely STT ghost phrase, so ask for the wake word
+        self._question = f"{action} '{target}'? Say 'Tusk, yes' to confirm."
         return ToolResult(False, f"needs_confirmation: {self._question} Do not retry; call done.")
 
     def _confirm(self, pending: PendingAction) -> KernelResponse:

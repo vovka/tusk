@@ -28,8 +28,8 @@ def test_confirmation_reply_skips_agent() -> None:
 
 def test_new_question_replaces_agent_reply() -> None:
     seen: list[str] = []
-    mode = ConfirmingCommandMode(_inner(seen), _Gate(None, "Close window 'X'? Say yes to confirm."))
-    assert mode.process_command("close X", "command").reply == "Close window 'X'? Say yes to confirm."
+    mode = ConfirmingCommandMode(_inner(seen), _Gate(None, "Close window 'X'? Say 'Tusk, yes' to confirm."))
+    assert mode.process_command("close X", "command").reply == "Close window 'X'? Say 'Tusk, yes' to confirm."
     assert seen == ["close X"]
 
 

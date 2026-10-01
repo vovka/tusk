@@ -5,7 +5,7 @@ Last updated: 2026-10-01
 ## Purpose
 
 Tusk must not close windows, delete content or run shell/kill tools on a misheard or
-misrouted command. Such tool calls are held until the user says "yes".
+misrouted command. Such tool calls are held until the user says "Tusk, yes".
 
 ## Flow
 
@@ -17,7 +17,7 @@ misrouted command. Such tool calls are held until the user says "yes".
    and `press_keys` containing `Delete`, `BackSpace`, `<alt>F4`, `<ctrl>w` or `<ctrl>q`.
    `<ctrl>a` alone only selects and is allowed; the Delete/BackSpace after it is held.
 3. A destructive call is not run. The gate stores one `PendingAction` and returns
-   `needs_confirmation: Close window 'X'? Say yes to confirm.` A sequence stops at that step.
+   `needs_confirmation: Close window 'X'? Say 'Tusk, yes' to confirm.` A sequence stops at that step.
 4. `ConfirmingCommandMode` (wired in `startup.build_api`) replaces the agent's reply with the
    question, so it is spoken. On the next utterance it calls `ConfirmationGate.resolve` first:
    "yes"/"confirm"/"do it" runs the action, "no"/"cancel" replies "Cancelled.", anything else
@@ -35,3 +35,5 @@ misrouted command. Such tool calls are held until the user says "yes".
 - The list lives in the kernel to avoid touching `adapters/gnome`; a `destructive` manifest flag
   (read like `settle_ms` in `ToolRegistry._entry`) is the cleaner long-term home.
 - Confirmation is handled inside command mode, not ahead of dictation/coding mode slots.
+- A bare "yes" never reaches the kernel: the voice `Sanitizer` drops it as an STT ghost phrase and
+  the gatekeeper treats a wake-word-less "yes" as ambient. The question therefore asks for "Tusk, yes".

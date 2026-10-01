@@ -39,9 +39,9 @@ def test_destructive_call_is_held_with_question() -> None:
     gate = _gate(desktop)
     result = gate.execute("gnome.close_window", {"window_title": "Terminal"})
     assert result.success is False
-    assert result.message.startswith("needs_confirmation: Close window 'Terminal'? Say yes to confirm.")
+    assert result.message.startswith("needs_confirmation: Close window 'Terminal'? Say 'Tusk, yes' to confirm.")
     assert desktop.calls == []
-    assert gate.take_question() == "Close window 'Terminal'? Say yes to confirm."
+    assert gate.take_question() == "Close window 'Terminal'? Say 'Tusk, yes' to confirm."
     assert gate.take_question() is None
 
 
