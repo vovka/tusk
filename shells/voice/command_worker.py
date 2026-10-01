@@ -29,7 +29,7 @@ class CommandWorker:
         self._queue: queue.Queue[tuple[str, str, str]] = queue.Queue()
         self._busy = threading.Event()
         self._active_keys: set[str] = set()
-        self._active_lock = threading.Lock()
+        self._active_lock = threading.RLock()
 
     def start(self) -> None:
         # ponytail: daemon thread, no shutdown protocol — the app runs until process exit
@@ -41,8 +41,9 @@ class CommandWorker:
             if key in self._active_keys:
                 self._log.log("TUSK", f"duplicate command dropped: {text}")
                 return
+            self.flush()  # latest wins: at most one pending command
             self._active_keys.add(key)
-        self._queue.put((text, refrain, kind))
+            self._queue.put((text, refrain, kind))
 
     def flush(self) -> None:
         while True:
