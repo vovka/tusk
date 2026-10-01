@@ -78,7 +78,7 @@ class AgentRuntime:
         finished = self._guard_result(session_id, profile.profile_id, tool_call, repeat, guards)
         if finished is not None:
             return finished
-        result = executor(tool_call, session_id)
+        result = guards.refusal(profile.profile_id, tool_call) or executor(tool_call, session_id)
         self._record.result(session_id, step, tool_call, result)
         self._record.appended(messages, tool_call, result)
         guards.observe(tool_call, result)
