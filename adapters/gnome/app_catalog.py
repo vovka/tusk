@@ -4,6 +4,7 @@ import os
 import re
 from dataclasses import asdict
 
+from tusk.shared.desktop.fuzzy_name_matcher import FuzzyNameMatcher
 from tusk.shared.schemas.desktop.app_entry import AppEntry
 
 __all__ = ["AppCatalog"]
@@ -15,8 +16,9 @@ _DEFAULT_DIRS = ["/usr/share/applications", "/usr/local/share/applications", "/h
 
 
 class AppCatalog:
-    def __init__(self, desktop_dirs: list[str] = _DEFAULT_DIRS) -> None:
+    def __init__(self, desktop_dirs: list[str] = _DEFAULT_DIRS, matcher: FuzzyNameMatcher | None = None) -> None:
         self._dirs = desktop_dirs
+        self._matcher = matcher or FuzzyNameMatcher()
 
     def list_apps(self) -> list[AppEntry]:
         paths = [p for d in self._dirs for p in glob.glob(f"{d}/*.desktop")]
@@ -29,7 +31,14 @@ class AppCatalog:
     def search(self, query: str, limit: int = 10) -> list[AppEntry]:
         ranked = [_ranked(item, query.casefold()) for item in self.list_apps()]
         matches = [item for item in ranked if item]
+        if not matches:
+            return self._fuzzy_search(query)
         return [app for _, app in sorted(matches, key=lambda item: item[0])[:limit]]
+
+    def _fuzzy_search(self, query: str) -> list[AppEntry]:
+        by_command = {os.path.basename(app.exec_cmd).casefold(): app for app in self.list_apps()}
+        closest = self._matcher.closest(query, list(by_command))
+        return [by_command[closest]] if closest else []
 
     def _parse(self, path: str) -> AppEntry | None:
         config = self._read_config(path)

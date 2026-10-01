@@ -15,14 +15,15 @@ __all__ = ["WhisperSTT"]
 
 
 class WhisperSTT(STTEngine):
-    def __init__(self, model_size: str) -> None:
+    def __init__(self, model_size: str, vocabulary: str = "") -> None:
         if whisper is None or np is None:
             raise RuntimeError("whisper dependencies are not installed")
         self._model = whisper.load_model(model_size)
+        self._vocabulary = vocabulary
 
     def transcribe(self, audio_frames: bytes, sample_rate: int) -> Utterance:
         audio_array = self._decode_pcm(audio_frames)
-        result = self._model.transcribe(audio_array, fp16=False, language="en")
+        result = self._model.transcribe(audio_array, fp16=False, language="en", initial_prompt=self._vocabulary or None)
         text = result["text"].strip()
         duration = len(audio_frames) / (sample_rate * 2)
         confidence = self._compute_confidence(result.get("segments", []))

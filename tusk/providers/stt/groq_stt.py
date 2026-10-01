@@ -16,11 +16,12 @@ _HALLUCINATION = re.compile(r"^\[.+\]$")  # e.g. [BLANK_AUDIO], [Music], [Applau
 
 
 class GroqSTT(STTEngine):
-    def __init__(self, api_key: str, model: str = "whisper-large-v3-turbo") -> None:
+    def __init__(self, api_key: str, model: str = "whisper-large-v3-turbo", vocabulary: str = "") -> None:
         if Groq is None:
             raise RuntimeError("groq package is not installed")
         self._client = Groq(api_key=api_key)
         self._model = model
+        self._vocabulary = vocabulary
 
     def transcribe(self, audio_frames: bytes, sample_rate: int) -> Utterance:
         wav_bytes = self._pcm_to_wav(audio_frames, sample_rate)
@@ -30,10 +31,12 @@ class GroqSTT(STTEngine):
         return Utterance(text=text, audio_frames=audio_frames, duration_seconds=duration, confidence=confidence)
 
     def _call_api(self, wav_bytes: bytes) -> str:
+        options = {"prompt": self._vocabulary} if self._vocabulary else {}
         response = self._client.audio.transcriptions.create(
             file=("audio.wav", wav_bytes),
             model=self._model,
             language="en",
+            **options,
         )
         return response.text.strip()
 
