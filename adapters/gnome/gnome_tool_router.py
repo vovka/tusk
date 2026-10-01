@@ -10,7 +10,17 @@ __all__ = ["GnomeToolRouter"]
 
 
 class GnomeToolRouter:
-    def __init__(self, apps: object, clipboard: object, context: object, input_simulator: object, text_paster: object) -> None:
+    def __init__(
+        self,
+        apps: object,
+        clipboard: object,
+        context: object,
+        input_simulator: object,
+        text_paster: object,
+        window_tools: WindowTools | None = None,
+    ) -> None:
+        # Wayland window tools also list windows, so app launch can detect the new one without wmctrl.
+        self._window_tools = window_tools or WindowTools()
         self._schemas = ToolSchemaCatalog().build()
         self._handlers = self._build_handlers(apps, clipboard, context, input_simulator, text_paster)
 
@@ -33,11 +43,11 @@ class GnomeToolRouter:
 
     def _tool_groups(self, apps: object, clipboard: object, context: object, input_simulator: object, text_paster: object) -> tuple[object, ...]:
         return (
-            ApplicationTools(apps),
+            ApplicationTools(apps, window_lister=getattr(self._window_tools, "list_windows", None)),
             ClipboardTools(clipboard),
             ContextTools(context),
             InputTools(input_simulator, text_paster, GnomeTextChunker()),
-            WindowTools(),
+            self._window_tools,
         )
 
     def _merged_handlers(
