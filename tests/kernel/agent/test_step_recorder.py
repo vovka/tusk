@@ -100,3 +100,11 @@ def _recorder(sequence_tools: set[str] | None = None) -> StepRecorder:
     tools = sequence_tools or set()
     registry = types.SimpleNamespace(get=lambda name: types.SimpleNamespace(sequence_callable=name in tools))
     return StepRecorder(types.SimpleNamespace(), registry)
+
+
+def test_appended_tool_call_keeps_its_arguments() -> None:
+    # without the arguments gpt-oss could not tell what it already did and re-issued the call until max steps
+    messages: list[dict[str, str]] = []
+    call = ToolCall("switch_model", {"slot": "main_agent", "model": "gpt-oss-120b"}, "c1")
+    _recorder().appended(messages, call, ToolResult(True, "switched"))
+    assert messages[0]["content"] == '[tool:switch_model] called with {"slot": "main_agent", "model": "gpt-oss-120b"}'
