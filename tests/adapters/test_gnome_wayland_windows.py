@@ -62,3 +62,23 @@ def test_build_router_keeps_x11_backend(monkeypatch: object) -> None:
     monkeypatch.setenv("XDG_SESSION_TYPE", "x11")
     monkeypatch.delenv("WAYLAND_DISPLAY", raising=False)
     assert not isinstance(build_router()._window_tools, WaylandWindowTools)
+
+
+def test_window_tools_tile_right_calls_extension() -> None:
+    bus = FakeBus()
+    result = WaylandWindowTools(bus).tile_window({"window_title": "gedit", "side": "right"})
+    assert result == {"success": True, "message": "tiled right: gedit"}
+    assert bus.calls == [("TileRight", [7])]
+
+
+def test_window_tools_tile_rejects_bad_side() -> None:
+    bus = FakeBus()
+    assert WaylandWindowTools(bus).tile_window({"window_title": "gedit", "side": ""})["success"] is False
+    assert bus.calls == []
+
+
+def test_get_active_window_reports_focused_wayland_window() -> None:
+    from adapters.gnome.tools.context_tools import ContextTools
+    provider = WaylandContextProvider(types.SimpleNamespace(list_apps=lambda: []), FakeBus())
+    message = ContextTools(provider).get_active_window({})["message"]
+    assert message == "active window: Notes - gedit -> gedit [3x4 at 1,2]"

@@ -48,6 +48,27 @@ class WindowTools:
             return {"success": False, "message": f"wmctrl rejected geometry {geometry!r}"}
         return {"success": True, "message": f"moved/resized: {title}"}
 
+    def tile_window(self, arguments: dict) -> dict:
+        title = self._present_title(arguments)
+        side = title if isinstance(title, dict) else self._side(arguments)
+        if isinstance(side, dict):
+            return side
+        width, height = self._display_size()
+        left = 0 if side == "left" else width // 2
+        subprocess.run(["wmctrl", "-r", title, "-b", "remove,maximized_vert,maximized_horz"], check=False)
+        subprocess.run(["wmctrl", "-r", title, "-e", f"0,{left},0,{width // 2},{height}"], check=False)
+        return {"success": True, "message": f"tiled {side}: {title}"}
+
+    def _display_size(self) -> tuple[int, int]:
+        # ponytail: whole X screen incl. panels and all monitors; use the work area if multi-monitor matters.
+        result = subprocess.run(["xdotool", "getdisplaygeometry"], capture_output=True, text=True, check=False)
+        width, height = result.stdout.split()
+        return int(width), int(height)
+
+    def _side(self, arguments: dict) -> str | dict:
+        side = str(arguments.get("side", "")).strip().lower()
+        return side if side in ("left", "right") else {"success": False, "message": f"bad side {side!r}: use left or right"}
+
     def switch_workspace(self, arguments: dict) -> dict:
         subprocess.run(["wmctrl", "-s", arguments["workspace_number"]], check=False)
         return {"success": True, "message": f"workspace: {arguments['workspace_number']}"}

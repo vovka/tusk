@@ -85,5 +85,6 @@ class GnomeToolRouter:
             "maximize_window": window_tools.maximize_window,
             "minimize_window": window_tools.minimize_window,
             "move_resize_window": window_tools.move_resize_window,
+            "tile_window": window_tools.tile_window,
             "switch_workspace": window_tools.switch_workspace,
         }

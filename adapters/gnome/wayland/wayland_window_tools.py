@@ -31,6 +31,12 @@ class WaylandWindowTools(WindowTools):
             return geometry
         return self._act(arguments, "MoveResize", "moved/resized", [int(value) for value in geometry.split(",")])
 
+    def tile_window(self, arguments: dict) -> dict:
+        side = self._side(arguments)
+        if isinstance(side, dict):
+            return side
+        return self._act(arguments, "TileLeft" if side == "left" else "TileRight", f"tiled {side}")
+
     def switch_workspace(self, arguments: dict) -> dict:
         self._bus.call("SwitchWorkspace", [int(arguments["workspace_number"])])
         return {"success": True, "message": f"workspace: {arguments['workspace_number']}"}
