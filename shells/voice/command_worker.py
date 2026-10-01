@@ -28,20 +28,37 @@ class CommandWorker:
         self._ack_enabled = ack_enabled
         self._queue: queue.Queue[tuple[str, str, str]] = queue.Queue()
         self._busy = threading.Event()
+        self._active_keys: set[str] = set()
+        self._active_lock = threading.Lock()
 
     def start(self) -> None:
         # ponytail: daemon thread, no shutdown protocol — the app runs until process exit
         threading.Thread(target=self._run, daemon=True).start()
 
     def enqueue(self, text: str, refrain: str = "", kind: str = "conversation") -> None:
+        key = self._key(text)
+        with self._active_lock:
+            if key in self._active_keys:
+                self._log.log("TUSK", f"duplicate command dropped: {text}")
+                return
+            self._active_keys.add(key)
         self._queue.put((text, refrain, kind))
 
     def flush(self) -> None:
         while True:
             try:
-                self._queue.get_nowait()
+                text, _, _ = self._queue.get_nowait()
             except queue.Empty:
                 return
+            self._release(text)
+
+    @staticmethod
+    def _key(text: str) -> str:
+        return " ".join(text.lower().split())
+
+    def _release(self, text: str) -> None:
+        with self._active_lock:
+            self._active_keys.discard(self._key(text))
 
     @property
     def is_busy(self) -> bool:
@@ -64,6 +81,7 @@ class CommandWorker:
             except Exception as exc:
                 self._log.log("ERROR", f"command failed: {exc}")
             finally:
+                self._release(text)
                 self._busy.clear()
 
     def _execute(self, text: str, refrain: str, kind: str) -> None:
