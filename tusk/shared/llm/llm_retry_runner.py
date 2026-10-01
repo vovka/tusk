@@ -4,6 +4,9 @@ from tusk.shared.llm.llm_retry_policy import LLMRetryPolicy
 
 __all__ = ["LLMRetryRunner"]
 
+# a TPM 429 asks for a few seconds; a TPD 429 asks for minutes, which a voice command cannot wait for
+_MAX_RETRY_AFTER_SECONDS = 20.0
+
 
 class LLMRetryRunner:
     def __init__(
@@ -36,12 +39,17 @@ class LLMRetryRunner:
     def _handle_retry(self, exc: Exception, attempt: int, on_retry: object | None) -> None:
         if not self._retry(exc, attempt):
             raise exc
-        self._notify(on_retry, exc, attempt)
-        self._sleep(self._delay(attempt))
+        delay = self._delay(exc, attempt)
+        self._notify(on_retry, exc, attempt, delay)
+        self._sleep(delay)
 
-    def _notify(self, on_retry: object | None, exc: Exception, attempt: int) -> None:
+    def _notify(self, on_retry: object | None, exc: Exception, attempt: int, delay: float) -> None:
         if on_retry:
-            on_retry(exc, attempt)
+            on_retry(exc, attempt, delay)
 
-    def _delay(self, attempt: int) -> float:
-        return 0.5 * attempt
+    def _delay(self, exc: Exception, attempt: int) -> float:
+        headers = getattr(getattr(exc, "response", None), "headers", None) or {}
+        try:
+            return min(float(headers.get("retry-after", "")), _MAX_RETRY_AFTER_SECONDS)
+        except ValueError:
+            return 0.5 * attempt

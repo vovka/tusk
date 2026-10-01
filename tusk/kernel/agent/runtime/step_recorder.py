@@ -26,7 +26,8 @@ class StepRecorder:
         self._store.append_event(session_id, "tool_call_result", data)
 
     def appended(self, messages: list[dict[str, str]], tool_call: ToolCall, tool_result: ToolResult) -> None:
-        messages.append({"role": "assistant", "content": f"[tool:{tool_call.tool_name}] called"})
+        arguments = json.dumps(tool_call.parameters)
+        messages.append({"role": "assistant", "content": f"[tool:{tool_call.tool_name}] called with {arguments}"})
         child = _child_result_message(tool_result)
         if child is not None:
             messages.append({"role": "assistant", "content": child})

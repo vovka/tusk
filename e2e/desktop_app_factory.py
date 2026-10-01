@@ -4,6 +4,7 @@ Unlike app_factory, this wires the adapters so commands reach the desktop;
 the host launcher (launcher/tusk_host_launcher.py) must be running.
 """
 import main as app_main
+from tusk.kernel.agent.confirmation import ConfirmationGate
 from tusk.kernel import KernelAPI, SlidingWindowHistory, ToolRegistry
 from tusk.kernel.core.startup import build_adapter_manager, build_agent, build_api
 from tusk.kernel.tools.tool_runtime import ToolRuntime
@@ -31,7 +32,9 @@ def _kernel(config: Config, log: ColorLogPrinter, llm_registry: LLMRegistry, tok
     reporter = StatusReporterHub(NullStatusSink(), log)
     tool_registry = ToolRegistry()
     adapter_manager = build_adapter_manager(config, log, tool_registry)
-    agent = build_agent(config, log, llm_registry, tool_registry, SlidingWindowHistory(20), token, NullTracer())
-    kernel = build_api(agent, config, log, llm_registry, reporter, token, NullTracer())
+    confirmation = ConfirmationGate(tool_registry)
+    history = SlidingWindowHistory(20)
+    agent = build_agent(config, log, llm_registry, tool_registry, history, token, NullTracer(), confirmation=confirmation)
+    kernel = build_api(agent, config, log, llm_registry, reporter, token, NullTracer(), confirmation=confirmation)
     ToolRuntime(tool_registry, llm_registry, adapter_manager, log, reporter).register_tools(kernel)
     return kernel, tool_registry

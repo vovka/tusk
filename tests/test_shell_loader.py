@@ -121,11 +121,11 @@ def _built_voice_shell(monkeypatch, requested: list[bool]) -> object:
 
 
 def _patch_stt(monkeypatch, engine: object) -> None:
-    monkeypatch.setattr(shell_loader, "STTEngineFactory", lambda key, size: types.SimpleNamespace(create=lambda name: engine))
+    monkeypatch.setattr("stt_engine_builder.STTEngineFactory", lambda key, size, vocabulary: types.SimpleNamespace(create=lambda name: engine))
 
 
 def _voice_class() -> object:
-    def make(config, log, stt_engine=None, gatekeeper=None, worker=None, reporter=None, on_interrupt=None, echo_filter=None):
+    def make(config, log, stt_engine=None, gatekeeper=None, worker=None, reporter=None, on_interrupt=None, echo_filter=None, on_speech_end=None):
         return types.SimpleNamespace(kind="voice", worker=worker, on_interrupt=on_interrupt, stt=stt_engine, echo_filter=echo_filter)
     return make
 

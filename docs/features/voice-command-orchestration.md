@@ -45,6 +45,11 @@ The voice shell uses the gatekeeper to classify utterances, then routes actionab
 - Some models emit static finish/delegation tools as `functions.done`, `functions.run_agent`, or `name=functions.done`. `ToolCall` now normalizes those aliases before runtime dispatch.
 - `ToolUseFailedRecovery` now falls back to extracting `failed_generation` directly from the provider error string when the outer wrapper cannot be parsed with `ast.literal_eval`, then best-effort recovers malformed `done(...)` calls by status and summary.
 
+## Command Queueing (CommandWorker)
+- One command runs at a time. A command identical (case and whitespace normalized) to the running or pending one is dropped.
+- At most one command waits: a new, different command replaces the pending one (latest wins).
+- A running command is never cancelled by a new command; only the spoken interrupt stops it.
+
 ## Testing Strategy
 - `tests/test_sequence_agent_flow.py`: happy-path sequence execution.
 - `tests/test_sequence_planner_validation.py`: planner validation and sequence promotion.

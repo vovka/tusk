@@ -13,3 +13,4 @@ class StatusSnapshot:
     detail: str = ""
     mic_device: str = ""
     models: tuple[tuple[str, str], ...] = ()
+    latency_median_ms: int | None = None

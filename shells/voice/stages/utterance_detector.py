@@ -1,4 +1,4 @@
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 
 try:
     import webrtcvad
@@ -11,7 +11,6 @@ from tusk.shared.schemas.utterance import Utterance
 
 __all__ = ["UtteranceDetector"]
 
-_SILENCE_FRAMES_THRESHOLD = 20
 _MIN_VOICED_FRAMES = 5
 
 
@@ -23,6 +22,8 @@ class UtteranceDetector:
         aggressiveness: int,
         log_printer: LogPrinter,
         frame_duration_ms: int = 30,
+        silence_ms: int = 600,
+        on_speech_end: Callable[[float], None] | None = None,
     ) -> None:
         if webrtcvad is None:
             raise RuntimeError("webrtcvad package is not installed")
@@ -31,6 +32,8 @@ class UtteranceDetector:
         self._vad = webrtcvad.Vad(aggressiveness)
         self._log = log_printer
         self._frame_seconds = frame_duration_ms / 1000
+        self._silence_frames = max(1, silence_ms // frame_duration_ms)
+        self._on_speech_end = on_speech_end
 
     def stream_utterances(self) -> Iterator[Utterance]:
         voiced_frames: list[bytes] = []
@@ -74,7 +77,7 @@ class UtteranceDetector:
 
     def _on_silence(self, voiced_frames: list[bytes], silence_count: int) -> tuple[list[bytes], int, Utterance | None]:
         silence_count += 1
-        if silence_count < _SILENCE_FRAMES_THRESHOLD:
+        if silence_count < self._silence_frames:
             return voiced_frames, silence_count, None
         utterance = self._completed_utterance(voiced_frames)
         return [], 0, utterance
@@ -84,4 +87,6 @@ class UtteranceDetector:
             self._log.log("DETECTOR", f"dropped short utterance ({len(voiced_frames)} frames)", "detector")
             return None
         self._log.log("DETECTOR", f"utterance complete ({len(voiced_frames)} frames)", "detector")
+        if self._on_speech_end is not None:
+            self._on_speech_end(self._silence_frames * self._frame_seconds)
         return self._build_utterance(voiced_frames)

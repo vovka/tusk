@@ -76,6 +76,6 @@ class LLMProxy(LLMProvider):
         if self._log:
             self._log.log("LLMREQUEST", f"[{self._slot}] provider={self.label} kind={kind}", "llm-request")
 
-    def _log_retry(self, exc: Exception, attempt: int) -> None:
+    def _log_retry(self, exc: Exception, attempt: int, wait_seconds: float) -> None:
         if self._log:
-            self._log.log("LLMREQUEST", f"[{self._slot}] retry {attempt} after failure: {exc}", "llm-request")
+            self._log.log("LLMREQUEST", f"[{self._slot}] retry {attempt} in {wait_seconds:g}s after failure: {exc}", "llm-request")

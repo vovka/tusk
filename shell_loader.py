@@ -13,18 +13,19 @@ from shells.voice.stages.echo_filter import EchoFilter
 from shells.voice.stages.speech_playback import SpeechPlayback
 from shells.voice.stages.gate.speech_stop_gate import SpeechStopGate
 from shells.voice.voice_shell import VoiceShell
-from tusk.providers.stt import STTEngineFactory
+from stt_engine_builder import SttEngineBuilder
 from tusk.providers.tts import GroqTTS
 
 __all__ = ["ShellLoader"]
 
 
 class ShellLoader:
-    def __init__(self, config: object, kernel: object, log: object, reporter: object) -> None:
+    def __init__(self, config: object, kernel: object, log: object, reporter: object, on_speech_end: object = None) -> None:
         self._config = config
         self._kernel = kernel
         self._log = log
         self._reporter = reporter
+        self._on_speech_end = on_speech_end
         self._shutdown_event = threading.Event()
         self._control: object | None = None
 
@@ -60,14 +61,13 @@ class ShellLoader:
         shell = shell_class(
             self._config, self._log, stt_engine=stt_engine, gatekeeper=self._gatekeeper(worker),
             worker=worker, reporter=self._reporter, on_interrupt=self._interrupt_callback(worker),
-            echo_filter=echo_filter,
+            echo_filter=echo_filter, on_speech_end=self._on_speech_end,
         )
         self._control = shell
         return shell
 
     def _stt_engine(self) -> object:
-        factory = STTEngineFactory(self._config.groq_api_key, self._config.whisper_model_size)
-        return factory.create(self._config.stt_engine)
+        return SttEngineBuilder(self._config).build()
 
     def _build_worker(self) -> CommandWorker:
         tts_engine = GroqTTS(self._config.groq_api_key) if self._config.tts_enabled else None

@@ -1,6 +1,7 @@
 import tempfile
 import types
 
+from tusk.kernel.agent.confirmation.confirmation_gate import ConfirmationGate
 from tusk.kernel.core.main_agent import MainAgent
 from tusk.kernel.core.agent_profiles import build_agent_profiles
 from tusk.shared.schemas.tools.tool_result import ToolResult
@@ -37,7 +38,7 @@ def make_agent(
     store = FileStore(tempfile.mkdtemp(prefix="tusk-agent-tests-"))
     llms = _llm_map(llm, planner_llm, executor_llm, default_llm)
     profiles = build_agent_profiles(types.SimpleNamespace(get=lambda name: llms[name]))
-    return MainAgent(AgentOrchestrator(profiles, registry, store, log, interrupt_token), history)
+    return MainAgent(AgentOrchestrator(profiles, registry, store, log, interrupt_token, confirmation=ConfirmationGate(registry)), history)
 
 
 def _llm_map(llm: object, planner: object | None, executor: object | None, default: object | None) -> dict[str, object]:

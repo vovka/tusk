@@ -57,6 +57,8 @@ _COMMAND_PROMPT = "\n".join([
     "For genuinely multi-step work, call run_agent with the planner profile first, then the executor profile.",
     "When you need to insert a large block of literal text, prefer writing it to the clipboard and pasting it",
     "with the clipboard-write and key-press tools, instead of typing it character by character.",
+    "Switching a model (e.g. 'use gpt-oss-120b for the main agent') is a single switch_model call, not multi-step work.",
+    "Speech recognition often mishears app names: when search_applications returns a match, launch it, don't ask.",
     "When finished, call done with a terse spoken-style summary of what happened.",
     "The done reply must be one plain spoken sentence — never tool syntax, brackets, or JSON.",
 ])

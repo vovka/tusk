@@ -32,6 +32,7 @@ class VoiceShell:
         reporter: StatusReporter | None = None,
         on_interrupt: Callable[[], None] | None = None,
         echo_filter: EchoFilter | None = None,
+        on_speech_end: Callable[[float], None] | None = None,
     ) -> None:
         self._reporter = reporter
         self._pause_gate = threading.Event()
@@ -39,6 +40,7 @@ class VoiceShell:
         self._worker = worker
         self._on_interrupt = on_interrupt
         self._echo_filter = echo_filter
+        self._on_speech_end = on_speech_end
         self._pipeline = pipeline or self._build_pipeline(config, log_printer, stt_engine, gatekeeper)
         self._log = log_printer
         self._running = True
@@ -92,6 +94,8 @@ class VoiceShell:
             config.vad_aggressiveness,
             log_printer,
             frame_duration_ms=config.audio_frame_duration_ms,
+            silence_ms=config.vad_silence_ms,
+            on_speech_end=self._on_speech_end,
         )
 
     def _log_reply(self, result: KernelResponse) -> None:

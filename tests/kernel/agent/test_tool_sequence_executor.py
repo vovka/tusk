@@ -1,6 +1,7 @@
 import tempfile
 
 from tests.kernel_api_support import make_registry_tool
+from tusk.kernel.agent.confirmation.confirmation_gate import ConfirmationGate
 from tusk.kernel.agent.session.file_store import FileStore
 from tusk.kernel.agent.tool_sequence.executor import Executor
 from tusk.kernel.tools.tool_registry import ToolRegistry
@@ -27,7 +28,7 @@ def test_sequence_executor_aborts_on_failed_step() -> None:
 
 def _executor(registry: ToolRegistry) -> Executor:
     store = FileStore(tempfile.mkdtemp(prefix="tusk-sequence-exec-"))
-    return Executor(registry, store)
+    return Executor(registry, store, confirmation=ConfirmationGate(registry))
 
 
 def _plan(text: str) -> dict[str, object]:
@@ -63,7 +64,7 @@ def test_sequence_executor_cancels_between_steps() -> None:
 
 def _cancellable_executor(registry: ToolRegistry, token: object) -> Executor:
     store = FileStore(tempfile.mkdtemp(prefix="tusk-sequence-exec-"))
-    return Executor(registry, store, token)
+    return Executor(registry, store, token, confirmation=ConfirmationGate(registry))
 
 
 def _two_step_plan() -> dict[str, object]:
@@ -91,7 +92,7 @@ def _settle_registry() -> ToolRegistry:
 
 def _settling_executor(registry: ToolRegistry, sleeps: list[float]) -> Executor:
     store = FileStore(tempfile.mkdtemp(prefix="tusk-sequence-exec-"))
-    return Executor(registry, store, sleep=sleeps.append)
+    return Executor(registry, store, sleep=sleeps.append, confirmation=ConfirmationGate(registry))
 
 
 def test_sequence_executor_settles_after_launch_style_steps() -> None:
@@ -113,3 +114,14 @@ def test_sequence_executor_skips_settle_on_last_step() -> None:
     result = _settling_executor(_settle_registry(), sleeps).execute("s1", plan, {"gnome.launch_application"})
     assert result.success is True
     assert sleeps == []
+
+
+def test_sequence_executor_stops_at_destructive_step() -> None:
+    seen: list[dict[str, object]] = []
+    registry = ToolRegistry()
+    registry.register(make_registry_tool("gnome.close_window", "closed", sequence_callable=True, execute=_record(seen)))
+    plan = {"goal": "Close", "steps": [{"id": "s1", "tool_name": "gnome.close_window", "args": {"window_title": "X"}}]}
+    result = _executor(registry).execute("s1", plan, {"gnome.close_window"})
+    assert result.success is False
+    assert "needs_confirmation" in result.message
+    assert seen == []

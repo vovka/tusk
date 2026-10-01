@@ -89,3 +89,9 @@ def test_menu_structure_change_rebuilds_menu() -> None:
     sink.publish(StatusSnapshot(AppStatus.LISTENING, AppMode.DEFAULT))
     sink.publish(StatusSnapshot(AppStatus.PAUSED, AppMode.DEFAULT))
     assert backend.counts["menu"] == 2
+
+
+def test_latency_median_surfaces_in_tooltip() -> None:
+    backend = _backend()
+    _sink(backend).publish(StatusSnapshot(AppStatus.LISTENING, AppMode.DEFAULT, latency_median_ms=1400))
+    assert backend.calls["tooltip"] == "TUSK — listening — median latency 1.4 s"

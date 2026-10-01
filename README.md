@@ -306,7 +306,6 @@ The following features are described in the project vision (`docs/brief.md`) but
 yet implemented:
 
 - **Sub-agents subsystem** — the main agent cannot spawn sub-agents for complex or parallel tasks
-- **Dangerous action registry / confirmation prompts** — no safety confirmation before destructive actions
 - **Configurable master prompt / personality** — the agent system prompt is hardcoded
 - **Cross-session memory** — conversation history is in-memory only, lost on restart
 - **Non-Linux/X11 platforms** — window management and input simulation require Linux with X11
@@ -315,6 +314,7 @@ yet implemented:
 The following items from the original vision have been resolved:
 
 - **Extension API / runtime discovery** — resolved via MCP adapter model (`adapter.json` manifests, stdio JSON-RPC, hot-plug at startup)
+- **Confirmation prompts for destructive actions** — resolved via a kernel-side spoken confirmation gate (see `docs/features/destructive-action-confirmation.md`); the destructive-tool list is hardcoded in the kernel, not yet a manifest flag
 
 ## License
 
