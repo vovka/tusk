@@ -30,7 +30,7 @@ def _patch_startup(monkeypatch: object, agent: object) -> None:
     monkeypatch.setattr(startup, "AgentBackendFactory", FactoryStub)
     monkeypatch.setattr(startup, "ToolRuntime", RuntimeStub)
     monkeypatch.setattr(startup, "build_adapter_manager", lambda *args: object())
-    monkeypatch.setattr(startup, "build_agent", lambda *args: agent)
+    monkeypatch.setattr(startup, "build_agent", lambda *args, **kwargs: agent)
 
 
 def _llm_registry() -> object:

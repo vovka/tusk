@@ -34,7 +34,8 @@ class AgentOrchestrator:
         log_printer: LogPrinter,
         interrupt_token: object | None = None,
         tracer: Tracer | None = None,
-        confirmation: ActionConfirmation | None = None,
+        *,
+        confirmation: ActionConfirmation,
     ) -> None:
         self._profiles = profiles
         self._registry = tool_registry
@@ -42,7 +43,7 @@ class AgentOrchestrator:
         self._init_components(session_store, log_printer, tool_registry, interrupt_token, tracer, confirmation)
 
     def _init_components(self, store: Store, log: LogPrinter, registry: ToolRegistry, token: object | None, tracer: Tracer | None,
-                         confirmation: ActionConfirmation | None) -> None:
+                         confirmation: ActionConfirmation) -> None:
         self._runtime = AgentRuntime(store, log, StepRecorder(store, registry), token)
         self._guard = AgentRunGuard()
         self._children = AgentChildRunner(store)

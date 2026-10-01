@@ -1,5 +1,6 @@
 import types
 
+from tusk.kernel.agent.confirmation.confirmation_gate import ConfirmationGate
 from tusk.kernel.agent.orchestrator_tool_dispatcher import OrchestratorToolDispatcher
 from tusk.kernel.tools.registered_tool import RegisteredTool
 from tusk.kernel.tools.tool_registry import ToolRegistry
@@ -40,5 +41,5 @@ def test_dispatch_executes_valid_arguments() -> None:
 def _dispatch(tool_call: ToolCall) -> ToolResult:
     registry = ToolRegistry()
     registry.register(RegisteredTool("focus_window", "closes a window", _SCHEMA, lambda args: ToolResult(True, "closed"), "gnome"))
-    dispatcher = OrchestratorToolDispatcher(registry, types.SimpleNamespace(list_tools=lambda: None), types.SimpleNamespace())
+    dispatcher = OrchestratorToolDispatcher(registry, types.SimpleNamespace(list_tools=lambda: None), types.SimpleNamespace(), confirmation=ConfirmationGate(registry))
     return dispatcher.dispatch(tool_call, run_agent=lambda call: ToolResult(False, "unused"))

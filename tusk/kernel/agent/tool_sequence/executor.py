@@ -1,7 +1,6 @@
 import time
 from typing import Callable
 
-from tusk.kernel.agent.confirmation.confirmation_gate import ConfirmationGate
 from tusk.kernel.interfaces.action_confirmation import ActionConfirmation
 from tusk.kernel.agent.tool_sequence.plan_validator import PlanValidator
 from tusk.kernel.agent.tool_sequence.recorder import Recorder
@@ -18,14 +17,14 @@ __all__ = ["Executor"]
 class Executor:
     def __init__(self, registry: ToolRegistry, session_store: object, interrupt_token: object | None = None,
                  sleep: Callable[[float], None] = time.sleep, tracer: Tracer | None = None,
-                 confirmation: ActionConfirmation | None = None) -> None:
+                 *, confirmation: ActionConfirmation) -> None:
         self._registry = registry
         self._validator = PlanValidator(registry)
         self._record = Recorder(session_store)
         self._token = interrupt_token
         self._sleep = sleep
         self._tracer = tracer or NullTracer()
-        self._confirmation = confirmation or ConfirmationGate(registry)
+        self._confirmation = confirmation
 
     def execute(self, session_id: str, parameters: dict[str, object], allowed: set[str]) -> ToolResult:
         message = self._validator.validate(parameters, allowed)

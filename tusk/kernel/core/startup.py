@@ -20,24 +20,22 @@ def build_kernel(config: Config, log: ColorLogPrinter, llm_registry: LLMRegistry
     adapter_manager = build_adapter_manager(config, log, tool_registry)
     history = SlidingWindowHistory(20)
     confirmation = ConfirmationGate(tool_registry, latency_meter=latency_meter)
-    agent = build_agent(config, log, llm_registry, tool_registry, history, token, tracer, confirmation)
-    kernel = build_api(agent, config, log, llm_registry, reporter, token, tracer, confirmation)
+    agent = build_agent(config, log, llm_registry, tool_registry, history, token, tracer, confirmation=confirmation)
+    kernel = build_api(agent, config, log, llm_registry, reporter, token, tracer, confirmation=confirmation)
     ToolRuntime(tool_registry, llm_registry, adapter_manager, log, reporter).register_tools(kernel)
     return kernel
 
 
-def build_api(agent: MainAgent, config: Config, log: ColorLogPrinter, llm_registry: LLMRegistry, reporter: StatusReporterHub, token: InterruptToken | None = None, tracer: Tracer | None = None, confirmation: ActionConfirmation | None = None) -> KernelAPI:
+def build_api(agent: MainAgent, config: Config, log: ColorLogPrinter, llm_registry: LLMRegistry, reporter: StatusReporterHub, token: InterruptToken | None = None, tracer: Tracer | None = None, *, confirmation: ActionConfirmation) -> KernelAPI:
     backend = AgentBackendFactory(agent, config, log).create()
-    command_mode = CommandMode(backend, log)
-    if confirmation is not None:
-        command_mode = ConfirmingCommandMode(command_mode, confirmation)
+    command_mode = ConfirmingCommandMode(CommandMode(backend, log), confirmation)
     return KernelAPI(command_mode, llm_registry, log, reporter, token, tracer=tracer)
 
 
-def build_agent(config: Config, log: ColorLogPrinter, llm_registry: LLMRegistry, tool_registry: ToolRegistry, history: ConversationHistory, token: InterruptToken | None = None, tracer: Tracer | None = None, confirmation: ActionConfirmation | None = None) -> MainAgent:
+def build_agent(config: Config, log: ColorLogPrinter, llm_registry: LLMRegistry, tool_registry: ToolRegistry, history: ConversationHistory, token: InterruptToken | None = None, tracer: Tracer | None = None, *, confirmation: ActionConfirmation) -> MainAgent:
     store = FileStore(config.agent_session_log_dir)
     profiles = build_agent_profiles(llm_registry)
-    return MainAgent(AgentOrchestrator(profiles, tool_registry, store, log, token, tracer, confirmation), history, store)
+    return MainAgent(AgentOrchestrator(profiles, tool_registry, store, log, token, tracer, confirmation=confirmation), history, store)
 
 
 def build_adapter_manager(config: Config, log: ColorLogPrinter, tool_registry: ToolRegistry) -> AdapterManager:
