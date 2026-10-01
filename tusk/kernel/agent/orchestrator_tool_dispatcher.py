@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from dataclasses import replace
 
 from tusk.shared.schemas.tools.tool_call import ToolCall
 from tusk.shared.schemas.tools.tool_result import ToolResult
@@ -38,7 +39,7 @@ class OrchestratorToolDispatcher:
             return self._catalog.list_tools()
         if tool_call.tool_name == "execute_tool_sequence":
             return self._execute_sequence(session_id, allowed_tool_names, sequence_plan)
-        return self._real_tool(tool_call)
+        return self._real_tool(self._with_full_name(tool_call))
 
     def _execute_sequence(
         self,
@@ -47,6 +48,14 @@ class OrchestratorToolDispatcher:
         sequence_plan: ToolSequencePlan | None,
     ) -> ToolResult:
         return self._sequence.execute_plan(session_id, sequence_plan, allowed_tool_names or set())
+
+    def _with_full_name(self, tool_call: ToolCall) -> ToolCall:
+        # models sometimes drop the adapter prefix ("switch_workspace"); resolving it saves a whole LLM retry hop
+        names = self._registry.real_tool_names()
+        if tool_call.tool_name in names:
+            return tool_call
+        matches = [name for name in names if name.endswith(f".{tool_call.tool_name}")]
+        return replace(tool_call, tool_name=matches[0]) if len(matches) == 1 else tool_call
 
     def _real_tool(self, tool_call: ToolCall) -> ToolResult:
         try:
