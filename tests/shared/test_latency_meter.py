@@ -1,5 +1,6 @@
 import types
 
+from tusk.shared.logging import ColorLogPrinter
 from tusk.shared.status.latency_meter import LatencyMeter
 
 
@@ -44,3 +45,10 @@ def test_median_rolls_over_recent_utterances() -> None:
         now[0] = 100.0 + delay
         meter.mark_tool_call()
     assert medians == [1000, 2000, 2000]
+
+
+def test_latency_line_prints_with_default_log_groups(capsys) -> None:
+    meter = LatencyMeter(ColorLogPrinter(), clock=lambda: 1.0)
+    meter.mark_speech_end()
+    meter.mark_tool_call()
+    assert "latency speech_end→first_tool_call: 0 ms" in capsys.readouterr().out
