@@ -340,8 +340,9 @@ yet implemented:
 - **Sub-agents subsystem** — the main agent cannot spawn sub-agents for complex or parallel tasks
 - **Configurable master prompt / personality** — the agent system prompt is hardcoded
 - **Cross-session memory** — conversation history is in-memory only, lost on restart
-- **Non-Linux/X11 platforms** — window management and input simulation require Linux with X11
-  (directly or via XWayland); there is no macOS/Windows or native Wayland support
+- **Non-Linux platforms and non-GNOME Wayland** — window management and input simulation require Linux
+  with X11, or GNOME Shell 46 on Wayland via the bundled `tusk-shell` extension; there is no
+  macOS/Windows support and no Wayland support on other compositors
 
 The following items from the original vision have been resolved:
 
