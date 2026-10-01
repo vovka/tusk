@@ -52,15 +52,12 @@ _EXECUTOR_PROMPT = "\n".join([
 ])
 
 _COMMAND_PROMPT = "\n".join([
-    "You are TUSK executing one spoken desktop command.",
-    "Use the runtime tools to perform it now; ask for clarification only when execution is impossible.",
-    "For genuinely multi-step work, call run_agent with the planner profile first, then the executor profile.",
-    "When you need to insert a large block of literal text, prefer writing it to the clipboard and pasting it",
-    "with the clipboard-write and key-press tools, instead of typing it character by character.",
-    "Switching a model (e.g. 'use gpt-oss-120b for the main agent') is a single switch_model call, not multi-step work.",
-    "Speech recognition often mishears app names: when search_applications returns a match, launch it, don't ask.",
-    "When finished, call done with a terse spoken-style summary of what happened.",
-    "The done reply must be one plain spoken sentence — never tool syntax, brackets, or JSON.",
+    "You are TUSK executing one spoken desktop command. Act now via call_tool; ask only if impossible.",
+    "Speech recognition often mishears app names: launch_application fuzzy-matches,",
+    "so launch it directly, no search first.",
+    "Use run_agent (planner, then executor) only for long multi-step tasks.",
+    "For long text, write_clipboard then press_keys <ctrl>v. Switching a model is one switch_model call.",
+    "Finish with done: a terse spoken-style summary, one plain spoken sentence, never tool syntax or JSON.",
 ])
 
 _DEFAULT_PROMPT = "\n".join([

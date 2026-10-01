@@ -1,6 +1,7 @@
 from tusk.kernel.tools.tool_registry import ToolRegistry
 from tusk.kernel.agent.agent_profile import AgentProfile
 from tusk.kernel.agent.agent_run_request import AgentRunRequest
+from tusk.kernel.agent.runtime.call_tool import CallTool
 from tusk.kernel.agent.static_tool_schemas import (
     DEFAULT_DONE,
     EXECUTE_TOOL_SEQUENCE,
@@ -39,6 +40,9 @@ class AgentToolsetBuilder:
     ) -> None:
         if self._sequence_mode(profile, request):
             return
+        if self._full_catalogue(request):
+            tools.append(CallTool.definition(self._registry.planner_tools()))
+            return
         names = self.runtime_names(profile, request)
         if names:
             tools.extend(self._registry.definitions_for(names))
@@ -46,10 +50,13 @@ class AgentToolsetBuilder:
     def _filter_runtime(self, names: tuple[str, ...], request: AgentRunRequest) -> set[str]:
         # only the kernel-minted gate command may request every visible (planner-visible) tool;
         # a delegated or recovered child never carries gate_command, so it stays narrowed
-        if "*" in names and request.gate_command:
+        if self._full_catalogue(request):
             return {tool.name for tool in self._registry.planner_tools()}
         real = self._registry.real_tool_names()
         return {name for name in names if name in real}
+
+    def _full_catalogue(self, request: AgentRunRequest) -> bool:
+        return "*" in request.runtime_tool_names and request.gate_command
 
     def _done_tool(self, profile: AgentProfile) -> dict[str, object]:
         schema = PLANNER_DONE if profile.profile_id == "planner" else DEFAULT_DONE

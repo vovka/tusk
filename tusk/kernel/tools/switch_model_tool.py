@@ -12,9 +12,8 @@ class SwitchModelTool:
     source = "kernel"
     name = "switch_model"
     description = (
-        "Switch the LLM model of a slot. 'main agent' means slot main_agent: one call switches both the "
-        "conversation_agent and command_agent slots. model is 'provider/model' (e.g. groq/openai/gpt-oss-120b) "
-        "or a short id such as gpt-oss-120b, which is matched to a known model. provider is optional."
+        "Switch a slot's LLM. 'main agent' is slot main_agent (both conversation_agent and command_agent). "
+        "model: provider/model or a short id like gpt-oss-120b."
     )
 
     def __init__(self, llm_registry: LLMRegistry, reporter: StatusReporter | None = None) -> None:

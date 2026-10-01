@@ -1,6 +1,8 @@
 from collections.abc import Callable
 
-from tusk.kernel.agent.runtime.model_failure_reply_builder import ModelFailureReplyBuilder
+from tusk.kernel.agent.runtime import (
+    CallTool, MessageHistoryBuilder, ModelFailureReplyBuilder, ResultFactory, StepRecorder, TurnGuards,
+)
 from tusk.kernel.tools.repeated_tool_call_guard import RepeatedToolCallGuard
 from tusk.shared.schemas.tools.tool_call import ToolCall
 from tusk.shared.schemas.tools.tool_result import ToolResult
@@ -8,10 +10,6 @@ from tusk.kernel.agent.agent_profile import AgentProfile
 from tusk.kernel.agent.agent_result import AgentResult
 from tusk.kernel.agent.agent_run_request import AgentRunRequest
 from tusk.kernel.agent.session.store import Store
-from tusk.kernel.agent.runtime.message_history_builder import MessageHistoryBuilder
-from tusk.kernel.agent.runtime.result_factory import ResultFactory
-from tusk.kernel.agent.runtime.step_recorder import StepRecorder
-from tusk.kernel.agent.runtime.turn_guards import TurnGuards
 from tusk.shared.logging.interfaces.log_printer import LogPrinter
 
 
@@ -99,7 +97,7 @@ class AgentRuntime:
 
     def _tool_call(self, profile: AgentProfile, messages: list[dict[str, object]], tools: list[dict[str, object]]) -> ToolCall:
         try:
-            return profile.llm_provider.complete_tool_call(profile.system_prompt, messages, tools)
+            return CallTool.unwrap(profile.llm_provider.complete_tool_call(profile.system_prompt, messages, tools))
         except Exception as exc:
             self._log.log("AGENT", f"llm failure: {exc}")
             text = self._failure.build(exc)

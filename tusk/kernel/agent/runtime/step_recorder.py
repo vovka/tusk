@@ -46,7 +46,7 @@ class StepRecorder:
     def _is_actuator(self, tool_name: str) -> bool:
         # Only actuators (sequence_callable) finish a command; read-only probes must keep probing.
         try:
-            return self._registry.get(tool_name).sequence_callable
+            return self._registry.get(self._registry.resolve_name(tool_name)).sequence_callable
         except KeyError:
             return False
 

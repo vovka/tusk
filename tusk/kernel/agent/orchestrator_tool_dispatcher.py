@@ -49,12 +49,7 @@ class OrchestratorToolDispatcher:
         return self._sequence.execute_plan(session_id, sequence_plan, allowed_tool_names or set())
 
     def _with_full_name(self, tool_call: ToolCall) -> ToolCall:
-        # models sometimes drop the adapter prefix ("switch_workspace"); resolving it saves a whole LLM retry hop
-        names = self._registry.real_tool_names()
-        if tool_call.tool_name in names:
-            return tool_call
-        matches = [name for name in names if name.endswith(f".{tool_call.tool_name}")]
-        return replace(tool_call, tool_name=matches[0]) if len(matches) == 1 else tool_call
+        return replace(tool_call, tool_name=self._registry.resolve_name(tool_call.tool_name))
 
     def _real_tool(self, tool_call: ToolCall) -> ToolResult:
         try:

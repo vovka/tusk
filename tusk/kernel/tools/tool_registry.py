@@ -19,6 +19,13 @@ class ToolRegistry:
     def get(self, name: str) -> RegisteredTool:
         return self._tools[name]
 
+    def resolve_name(self, name: str) -> str:
+        # models drop the adapter prefix ("switch_workspace"); a unique suffix match saves a whole LLM retry hop
+        if name in self._tools:
+            return name
+        matches = [full for full in self._tools if full.endswith(f".{name}")]
+        return matches[0] if len(matches) == 1 else name
+
     def all_tools(self) -> list[RegisteredTool]:
         return list(self._tools.values())
 
