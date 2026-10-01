@@ -198,6 +198,10 @@ All settings are configured via environment variables:
 | `AUDIO_SAMPLE_RATE` | `16000` | Microphone sample rate (Hz) |
 | `AUDIO_FRAME_DURATION_MS` | `30` | VAD frame size in ms (`10`, `20`, or `30`) |
 | `VAD_AGGRESSIVENESS` | `2` | VAD sensitivity: `0` (least) to `3` (most aggressive) |
+| `TUSK_TTS` | `on` | Spoken replies (`off` to disable) |
+| `TUSK_TTS_URL` | `""` | OpenAI-compatible `/v1/audio/speech` endpoint (e.g. local Kokoro); when set, replaces Groq TTS |
+| `TUSK_TTS_MODEL` | `kokoro` | `model` sent to `TUSK_TTS_URL` |
+| `TUSK_TTS_VOICE` | `am_michael` | `voice` sent to `TUSK_TTS_URL` |
 | `FOLLOW_UP_TIMEOUT_SECONDS` | `30` | Base seconds for the adaptive follow-up window |
 | `MAX_FOLLOW_UP_TIMEOUT_SECONDS` | `120` | Maximum seconds for the adaptive follow-up window |
 | `TUSK_SHELLS` | `voice` | Comma-separated shells to start (`voice`, `cli`) |

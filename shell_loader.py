@@ -14,7 +14,7 @@ from shells.voice.stages.speech_playback import SpeechPlayback
 from shells.voice.stages.gate.speech_stop_gate import SpeechStopGate
 from shells.voice.voice_shell import VoiceShell
 from stt_engine_builder import SttEngineBuilder
-from tusk.providers.tts import GroqTTS
+from tts_engine_builder import TtsEngineBuilder
 
 __all__ = ["ShellLoader"]
 
@@ -70,7 +70,7 @@ class ShellLoader:
         return SttEngineBuilder(self._config).build()
 
     def _build_worker(self) -> CommandWorker:
-        tts_engine = GroqTTS(self._config.groq_api_key) if self._config.tts_enabled else None
+        tts_engine = TtsEngineBuilder(self._config).build() if self._config.tts_enabled else None
         token = self._kernel.interrupt_token
         speaker = ChunkedSpeaker(tts_engine, SpeechPlayback(token), self._log, token)
         return CommandWorker(self._kernel.submit, speaker, self._log, token, self._config.ack_enabled)

@@ -10,7 +10,7 @@ from tusk.shared.interrupt import InterruptToken
 def _loader(shells: list[str], log: object | None = None, tts_enabled: bool = False, stt_engine: str = "groq") -> ShellLoader:
     config = types.SimpleNamespace(
         shells=shells, groq_api_key="k", follow_up_timeout_seconds=30, tts_enabled=tts_enabled,
-        ack_enabled=True, stt_engine=stt_engine, whisper_model_size="base",
+        ack_enabled=True, stt_engine=stt_engine, whisper_model_size="base", tts_url="",
     )
     kernel = types.SimpleNamespace(
         submit=lambda text: None,
@@ -46,7 +46,7 @@ def test_tray_receives_voice_shell_as_pipeline_control(monkeypatch) -> None:
 def test_command_worker_receives_tts_engine_when_enabled(monkeypatch) -> None:
     _patch_stt(monkeypatch, object())
     sentinel = object()
-    monkeypatch.setattr(shell_loader, "GroqTTS", lambda key: sentinel)
+    monkeypatch.setattr("tts_engine_builder.GroqTTS", lambda key: sentinel)
     loader = _loader(["voice"], tts_enabled=True)
     loader._gatekeeper = lambda worker: None
     loader._load_class = lambda name: _voice_class()

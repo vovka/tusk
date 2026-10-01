@@ -24,6 +24,9 @@ class Config:
     vad_aggressiveness: int
     vad_silence_ms: int
     tts_enabled: bool
+    tts_url: str
+    tts_model: str
+    tts_voice: str
     ack_enabled: bool
     follow_up_timeout_seconds: float
     max_follow_up_timeout_seconds: float
