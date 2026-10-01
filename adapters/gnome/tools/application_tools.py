@@ -26,7 +26,7 @@ class ApplicationTools:
         requested = arguments["application_name"]
         command = self._resolve(requested)
         if command is None:
-            return {"success": False, "message": f"no applications found for: {requested}"}
+            return {"success": False, "message": self._no_match_message(requested)}
         before_ids = self._window_ids()
         response = self._launch(command)
         if not response.startswith("ok"):
@@ -55,6 +55,11 @@ class ApplicationTools:
     def _resolve(self, application_name: str) -> str | None:
         matches = self._apps.search(application_name, limit=1)
         return matches[0].exec_cmd if matches else None
+
+    def _no_match_message(self, requested: str) -> str:
+        candidates = self._apps.suggest(requested)
+        suffix = f"; closest: {', '.join(candidates)}" if candidates else ""
+        return f"no applications found for: {requested}{suffix}"
 
     def _message(self, requested: str, response: str) -> str:
         return f"launched: {requested}" if response.startswith("ok") else response.strip()

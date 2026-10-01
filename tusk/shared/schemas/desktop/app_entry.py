@@ -7,3 +7,7 @@ __all__ = ["AppEntry"]
 class AppEntry:
     name: str
     exec_cmd: str
+    generic_name: str = ""
+    keywords: tuple[str, ...] = ()
+    categories: tuple[str, ...] = ()
+    desktop_id: str = ""
