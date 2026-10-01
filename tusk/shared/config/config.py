@@ -22,6 +22,7 @@ class Config:
     audio_sample_rate: int
     audio_frame_duration_ms: int
     vad_aggressiveness: int
+    vad_silence_ms: int
     tts_enabled: bool
     ack_enabled: bool
     follow_up_timeout_seconds: float
