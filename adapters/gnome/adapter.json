@@ -29,6 +29,9 @@
     "move_resize_window": {
       "sequence_callable": true
     },
+    "tile_window": {
+      "sequence_callable": true
+    },
     "switch_workspace": {
       "sequence_callable": true
     },
