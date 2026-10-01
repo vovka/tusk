@@ -13,6 +13,7 @@ from tusk.shared.schemas.utterance import Utterance
 __all__ = ["GroqSTT"]
 
 _HALLUCINATION = re.compile(r"^\[.+\]$")  # e.g. [BLANK_AUDIO], [Music], [Applause]
+_MAX_PROMPT_CHARS = 896  # Groq rejects a longer transcription prompt with HTTP 400
 
 
 class GroqSTT(STTEngine):
@@ -21,7 +22,13 @@ class GroqSTT(STTEngine):
             raise RuntimeError("groq package is not installed")
         self._client = Groq(api_key=api_key)
         self._model = model
-        self._vocabulary = vocabulary
+        self._vocabulary = self._fit_prompt(vocabulary)
+
+    @staticmethod
+    def _fit_prompt(vocabulary: str) -> str:
+        if len(vocabulary) <= _MAX_PROMPT_CHARS:
+            return vocabulary
+        return vocabulary[:_MAX_PROMPT_CHARS].rsplit(",", 1)[0]
 
     def transcribe(self, audio_frames: bytes, sample_rate: int) -> Utterance:
         wav_bytes = self._pcm_to_wav(audio_frames, sample_rate)

@@ -30,3 +30,11 @@ def test_groq_omits_prompt_without_vocabulary(monkeypatch) -> None:
     engine, transcriptions = _engine(monkeypatch, "")
     engine.transcribe(b"\x00\x00" * 10, 16000)
     assert "prompt" not in transcriptions.calls[0]
+
+
+def test_groq_trims_vocabulary_to_the_api_prompt_limit(monkeypatch) -> None:
+    engine, transcriptions = _engine(monkeypatch, ", ".join(f"application{i}" for i in range(200)))
+    engine.transcribe(b"\x00\x00" * 10, 16000)
+    prompt = transcriptions.calls[0]["prompt"]
+    assert len(prompt) <= 896
+    assert not prompt.endswith(",")
