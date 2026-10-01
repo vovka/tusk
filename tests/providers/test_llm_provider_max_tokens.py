@@ -39,3 +39,11 @@ def test_openrouter_structured_honors_max_tokens() -> None:
     provider._client = _capture_client(captured)
     provider.complete_structured("system", "user", "schema", {}, max_tokens=96)
     assert captured["max_tokens"] == 96
+
+
+def test_groq_client_leaves_retries_to_the_logged_retry_runner(monkeypatch: object) -> None:
+    import tusk.providers.llm.groq_llm as groq_llm
+    client_kwargs: dict[str, object] = {}
+    monkeypatch.setattr(groq_llm, "Groq", lambda **kwargs: client_kwargs.update(kwargs))
+    GroqLLM("test-key", "test-model")
+    assert client_kwargs["max_retries"] == 0

@@ -17,7 +17,8 @@ class GroqLLM(LLMProvider):
     def __init__(self, api_key: str, model: str) -> None:
         if Groq is None:
             raise RuntimeError("groq package is not installed")
-        self._client = Groq(api_key=api_key, timeout=30.0)
+        # the SDK's own silent 429 retries looked like 10-15 s LLM latency; LLMRetryRunner retries and logs instead
+        self._client = Groq(api_key=api_key, timeout=30.0, max_retries=0)
         self._model = model
         self._recovery = ToolUseFailedRecovery()
         self._logger = None
