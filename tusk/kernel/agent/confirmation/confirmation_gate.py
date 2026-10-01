@@ -42,6 +42,7 @@ class ConfirmationGate(ActionConfirmation):
         if pending is None or self._clock() - pending.created_at > self._ttl_seconds:
             return None
         words = " ".join(text.lower().replace(",", " ").replace(".", " ").replace("!", " ").split())
+        words = words.removeprefix("tusk ")  # conversation-kind utterances keep the wake word
         if words in _CONFIRM_WORDS:
             return self._confirm(pending)
         return KernelResponse(True, "Cancelled.") if words in _DECLINE_WORDS else None

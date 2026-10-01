@@ -60,6 +60,15 @@ def test_yes_executes_pending_action_once() -> None:
     assert gate.resolve("yes") is None
 
 
+def test_yes_with_wake_word_executes_pending_action() -> None:
+    # E2E: a conversation-kind utterance reaches the kernel unstripped, as "Tusk, yes."
+    desktop = _Desktop()
+    gate = _gate(desktop)
+    gate.execute("gnome.close_window", {"window_title": "Terminal"})
+    assert gate.resolve("Tusk, yes.").handled is True
+    assert desktop.calls == [("gnome.close_window", {"window_title": "Terminal"})]
+
+
 def test_other_utterance_cancels_pending_action() -> None:
     desktop = _Desktop()
     gate = _gate(desktop)
