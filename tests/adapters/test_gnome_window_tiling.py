@@ -20,8 +20,8 @@ def test_tile_window_left_unmaximizes_then_uses_left_half(monkeypatch: object) -
     monkeypatch.setattr(window_tools_module.WindowTools, "_display_size", lambda self: (2880, 1800))
     result = WindowTools().tile_window({"window_title": "gedit", "side": "left"})
     assert result == {"success": True, "message": "tiled left: gedit"}
-    assert calls[-2] == ["wmctrl", "-r", "gedit", "-b", "remove,maximized_vert,maximized_horz"]
-    assert calls[-1] == ["wmctrl", "-r", "gedit", "-e", "0,0,0,1440,1800"]
+    assert calls[-2] == ["wmctrl", "-i", "-r", "0x01", "-b", "remove,maximized_vert,maximized_horz"]
+    assert calls[-1] == ["wmctrl", "-i", "-r", "0x01", "-e", "0,0,0,1440,1800"]
 
 
 def test_tile_window_right_uses_right_half(monkeypatch: object) -> None:

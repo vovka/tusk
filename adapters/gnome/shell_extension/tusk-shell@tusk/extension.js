@@ -30,6 +30,9 @@ export default class TuskShellExtension extends Extension {
     disable() {
         Gio.bus_unown_name(this._nameId);
         this._exported.unexport();
+        // KeyCombo/TypeText release every key they press within the same call, so nothing is held here.
+        this._keyboard.run_dispose();
+        this._pointer.run_dispose();
         this._exported = this._keyboard = this._pointer = null;
     }
 }

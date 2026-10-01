@@ -6,6 +6,11 @@ import St from 'gi://St';
 const MODIFIERS = {ctrl: 'Control_L', control: 'Control_L', alt: 'Alt_L', shift: 'Shift_L', super: 'Super_L'};
 const CHAR_KEYS = {'\n': Clutter.KEY_Return, '\b': Clutter.KEY_BackSpace, '\t': Clutter.KEY_Tab};
 const now = () => GLib.get_monotonic_time();
+const PASTE_SETTLE_MS = 100;
+const wait = ms => new Promise(resolve => GLib.timeout_add(GLib.PRIORITY_DEFAULT, ms, () => {
+    resolve();
+    return GLib.SOURCE_REMOVE;
+}));
 
 function windows() {
     return global.get_window_actors().map(actor => actor.meta_window)
@@ -73,14 +78,20 @@ export class ShellService {
         keys.reverse().forEach(key => this._keyboard.notify_keyval(now(), key, Clutter.KeyState.RELEASED));
     }
 
-    TypeText(text) {
+    // Async (GJS calls TypeTextAsync) so the reply waits for clipboard pastes to finish in order.
+    TypeTextAsync([text], invocation) {
+        this._typeText(text).then(() => invocation.return_value(null))
+            .catch(error => invocation.return_dbus_error('org.tusk.Shell.Error.Failed', error.message));
+    }
+
+    async _typeText(text) {
         // Mutter can only type keyvals in the active layout, so non-ASCII runs are pasted
         // through the clipboard (which they overwrite) with ctrl+v.
         for (const run of text.match(/[\x00-\x7f]+|[^\x00-\x7f]+/gu) ?? []) {
             if (/^[\x00-\x7f]/.test(run))
                 [...run].forEach(char => this._tap(CHAR_KEYS[char] ?? Clutter.unicode_to_keysym(char.codePointAt(0))));
             else
-                this._paste(run);
+                await this._paste(run);
         }
     }
 
@@ -89,9 +100,11 @@ export class ShellService {
         this._keyboard.notify_keyval(now(), key, Clutter.KeyState.RELEASED);
     }
 
-    _paste(text) {
+    async _paste(text) {
         St.Clipboard.get_default().set_text(St.ClipboardType.CLIPBOARD, text);
+        await wait(PASTE_SETTLE_MS);
         this.KeyCombo(['ctrl', 'v']);
+        await wait(PASTE_SETTLE_MS); // the app reads the clipboard asynchronously after ctrl+v
     }
 
     PointerMove(x, y) { this._pointer.notify_absolute_motion(now(), x, y); }

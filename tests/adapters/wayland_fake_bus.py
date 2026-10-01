@@ -9,11 +9,12 @@ _WINDOWS = [
 
 
 class FakeBus:
-    def __init__(self) -> None:
+    def __init__(self, windows: list[dict] | None = None) -> None:
+        self._windows = _WINDOWS if windows is None else windows
         self.calls: list[tuple[str, list[object]]] = []
 
     def call(self, method: str, arguments: list[object]) -> None:
         self.calls.append((method, arguments))
 
     def call_string(self, method: str) -> str:
-        return json.dumps(_WINDOWS)
+        return json.dumps(self._windows)
