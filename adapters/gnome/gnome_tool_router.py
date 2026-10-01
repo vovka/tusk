@@ -2,9 +2,11 @@ from adapters.gnome.tools.application_tools import ApplicationTools
 from adapters.gnome.tools.clipboard_tools import ClipboardTools
 from adapters.gnome.tools.context_tools import ContextTools
 from adapters.gnome.tools.input_tools import InputTools
+from adapters.gnome.tools.launched_window_guard import LaunchedWindowGuard
 from adapters.gnome.gnome_text_chunker import GnomeTextChunker
 from adapters.gnome.tools.tool_schema_catalog import ToolSchemaCatalog
 from adapters.gnome.tools.window_tools import WindowTools
+from adapters.gnome.tools.x11_windows import X11Windows
 
 __all__ = ["GnomeToolRouter"]
 
@@ -19,8 +21,9 @@ class GnomeToolRouter:
         text_paster: object,
         window_tools: WindowTools | None = None,
     ) -> None:
-        # Wayland window tools also list windows, so app launch can detect the new one without wmctrl.
+        # Wayland window tools also list and focus windows by id; X11 uses wmctrl/xdotool for that.
         self._window_tools = window_tools or WindowTools()
+        self._windows = window_tools if window_tools is not None else X11Windows()
         self._schemas = ToolSchemaCatalog().build()
         self._handlers = self._build_handlers(apps, clipboard, context, input_simulator, text_paster)
 
@@ -42,11 +45,12 @@ class GnomeToolRouter:
         return self._merged_handlers(application, clipboard_tools, context_tools, input_tools, window_tools)
 
     def _tool_groups(self, apps: object, clipboard: object, context: object, input_simulator: object, text_paster: object) -> tuple[object, ...]:
+        launched = LaunchedWindowGuard(self._windows)
         return (
-            ApplicationTools(apps, window_lister=getattr(self._window_tools, "list_windows", None)),
+            ApplicationTools(apps, window_lister=self._windows.list_windows, launched=launched),
             ClipboardTools(clipboard),
             ContextTools(context),
-            InputTools(input_simulator, text_paster, GnomeTextChunker()),
+            InputTools(input_simulator, text_paster, GnomeTextChunker(), launched),
             self._window_tools,
         )
 

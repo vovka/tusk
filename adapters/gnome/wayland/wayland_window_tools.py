@@ -41,11 +41,20 @@ class WaylandWindowTools(WindowTools):
         self._bus.call("SwitchWorkspace", [int(arguments["workspace_number"])])
         return {"success": True, "message": f"workspace: {arguments['workspace_number']}"}
 
-    def list_windows(self) -> list[tuple[str, str]]:
-        return [(str(item["id"]), item["title"]) for item in json.loads(self._bus.call_string("ListWindows"))]
+    def list_windows(self) -> list[tuple[str, str, str]]:
+        return [(str(item["id"]), item["title"], item["wm_class"]) for item in self._windows()]
+
+    def active_window_id(self) -> str:
+        return next((str(item["id"]) for item in self._windows() if item["focused"]), "")
+
+    def focus(self, window_id: str) -> None:
+        self._bus.call("Focus", [int(window_id)])
 
     def _listed_windows(self) -> list[tuple[str, str]]:
-        return self.list_windows()
+        return [(str(item["id"]), item["title"]) for item in self._windows()]
+
+    def _windows(self) -> list[dict]:
+        return json.loads(self._bus.call_string("ListWindows"))
 
     def _call_window(self, arguments: dict, method: str, verb: str, extra: list[int] | None = None) -> dict:
         target = self._target(arguments)

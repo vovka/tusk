@@ -40,7 +40,15 @@ def test_window_tools_switch_workspace() -> None:
 
 
 def test_window_tools_lists_ids_and_titles_for_launch_polling() -> None:
-    assert WaylandWindowTools(FakeBus()).list_windows() == [("7", "Notes - gedit"), ("9", "Terminal")]
+    assert WaylandWindowTools(FakeBus()).list_windows() == [("7", "Notes - gedit", "gedit"), ("9", "Terminal", "tilix")]
+
+
+def test_window_tools_report_active_window_and_focus_by_id() -> None:
+    bus = FakeBus()
+    tools = WaylandWindowTools(bus)
+    assert tools.active_window_id() == "7"
+    tools.focus("9")
+    assert bus.calls == [("Focus", [9])]
 
 
 def _recorder(calls: list[list[str]], stdout: str, returncode: int = 0, stderr: str = "") -> object:

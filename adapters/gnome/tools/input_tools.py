@@ -1,11 +1,20 @@
+from adapters.gnome.tools.launched_window_guard import LaunchedWindowGuard
+
 __all__ = ["InputTools"]
 
 
 class InputTools:
-    def __init__(self, input_simulator: object, text_paster: object, text_chunker: object) -> None:
+    def __init__(
+        self,
+        input_simulator: object,
+        text_paster: object,
+        text_chunker: object,
+        launched: LaunchedWindowGuard | None = None,
+    ) -> None:
         self._input = input_simulator
         self._paster = text_paster
         self._chunks = text_chunker
+        self._launched = launched
 
     def press_keys(self, arguments: dict) -> dict:
         try:
@@ -18,6 +27,8 @@ class InputTools:
         text = arguments["text"]
         if self._has_control_chars(text):
             return {"success": False, "message": self._type_text_error()}
+        if (focus_error := self._launched_window_focus_error()) is not None:
+            return {"success": False, "message": focus_error}
         try:
             self._type_chunks(text)
         except RuntimeError as exc:
@@ -66,6 +77,9 @@ class InputTools:
             "type_text only accepts literal printable text; use press_keys for "
             "Enter, Delete, shortcuts, or control keys."
         )
+
+    def _launched_window_focus_error(self) -> str | None:
+        return self._launched.ensure_active() if self._launched is not None else None
 
     def _type_chunks(self, text: str) -> None:
         for chunk in self._chunks.split(text):

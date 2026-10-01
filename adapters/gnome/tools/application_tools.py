@@ -1,7 +1,10 @@
+import os
 import socket
 import subprocess
 import time
 from typing import Callable
+
+from adapters.gnome.tools.launched_window_guard import LaunchedWindowGuard
 
 __all__ = ["ApplicationTools"]
 
@@ -15,23 +18,25 @@ class ApplicationTools:
         self,
         app_catalog: object,
         sleep: Callable[[float], None] = time.sleep,
-        window_lister: Callable[[], list[tuple[str, str]]] | None = None,
+        window_lister: Callable[[], list[tuple[str, str, str]]] = lambda: [],
+        launched: LaunchedWindowGuard | None = None,
     ) -> None:
         self._apps = app_catalog
         self._sleep = sleep
         self._window_lister = window_lister
+        self._launched = launched
 
     # Latency: bounded worst case, adds up to 10s to the launch path while polling for the new window.
     def launch_application(self, arguments: dict) -> dict:
         requested = arguments["application_name"]
-        command = self._resolve(requested)
-        if command is None:
+        app = self._resolve(requested)
+        if app is None:
             return {"success": False, "message": self._no_match_message(requested)}
-        before_ids = self._window_ids()
-        response = self._launch(command)
+        before = self._window_lister()
+        response = self._launch(app.exec_cmd)
         if not response.startswith("ok"):
-            return {"success": False, "message": self._message(requested, response)}
-        return {"success": True, "message": self._launched_message(requested, before_ids)}
+            return {"success": False, "message": response.strip()}
+        return self._verified_launch(requested, app, before)
 
     def open_uri(self, arguments: dict) -> dict:
         subprocess.Popen(["xdg-open", arguments["uri"]])
@@ -52,59 +57,51 @@ class ApplicationTools:
             sock.sendall(application_name.encode("utf-8"))
             return sock.recv(256).decode("utf-8")
 
-    def _resolve(self, application_name: str) -> str | None:
+    def _resolve(self, application_name: str) -> object | None:
         matches = self._apps.search(application_name, limit=1)
-        return matches[0].exec_cmd if matches else None
+        return matches[0] if matches else None
 
     def _no_match_message(self, requested: str) -> str:
         candidates = self._apps.suggest(requested)
         suffix = f"; closest: {', '.join(candidates)}" if candidates else ""
         return f"no applications found for: {requested}{suffix}"
 
-    def _message(self, requested: str, response: str) -> str:
-        return f"launched: {requested}" if response.startswith("ok") else response.strip()
-
     def _search_message(self, query: str, matches: list[object]) -> str:
         lines = "\n".join(f"{item.name} -> {item.exec_cmd}" for item in matches)
         return f"application matches for {query!r}:\n{lines}"
 
-    def _launched_message(self, requested: str, before_ids: set[str]) -> str:
-        title = self._poll_for_new_window(before_ids)
-        if title is None:
-            return f"launched: {requested} (no new window appeared within 10s)"
-        return f'launched: {requested}, window "{title}" open'
+    def _verified_launch(self, requested: str, app: object, before: list[tuple[str, str, str]]) -> dict:
+        window = self._poll_for_app_window(app, {item[0] for item in before})
+        window = window or next((item for item in before if _belongs(app, item[2])), None)
+        if window is None:
+            return {"success": False, "message": self._missing_window_message(requested, app, before)}
+        if self._launched is not None:
+            self._launched.remember(window[0], window[1])
+        return {"success": True, "message": f'launched: {requested}, window "{window[1]}" of {app.name} open'}
 
-    def _poll_for_new_window(self, before: set[str]) -> str | None:
+    def _missing_window_message(self, requested: str, app: object, before: list[tuple[str, str, str]]) -> str:
+        known = {item[0] for item in before}
+        strays = [f'"{item[1]}" ({item[2]})' for item in self._window_lister() if item[0] not in known]
+        suffix = f"; other new windows: {', '.join(strays)}" if strays else ""
+        return f"launched {requested} but no {app.name} window appeared within 10s{suffix}"
+
+    def _poll_for_app_window(self, app: object, before: set[str]) -> tuple[str, str, str] | None:
         elapsed = 0.0
         while True:
-            title = self._new_window_title(before)
-            if title is not None:
-                return title
-            if elapsed >= _POLL_TIMEOUT_SECONDS:
-                return None
+            window = self._new_app_window(app, before)
+            if window is not None or elapsed >= _POLL_TIMEOUT_SECONDS:
+                return window
             self._sleep(_POLL_INTERVAL_SECONDS)
             elapsed += _POLL_INTERVAL_SECONDS
 
-    def _new_window_title(self, before: set[str]) -> str | None:
-        for window_id, title in self._list_windows():
-            if window_id not in before:
-                return title
-        return None
+    def _new_app_window(self, app: object, before: set[str]) -> tuple[str, str, str] | None:
+        return next((item for item in self._window_lister() if item[0] not in before and _belongs(app, item[2])), None)
 
-    def _list_windows(self) -> list[tuple[str, str]]:
-        if self._window_lister is not None:
-            return self._window_lister()
-        try:
-            result = subprocess.run(["wmctrl", "-l"], capture_output=True, text=True, check=False)
-        except FileNotFoundError:
-            return []
-        if result.returncode != 0:
-            return []
-        return [self._parse_window_line(line) for line in result.stdout.splitlines() if line.strip()]
 
-    def _parse_window_line(self, line: str) -> tuple[str, str]:
-        columns = line.split(None, 3)
-        return columns[0], columns[3] if len(columns) > 3 else ""
-
-    def _window_ids(self) -> set[str]:
-        return {window_id for window_id, _ in self._list_windows()}
+def _belongs(app: object, wm_class: str) -> bool:
+    # Unknown class cannot be checked; otherwise any WM_CLASS part must overlap the command or desktop id.
+    names = {os.path.basename(app.exec_cmd).casefold(), app.desktop_id.removesuffix(".desktop").casefold()} - {""}
+    parts = [part.casefold() for part in wm_class.split(".") if part]
+    if not parts or wm_class == "N/A":
+        return True
+    return any(part in name or name in part for part in parts for name in names)
