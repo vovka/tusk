@@ -39,7 +39,7 @@ class VoiceGatekeeperBuilder:
 
     def _wire_mode(self, slot: GatekeeperSlot, base: object, stop_llm: object, worker: CommandWorker,
                    gate: object, set_callbacks: object, request_stop: object) -> None:
-        make = lambda: self._guarded(StopGatekeeper(gate, request_stop), stop_llm, worker)
+        make = lambda: self._guarded(StopGatekeeper(gate, request_stop, base), stop_llm, worker)
         set_callbacks(on_start=lambda: slot.swap(make()), on_stop=lambda: slot.swap(base))
 
     def _guarded(self, inner: object, stop_llm: object, worker: CommandWorker) -> PlaybackGate:

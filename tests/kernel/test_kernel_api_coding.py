@@ -58,3 +58,12 @@ def _coding_mode(actions: list[str]) -> object:
         stop=lambda: actions.append("stop") or KernelResponse(True, "stopped"),
         process_text=lambda text: actions.append(f"process:{text}") or KernelResponse(True, "updated"),
     )
+
+
+def test_mode_bypass_kind_reaches_command_mode_while_coding() -> None:
+    kinds: list[str] = []
+    command_mode = types.SimpleNamespace(process_command=lambda text, kind: kinds.append(kind) or KernelResponse(True, text))
+    api = KernelAPI(command_mode, types.SimpleNamespace())
+    api._coding._mode = _coding_mode(actions := [])
+    assert api.submit("use gpt oss", "mode-bypass:command") == KernelResponse(True, "use gpt oss")
+    assert kinds == ["command"] and actions == []

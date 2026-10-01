@@ -172,6 +172,9 @@ Speak naturally. TUSK responds to:
 - **"Hey Tusk, launch the terminal"** — opens gnome-terminal
 - **"Open gedit"** (no prefix needed for obvious desktop commands)
 - **"Tusk, start dictation"** — enters dictation mode, pasting speech as text
+- **"Tusk, start pair coding mode"** — enters pair-coding mode; speech without the wake word becomes code edits
+- **"Tusk, stop pair coding mode"** / **"Tusk, stop dictation"** — leaves the mode; any other
+  "Tusk, …" command spoken inside a mode (e.g. switching the model) runs as a normal command
 - **"Tusk, maximize this window"** — maximizes the active window
 - **"Tusk, press ctrl+a"** — sends a keyboard shortcut
 - **"Tusk, use Opus for the agent"** — switches the agent LLM at runtime
