@@ -1,5 +1,6 @@
 import re
 
+from shells.voice.stages.confirmation_reply import ConfirmationReply
 from tusk.shared.logging.interfaces.log_printer import LogPrinter
 from tusk.shared.schemas.utterance import Utterance
 
@@ -19,9 +20,15 @@ _GHOST_PHRASES = {
 
 
 class Sanitizer:
-    def __init__(self, log_printer: LogPrinter | None = None, vocabulary: str = "") -> None:
+    def __init__(
+        self,
+        log_printer: LogPrinter | None = None,
+        vocabulary: str = "",
+        confirmation_reply: ConfirmationReply | None = None,
+    ) -> None:
         self._log = log_printer
         self._vocabulary_words = set(_words(vocabulary))
+        self._confirmation_reply = confirmation_reply
 
     def process(self, utterance: Utterance) -> Utterance | None:
         reason = self._reason(utterance)
@@ -33,6 +40,9 @@ class Sanitizer:
         return utterance
 
     def _reason(self, utterance: Utterance) -> str | None:
+        # a bare "yes"/"no" is a ghost phrase, except as the answer to a pending confirmation
+        if self._confirmation_reply is not None and self._confirmation_reply.answer(utterance.text) is not None:
+            return None
         if utterance.duration_seconds < _MIN_DURATION:
             return "short-duration"
         text = utterance.text.strip()

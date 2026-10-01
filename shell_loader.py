@@ -7,6 +7,8 @@ from shells.tray.tray_shell import TrayShell
 from shells.voice.command_worker import CommandWorker
 from shells.voice.gatekeeper_slot import GatekeeperSlot
 from shells.voice.stages.chunked_speaker import ChunkedSpeaker
+from shells.voice.confirmation_answer_gate import ConfirmationAnswerGate
+from shells.voice.stages.confirmation_reply import ConfirmationReply
 from shells.voice.stages.echo_filter import EchoFilter
 from shells.voice.stages.sanitizer import Sanitizer
 from shells.voice.stages.speech_playback import SpeechPlayback
@@ -54,13 +56,13 @@ class ShellLoader:
         return shell_class()
 
     def _build_voice(self, shell_class: object) -> object:
-        stt_engine = self._stt_engine()
         worker = self._build_worker()
+        reply = ConfirmationReply(lambda: worker.recent_speech)
         shell = shell_class(
-            self._config, self._log, stt_engine=stt_engine, gatekeeper=self._gatekeeper(worker),
+            self._config, self._log, stt_engine=self._stt_engine(), gatekeeper=ConfirmationAnswerGate(self._gatekeeper(worker), reply),
             worker=worker, reporter=self._reporter, on_interrupt=self._interrupt_callback(worker),
             echo_filter=EchoFilter(lambda: worker.recent_speech, self._log), on_speech_end=self._on_speech_end,
-            sanitizer=Sanitizer(self._log, AppVocabulary.installed().text()),
+            sanitizer=Sanitizer(self._log, AppVocabulary.installed().text(), reply),
         )
         self._control = shell
         return shell
