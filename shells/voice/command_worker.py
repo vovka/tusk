@@ -1,4 +1,5 @@
 import queue
+import re
 import threading
 from collections.abc import Callable
 
@@ -55,7 +56,8 @@ class CommandWorker:
 
     @staticmethod
     def _key(text: str) -> str:
-        return " ".join(text.lower().split())
+        # STT punctuates the same phrase differently from one take to the next
+        return " ".join(re.sub(r"[^\w\s]", " ", text.lower()).split())
 
     def _release(self, text: str) -> None:
         with self._active_lock:

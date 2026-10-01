@@ -36,3 +36,12 @@ def test_command_can_repeat_after_it_finished() -> None:
     await_condition(lambda: not worker.is_busy)
     worker.enqueue("type a poem")
     await_condition(lambda: submits == ["type a poem", "type a poem"])
+
+
+def test_duplicate_differing_only_in_punctuation_is_dropped() -> None:
+    # real STT/gate output for one repeated phrase: "open-get-it, and type a short poem" vs "... poem."
+    worker, release, submits = _start_blocked_worker("open-get-it, and type a short poem")
+    worker.enqueue("open-get-it, and type a short poem.")
+    release.set()
+    await_condition(lambda: not worker.is_busy)
+    assert submits == ["open-get-it, and type a short poem"]
