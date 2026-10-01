@@ -1,0 +1,16 @@
+[Desktop Entry]
+Name=gedit
+Exec=gedit %U
+Terminal=false
+Type=Application
+Categories=GNOME;GTK;Utility;TextEditor;
+Keywords=Text;Editor;Plaintext;Write;gedit;
+Actions=new-window;new-document;
+
+[Desktop Action new-window]
+Name=New Window
+Exec=gedit --new-window
+
+[Desktop Action new-document]
+Name=New Document
+Exec=gedit --new-document

@@ -1,0 +1,5 @@
+[Desktop Entry]
+Name=Settings Manager
+Exec=xfce4-settings-manager
+Type=Application
+Categories=XFCE;GTK;Settings;DesktopSettings;X-XFCE-SettingsDialog;

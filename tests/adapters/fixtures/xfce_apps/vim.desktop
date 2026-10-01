@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Vim
+GenericName=Text Editor
+Exec=vim %F
+Terminal=true
+Type=Application
+Keywords=Text;editor;
+Categories=Utility;TextEditor;

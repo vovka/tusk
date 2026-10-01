@@ -42,7 +42,7 @@ class AppCatalog:
         if not matches:
             return self._fuzzy_search(query)
         defaults = self._defaults(matches)
-        ordered = sorted(matches, key=lambda item: (item[0][0], item[1].desktop_id not in defaults, item[0]))
+        ordered = sorted(matches, key=lambda item: (not _is_generic_default(item, defaults), item[0]))
         return [app for _, app in ordered[:limit]]
 
     def suggest(self, query: str, limit: int = 5) -> list[str]:
@@ -84,13 +84,18 @@ class AppCatalog:
         if not config.has_section("Desktop Entry"):
             return None
         section = config["Desktop Entry"]
-        if section.get("nodisplay", "false").lower() == "true":
+        if any(section.get(flag, "false").lower() == "true" for flag in ("nodisplay", "hidden")):
             return None
         return section if section.get("type", "") == "Application" else None
 
     def _clean_exec(self, exec_str: str) -> str:
         cleaned = _PLACEHOLDER.sub("", exec_str).strip()
         return cleaned.split()[0] if cleaned else ""
+
+
+def _is_generic_default(match: tuple[tuple[int, str, str], AppEntry], defaults: set[str]) -> bool:
+    # A generic query ("text editor") goes to the system default even when another app matches a tighter tier.
+    return match[0][0] in _GENERIC_TIERS and match[1].desktop_id in defaults
 
 
 def _split_list(value: str) -> tuple[str, ...]:
