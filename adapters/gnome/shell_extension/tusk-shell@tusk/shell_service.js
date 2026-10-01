@@ -1,6 +1,7 @@
 import Clutter from 'gi://Clutter';
 import GLib from 'gi://GLib';
 import Meta from 'gi://Meta';
+import St from 'gi://St';
 
 const MODIFIERS = {ctrl: 'Control_L', control: 'Control_L', alt: 'Alt_L', shift: 'Shift_L', super: 'Super_L'};
 const CHAR_KEYS = {'\n': Clutter.KEY_Return, '\b': Clutter.KEY_BackSpace, '\t': Clutter.KEY_Tab};
@@ -73,11 +74,24 @@ export class ShellService {
     }
 
     TypeText(text) {
-        for (const char of text) {
-            const key = CHAR_KEYS[char] ?? Clutter.unicode_to_keysym(char.codePointAt(0));
-            this._keyboard.notify_keyval(now(), key, Clutter.KeyState.PRESSED);
-            this._keyboard.notify_keyval(now(), key, Clutter.KeyState.RELEASED);
+        // Mutter can only type keyvals in the active layout, so non-ASCII runs are pasted
+        // through the clipboard (which they overwrite) with ctrl+v.
+        for (const run of text.match(/[\x00-\x7f]+|[^\x00-\x7f]+/gu) ?? []) {
+            if (/^[\x00-\x7f]/.test(run))
+                [...run].forEach(char => this._tap(CHAR_KEYS[char] ?? Clutter.unicode_to_keysym(char.codePointAt(0))));
+            else
+                this._paste(run);
         }
+    }
+
+    _tap(key) {
+        this._keyboard.notify_keyval(now(), key, Clutter.KeyState.PRESSED);
+        this._keyboard.notify_keyval(now(), key, Clutter.KeyState.RELEASED);
+    }
+
+    _paste(text) {
+        St.Clipboard.get_default().set_text(St.ClipboardType.CLIPBOARD, text);
+        this.KeyCombo(['ctrl', 'v']);
     }
 
     PointerMove(x, y) { this._pointer.notify_absolute_motion(now(), x, y); }
