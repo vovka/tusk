@@ -1,0 +1,4 @@
+== default compose (docker-default AppArmor profile) ==
+Error connecting: GDBus.Error:org.freedesktop.DBus.Error.AccessDenied: An AppArmor policy prevents this sender from sending this message to this recipient; type="method_call", sender="(null)" (inactiv
+== with docker-compose.wayland.yml (apparmor=unconfined) ==
+(['org.freedesktop.DBus', ':1.7', 'org.freedesktop.Notifications', ':1.107', ':1.8', 'io.snapcraft.SnapDesktopIntegration', ':1.108', 'org.freedesktop.portal.Desktop', 'org.freedesktop.background.Moni

@@ -28,11 +28,15 @@ for _ in $(seq 1 30); do
     sleep 1
 done
 
-# The host launcher socket would start apps on the real desktop, so gedit is spawned here.
-WAYLAND_DISPLAY=wayland-0 gedit > /dev/null 2>&1 &
-sleep 4
+# Host launcher on a private socket (its path is a module constant, overridden here), so
+# launch_application opens gedit inside the nested shell, never on the real desktop.
+mkdir -p "$work/launch"
+WAYLAND_DISPLAY=wayland-0 python3 -u -c "import sys; sys.path.insert(0, '$repo/launcher'); import tusk_host_launcher as launcher; \
+launcher._SOCKET_PATH = '$work/launch/launch.sock'; launcher.main()" > "$out/launcher.log" 2>&1 &
+sleep 1
 
-docker run --rm --security-opt apparmor=unconfined -u "$(id -u):$(id -g)" -e HOME=/tmp -e PYTHONPATH="$repo:/usr/lib/python3/dist-packages" -e XDG_SESSION_TYPE=wayland -e WAYLAND_DISPLAY=wayland-0 \
+docker run --rm --security-opt apparmor=unconfined -u "$(id -u):$(id -g)" -e HOME=/tmp \
+    -e PYTHONPATH="$repo:/usr/lib/python3/dist-packages" -e XDG_SESSION_TYPE=wayland -e WAYLAND_DISPLAY=wayland-0 \
     -e XDG_RUNTIME_DIR=/run/user/1000 -e DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus \
-    -v "$work/run:/run/user/1000" -v "$work:$work" -v "$repo:$repo" -w "$repo" --entrypoint "" \
-    "$IMAGE" python scripts/wayland_e2e_driver.py "$out" "$work"
+    -v "$work/run:/run/user/1000" -v "$work/launch:/tmp/tusk" -v /usr/share/applications:/usr/share/applications:ro \
+    -v "$work:$work" -v "$repo:$repo" -w "$repo" --entrypoint "" "$IMAGE" python scripts/e2e_driver.py wayland "$out" "$work"

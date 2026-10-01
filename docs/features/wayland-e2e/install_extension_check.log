@@ -1,0 +1,17 @@
+== install with HOME=<tmp> on a private bus ==
+Linked /tmp/tmp.9bvOP6rUG6/.local/share/gnome-shell/extensions/tusk-shell@tusk -> /home/vova/dev/tusk/tusk-wayland/adapters/gnome/shell_extension/tusk-shell@tusk
+dbus-daemon[439123]: [session uid=1000 pid=439123] Activating service name='org.gnome.Shell.Extensions' requested by ':1.0' (uid=1000 pid=439130 comm="gnome-extensions enable tusk-shell@tusk" label="unconfined")
+dbus-daemon[439123]: [session uid=1000 pid=439123] Activating service name='org.gtk.vfs.Daemon' requested by ':1.1' (uid=1000 pid=439141 comm="/usr/bin/gjs -m /usr/share/gnome-shell/org.gnome.S" label="unconfined")
+dbus-daemon[439123]: [session uid=1000 pid=439123] Successfully activated service 'org.gtk.vfs.Daemon'
+
+(org.gnome.Shell.Extensions:439141): Gtk-WARNING **: 13:11:07.337: Failed to open display
+dbus-daemon[439123]: [session uid=1000 pid=439123] Activated service 'org.gnome.Shell.Extensions' failed: Process org.gnome.Shell.Extensions exited with status 1
+dbus-daemon[439123]: [session uid=1000 pid=439123] Activating service name='ca.desrt.dconf' requested by ':1.4' (uid=1000 pid=439130 comm="gnome-extensions enable tusk-shell@tusk" label="unconfined")
+dbus-daemon[439123]: [session uid=1000 pid=439123] Successfully activated service 'ca.desrt.dconf'
+Enabled tusk-shell@tusk.
+On Wayland, GNOME Shell only loads new extensions after you log out and log back in.
+A connection to the bus can't be made
+exit=0
+== installed entry ==
+lrwxrwxrwx 1 vova vova 79 жов  1 13:11 tusk-shell@tusk -> <repo>/adapters/gnome/shell_extension/tusk-shell@tusk
+metadata.json reachable
