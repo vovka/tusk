@@ -62,7 +62,7 @@ class ShellLoader:
             self._config, self._log, stt_engine=self._stt_engine(), gatekeeper=ConfirmationAnswerGate(self._gatekeeper(worker), reply),
             worker=worker, reporter=self._reporter, on_interrupt=self._interrupt_callback(worker),
             echo_filter=EchoFilter(lambda: worker.recent_speech, self._log), on_speech_end=self._on_speech_end,
-            sanitizer=Sanitizer(self._log, AppVocabulary.installed().text(), reply),
+            sanitizer=Sanitizer(self._log, AppVocabulary.installed().stt_prompt(self._config.stt_app_vocabulary), reply),
         )
         self._control = shell
         return shell

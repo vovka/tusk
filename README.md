@@ -195,6 +195,7 @@ All settings are configured via environment variables:
 | `UTILITY_LLM` | `groq/llama-3.3-70b-versatile` | Model for summaries and text cleanup (`provider/model`) |
 | `STT_ENGINE` | `groq` | Speech-to-text engine: `groq` (hosted Whisper API) or `whisper` (local model) |
 | `WHISPER_MODEL_SIZE` | `base` | Local Whisper model (`STT_ENGINE=whisper`): `tiny`, `base`, `small`, `medium` |
+| `STT_APP_VOCABULARY` | `off` | `on` adds installed app names to the STT prompt (default prompt is just the wake word) |
 | `AUDIO_SAMPLE_RATE` | `16000` | Microphone sample rate (Hz) |
 | `AUDIO_FRAME_DURATION_MS` | `30` | VAD frame size in ms (`10`, `20`, or `30`) |
 | `VAD_AGGRESSIVENESS` | `2` | VAD sensitivity: `0` (least) to `3` (most aggressive) |

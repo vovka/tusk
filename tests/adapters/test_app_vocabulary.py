@@ -23,3 +23,9 @@ def test_text_deduplicates_and_caps_names(tmp_path) -> None:
     names = AppVocabulary(AppCatalog([str(tmp_path)])).text().split(", ")
     assert names[:3] == ["TUSK", "App 00", "App 01"] and len(names) == 26
     assert "Mouse Preferences" not in names
+
+
+def test_stt_prompt_is_wake_word_only_unless_app_vocabulary_enabled() -> None:
+    vocabulary = AppVocabulary(AppCatalog([_FIXTURES]))
+    assert vocabulary.stt_prompt(enabled=False) == "TUSK"
+    assert vocabulary.stt_prompt(enabled=True) == vocabulary.text()

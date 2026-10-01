@@ -1,6 +1,7 @@
 import re
 
 from shells.voice.stages.confirmation_reply import ConfirmationReply
+from tusk.shared.desktop.fuzzy_name_matcher import FuzzyNameMatcher
 from tusk.shared.logging.interfaces.log_printer import LogPrinter
 from tusk.shared.schemas.utterance import Utterance
 
@@ -10,6 +11,11 @@ _MIN_DURATION = 0.4
 _MAX_SHORT_WORD_LENGTH = 3
 _PROMPT_ECHO_MIN_WORDS = 3
 _PROMPT_ECHO_SHARE = 0.8
+# A mangled echo keeps the prompt's shape: a long comma list where many items resemble prompt names.
+_ECHO_LIST_MIN_ITEMS = 4
+_ECHO_LIST_MAX_ITEM_WORDS = 3
+_ECHO_LIST_SHARE = 0.5
+_MIN_FUZZY_WORD_LENGTH = 3
 _GHOST_PHRASES = {
     "thank you", "thanks", "thanks for watching", "thank you for watching",
     "thank you very much", "you", "bye", "bye bye", "okay", "ok", "oh",
@@ -27,7 +33,8 @@ class Sanitizer:
         confirmation_reply: ConfirmationReply | None = None,
     ) -> None:
         self._log = log_printer
-        self._vocabulary_words = set(_words(vocabulary))
+        self._vocabulary_words = sorted(set(_words(vocabulary)))
+        self._matcher = FuzzyNameMatcher()
         self._confirmation_reply = confirmation_reply
 
     def process(self, utterance: Utterance) -> Utterance | None:
@@ -51,9 +58,21 @@ class Sanitizer:
     def _prompt_echo(self, text: str) -> str | None:
         # On silence Whisper "transcribes" its own vocabulary prompt; such junk must not reach the gatekeeper.
         words = _words(text)
-        echoed = sum(word in self._vocabulary_words for word in words)
+        echoed = sum(self._echoes(word) for word in words)
         is_echo = len(words) >= _PROMPT_ECHO_MIN_WORDS and echoed >= _PROMPT_ECHO_SHARE * len(words)
-        return "prompt-echo" if is_echo else None
+        return "prompt-echo" if is_echo or self._echoed_list(text) else None
+
+    def _echoed_list(self, text: str) -> bool:
+        items = [_words(item) for item in text.split(",") if _words(item)]
+        if len(items) < _ECHO_LIST_MIN_ITEMS or any(len(item) > _ECHO_LIST_MAX_ITEM_WORDS for item in items):
+            return False
+        echoed = sum(any(self._echoes(word) for word in item) for item in items)
+        return echoed >= _ECHO_LIST_SHARE * len(items)
+
+    def _echoes(self, word: str) -> bool:
+        if word in self._vocabulary_words:
+            return True
+        return len(word) >= _MIN_FUZZY_WORD_LENGTH and self._matcher.closest(word, self._vocabulary_words) is not None
 
     def _log_drop(self, reason: str, text: str) -> None:
         if self._log:

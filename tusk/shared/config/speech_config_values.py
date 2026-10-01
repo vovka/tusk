@@ -13,7 +13,9 @@ class SpeechConfigValues:
             "tts_model": os.environ.get("TUSK_TTS_MODEL", "kokoro"),
             "tts_voice": os.environ.get("TUSK_TTS_VOICE", "am_michael"),
             "ack_enabled": self._switch("TUSK_ACK"),
+            # Whisper echoed the app list on silence and it did not fix app-name spelling, so it is opt-in.
+            "stt_app_vocabulary": self._switch("STT_APP_VOCABULARY", "off"),
         }
 
-    def _switch(self, name: str) -> bool:
-        return os.environ.get(name, "on").lower() not in ("off", "0", "false")
+    def _switch(self, name: str, default: str = "on") -> bool:
+        return os.environ.get(name, default).lower() not in ("off", "0", "false")

@@ -11,6 +11,6 @@ class SttEngineBuilder:
         self._config = config
 
     def build(self) -> object:
-        vocabulary = AppVocabulary.installed().text()
+        vocabulary = AppVocabulary.installed().stt_prompt(self._config.stt_app_vocabulary)
         factory = STTEngineFactory(self._config.groq_api_key, self._config.whisper_model_size, vocabulary)
         return factory.create(self._config.stt_engine)

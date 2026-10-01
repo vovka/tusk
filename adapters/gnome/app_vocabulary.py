@@ -5,6 +5,7 @@ __all__ = ["AppVocabulary"]
 
 # Whisper echoes a long prompt back on silence, so keep it short and free of settings-panel noise.
 _MAX_NAMES = 25
+_WAKE_WORD = "TUSK"
 _SETTINGS_CATEGORIES = {"Settings", "DesktopSettings", "X-XFCE-SettingsDialog"}
 _SETTINGS_WORDS = ("settings", "preferences")
 
@@ -19,12 +20,15 @@ class AppVocabulary:
     def installed(cls) -> "AppVocabulary":
         return cls(AppCatalog())
 
+    def stt_prompt(self, enabled: bool) -> str:
+        return self.text() if enabled else _WAKE_WORD
+
     def text(self) -> str:
         names: dict[str, str] = {}
         for app in sorted(self._apps.list_apps(), key=lambda item: item.name.casefold()):
             if not _is_settings_panel(app):
                 names.setdefault(app.name.casefold(), app.name)
-        return ", ".join(["TUSK", *list(names.values())[:_MAX_NAMES]])
+        return ", ".join([_WAKE_WORD, *list(names.values())[:_MAX_NAMES]])
 
 
 def _is_settings_panel(app: AppEntry) -> bool:
