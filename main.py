@@ -8,7 +8,8 @@ from tusk.kernel.core.startup import build_kernel
 from tusk.providers.llm import ConfigurableLLMFactory
 from tusk.shared.config import Config, StartupOptions
 from tusk.shared.interrupt import InterruptToken
-from tusk.shared.llm import LLMProxy, LLMRegistry
+from tusk.shared.llm import LLMProxy, LLMRegistry, RotatingLLMProvider
+from tusk.shared.llm.interfaces.llm_provider import LLMProvider
 from tusk.shared.logging import ColorLogPrinter
 from tusk.shared.status import LatencyMeter, NullStatusSink, StatusReporterHub
 from tusk.shared.tracing import TracerFactory
@@ -48,8 +49,15 @@ def _register_slots(factory: ConfigurableLLMFactory, config: Config, log: ColorL
 
 def _slot_proxy(factory: ConfigurableLLMFactory, slot: object, log: ColorLogPrinter, name: str, options: StartupOptions, tracer: Tracer, token: InterruptToken | None = None) -> LLMProxy:
     # the gatekeeper/utility slots get no token: they must stay usable while an interrupt is pending
-    provider = factory.create(slot.provider_name, slot.model)
+    provider = _slot_provider(factory, slot, log, name)
     return LLMProxy(provider, log, name, enabled_log_groups=options.log_groups, preview_chars=options.llm_log_preview_chars, interrupt_token=token, tracer=tracer)
+
+
+def _slot_provider(factory: ConfigurableLLMFactory, slot: object, log: ColorLogPrinter, name: str) -> LLMProvider:
+    if not getattr(slot, "rotation", ()):
+        return factory.create(slot.provider_name, slot.model)
+    providers = [factory.create(*item.split("/", 1)) for item in slot.rotation]
+    return RotatingLLMProvider(providers, lambda exc, label: log.log("LLMREQUEST", f"[{name}] 429, failing over to {label}: {exc}", "llm-request"))
 
 
 def _check_version_flag(options: StartupOptions) -> None:

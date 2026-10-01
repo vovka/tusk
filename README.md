@@ -207,6 +207,8 @@ All settings are configured via environment variables:
 | `CODEX_EXEC_MODEL` | `""` | `--model` passed to `codex exec` (empty → codex default) |
 | `CODEX_EXEC_SANDBOX_MODE` | `read-only` | `--sandbox` mode for `codex exec` |
 
+Any `*_LLM` slot also accepts a comma-separated list, e.g. `AGENT_LLM=groq/qwen/qwen3.8-27b,groq/openai/gpt-oss-20b,groq/openai/gpt-oss-120b`: requests rotate round-robin across the models and a 429 from one immediately fails over to the next, multiplying per-model rate limits. Switching a slot by voice replaces the rotation with the single chosen model.
+
 > See [docs/architecture.md § Agent Backends](docs/architecture.md#agent-backends) for the
 > full backend diagram and the remaining `CODEX_EXEC_*` variables.
 
