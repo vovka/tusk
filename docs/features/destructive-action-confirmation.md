@@ -15,7 +15,8 @@ misrouted command. Such tool calls are held until the user says "Tusk, yes".
 2. `DestructiveActionPolicy` classifies the call (by name after the adapter prefix):
    `close_window`, tools starting with `kill`, `delete`, `run_shell`, `execute_shell`, `shell`,
    and `press_keys` containing `Delete`, `BackSpace`, `<alt>F4`, `<ctrl>w` or `<ctrl>q`.
-   `<ctrl>a` alone only selects and is allowed; the Delete/BackSpace after it is held.
+   `<ctrl>a` alone only selects and is allowed; the Delete/BackSpace after it is held. Key names are
+   compared after splitting on `+`, `<`, `>`, so `Ctrl+W` and `<ctrl>w` are both held.
 3. A destructive call is not run. The gate stores one `PendingAction` and returns
    `needs_confirmation: Close window 'X'? Say 'Tusk, yes' to confirm.` A sequence stops at that step.
 4. `ConfirmingCommandMode` (wired in `startup.build_api`) replaces the agent's reply with the

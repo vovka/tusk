@@ -1,9 +1,12 @@
+import re
+
 __all__ = ["DestructiveActionPolicy"]
 
 _DESTRUCTIVE_TOOL_PREFIXES = ("kill", "delete", "run_shell", "execute_shell", "shell")
 # press_keys has no target argument, so any deleting/closing key acts on whatever window has focus;
 # ctrl+a alone only selects, the Delete/BackSpace that follows is what destroys.
-_DESTRUCTIVE_KEYS = ("delete", "backspace", "<alt>f4", "<ctrl>w", "<ctrl>q")
+_DELETING_KEYS = ("delete", "backspace")
+_CLOSING_COMBOS = ({"alt", "f4"}, {"ctrl", "w"}, {"ctrl", "q"})
 
 
 class DestructiveActionPolicy:
@@ -18,6 +21,9 @@ class DestructiveActionPolicy:
         return None
 
     def _describe_keys(self, keys: str) -> str | None:
-        if any(key in keys.lower() for key in _DESTRUCTIVE_KEYS):
+        # models spell combos both as "<ctrl>w" and "Ctrl+W", so compare key names, not the raw string
+        pressed = set(re.split(r"[+<>\s]+", keys.lower().replace("control", "ctrl"))) - {""}
+        deleting = any(name in key for key in pressed for name in _DELETING_KEYS)
+        if deleting or any(combo <= pressed for combo in _CLOSING_COMBOS):
             return f"Press {keys} in window"
         return None
