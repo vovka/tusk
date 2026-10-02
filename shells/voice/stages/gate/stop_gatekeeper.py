@@ -13,9 +13,11 @@ from tusk.shared.schemas.utterance import Utterance
 __all__ = ["StopGatekeeper"]
 
 # "coating" is how STT hears "coding"; matched with or without wake word, so no LLM call is needed to leave the mode.
+# Hyphenated ("pair-coding"), "paired/pear" and a filler word around the phrase are plausible STT outputs, not yet seen in takes.
 _STOP_PHRASE = re.compile(
-    r"(?:(?:stop|exit|end|finish|leave|quit)(?: the)?(?: pair)? (?:coding|coating|dictation)(?: mode)?"
-    r"|done (?:coding|coating|dictating))"
+    r"(?:(?:ok|okay|please) )?"
+    r"(?:(?:stop|exit|end|finish|leave|quit)(?: the)?(?: (?:pair|paired|pear))?[ -]?(?:coding|coating|programming|dictation)"
+    r"(?: mode)?|done (?:coding|coating|dictating))(?: please| now)?"
 )
 
 

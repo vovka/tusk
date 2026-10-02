@@ -103,3 +103,11 @@ def test_stop_word_inside_dictated_text_still_forwards() -> None:
     gk = StopGatekeeper(_gate(False), lambda: None)
     result = gk.process(_utterance("stop the loop after ten iterations"), [])
     assert result.action == "forward_current"
+
+
+def test_stt_variants_of_the_stop_phrase_stop_without_llm_gate() -> None:
+    for text in ["Stop pair-coding mode.", "Stop pair-coating mode", "Stop paired coding mode.", "Stop pear coding mode",
+                 "Stop pair programming.", "Okay, stop pair coding mode", "Stop pair coding mode please.", "Stop coding now"]:
+        called = []
+        gk = StopGatekeeper(_unused_gate(), lambda: called.append(1))
+        assert gk.process(_utterance(text), []) == GateDispatch("drop") and called == [1], text
