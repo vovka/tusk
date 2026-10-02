@@ -40,22 +40,25 @@ class SwitchModelTool:
         }
 
     def execute(self, parameters: dict) -> ToolResult:
-        slots = _MAIN_AGENT_SLOTS if parameters["slot"] == _MAIN_AGENT else (parameters["slot"],)
+        slot = parameters["slot"]
+        slots = _MAIN_AGENT_SLOTS if slot == _MAIN_AGENT else (slot,)
         try:
-            messages = [self._swap(slot, parameters) for slot in slots]
+            models = [self._swap(underlying, parameters) for underlying in slots]
         except (KeyError, ValueError) as exc:
             # the registry only names in-use models; without the aliases the agent assumed nothing else exists
             return ToolResult(False, f"{exc}. Available: {', '.join(_ALIASES)}.")
         self._report_models()
         # without the directive the model kept re-issuing the same switch until max steps
-        return ToolResult(True, f"{'; '.join(messages)}. Call done now to finish.")
+        return ToolResult(True, _confirmation(slot, models[0]))
 
     def _swap(self, slot: str, parameters: dict) -> str:
         provider, model = self._resolve(slot, parameters)
-        return self._registry.swap(slot, provider, model)
+        self._registry.swap(slot, provider, model)
+        return model
 
     def _resolve(self, slot: str, parameters: dict) -> tuple[str, str]:
-        provider, model = parameters.get("provider", ""), parameters["model"]
+        provider, _, namespace = parameters.get("provider", "").partition("/")
+        model = f"{namespace}/{parameters['model']}" if namespace else parameters["model"]
         labels = dict(self._registry.model_labels())
         providers = {label.split("/")[0] for label in labels.values()} | {provider}
         known = self._known_label(list(labels.values()), providers, f"{provider}/{model}" if provider else model)
@@ -76,6 +79,11 @@ class SwitchModelTool:
     def _report_models(self) -> None:
         if self._reporter is not None:
             self._reporter.set_models(self._registry.model_labels())
+
+
+def _confirmation(slot: str, model: str) -> str:
+    # naming only the requested slot: listing conversation_agent made the agent re-switch it unasked
+    return f"{slot.replace('_', ' ').capitalize()} set to {model.rsplit('/', 1)[-1]}. Call done now to finish."
 
 
 def _spoken_alias(model: str) -> str:

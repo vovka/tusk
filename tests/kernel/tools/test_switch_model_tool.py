@@ -125,3 +125,20 @@ def test_failed_swap_lists_alias_models_as_available() -> None:
     registry.swap = lambda *args: (_ for _ in ()).throw(ValueError("unknown model groq/x"))
     result = SwitchModelTool(registry).execute({"slot": "command_agent", "model": "x"})
     assert not result.success and all(a in result.message for a in ("gpt-oss-120b", "gpt-oss-20b", "qwen3.8-27b"))
+
+
+def test_main_agent_success_names_the_requested_slot_only() -> None:
+    # naming the underlying slots made the agent re-switch conversation_agent on its own
+    result = SwitchModelTool(_registry([])).execute({"slot": "main_agent", "model": "gpt-oss-120b"})
+    assert result.message.startswith("Main agent set to gpt-oss-120b.")
+    assert "conversation_agent" not in result.message and "command_agent" not in result.message
+
+
+def test_provider_with_namespace_is_normalised() -> None:
+    swaps = _execute({"slot": "conversation_agent", "provider": "groq/openai", "model": "gpt-oss-120b"})
+    assert swaps == [("conversation_agent", "groq", "openai/gpt-oss-120b")]
+
+
+def test_unknown_model_with_namespaced_provider_splits_provider() -> None:
+    swaps = _execute({"slot": "command_agent", "provider": "anthropic/claude", "model": "m"})
+    assert swaps == [("command_agent", "anthropic", "claude/m")]
