@@ -47,3 +47,11 @@ def test_groq_client_leaves_retries_to_the_logged_retry_runner(monkeypatch: obje
     monkeypatch.setattr(groq_llm, "Groq", lambda **kwargs: client_kwargs.update(kwargs))
     GroqLLM("test-key", "test-model")
     assert client_kwargs["max_retries"] == 0
+
+
+def test_groq_verify_retrieves_model_metadata() -> None:
+    retrieved: list = []
+    provider = GroqLLM("test-key", "openai/gpt-oss-120b")
+    provider._client = SimpleNamespace(models=SimpleNamespace(retrieve=retrieved.append))
+    provider.verify()
+    assert retrieved == ["openai/gpt-oss-120b"]

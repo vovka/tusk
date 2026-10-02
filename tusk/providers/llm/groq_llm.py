@@ -30,6 +30,10 @@ class GroqLLM(LLMProvider):
     def set_payload_logger(self, logger: object) -> None:
         self._logger = logger
 
+    def verify(self) -> None:
+        # metadata GET: raises for an unknown model id without spending tokens
+        self._client.models.retrieve(self._model)
+
     def complete(self, system_prompt: str, user_message: str, max_tokens: int = 256) -> str:
         payload = _chat_payload(self._model, system_prompt, [{"role": "user", "content": user_message}], max_tokens)
         return message_content(self._create(payload))
