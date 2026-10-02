@@ -84,3 +84,11 @@ def test_short_model_id_with_explicit_provider_resolves_to_a_known_full_id() -> 
 def test_unknown_explicit_provider_is_kept() -> None:
     swaps = _execute({"slot": "command_agent", "provider": "anthropic", "model": "m"})
     assert swaps == [("command_agent", "anthropic", "m")]
+
+
+def test_spoken_short_id_resolves_via_alias_when_no_slot_uses_it() -> None:
+    swaps: list = []
+    registry = _registry(swaps)
+    registry.model_labels = lambda: (("conversation_agent", "groq/openai/gpt-oss-20b"), ("command_agent", "openrouter/x/y"))
+    SwitchModelTool(registry).execute({"slot": "command_agent", "model": "gpt-oss-120b"})
+    assert swaps == [("command_agent", "groq", "openai/gpt-oss-120b")]

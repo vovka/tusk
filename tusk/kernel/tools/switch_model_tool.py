@@ -6,6 +6,11 @@ __all__ = ["SwitchModelTool"]
 
 _MAIN_AGENT = "main_agent"
 _MAIN_AGENT_SLOTS = ("conversation_agent", "command_agent")
+_ALIASES = {
+    "gpt-oss-120b": "groq/openai/gpt-oss-120b",
+    "gpt-oss-20b": "groq/openai/gpt-oss-20b",
+    "qwen3.8-27b": "groq/qwen/qwen3.8-27b",
+}
 
 
 class SwitchModelTool:
@@ -62,7 +67,8 @@ class SwitchModelTool:
         wanted_provider = prefix if rest and prefix in providers else None
         short_id = model.rsplit("/", 1)[-1]
         matches = [label for label in labels if label.rsplit("/", 1)[-1] == short_id]
-        return next((label for label in matches if wanted_provider in (None, label.split("/")[0])), "")
+        known = next((label for label in matches if wanted_provider in (None, label.split("/")[0])), "")
+        return known or _ALIASES.get(model.casefold(), "")
 
     def _report_models(self) -> None:
         if self._reporter is not None:
