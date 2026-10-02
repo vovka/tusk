@@ -22,7 +22,7 @@ def test_recovery_runs_for_directed_conversation_without_a_cue() -> None:
 
 
 def test_recovery_runs_when_wake_word_present() -> None:
-    _gatekeeper([_ambient(), _none()]).process(_utterance("tusk hello there"), [], _candidates())
+    _gatekeeper([_ambient(), _none()]).process(_utterance("hello there tusk"), [], _candidates())
     assert _CALL_COUNT["n"] == 2
 
 
