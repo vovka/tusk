@@ -77,7 +77,7 @@ def _spoken_command_reply(result: Any) -> str:
     # a one-shot command is spoken aloud, so never leak an internal failure summary or tool/JSON syntax
     if result.status == "cancelled":
         return "Stopped."
-    if result.status == "failed":
+    if result.status == "failed" and not getattr(result, "payload", {}).get("agent_authored"):
         return "I couldn't complete that."
     return _plain_reply(result.reply_text())
 
