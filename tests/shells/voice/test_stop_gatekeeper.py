@@ -84,3 +84,22 @@ def _unused_gate() -> object:
 def _command_gate(result: GateDispatch | None = None) -> object:
     dispatch = result or GateDispatch("forward_current", "use GPT OSS 120B for the main agent", kind="command")
     return types.SimpleNamespace(process=lambda utterance, recent, candidates=None: dispatch)
+
+
+def _unused_gate() -> object:
+    def fail(text: str) -> bool:
+        raise AssertionError("LLM gate must not be called")
+    return types.SimpleNamespace(should_stop=fail)
+
+
+def test_bare_stop_phrase_stops_without_llm_gate() -> None:
+    called = []
+    gk = StopGatekeeper(_unused_gate(), lambda: called.append(1))
+    assert gk.process(_utterance("Stop Pair Coating Mode."), []) == GateDispatch("drop")
+    assert called == [1]
+
+
+def test_stop_word_inside_dictated_text_still_forwards() -> None:
+    gk = StopGatekeeper(_gate(False), lambda: None)
+    result = gk.process(_utterance("stop the loop after ten iterations"), [])
+    assert result.action == "forward_current"
