@@ -102,3 +102,8 @@ def test_command_prompt_launches_the_closest_match_of_a_misheard_app_name() -> N
     # E2E: STT heard "gedit" as "jetty"; search_applications returned gedit and the agent still asked to clarify
     prompt = build_agent_profiles(_mock_registry())["command"].system_prompt
     assert "mishears app names" in prompt and "launch it" in prompt
+
+
+def test_command_prompt_resolves_it_to_the_active_window() -> None:
+    prompt = build_agent_profiles(_mock_registry())["command"].system_prompt
+    assert "'it'/'this' = active window: close_window without window_title" in prompt
