@@ -71,7 +71,7 @@ class AgentRuntime:
         messages: list[dict[str, str]], executor: Callable[[ToolCall, str], ToolResult],
         repeat: RepeatedToolCallGuard, guards: TurnGuards, step: int,
     ) -> AgentResult | None:
-        tool_call = self._tool_call(profile, messages, tools)
+        tool_call = self._tool_call(profile, messages, tools, guards)
         self._record.requested(session_id, step, tool_call)
         finished = self._guard_result(session_id, profile.profile_id, tool_call, repeat, guards)
         if finished is not None:
@@ -95,13 +95,13 @@ class AgentRuntime:
             return self._failed(session_id, "repeated identical tool call")
         return None
 
-    def _tool_call(self, profile: AgentProfile, messages: list[dict[str, object]], tools: list[dict[str, object]]) -> ToolCall:
+    def _tool_call(self, profile: AgentProfile, messages: list[dict[str, object]], tools: list[dict[str, object]], guards: TurnGuards) -> ToolCall:
         try:
             return CallTool.unwrap(profile.llm_provider.complete_tool_call(profile.system_prompt, messages, tools))
         except Exception as exc:
             self._log.log("ERROR", f"llm failure: {exc}")
             text = self._failure.build(exc)
-            return ToolCall("done", {"status": "failed", "summary": text, "text": text})
+            return guards.partial_done(profile.profile_id) or ToolCall("done", {"status": "failed", "summary": text, "text": text})
 
     def _finish(self, session_id: str, parameters: dict[str, object]) -> AgentResult:
         result = self._results.from_parameters(session_id, parameters)

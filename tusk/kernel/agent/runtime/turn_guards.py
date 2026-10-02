@@ -12,6 +12,7 @@ class TurnGuards:
     def __init__(self) -> None:
         self._guards = [ConversationRunAgentGuard(), ConversationFailureBudgetGuard(), ExecutorClipboardGuard()]
         self._typing = ConsecutiveTypingGuard()
+        self._last_success: str | None = None
 
     def violation(self, profile_id: str, tool_call: ToolCall) -> str | None:
         for guard in self._guards:
@@ -27,5 +28,14 @@ class TurnGuards:
 
     def observe(self, tool_call: ToolCall, tool_result: ToolResult) -> None:
         self._typing.observe(tool_call, tool_result)
+        if tool_result.success:
+            self._last_success = tool_result.message
         for guard in self._guards:
             guard.observe(tool_call, tool_result)
+
+    def partial_done(self, profile_id: str) -> ToolCall | None:
+        # ponytail: a command whose tool already ran counts as done when only the follow-up LLM call failed;
+        # multi-step commands report just the last success, track remaining steps if that misleads users
+        if profile_id != "command" or self._last_success is None:
+            return None
+        return ToolCall("done", {"status": "done", "summary": self._last_success, "text": self._last_success})
