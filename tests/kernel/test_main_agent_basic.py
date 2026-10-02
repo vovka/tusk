@@ -17,7 +17,7 @@ def test_main_agent_invalid_json_returns_visible_failure() -> None:
     log = types.SimpleNamespace(log=lambda tag, message: logs.append((tag, message)))
     reply = make_agent(llm, log=log).process_command("test")
     assert "temporarily unavailable" in reply.lower()
-    assert any(tag == "AGENT" and "llm failure" in message for tag, message in logs)
+    assert any(tag == "ERROR" and "llm failure" in message for tag, message in logs)
 
 
 def test_clarify_persists_reply() -> None:

@@ -52,7 +52,7 @@ class SpeechStopGate:
 
     def _log_error(self, message: str, exc: Exception) -> None:
         if self._log is not None:
-            self._log.log("SPEECHSTOP", f"{message}: {exc}", "speech-stop")
+            self._log.log("ERROR", f"{message}: {exc}", "speech-stop")
 
     def _log_result(self, text: str, data: dict[str, object]) -> None:
         if self._log is not None:

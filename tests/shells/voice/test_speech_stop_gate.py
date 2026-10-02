@@ -38,3 +38,12 @@ def _gate(raw: str) -> tuple[SpeechStopGate, list[str]]:
     llm = types.SimpleNamespace(complete_structured=complete_structured)
     log = types.SimpleNamespace(log=lambda *args: None)
     return SpeechStopGate(llm, log), prompts
+
+
+def test_llm_failure_logs_as_always_visible_error() -> None:
+    def broken(*args: object) -> str:
+        raise RuntimeError("llm down")
+    logs: list[tuple] = []
+    llm = types.SimpleNamespace(complete_structured=broken, complete=broken)
+    SpeechStopGate(llm, types.SimpleNamespace(log=lambda *a: logs.append(a))).should_stop("stop", "reply")
+    assert logs and logs[0][0] == "ERROR"

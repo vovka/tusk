@@ -63,3 +63,10 @@ def _literal_json() -> str:
 
 def _structured_failure(*args) -> str:
     raise RuntimeError("json_validate_failed")
+
+
+def test_gate_failures_log_as_always_visible_error() -> None:
+    logs: list[tuple] = []
+    llm = types.SimpleNamespace(label="gate", complete_structured=_structured_failure, complete=_structured_failure)
+    ModeGate(llm, "coding", CODING_GATE_PROMPT, types.SimpleNamespace(log=lambda *a: logs.append(a))).should_stop("x")
+    assert logs and logs[0][0] == "ERROR"

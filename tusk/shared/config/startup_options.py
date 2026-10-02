@@ -9,13 +9,13 @@ _GROUPS = (
     "gate-recovery", "kernel-input", "llm-request", "llm-payload", "llm-tools", "llm-response",
     "llm-wait", "llm-payload-full", "llm-tools-full", "llm-response-full", "agent", "tool",
     "pipeline", "dictation", "vad", "stt", "gate", "llm", "llm-tool", "llm-tool-full",
-    "llm-with-payload", "wait",
+    "llm-with-payload", "wait", "dictation-gate", "coding-gate", "speech-stop",
 )
 _ALL = tuple(name for name in _GROUPS if name not in {"vad", "stt", "gate", "llm", "llm-tool", "llm-tool-full", "llm-with-payload", "wait"} and not name.endswith("-full"))
 _ALIASES = {
     "vad": {"detector"},
     "stt": {"transcriber"},
-    "gate": {"gatekeeper", "gate-recovery"},
+    "gate": {"gatekeeper", "gate-recovery", "dictation-gate", "coding-gate", "speech-stop"},
     "llm": {"llm-request", "llm-response"},
     "llm-tool": {"llm-tools"},
     "llm-tool-full": {"llm-tools-full"},

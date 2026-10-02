@@ -99,7 +99,7 @@ class AgentRuntime:
         try:
             return CallTool.unwrap(profile.llm_provider.complete_tool_call(profile.system_prompt, messages, tools))
         except Exception as exc:
-            self._log.log("AGENT", f"llm failure: {exc}")
+            self._log.log("ERROR", f"llm failure: {exc}")
             text = self._failure.build(exc)
             return ToolCall("done", {"status": "failed", "summary": text, "text": text})
 

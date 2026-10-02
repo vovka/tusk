@@ -10,7 +10,7 @@ def test_startup_options_expand_groups_and_preview_config() -> None:
     env = StartupOptions.from_sources([], {"SHOW_LOGS": "gate", "LLM_LOG_PREVIEW_CHARS": "140"})
     help_text = "".join(build_parser().format_help().split())
     assert cli.log_groups == frozenset({"transcriber", "llm-request", "llm-payload", "llm-tools", "llm-response", "llm-wait"})
-    assert env.log_groups == frozenset({"gatekeeper", "gate-recovery"})
+    assert env.log_groups == frozenset({"gatekeeper", "gate-recovery", "dictation-gate", "coding-gate", "speech-stop"})
     assert env.llm_log_preview_chars == 140
     assert "llm-payload-full" in help_text
 
@@ -61,3 +61,10 @@ def test_diagnostic_content_uses_gray_style() -> None:
     with patch("builtins.print") as mocked:
         ColorLogPrinter(frozenset({"llm-request"})).log("LLMREQUEST", "diagnostic", "llm-request")
     assert "\033[90mdiagnostic\033[0m" in mocked.call_args[0][0]
+
+
+def test_mode_gate_groups_are_selectable_and_in_gate_alias() -> None:
+    options = StartupOptions.from_sources(["--show-logs", "coding-gate"], {})
+    gate = StartupOptions.from_sources(["--show-logs", "gate"], {})
+    assert "coding-gate" in options.log_groups
+    assert {"dictation-gate", "coding-gate", "speech-stop"} <= gate.log_groups
