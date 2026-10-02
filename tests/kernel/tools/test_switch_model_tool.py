@@ -92,3 +92,15 @@ def test_spoken_short_id_resolves_via_alias_when_no_slot_uses_it() -> None:
     registry.model_labels = lambda: (("conversation_agent", "groq/openai/gpt-oss-20b"), ("command_agent", "openrouter/x/y"))
     SwitchModelTool(registry).execute({"slot": "command_agent", "model": "gpt-oss-120b"})
     assert swaps == [("command_agent", "groq", "openai/gpt-oss-120b")]
+
+
+def test_spoken_model_variants_normalise_to_alias() -> None:
+    # E2E: STT rendered gpt-oss-120b as "GPT-OSS, $120 billion"
+    for spoken in ("GPT-OSS, $120 billion", "GPT-OSS 120 billion", "gpt oss 120b", "120B"):
+        swaps = _execute({"slot": "command_agent", "model": spoken})
+        assert swaps == [("command_agent", "groq", "openai/gpt-oss-120b")], spoken
+
+
+def test_description_lists_alias_ids() -> None:
+    description = SwitchModelTool(_registry([])).description
+    assert all(alias in description for alias in ("gpt-oss-120b", "gpt-oss-20b", "qwen3.8-27b"))

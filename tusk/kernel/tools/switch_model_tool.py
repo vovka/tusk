@@ -1,3 +1,5 @@
+import re
+
 from tusk.shared.schemas.tools.tool_result import ToolResult
 from tusk.shared.llm.llm_registry import LLMRegistry
 from tusk.shared.status.interfaces.status_reporter import StatusReporter
@@ -17,8 +19,8 @@ class SwitchModelTool:
     source = "kernel"
     name = "switch_model"
     description = (
-        "Switch a slot's LLM. 'main agent' is slot main_agent (both conversation_agent and command_agent). "
-        "model: provider/model or a short id like gpt-oss-120b."
+        "Switch a slot's LLM. 'main agent' = slot main_agent (conversation_agent + command_agent). "
+        f"model: {', '.join(_ALIASES)} or provider/model."
     )
 
     def __init__(self, llm_registry: LLMRegistry, reporter: StatusReporter | None = None) -> None:
@@ -68,8 +70,19 @@ class SwitchModelTool:
         short_id = model.rsplit("/", 1)[-1]
         matches = [label for label in labels if label.rsplit("/", 1)[-1] == short_id]
         known = next((label for label in matches if wanted_provider in (None, label.split("/")[0])), "")
-        return known or _ALIASES.get(model.casefold(), "")
+        return known or _ALIASES.get(model.casefold(), "") or _spoken_alias(model)
 
     def _report_models(self) -> None:
         if self._reporter is not None:
             self._reporter.set_models(self._registry.model_labels())
+
+
+def _spoken_alias(model: str) -> str:
+    # STT renders ids loosely ("GPT-OSS, $120 billion", "120B"); compare on bare lowercase alphanumerics
+    spoken = _squash(model.casefold().replace("billion", "b"))
+    matches = [full for alias, full in _ALIASES.items() if spoken and _squash(alias).endswith(spoken)]
+    return matches[0] if len(matches) == 1 else ""
+
+
+def _squash(text: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", text)
