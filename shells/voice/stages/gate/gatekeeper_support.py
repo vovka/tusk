@@ -23,7 +23,7 @@ __all__ = [
 
 _REFERENCE_CUES = frozenset({"that", "those", "this", "these", "previous", "last", "earlier", "before", "again", "instead", "actually", "meant", "one", "it", "them", "prior", "recent", "other", "no", "yes", "yeah"})
 # "task" and "dusk" are common STT mishearings of the wake word
-WAKE_WORDS = frozenset({"tusk", "task", "dusk"})
+WAKE_WORDS = frozenset({"tusk", "task", "dusk", "tosk"})
 
 PRIMARY_SCHEMA = {
     "type": "object",
