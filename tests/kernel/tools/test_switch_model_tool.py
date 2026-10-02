@@ -104,3 +104,24 @@ def test_spoken_model_variants_normalise_to_alias() -> None:
 def test_description_lists_alias_ids() -> None:
     description = SwitchModelTool(_registry([])).description
     assert all(alias in description for alias in ("gpt-oss-120b", "gpt-oss-20b", "qwen3.8-27b"))
+
+
+def test_main_agent_switch_from_spoken_utterance_id() -> None:
+    # E2E: "TUSK set the main agent to GPT-OSS, $120 billion."
+    swaps = _execute({"slot": "main_agent", "model": "GPT-OSS, $120 billion"})
+    assert swaps == [("conversation_agent", "groq", "openai/gpt-oss-120b"), ("command_agent", "groq", "openai/gpt-oss-120b")]
+
+
+def test_ambiguous_family_id_fails_listing_options() -> None:
+    swaps: list = []
+    result = SwitchModelTool(_registry(swaps)).execute({"slot": "main_agent", "model": "gpt-oss"})
+    assert not result.success and swaps == []
+    assert "gpt-oss-120b" in result.message and "gpt-oss-20b" in result.message
+
+
+def test_failed_swap_lists_alias_models_as_available() -> None:
+    # the registry error only named in-use models, so the agent believed gpt-oss-120b did not exist
+    registry = _registry([])
+    registry.swap = lambda *args: (_ for _ in ()).throw(ValueError("unknown model groq/x"))
+    result = SwitchModelTool(registry).execute({"slot": "command_agent", "model": "x"})
+    assert not result.success and all(a in result.message for a in ("gpt-oss-120b", "gpt-oss-20b", "qwen3.8-27b"))

@@ -44,7 +44,8 @@ class SwitchModelTool:
         try:
             messages = [self._swap(slot, parameters) for slot in slots]
         except (KeyError, ValueError) as exc:
-            return ToolResult(False, str(exc))
+            # the registry only names in-use models; without the aliases the agent assumed nothing else exists
+            return ToolResult(False, f"{exc}. Available: {', '.join(_ALIASES)}.")
         self._report_models()
         # without the directive the model kept re-issuing the same switch until max steps
         return ToolResult(True, f"{'; '.join(messages)}. Call done now to finish.")
@@ -81,6 +82,9 @@ def _spoken_alias(model: str) -> str:
     # STT renders ids loosely ("GPT-OSS, $120 billion", "120B"); compare on bare lowercase alphanumerics
     spoken = _squash(model.casefold().replace("billion", "b"))
     matches = [full for alias, full in _ALIASES.items() if spoken and _squash(alias).endswith(spoken)]
+    family = [alias for alias in _ALIASES if spoken and _squash(alias).startswith(spoken)]
+    if not matches and len(family) > 1:
+        raise ValueError(f"ambiguous model {model!r}: say {' or '.join(family)}")
     return matches[0] if len(matches) == 1 else ""
 
 
