@@ -42,3 +42,13 @@ def _stopping_router() -> object:
 
 def _log() -> object:
     return types.SimpleNamespace(log=lambda *args: None)
+
+
+def test_stop_logs_always_visible_mode_ended_line() -> None:
+    # E2E: a bare "stop pair coding mode" left the mode with nothing in the default log
+    from tusk.shared.logging.log_tag_palette import is_always_visible
+    logs: list[tuple] = []
+    log = types.SimpleNamespace(log=lambda *args: logs.append(args))
+    AdapterMode(_state(), _stopping_router(), log, "CODING").stop()
+    assert ("MODE", "coding mode ended") in logs
+    assert is_always_visible("MODE")

@@ -37,7 +37,7 @@ _CONTENT = {
     "TUSK": "\033[1m",
 }
 _GROUPS = {"READY": "ready", "KERNELINPUT": "kernel-input", "LLMREQUEST": "llm-request", "LLMPAYLOAD": "llm-payload", "LLMTOOLS": "llm-tools", "LLMRESPONSE": "llm-response", "LLMWAIT": "llm-wait"}
-_ALWAYS = frozenset({"ERROR", "READY", "KERNELINPUT", "TUSK", "LATENCY"})
+_ALWAYS = frozenset({"ERROR", "READY", "KERNELINPUT", "TUSK", "LATENCY", "MODE"})
 
 
 def color_for(tag: str) -> str:
