@@ -35,3 +35,11 @@ def test_structured_budget_leaves_room_for_reasoning() -> None:
     llm = types.SimpleNamespace(complete_structured=structured)
     LLMClient(llm, _Log()).primary("prompt", "hello")
     assert budgets == [1024]
+
+
+def test_structured_failure_is_logged_as_error() -> None:
+    # E2E: a gatekeeper 400 json_validate_failed never surfaced as ERROR
+    tags: list[str] = []
+    log = types.SimpleNamespace(log=lambda tag, *a: tags.append(tag))
+    LLMClient(_llm([]), log).primary("prompt", "hello")
+    assert tags[0] == "ERROR"

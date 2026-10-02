@@ -48,7 +48,7 @@ class LLMClient:
         try:
             return self._llm.complete_structured(prompt, text, name, schema, 1024)
         except Exception as exc:
-            self._log.log("GATEKEEPER", f"{name} structured output failed: {exc}", "gatekeeper")
+            self._log.log("ERROR", f"{name} structured output failed: {exc}", "gatekeeper")
         try:
             return self._llm.complete(prompt, text, 1024)
         except Exception as exc:
