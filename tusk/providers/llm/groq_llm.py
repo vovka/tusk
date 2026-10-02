@@ -31,8 +31,9 @@ class GroqLLM(LLMProvider):
         self._logger = logger
 
     def verify(self) -> None:
-        # metadata GET: raises for an unknown model id without spending tokens
-        self._client.models.retrieve(self._model)
+        # model listing costs no tokens; models.retrieve URL-encodes the slash in "openai/..." ids and Groq rejects it
+        if self._model not in {model.id for model in self._client.models.list().data}:
+            raise ValueError(f"groq does not serve {self._model}")
 
     def complete(self, system_prompt: str, user_message: str, max_tokens: int = 256) -> str:
         payload = _chat_payload(self._model, system_prompt, [{"role": "user", "content": user_message}], max_tokens)

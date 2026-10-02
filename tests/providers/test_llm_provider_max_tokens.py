@@ -49,9 +49,21 @@ def test_groq_client_leaves_retries_to_the_logged_retry_runner(monkeypatch: obje
     assert client_kwargs["max_retries"] == 0
 
 
-def test_groq_verify_retrieves_model_metadata() -> None:
-    retrieved: list = []
+def _listing_client(*ids: str) -> object:
+    listing = SimpleNamespace(data=[SimpleNamespace(id=model_id) for model_id in ids])
+    return SimpleNamespace(models=SimpleNamespace(list=lambda: listing))
+
+
+def test_groq_verify_accepts_slashed_model_id_from_listing() -> None:
+    # models.retrieve URL-encodes the slash (openai%2Fgpt-oss-20b) and Groq rejects it, so even in-use ids failed
     provider = GroqLLM("test-key", "openai/gpt-oss-120b")
-    provider._client = SimpleNamespace(models=SimpleNamespace(retrieve=retrieved.append))
+    provider._client = _listing_client("openai/gpt-oss-20b", "openai/gpt-oss-120b")
     provider.verify()
-    assert retrieved == ["openai/gpt-oss-120b"]
+
+
+def test_groq_verify_rejects_unlisted_model() -> None:
+    import pytest
+    provider = GroqLLM("test-key", "gpt-oss")
+    provider._client = _listing_client("openai/gpt-oss-120b")
+    with pytest.raises(ValueError):
+        provider.verify()
