@@ -2,6 +2,7 @@ import types
 
 from tests.kernel_api_support import make_registry_tool
 from tests.recording_tracer import RecordingTracer
+from tusk.kernel.agent.confirmation.confirmation_gate import ConfirmationGate
 from tusk.kernel.agent.agent_tool_catalog import AgentToolCatalog
 from tusk.kernel.agent.orchestrator_tool_dispatcher import OrchestratorToolDispatcher
 from tusk.kernel.agent.tool_sequence.executor import Executor
@@ -18,8 +19,8 @@ def _registry() -> ToolRegistry:
 
 
 def _dispatcher(registry: ToolRegistry, tracer: RecordingTracer) -> OrchestratorToolDispatcher:
-    executor = Executor(registry, _NULL_STORE)
-    return OrchestratorToolDispatcher(registry, AgentToolCatalog(registry), executor, tracer=tracer)
+    executor = Executor(registry, _NULL_STORE, confirmation=ConfirmationGate(registry))
+    return OrchestratorToolDispatcher(registry, AgentToolCatalog(registry), executor, tracer=tracer, confirmation=ConfirmationGate(registry))
 
 
 def test_dispatcher_wraps_real_tool_execution_in_span() -> None:
@@ -32,7 +33,8 @@ def test_dispatcher_wraps_real_tool_execution_in_span() -> None:
 
 def test_sequence_executor_wraps_each_step_in_span() -> None:
     tracer = RecordingTracer()
-    executor = Executor(_registry(), _NULL_STORE, tracer=tracer)
+    registry = _registry()
+    executor = Executor(registry, _NULL_STORE, tracer=tracer, confirmation=ConfirmationGate(registry))
     plan = {"goal": "press", "steps": [{"id": "s1", "tool_name": "gnome.press_keys", "args": {}}]}
     executor.execute("session-1", plan, {"gnome.press_keys"})
     assert tracer.spans[0]["name"] == "tool.gnome.press_keys"

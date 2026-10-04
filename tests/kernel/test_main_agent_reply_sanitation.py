@@ -45,3 +45,21 @@ def _agent(status: str, reply_text: str) -> MainAgent:
 
 def _registry() -> object:
     return types.SimpleNamespace(get=lambda name: types.SimpleNamespace(label=name))
+
+
+def test_agent_authored_failure_speaks_its_own_sentence() -> None:
+    # E2E: a failed switch_model to "banana" spoke the generic line instead of the available-models answer
+    from tusk.kernel.agent.runtime.result_factory import ResultFactory
+    sentence = "I couldn't switch to banana; available are gpt-oss-20b and qwen3.8-27b."
+    result = ResultFactory(None).from_parameters("c1", {"status": "failed", "summary": sentence})
+    orchestrator = types.SimpleNamespace(run=lambda request: result)
+    agent = MainAgent(orchestrator, types.SimpleNamespace(append=lambda message: None), None)
+    assert agent.process_command("switch to banana", "command") == sentence
+
+
+def test_internal_runtime_failure_stays_generic() -> None:
+    from tusk.kernel.agent.runtime.result_factory import ResultFactory
+    result = ResultFactory(None).failed("c1", "repeated identical tool call")
+    orchestrator = types.SimpleNamespace(run=lambda request: result)
+    agent = MainAgent(orchestrator, types.SimpleNamespace(append=lambda message: None), None)
+    assert agent.process_command("x", "command") == "I couldn't complete that."

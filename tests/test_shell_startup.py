@@ -10,6 +10,14 @@ def test_main_builds_reporter_and_starts_loader(monkeypatch) -> None:
     assert captured["started"] and captured["reporter"] is captured["loader_reporter"]
 
 
+
+def test_main_shares_one_latency_meter_between_kernel_and_shells(monkeypatch) -> None:
+    captured: dict = {}
+    _stub_main(monkeypatch, captured)
+    main.main()
+    assert captured["kernel_meter"] is captured["loader_meter"] is not None
+
+
 def test_main_publishes_initial_model_labels(monkeypatch) -> None:
     captured: dict = {}
     _stub_main(monkeypatch, captured)
@@ -25,8 +33,8 @@ def _stub_main(monkeypatch, captured: dict) -> None:
     monkeypatch.setattr(main.Config, "from_env", lambda: config)
     monkeypatch.setattr(main, "_build_log", lambda options: types.SimpleNamespace(log=lambda *a: None))
     monkeypatch.setattr(main, "StatusReporterHub", lambda sink, logger: _reporter(captured))
-    monkeypatch.setattr(main, "_build_kernel", lambda c, l, o, reporter, token, tracer: kernel)
-    monkeypatch.setattr(main, "ShellLoader", lambda c, k, l, reporter: _loader(captured, reporter))
+    monkeypatch.setattr(main, "_build_kernel", lambda c, l, o, reporter, token, tracer, meter: captured.__setitem__("kernel_meter", meter) or kernel)
+    monkeypatch.setattr(main, "ShellLoader", lambda c, k, l, reporter, meter: captured.__setitem__("loader_meter", meter.__self__) or _loader(captured, reporter))
 
 
 def _reporter(captured: dict) -> object:

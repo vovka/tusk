@@ -1,30 +1,32 @@
 import threading
 
+from adapters.gnome.app_vocabulary import AppVocabulary
 from shells.cli.cli_shell import CLIShell
 from shells.emulator.emulator_shell import EmulatorShell
 from shells.tray.tray_shell import TrayShell
 from shells.voice.command_worker import CommandWorker
 from shells.voice.gatekeeper_slot import GatekeeperSlot
-from shells.voice.playback_gate import PlaybackGate
-from shells.voice.stages.gate.stop_gatekeeper import StopGatekeeper
-from shells.voice.stages.gate.gatekeeper import LLMGatekeeper
 from shells.voice.stages.chunked_speaker import ChunkedSpeaker
+from shells.voice.confirmation_answer_gate import ConfirmationAnswerGate
+from shells.voice.stages.confirmation_reply import ConfirmationReply
 from shells.voice.stages.echo_filter import EchoFilter
+from shells.voice.stages.sanitizer import Sanitizer
 from shells.voice.stages.speech_playback import SpeechPlayback
-from shells.voice.stages.gate.speech_stop_gate import SpeechStopGate
 from shells.voice.voice_shell import VoiceShell
-from tusk.providers.stt import STTEngineFactory
-from tusk.providers.tts import GroqTTS
+from stt_engine_builder import SttEngineBuilder
+from tts_engine_builder import TtsEngineBuilder
+from voice_gatekeeper_builder import VoiceGatekeeperBuilder
 
 __all__ = ["ShellLoader"]
 
 
 class ShellLoader:
-    def __init__(self, config: object, kernel: object, log: object, reporter: object) -> None:
+    def __init__(self, config: object, kernel: object, log: object, reporter: object, on_speech_end: object = None) -> None:
         self._config = config
         self._kernel = kernel
         self._log = log
         self._reporter = reporter
+        self._on_speech_end = on_speech_end
         self._shutdown_event = threading.Event()
         self._control: object | None = None
 
@@ -54,23 +56,22 @@ class ShellLoader:
         return shell_class()
 
     def _build_voice(self, shell_class: object) -> object:
-        stt_engine = self._stt_engine()
         worker = self._build_worker()
-        echo_filter = EchoFilter(lambda: worker.recent_speech, self._log)
+        reply = ConfirmationReply(lambda: worker.recent_speech)
         shell = shell_class(
-            self._config, self._log, stt_engine=stt_engine, gatekeeper=self._gatekeeper(worker),
+            self._config, self._log, stt_engine=self._stt_engine(), gatekeeper=ConfirmationAnswerGate(self._gatekeeper(worker), reply),
             worker=worker, reporter=self._reporter, on_interrupt=self._interrupt_callback(worker),
-            echo_filter=echo_filter,
+            echo_filter=EchoFilter(lambda: worker.recent_speech, self._log), on_speech_end=self._on_speech_end,
+            sanitizer=Sanitizer(self._log, AppVocabulary.installed().stt_prompt(self._config.stt_app_vocabulary), reply),
         )
         self._control = shell
         return shell
 
     def _stt_engine(self) -> object:
-        factory = STTEngineFactory(self._config.groq_api_key, self._config.whisper_model_size)
-        return factory.create(self._config.stt_engine)
+        return SttEngineBuilder(self._config).build()
 
     def _build_worker(self) -> CommandWorker:
-        tts_engine = GroqTTS(self._config.groq_api_key) if self._config.tts_enabled else None
+        tts_engine = TtsEngineBuilder(self._config).build() if self._config.tts_enabled else None
         token = self._kernel.interrupt_token
         speaker = ChunkedSpeaker(tts_engine, SpeechPlayback(token), self._log, token)
         return CommandWorker(self._kernel.submit, speaker, self._log, token, self._config.ack_enabled)
@@ -82,34 +83,7 @@ class ShellLoader:
         return request_interrupt
 
     def _gatekeeper(self, worker: CommandWorker) -> GatekeeperSlot:
-        registry = self._kernel.get_llm_registry()
-        gk_llm = registry.get("gatekeeper") if registry else None
-        stop_llm = registry.get_with_fallback("stop_gate", "gatekeeper") if registry else None
-        base = self._guarded(self._base_gate(gk_llm, worker), stop_llm, worker)
-        slot = GatekeeperSlot(base)
-        self._wire_modes(slot, base, stop_llm, worker)
-        return slot
-
-    def _base_gate(self, gk_llm: object, worker: CommandWorker) -> LLMGatekeeper:
-        return LLMGatekeeper(
-            gk_llm, self._log, follow_up_window_seconds=self._config.follow_up_timeout_seconds,
-            is_busy=lambda: worker.is_busy, current_speech_text=lambda: worker.current_speech_text,
-        )
-
-    def _wire_modes(self, slot: GatekeeperSlot, base: object, stop_llm: object, worker: CommandWorker) -> None:
-        self._wire_mode(slot, base, stop_llm, worker, self._kernel.dictation_gate(),
-                        self._kernel.set_dictation_callbacks, self._kernel.request_dictation_stop)
-        self._wire_mode(slot, base, stop_llm, worker, self._kernel.coding_gate(),
-                        self._kernel.set_coding_callbacks, self._kernel.request_coding_stop)
-
-    def _wire_mode(self, slot: GatekeeperSlot, base: object, stop_llm: object, worker: CommandWorker,
-                   gate: object, set_callbacks: object, request_stop: object) -> None:
-        make = lambda: self._guarded(StopGatekeeper(gate, request_stop), stop_llm, worker)
-        set_callbacks(on_start=lambda: slot.swap(make()), on_stop=lambda: slot.swap(base))
-
-    def _guarded(self, inner: object, stop_llm: object, worker: CommandWorker) -> PlaybackGate:
-        # while TUSK's own voice plays, only stop_gate (STOP_GATE_LLM) may interrupt; otherwise delegate to inner
-        return PlaybackGate(inner, lambda: worker.current_speech_text, SpeechStopGate(stop_llm, self._log))
+        return VoiceGatekeeperBuilder(self._config, self._kernel, self._log).build(worker)
 
     def _load_class(self, name: str) -> object:
         try:

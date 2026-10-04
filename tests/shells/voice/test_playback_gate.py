@@ -29,6 +29,15 @@ def test_non_stop_speech_during_playback_is_dropped() -> None:
     assert inner_calls == []
 
 
+def test_non_stop_command_during_playback_goes_to_inner_gatekeeper() -> None:
+    # E2E: "TUSK Open the text editor." spoken over a reply got stop=False and was dropped
+    inner_calls: list[str] = []
+    gate = _gate(inner_calls, speaking="Switched the main agent.", stop=False)
+    dispatch = gate.process(_utterance("TUSK Open the text editor."), [])
+    assert dispatch.action == "forward_current"
+    assert inner_calls == ["TUSK Open the text editor."]
+
+
 def _utterance(text: str) -> Utterance:
     return Utterance(text, b"", 1.0)
 

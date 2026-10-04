@@ -90,7 +90,7 @@ def _gatekeeper() -> object:
 
 
 def _config() -> object:
-    return types.SimpleNamespace(audio_sample_rate=16000, audio_frame_duration_ms=30, vad_aggressiveness=2)
+    return types.SimpleNamespace(audio_sample_rate=16000, audio_frame_duration_ms=30, vad_aggressiveness=2, vad_silence_ms=400)
 
 
 def _log() -> object:

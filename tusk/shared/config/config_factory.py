@@ -2,6 +2,7 @@ import os
 import shlex
 
 from tusk.shared.config.config import Config
+from tusk.shared.config.speech_config_values import SpeechConfigValues
 from tusk.shared.schemas.llm_slot_config import LLMSlotConfig
 
 __all__ = ["ConfigFactory"]
@@ -73,8 +74,8 @@ class ConfigFactory:
             "audio_sample_rate": self._int("AUDIO_SAMPLE_RATE", "16000"),
             "audio_frame_duration_ms": self._int("AUDIO_FRAME_DURATION_MS", "30"),
             "vad_aggressiveness": self._int("VAD_AGGRESSIVENESS", "2"),
-            "tts_enabled": os.environ.get("TUSK_TTS", "on").lower() not in ("off", "0", "false"),
-            "ack_enabled": os.environ.get("TUSK_ACK", "on").lower() not in ("off", "0", "false"),
+            "vad_silence_ms": self._int("VAD_SILENCE_MS", "400"),
+            **SpeechConfigValues().values(),
         }
 
     def _environment_values(self, shells: str) -> dict:

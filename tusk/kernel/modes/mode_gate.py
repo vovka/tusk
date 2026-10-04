@@ -52,7 +52,7 @@ class ModeGate:
 
     def _log_error(self, message: str, exc: Exception) -> None:
         if self._log is not None:
-            self._log.log(self._tag, f"{message}: {exc}", self._group)
+            self._log.log("ERROR", f"{message}: {exc}", self._group)
 
     def _log_result(self, data: dict[str, object]) -> None:
         if self._log is not None:

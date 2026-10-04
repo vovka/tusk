@@ -1,6 +1,7 @@
 import json
 import shlex
 import sys
+import threading
 
 from tusk.shared.mcp.mcp_stdio_transport import MCPStdioTransport
 from tusk.shared.schemas.tools.mcp_tool_result import MCPToolResult
@@ -14,6 +15,8 @@ class MCPClient:
         self._transport: MCPStdioTransport | None = None
         self._timeout = response_timeout_seconds
         self._next_id = 0
+        # one request at a time: stdio has no way to match a reply to its caller, and the stop-mode path calls in from another thread
+        self._lock = threading.Lock()
 
     def connect_stdio(self, command: list[str], cwd: str, env: dict | None = None) -> None:
         self._transport = MCPStdioTransport(self._normalize_command(command), cwd, env, self._timeout)
@@ -52,9 +55,10 @@ class MCPClient:
         return self._transport is not None and self._transport.is_running()
 
     def _request(self, method: str, params: dict) -> dict:
-        self._next_id += 1
-        message = {"jsonrpc": "2.0", "id": self._next_id, "method": method, "params": params}
-        return self._decoded(self._exchange(json.dumps(message), method), method)
+        with self._lock:
+            self._next_id += 1
+            message = {"jsonrpc": "2.0", "id": self._next_id, "method": method, "params": params}
+            return self._decoded(self._exchange(json.dumps(message), method), method)
 
     def _exchange(self, payload: str, method: str) -> str:
         assert self._transport is not None

@@ -1,0 +1,5 @@
+[Desktop Entry]
+Name=Hidden Helper
+Exec=hidden-helper
+Type=Application
+Hidden=true

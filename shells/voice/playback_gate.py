@@ -1,3 +1,4 @@
+import re
 from collections.abc import Callable
 
 from shells.voice.buffered_utterance import BufferedUtterance
@@ -10,7 +11,7 @@ __all__ = ["PlaybackGate"]
 
 
 class PlaybackGate(Gatekeeper):
-    """While TUSK speaks, allow only interrupt-or-drop so forward-all modes never type TUSK's own voice."""
+    """While TUSK speaks, interrupt on stop, drop echoes of TUSK's own voice, pass real speech to the inner gate."""
 
     def __init__(
         self,
@@ -32,9 +33,18 @@ class PlaybackGate(Gatekeeper):
         if speaking is None:
             return self._inner.process(utterance, recent, candidates)
         text = utterance.text if isinstance(utterance, Utterance) else utterance.utterance.text
-        return self._interrupt_or_drop(text, speaking)
-
-    def _interrupt_or_drop(self, text: str, speaking: str) -> GateDispatch:
         if self._stop_gate.should_stop(text, speaking):
             return GateDispatch(GateAction.INTERRUPT)
-        return GateDispatch(GateAction.DROP)
+        if _is_echo(text, speaking):
+            return GateDispatch(GateAction.DROP)
+        return self._inner.process(utterance, recent, candidates)
+
+
+def _is_echo(text: str, speaking: str) -> bool:
+    # ponytail: substring match keeps forward-all modes from typing TUSK's voice; fuzzy match if misheard echoes leak
+    heard = _words(text)
+    return bool(heard) and heard in _words(speaking)
+
+
+def _words(text: str) -> str:
+    return " ".join(re.findall(r"[a-z0-9]+", text.casefold()))

@@ -7,7 +7,7 @@ from tusk.kernel.modes.dictation_gate_prompt import DICTATION_GATE_PROMPT
 from tusk.kernel.modes.mode_gate import ModeGate
 from tusk.kernel.modes.mode_slot import ModeSlot
 from tusk.kernel.core.submit_status_reporter import SubmitStatusReporter
-from tusk.shared.schemas.app_mode import AppMode
+from tusk.shared.schemas.app_mode import MODE_BYPASS_KIND_PREFIX, AppMode
 from tusk.shared.schemas.kernel_response import KernelResponse
 from tusk.shared.interrupt.interrupt_token import InterruptToken
 from tusk.shared.llm.llm_registry import LLMRegistry
@@ -67,11 +67,12 @@ class KernelAPI:
             self._log.log("KERNELINPUT", f"text={text!r}", "kernel-input")
 
     def _route(self, text: str, kind: str) -> KernelResponse:
-        if self._coding.active:
+        # a wake-word command spoken during dictation/coding skips the mode
+        if self._coding.active and not kind.startswith(MODE_BYPASS_KIND_PREFIX):
             return self._coding.process_text(text)
-        if self._dictation.active:
+        if self._dictation.active and not kind.startswith(MODE_BYPASS_KIND_PREFIX):
             return self._dictation.process_text(text)
-        return self._command_mode.process_command(text, kind)
+        return self._command_mode.process_command(text, kind.removeprefix(MODE_BYPASS_KIND_PREFIX))
 
     def _report_mode(self, mode: AppMode) -> None:
         if self._reporter is not None:

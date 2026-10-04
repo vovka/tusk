@@ -18,7 +18,7 @@ def test_launch_application_resolves_display_name_to_exec(monkeypatch) -> None:
     tools = _application_tools(calls)
     result = tools.launch_application({"application_name": "Firefox"})
     assert calls == ["firefox"]
-    assert result == {"success": True, "message": "launched: Firefox (no new window appeared within 10s)"}
+    assert result == {"success": False, "message": "launched Firefox but no Firefox window appeared within 10s"}
 
 
 def _search_result() -> dict:
@@ -35,7 +35,7 @@ def _search_handler(router: GnomeToolRouter) -> object:
 
 
 def _application_tools(calls: list[str]) -> ApplicationTools:
-    apps = types.SimpleNamespace(search=lambda query, limit=10: [types.SimpleNamespace(name="Firefox", exec_cmd="firefox")])
+    apps = types.SimpleNamespace(search=lambda query, limit=10: [types.SimpleNamespace(name="Firefox", exec_cmd="firefox", desktop_id="firefox.desktop")])
     tools = ApplicationTools(apps, sleep=lambda seconds: None)
     tools._launch = lambda application_name: _launch_response(calls, application_name)  # type: ignore[method-assign]
     return tools

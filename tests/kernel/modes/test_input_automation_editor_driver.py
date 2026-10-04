@@ -78,3 +78,34 @@ def _registry(calls: list[tuple]) -> object:
 def _record(calls: list[tuple], suffix: str, args: dict) -> ToolResult:
     calls.append((suffix, args))
     return ToolResult(True, "", {"text": "held"})
+
+
+def _clipboard_registry(clipboard: dict, copy_writes: str | None, read_ok: bool) -> object:
+    def execute(suffix: str, args: dict) -> ToolResult:
+        if suffix == "write_clipboard":
+            clipboard["text"] = args["text"]
+        if suffix == "press_keys" and args["keys"] == "<ctrl>c" and copy_writes is not None:
+            clipboard["text"] = copy_writes
+        text = clipboard["text"]
+        return ToolResult(read_ok and bool(text) if suffix == "read_clipboard" else True, "", {"text": text})
+
+    return types.SimpleNamespace(get=lambda name: types.SimpleNamespace(execute=lambda args: execute(name.split(".", 1)[1], args)))
+
+
+def test_read_buffer_returns_empty_when_clipboard_read_reports_empty() -> None:
+    clipboard = {"text": "OLD"}
+    driver = InputAutomationEditorDriver(_clipboard_registry(clipboard, "", True), "gnome", sleep=lambda seconds: None)
+    assert driver.read_buffer() == ""
+    assert clipboard["text"] == "OLD"
+
+
+def test_read_buffer_ignores_stale_clipboard_when_copy_is_noop() -> None:
+    clipboard = {"text": "OLD"}
+    driver = InputAutomationEditorDriver(_clipboard_registry(clipboard, None, True), "gnome", sleep=lambda seconds: None)
+    assert driver.read_buffer() == ""
+    assert clipboard["text"] == "OLD"
+
+
+def test_read_buffer_returns_copied_text() -> None:
+    driver = InputAutomationEditorDriver(_clipboard_registry({"text": "OLD"}, "x = 1", True), "gnome", sleep=lambda s: None)
+    assert driver.read_buffer() == "x = 1"

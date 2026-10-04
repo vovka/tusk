@@ -54,11 +54,22 @@ See [docs/architecture.md § Agent Backends](docs/architecture.md#agent-backends
 
 ### Display server support
 
-Clipboard read/write works natively on both X11 and Wayland — the GNOME adapter
-selects `wl-clipboard` on a Wayland session (`XDG_SESSION_TYPE=wayland` or
-`WAYLAND_DISPLAY` set) and `xclip` on X11. Input simulation and window management
-still rely on `xdotool`/`wmctrl`, which require X11; on Wayland they work only
-through XWayland and cannot drive native Wayland windows.
+The GNOME adapter picks its backend at start-up: Wayland when `XDG_SESSION_TYPE=wayland`
+or `WAYLAND_DISPLAY` is set, X11 otherwise.
+
+- **X11:** input and windows go through `xdotool`/`wmctrl`, the clipboard through `xclip`.
+- **GNOME Wayland (GNOME Shell 46 only):** input and windows go through the bundled
+  `tusk-shell@tusk` GNOME Shell extension, which TUSK calls over the session D-Bus
+  (`org.tusk.Shell`); the clipboard goes through `wl-clipboard`. Characters outside the
+  active keyboard layout (e.g. Cyrillic on a US layout) are pasted via the clipboard with
+  Ctrl+V, which overwrites the clipboard and does not work in terminals.
+
+> **Trust model (Wayland):** any client on your session bus — including the TUSK container —
+> can call `org.tusk.Shell` to type, click, and move or close windows, the same exposure as
+> `xdotool` on X11. The container reaches the bus only with the opt-in
+> `docker-compose.wayland.yml` override, which runs it with `apparmor=unconfined` and so
+> loosens container isolation; a custom AppArmor profile allowing just the session bus would
+> be tighter, but loading one needs root.
 
 ## Setup
 
@@ -69,11 +80,32 @@ git clone https://github.com/vovka/tusk.git
 cd tusk
 ```
 
-### 2. Allow Docker to connect to your X11 display
+### 2. Allow Docker to reach your display
+
+On X11:
 
 ```bash
 xhost +local:docker
 ```
+
+On GNOME Wayland, install and enable the shell extension, then **log out and log back
+in** (GNOME Shell on Wayland only loads new extensions at login):
+
+```bash
+scripts/install-gnome-extension.sh
+```
+
+`docker-compose.yml` passes `XDG_SESSION_TYPE` and `WAYLAND_DISPLAY` into the container and
+mounts the session bus (`/run/user/1000/bus`) and the Wayland socket
+(`/run/user/1000/$WAYLAND_DISPLAY`; `/dev/null` stands in on X11). The X11 mounts stay in
+place. On Wayland, add the AppArmor override, because the host D-Bus daemon rejects
+AppArmor-confined Docker clients:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.wayland.yml up
+```
+
+An absolute `WAYLAND_DISPLAY` (a socket path instead of a name like `wayland-0`) is not supported.
 
 ### 3. Create your `.env` file
 
@@ -140,6 +172,9 @@ Speak naturally. TUSK responds to:
 - **"Hey Tusk, launch the terminal"** — opens gnome-terminal
 - **"Open gedit"** (no prefix needed for obvious desktop commands)
 - **"Tusk, start dictation"** — enters dictation mode, pasting speech as text
+- **"Tusk, start pair coding mode"** — enters pair-coding mode; speech without the wake word becomes code edits
+- **"Tusk, stop pair coding mode"** / **"Tusk, stop dictation"** — leaves the mode; any other
+  "Tusk, …" command spoken inside a mode (e.g. switching the model) runs as a normal command
 - **"Tusk, maximize this window"** — maximizes the active window
 - **"Tusk, press ctrl+a"** — sends a keyboard shortcut
 - **"Tusk, use Opus for the agent"** — switches the agent LLM at runtime
@@ -163,9 +198,14 @@ All settings are configured via environment variables:
 | `UTILITY_LLM` | `groq/llama-3.3-70b-versatile` | Model for summaries and text cleanup (`provider/model`) |
 | `STT_ENGINE` | `groq` | Speech-to-text engine: `groq` (hosted Whisper API) or `whisper` (local model) |
 | `WHISPER_MODEL_SIZE` | `base` | Local Whisper model (`STT_ENGINE=whisper`): `tiny`, `base`, `small`, `medium` |
+| `STT_APP_VOCABULARY` | `off` | `on` adds installed app names to the STT prompt (default prompt is just the wake word) |
 | `AUDIO_SAMPLE_RATE` | `16000` | Microphone sample rate (Hz) |
 | `AUDIO_FRAME_DURATION_MS` | `30` | VAD frame size in ms (`10`, `20`, or `30`) |
 | `VAD_AGGRESSIVENESS` | `2` | VAD sensitivity: `0` (least) to `3` (most aggressive) |
+| `TUSK_TTS` | `on` | Spoken replies (`off` to disable) |
+| `TUSK_TTS_URL` | `""` | OpenAI-compatible `/v1/audio/speech` endpoint (e.g. local Kokoro); when set, replaces Groq TTS |
+| `TUSK_TTS_MODEL` | `kokoro` | `model` sent to `TUSK_TTS_URL` |
+| `TUSK_TTS_VOICE` | `am_michael` | `voice` sent to `TUSK_TTS_URL` |
 | `FOLLOW_UP_TIMEOUT_SECONDS` | `30` | Base seconds for the adaptive follow-up window |
 | `MAX_FOLLOW_UP_TIMEOUT_SECONDS` | `120` | Maximum seconds for the adaptive follow-up window |
 | `TUSK_SHELLS` | `voice` | Comma-separated shells to start (`voice`, `cli`) |
@@ -174,6 +214,8 @@ All settings are configured via environment variables:
 | `AGENT_BACKEND_FALLBACK` | `""` | If `tusk`, retry a failed codex turn through the built-in pipeline |
 | `CODEX_EXEC_MODEL` | `""` | `--model` passed to `codex exec` (empty → codex default) |
 | `CODEX_EXEC_SANDBOX_MODE` | `read-only` | `--sandbox` mode for `codex exec` |
+
+Any `*_LLM` slot also accepts a comma-separated list, e.g. `AGENT_LLM=groq/qwen/qwen3.8-27b,groq/openai/gpt-oss-20b,groq/openai/gpt-oss-120b`: requests rotate round-robin across the models and a 429 from one immediately fails over to the next, multiplying per-model rate limits. Switching a slot by voice replaces the rotation with the single chosen model.
 
 > See [docs/architecture.md § Agent Backends](docs/architecture.md#agent-backends) for the
 > full backend diagram and the remaining `CODEX_EXEC_*` variables.
@@ -306,15 +348,16 @@ The following features are described in the project vision (`docs/brief.md`) but
 yet implemented:
 
 - **Sub-agents subsystem** — the main agent cannot spawn sub-agents for complex or parallel tasks
-- **Dangerous action registry / confirmation prompts** — no safety confirmation before destructive actions
 - **Configurable master prompt / personality** — the agent system prompt is hardcoded
 - **Cross-session memory** — conversation history is in-memory only, lost on restart
-- **Non-Linux/X11 platforms** — window management and input simulation require Linux with X11
-  (directly or via XWayland); there is no macOS/Windows or native Wayland support
+- **Non-Linux platforms and non-GNOME Wayland** — window management and input simulation require Linux
+  with X11, or GNOME Shell 46 on Wayland via the bundled `tusk-shell` extension; there is no
+  macOS/Windows support and no Wayland support on other compositors
 
 The following items from the original vision have been resolved:
 
 - **Extension API / runtime discovery** — resolved via MCP adapter model (`adapter.json` manifests, stdio JSON-RPC, hot-plug at startup)
+- **Confirmation prompts for destructive actions** — resolved via a kernel-side spoken confirmation gate (see `docs/features/destructive-action-confirmation.md`); the destructive-tool list is hardcoded in the kernel, not yet a manifest flag
 
 ## License
 

@@ -49,4 +49,9 @@ class TrayStatusSink(StatusSink):
     def _tooltip(self, snapshot: StatusSnapshot) -> str:
         if snapshot.status is AppStatus.ERROR and snapshot.detail:
             return f"TUSK — error: {snapshot.detail}"
-        return f"TUSK — {snapshot.status.value}"
+        return f"TUSK — {snapshot.status.value}{self._latency_suffix(snapshot)}"
+
+    def _latency_suffix(self, snapshot: StatusSnapshot) -> str:
+        if snapshot.latency_median_ms is None:
+            return ""
+        return f" — median latency {snapshot.latency_median_ms / 1000:.1f} s"

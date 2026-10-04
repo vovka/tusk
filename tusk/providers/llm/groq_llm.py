@@ -17,7 +17,8 @@ class GroqLLM(LLMProvider):
     def __init__(self, api_key: str, model: str) -> None:
         if Groq is None:
             raise RuntimeError("groq package is not installed")
-        self._client = Groq(api_key=api_key, timeout=30.0)
+        # the SDK's own silent 429 retries looked like 10-15 s LLM latency; LLMRetryRunner retries and logs instead
+        self._client = Groq(api_key=api_key, timeout=30.0, max_retries=0)
         self._model = model
         self._recovery = ToolUseFailedRecovery()
         self._logger = None
@@ -28,6 +29,11 @@ class GroqLLM(LLMProvider):
 
     def set_payload_logger(self, logger: object) -> None:
         self._logger = logger
+
+    def verify(self) -> None:
+        # model listing costs no tokens; models.retrieve URL-encodes the slash in "openai/..." ids and Groq rejects it
+        if self._model not in {model.id for model in self._client.models.list().data}:
+            raise ValueError(f"groq does not serve {self._model}")
 
     def complete(self, system_prompt: str, user_message: str, max_tokens: int = 256) -> str:
         payload = _chat_payload(self._model, system_prompt, [{"role": "user", "content": user_message}], max_tokens)

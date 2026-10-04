@@ -25,4 +25,5 @@ class AdapterMode:
     def stop(self) -> KernelResponse:
         result = self._router.stop(self._state)
         self._log.log(self._tag, result.reply or "stopped")
+        self._log.log("MODE", f"{self._tag.lower()} mode ended")
         return result

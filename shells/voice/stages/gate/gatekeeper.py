@@ -8,7 +8,7 @@ from shells.voice.interfaces.gatekeeper import Gatekeeper
 from shells.voice.recovery_decision import RecoveryDecision
 from shells.voice.stages.gate.command_gate_prompt import build_command_gate_prompt
 from shells.voice.stages.gate.llm_client import LLMClient
-from shells.voice.stages.gate.gatekeeper_support import fallback_dispatch, has_wake_word, recovered_dispatch, recovery_worthwhile, to_utterance
+from shells.voice.stages.gate.gatekeeper_support import fallback_dispatch, has_wake_word, recovered_dispatch, starts_with_wake_word, recovery_worthwhile, to_utterance
 from shells.voice.stages.gate.recent_context_formatter import RecentContextFormatter
 from shells.voice.stages.gate.recovery_gate_prompt import build_recovery_gate_prompt
 from tusk.shared.llm.interfaces.llm_provider import LLMProvider
@@ -66,7 +66,9 @@ class LLMGatekeeper(Gatekeeper):
         return self._current_speech_text() if self._current_speech_text is not None else None
 
     def _command_dispatch(self, result: GateResult, utterance: Utterance) -> GateDispatch | None:
-        if result.classification != GateClassification.COMMAND:
+        # a leading wake word is directed speech even when the LLM errs or calls it ambient
+        woken = result.classification == GateClassification.AMBIENT and starts_with_wake_word(utterance.text)
+        if result.classification != GateClassification.COMMAND and not woken:
             return None
         text = result.cleaned_command or utterance.text
         forward = GateDispatch(GateAction.FORWARD_CURRENT, text, intent=result.intent, kind="command")

@@ -1,5 +1,5 @@
 from shells.voice.gate_action import GateAction
-from shells.voice.stages.gate.gatekeeper_support import PRIMARY_SCHEMA, fallback_dispatch
+from shells.voice.stages.gate.gatekeeper_support import PRIMARY_SCHEMA, fallback_dispatch, has_wake_word
 from tusk.shared.schemas.gate_classification import GateClassification
 from tusk.shared.schemas.gate_result import GateResult
 from tusk.shared.schemas.utterance import Utterance
@@ -15,3 +15,7 @@ def test_conversation_fallback_carries_intent() -> None:
 def test_primary_schema_requires_intent() -> None:
     assert "intent" in PRIMARY_SCHEMA["properties"]
     assert "intent" in PRIMARY_SCHEMA["required"]
+
+
+def test_tosk_mishearing_counts_as_wake_word() -> None:
+    assert has_wake_word("Tosk close it")

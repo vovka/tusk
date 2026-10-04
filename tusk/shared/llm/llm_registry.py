@@ -23,8 +23,17 @@ class LLMRegistry:
 
     def swap(self, slot_name: str, provider_name: str, model: str) -> str:
         new_provider = self._factory.create(provider_name, model)
+        self._verify(new_provider, f"{provider_name}/{model}")
         self._slots[slot_name].swap(new_provider)
         return f"{slot_name} -> {provider_name}/{model}"
+
+    def _verify(self, provider: LLMProvider, label: str) -> None:
+        # a typo'd model id would otherwise only fail on the slot's next real call
+        try:
+            getattr(provider, "verify", lambda: None)()
+        except Exception as exc:
+            known = ", ".join(sorted({proxy.label for proxy in self._slots.values()}))
+            raise ValueError(f"unknown model {label}; known: {known}") from exc
 
     @property
     def slot_names(self) -> list[str]:

@@ -10,7 +10,7 @@ __all__ = ["StartCodingTool"]
 class StartCodingTool:
     source = "kernel"
     name = "start_coding"
-    description = "Enter pair-coding mode: TUSK applies the user's spoken code edits to the focused editor. Use to start coding, start a coding session, or begin pair programming."
+    description = "Start pair-coding mode (coding session, pair programming): spoken code edits go to the focused editor."
     input_schema = {"type": "object", "properties": {}}
 
     def __init__(self, tool_registry: ToolRegistry, controller: object, adapter_manager: AdapterManager, driver: EditorDriver) -> None:

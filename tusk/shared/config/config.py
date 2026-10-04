@@ -19,10 +19,15 @@ class Config:
     utility_llm: LLMSlotConfig
     stt_engine: str
     whisper_model_size: str
+    stt_app_vocabulary: bool
     audio_sample_rate: int
     audio_frame_duration_ms: int
     vad_aggressiveness: int
+    vad_silence_ms: int
     tts_enabled: bool
+    tts_url: str
+    tts_model: str
+    tts_voice: str
     ack_enabled: bool
     follow_up_timeout_seconds: float
     max_follow_up_timeout_seconds: float

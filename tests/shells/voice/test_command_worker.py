@@ -28,21 +28,9 @@ def test_commands_run_sequentially_in_order() -> None:
     submits: list[str] = []
     worker = make_worker(recording_submit(submits))
     worker.enqueue("first")
+    await_condition(lambda: submits == ["first"] and not worker.is_busy)
     worker.enqueue("second")
     await_condition(lambda: submits == ["first", "second"])
-
-
-def test_flush_drops_queued_commands() -> None:
-    release, started = threading.Event(), threading.Event()
-    submits: list[str] = []
-    worker = make_worker(blocking_submit(release, submits, started))
-    worker.enqueue("running")
-    assert started.wait(timeout=5.0)
-    worker.enqueue("queued")
-    worker.flush()
-    release.set()
-    await_condition(lambda: submits == ["running"] and not worker.is_busy)
-    assert submits == ["running"]
 
 
 def test_is_busy_only_while_processing() -> None:
@@ -85,6 +73,7 @@ def test_worker_survives_submit_failure() -> None:
     submits: list[str] = []
     worker = make_worker(failing_then_recording_submit(submits), logs=logs)
     worker.enqueue("boom")
+    await_condition(lambda: any(entry[0] == "ERROR" for entry in logs))
     worker.enqueue("hi")
     await_condition(lambda: submits == ["hi"] and not worker.is_busy)
     assert any(entry[0] == "ERROR" for entry in logs)

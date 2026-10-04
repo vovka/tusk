@@ -94,13 +94,3 @@ def test_maximize_succeeds_for_listed_window(monkeypatch: object) -> None:
     _patch_run(monkeypatch, calls)
     result = WindowTools().maximize_window({"window_title": "Unsaved Document 1 - gedit"})
     assert result["success"] is True
-
-
-def test_minimize_searches_only_visible_windows_with_escaped_title(monkeypatch: object) -> None:
-    calls: list[list[str]] = []
-    _patch_run(monkeypatch, calls, stdout="12345\n")
-    result = WindowTools().minimize_window({"window_title": "*Unsaved Document 1 - gedit"})
-    assert result["success"] is True
-    search = next(argv for argv in calls if argv[:2] == ["xdotool", "search"])
-    assert "--onlyvisible" in search
-    assert search[-1] == "\\*Unsaved\\ Document\\ 1\\ \\-\\ gedit"

@@ -46,11 +46,11 @@ class LLMClient:
 
     def _complete(self, prompt: str, text: str, name: str, schema: dict) -> str:
         try:
-            return self._llm.complete_structured(prompt, text, name, schema, 512)
+            return self._llm.complete_structured(prompt, text, name, schema, 1024)
         except Exception as exc:
-            self._log.log("GATEKEEPER", f"{name} structured output failed: {exc}", "gatekeeper")
+            self._log.log("ERROR", f"{name} structured output failed: {exc}", "gatekeeper")
         try:
-            return self._llm.complete(prompt, text, 512)
+            return self._llm.complete(prompt, text, 1024)
         except Exception as exc:
             self._log.log("ERROR", f"{name} fallback completion failed: {exc}")
             return ""

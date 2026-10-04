@@ -2,7 +2,7 @@ import types
 
 import pytest
 
-import shell_loader
+import voice_gatekeeper_builder
 from shell_loader import ShellLoader
 from tusk.shared.interrupt import InterruptToken
 
@@ -10,7 +10,7 @@ from tusk.shared.interrupt import InterruptToken
 def _loader(shells: list[str], log: object | None = None, tts_enabled: bool = False, stt_engine: str = "groq") -> ShellLoader:
     config = types.SimpleNamespace(
         shells=shells, groq_api_key="k", follow_up_timeout_seconds=30, tts_enabled=tts_enabled,
-        ack_enabled=True, stt_engine=stt_engine, whisper_model_size="base",
+        ack_enabled=True, stt_engine=stt_engine, whisper_model_size="base", tts_url="", stt_app_vocabulary=False,
     )
     kernel = types.SimpleNamespace(
         submit=lambda text: None,
@@ -46,7 +46,7 @@ def test_tray_receives_voice_shell_as_pipeline_control(monkeypatch) -> None:
 def test_command_worker_receives_tts_engine_when_enabled(monkeypatch) -> None:
     _patch_stt(monkeypatch, object())
     sentinel = object()
-    monkeypatch.setattr(shell_loader, "GroqTTS", lambda key: sentinel)
+    monkeypatch.setattr("tts_engine_builder.GroqTTS", lambda key: sentinel)
     loader = _loader(["voice"], tts_enabled=True)
     loader._gatekeeper = lambda worker: None
     loader._load_class = lambda name: _voice_class()
@@ -73,7 +73,7 @@ def test_gatekeeper_wiring_resolves_stop_gate_slot_with_fallback() -> None:
     worker = types.SimpleNamespace(is_busy=False, current_speech_text=None)
     slot = loader._gatekeeper(worker)
     assert ("get", "gatekeeper") in requested and ("fallback", "stop_gate", "gatekeeper") in requested
-    assert isinstance(slot._inner, shell_loader.PlaybackGate)
+    assert isinstance(slot._inner, voice_gatekeeper_builder.PlaybackGate)
 
 
 def test_gatekeeper_tolerates_missing_registry() -> None:
@@ -121,11 +121,11 @@ def _built_voice_shell(monkeypatch, requested: list[bool]) -> object:
 
 
 def _patch_stt(monkeypatch, engine: object) -> None:
-    monkeypatch.setattr(shell_loader, "STTEngineFactory", lambda key, size: types.SimpleNamespace(create=lambda name: engine))
+    monkeypatch.setattr("stt_engine_builder.STTEngineFactory", lambda key, size, vocabulary: types.SimpleNamespace(create=lambda name: engine))
 
 
 def _voice_class() -> object:
-    def make(config, log, stt_engine=None, gatekeeper=None, worker=None, reporter=None, on_interrupt=None, echo_filter=None):
+    def make(config, log, stt_engine=None, gatekeeper=None, worker=None, reporter=None, on_interrupt=None, echo_filter=None, on_speech_end=None, sanitizer=None):
         return types.SimpleNamespace(kind="voice", worker=worker, on_interrupt=on_interrupt, stt=stt_engine, echo_filter=echo_filter)
     return make
 

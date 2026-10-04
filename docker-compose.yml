@@ -32,6 +32,11 @@ services:
       PULSE_SOURCE: ${PULSE_SOURCE:-echo-cancel-source}
       PYTHONUNBUFFERED: "1"
       DBUS_SESSION_BUS_ADDRESS: unix:path=/run/user/1000/bus
+      # Wayland: the GNOME adapter picks its backend from these (empty on X11 hosts),
+      # and wl-clipboard finds the compositor socket under XDG_RUNTIME_DIR.
+      XDG_SESSION_TYPE: ${XDG_SESSION_TYPE:-}
+      WAYLAND_DISPLAY: ${WAYLAND_DISPLAY:-}
+      XDG_RUNTIME_DIR: /run/user/1000
       SHOW_LOGS: ${SHOW_LOGS:-}
       # OTLP endpoint for Arize Phoenix traces; set TRACING_OTLP_ENDPOINT= (empty)
       # in .env to disable tracing — the no-colon form keeps an empty value empty.
@@ -44,6 +49,8 @@ services:
       - /run/user/1000/pulse/native:/run/user/1000/pulse/native
       - ~/.cache/whisper:/root/.cache/whisper
       - /run/user/1000/bus:/run/user/1000/bus
+      # Wayland socket; on X11 hosts (no WAYLAND_DISPLAY) /dev/null stands in so no stray dir is created.
+      - ${WAYLAND_DISPLAY:+/run/user/1000/}${WAYLAND_DISPLAY:-/dev/null}:/run/user/1000/${WAYLAND_DISPLAY:-wayland-0}
       - /usr/share/applications:/usr/share/applications:ro
       - ~/.local/share/applications:/home-apps:ro
       - /var/lib/snapd/desktop/applications:/snap-apps:ro

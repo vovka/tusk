@@ -3,6 +3,7 @@ import types
 import main
 from tusk.shared.interrupt import InterruptToken
 from tusk.shared.llm import LLMRegistry
+from tusk.shared.schemas.llm_slot_config import LLMSlotConfig
 from tusk.shared.tracing.null_tracer import NullTracer
 
 
@@ -27,3 +28,15 @@ def test_register_slots_includes_command_and_stop_gate() -> None:
     assert "command_agent" in registry.slot_names
     assert "stop_gate" in registry.slot_names
     assert "gatekeeper" in registry.slot_names
+
+
+def test_rotation_slot_is_replaced_by_switch_model() -> None:
+    factory = types.SimpleNamespace(create=lambda provider, model: types.SimpleNamespace(label=f"{provider}/{model}"))
+    registry = LLMRegistry(factory)
+    log = types.SimpleNamespace(log=lambda *args: None, show_wait=lambda *args: None, clear_wait=lambda: None)
+    options = types.SimpleNamespace(log_groups=frozenset(), llm_log_preview_chars=120)
+    slot = LLMSlotConfig.parse("groq/m1,groq/m2")
+    registry.register_slot("command_agent", main._slot_proxy(factory, slot, log, "command_agent", options, NullTracer()))
+    assert registry.get("command_agent").label == "groq/m1"
+    registry.swap("command_agent", "groq", "m3")
+    assert dict(registry.model_labels())["command_agent"] == "groq/m3"

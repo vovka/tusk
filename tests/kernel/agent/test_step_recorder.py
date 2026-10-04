@@ -1,6 +1,8 @@
 import types
 
+from tests.kernel_api_support import make_registry_tool
 from tusk.kernel.agent.runtime.step_recorder import StepRecorder
+from tusk.kernel.tools.tool_registry import ToolRegistry
 from tusk.shared.schemas.tools.tool_call import ToolCall
 from tusk.shared.schemas.tools.tool_result import ToolResult
 
@@ -77,7 +79,7 @@ def test_appended_skips_nudge_for_failed_actuator() -> None:
 def test_appended_skips_nudge_for_unknown_tool() -> None:
     messages: list[dict[str, str]] = []
     result = ToolResult(True, "ok", None)
-    registry = types.SimpleNamespace(get=_raise_key_error)
+    registry = types.SimpleNamespace(get=_raise_key_error, resolve_name=lambda name: name)
     recorder = StepRecorder(types.SimpleNamespace(), registry)
     recorder.appended(messages, ToolCall("gnome.unregistered_tool", {}, "c1"), result)
     assert messages[-1] == {"role": "user", "content": "ok"}
@@ -98,5 +100,23 @@ def test_result_event_keeps_full_message() -> None:
 
 def _recorder(sequence_tools: set[str] | None = None) -> StepRecorder:
     tools = sequence_tools or set()
-    registry = types.SimpleNamespace(get=lambda name: types.SimpleNamespace(sequence_callable=name in tools))
+    registry = types.SimpleNamespace(
+        get=lambda name: types.SimpleNamespace(sequence_callable=name in tools), resolve_name=lambda name: name,
+    )
     return StepRecorder(types.SimpleNamespace(), registry)
+
+
+def test_appended_tool_call_keeps_its_arguments() -> None:
+    # without the arguments gpt-oss could not tell what it already did and re-issued the call until max steps
+    messages: list[dict[str, str]] = []
+    call = ToolCall("switch_model", {"slot": "main_agent", "model": "gpt-oss-120b"}, "c1")
+    _recorder().appended(messages, call, ToolResult(True, "switched"))
+    assert messages[0]["content"] == '[tool:switch_model] called with {"slot": "main_agent", "model": "gpt-oss-120b"}'
+
+
+def test_appended_nudges_done_after_actuator_called_by_short_name() -> None:
+    registry = ToolRegistry()
+    registry.register(make_registry_tool("gnome.launch_application", "launched", sequence_callable=True))
+    messages: list[dict[str, str]] = []
+    StepRecorder(types.SimpleNamespace(), registry).appended(messages, ToolCall("launch_application", {}), ToolResult(True, "ok"))
+    assert "Call the done tool now" in messages[-1]["content"]

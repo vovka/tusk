@@ -1,6 +1,8 @@
 from collections.abc import Callable
 
-from tusk.kernel.agent.runtime.model_failure_reply_builder import ModelFailureReplyBuilder
+from tusk.kernel.agent.runtime import (
+    CallTool, MessageHistoryBuilder, ModelFailureReplyBuilder, ResultFactory, StepRecorder, TurnGuards,
+)
 from tusk.kernel.tools.repeated_tool_call_guard import RepeatedToolCallGuard
 from tusk.shared.schemas.tools.tool_call import ToolCall
 from tusk.shared.schemas.tools.tool_result import ToolResult
@@ -8,10 +10,6 @@ from tusk.kernel.agent.agent_profile import AgentProfile
 from tusk.kernel.agent.agent_result import AgentResult
 from tusk.kernel.agent.agent_run_request import AgentRunRequest
 from tusk.kernel.agent.session.store import Store
-from tusk.kernel.agent.runtime.message_history_builder import MessageHistoryBuilder
-from tusk.kernel.agent.runtime.result_factory import ResultFactory
-from tusk.kernel.agent.runtime.step_recorder import StepRecorder
-from tusk.kernel.agent.runtime.turn_guards import TurnGuards
 from tusk.shared.logging.interfaces.log_printer import LogPrinter
 
 
@@ -73,12 +71,12 @@ class AgentRuntime:
         messages: list[dict[str, str]], executor: Callable[[ToolCall, str], ToolResult],
         repeat: RepeatedToolCallGuard, guards: TurnGuards, step: int,
     ) -> AgentResult | None:
-        tool_call = self._tool_call(profile, messages, tools)
+        tool_call = self._tool_call(profile, messages, tools, guards)
         self._record.requested(session_id, step, tool_call)
         finished = self._guard_result(session_id, profile.profile_id, tool_call, repeat, guards)
         if finished is not None:
             return finished
-        result = executor(tool_call, session_id)
+        result = guards.refusal(profile.profile_id, tool_call) or executor(tool_call, session_id)
         self._record.result(session_id, step, tool_call, result)
         self._record.appended(messages, tool_call, result)
         guards.observe(tool_call, result)
@@ -97,13 +95,13 @@ class AgentRuntime:
             return self._failed(session_id, "repeated identical tool call")
         return None
 
-    def _tool_call(self, profile: AgentProfile, messages: list[dict[str, object]], tools: list[dict[str, object]]) -> ToolCall:
+    def _tool_call(self, profile: AgentProfile, messages: list[dict[str, object]], tools: list[dict[str, object]], guards: TurnGuards) -> ToolCall:
         try:
-            return profile.llm_provider.complete_tool_call(profile.system_prompt, messages, tools)
+            return CallTool.unwrap(profile.llm_provider.complete_tool_call(profile.system_prompt, messages, tools))
         except Exception as exc:
-            self._log.log("AGENT", f"llm failure: {exc}")
+            self._log.log("ERROR", f"llm failure: {exc}")
             text = self._failure.build(exc)
-            return ToolCall("done", {"status": "failed", "summary": text, "text": text})
+            return guards.partial_done(profile.profile_id) or ToolCall("done", {"status": "failed", "summary": text, "text": text})
 
     def _finish(self, session_id: str, parameters: dict[str, object]) -> AgentResult:
         result = self._results.from_parameters(session_id, parameters)

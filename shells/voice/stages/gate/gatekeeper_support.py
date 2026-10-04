@@ -1,3 +1,5 @@
+import string
+
 from shells.voice.buffered_utterance import BufferedUtterance
 from shells.voice.gate_action import GateAction
 from shells.voice.gate_dispatch import GateDispatch
@@ -13,6 +15,7 @@ __all__ = [
     "WAKE_WORDS",
     "fallback_dispatch",
     "has_wake_word",
+    "starts_with_wake_word",
     "log_gate_result",
     "log_recovery",
     "normalize_recovery",
@@ -22,7 +25,8 @@ __all__ = [
 ]
 
 _REFERENCE_CUES = frozenset({"that", "those", "this", "these", "previous", "last", "earlier", "before", "again", "instead", "actually", "meant", "one", "it", "them", "prior", "recent", "other", "no", "yes", "yeah"})
-WAKE_WORDS = frozenset({"tusk", "task"})
+# "task" and "dusk" are common STT mishearings of the wake word
+WAKE_WORDS = frozenset({"tusk", "task", "dusk", "tosk"})
 
 PRIMARY_SCHEMA = {
     "type": "object",
@@ -57,6 +61,11 @@ def fallback_dispatch(result: GateResult, utterance: Utterance, wake_word: bool)
 def has_wake_word(text: str) -> bool:
     words = {part.strip(".,!?") for part in text.casefold().split()}
     return bool(words & WAKE_WORDS)
+
+
+def starts_with_wake_word(text: str) -> bool:
+    tokens = text.split()
+    return bool(tokens) and tokens[0].strip(string.punctuation).casefold() in WAKE_WORDS
 
 
 def recovery_worthwhile(utterance: Utterance, primary: GateResult, candidates: list[BufferedUtterance]) -> bool:

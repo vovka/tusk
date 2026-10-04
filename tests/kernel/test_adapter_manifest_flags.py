@@ -6,7 +6,7 @@ from tusk.kernel.core.adapter_manager import AdapterManager
 
 _GNOME_SEQUENCE_TOOLS = {
     "launch_application", "close_window", "focus_window", "maximize_window",
-    "minimize_window", "move_resize_window", "switch_workspace", "press_keys",
+    "minimize_window", "move_resize_window", "tile_window", "switch_workspace", "press_keys",
     "type_text", "replace_recent_text", "mouse_click", "mouse_move",
     "mouse_drag", "mouse_scroll", "write_clipboard", "open_uri",
 }

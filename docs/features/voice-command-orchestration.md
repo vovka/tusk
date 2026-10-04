@@ -13,6 +13,7 @@ The voice shell uses the gatekeeper to classify utterances, then routes actionab
 - `tusk/kernel/agent/planner_result_validator.py`: validates `planned_steps`, normalizes tool names, promotes valid plans to sequence mode.
 - `tusk/kernel/agent/planner_runtime_tool_resolver.py`: restores planner payload into executor `runtime_tool_names`, `execution_mode`, and `sequence_plan`.
 - `tusk/kernel/agent/agent_toolset_builder.py`: exposes either runtime tools or `execute_tool_sequence` to the executor.
+- `tusk/kernel/agent/runtime/call_tool.py`: the one-shot command's tools as a single `call_tool` with a compact catalogue; `AgentRuntime` unwraps it to the real tool call before guards run.
 - `tusk/kernel/agent/orchestrator_tool_dispatcher.py`: routes `run_agent`, `execute_tool_sequence`, and real tools.
 - `tusk/kernel/agent/tool_sequence_plan_validator.py`: rejects non-`sequence_callable` tools in sequence mode.
 - `tusk/kernel/agent/tool_sequence_executor.py`: executes compiled sequence plans and emits `<goal> completed`.
@@ -33,6 +34,7 @@ The voice shell uses the gatekeeper to classify utterances, then routes actionab
 7. Executor gets either real runtime tools or only `execute_tool_sequence`, depending on `execution_mode`.
 
 ## Important Patterns And Pitfalls
+- Token budget: a gate command (`gate_command=True`, runtime `*`) gets `done`, `run_agent` and `call_tool` whose description lists every planner-visible tool as `name(arg, opt?, enum=a|b): description` (adapter prefix dropped when unique; descriptions that only restate the name dropped). Full per-tool schemas cost ~2,100 tokens per step against Groq's ~8K/min free-tier cap; the catalogue keeps a step under ~900 (chars/4), pinned by `tests/kernel/agent/test_command_prompt_budget.py`. Executor children still get native schemas for their narrowed subset.
 - Gatekeeper structured-output failures are expected to fall back to plain completion. The log line is real, but not fatal by itself.
 - Planner payload must live under `done.arguments.payload`. If the model returns `execution_mode` or `planned_steps` at the top level, `RuntimeResultFactory` drops them and planner validation fails with `invalid planned_steps`.
 - Executor requests always recover a `sequence_plan` from planner `planned_steps`, even when planner mode is `normal`.
@@ -44,6 +46,11 @@ The voice shell uses the gatekeeper to classify utterances, then routes actionab
 - Conversation is only forced to stop after executor/default returns `done`. After executor failure, it may still improvise or re-delegate until the failure budget trips.
 - Some models emit static finish/delegation tools as `functions.done`, `functions.run_agent`, or `name=functions.done`. `ToolCall` now normalizes those aliases before runtime dispatch.
 - `ToolUseFailedRecovery` now falls back to extracting `failed_generation` directly from the provider error string when the outer wrapper cannot be parsed with `ast.literal_eval`, then best-effort recovers malformed `done(...)` calls by status and summary.
+
+## Command Queueing (CommandWorker)
+- One command runs at a time. A command identical (case and whitespace normalized) to the running or pending one is dropped.
+- At most one command waits: a new, different command replaces the pending one (latest wins).
+- A running command is never cancelled by a new command; only the spoken interrupt stops it.
 
 ## Testing Strategy
 - `tests/test_sequence_agent_flow.py`: happy-path sequence execution.
@@ -59,4 +66,4 @@ The voice shell uses the gatekeeper to classify utterances, then routes actionab
 - Tighten planner/tool-call schema enforcement so malformed `done.arguments` cannot bypass the declared planner schema.
 
 ---
-Last updated: 2026-04-04
+Last updated: 2026-10-01
