@@ -4,8 +4,13 @@ import uuid
 from typing import TextIO
 
 from adapters.coding.coding_edit_planner import CodingEditPlanner
-from adapters.coding.coding_tool_schema_catalog import CodingToolSchemaCatalog
-from tusk.shared.mcp.mcp_stdio_server import MCPStdioServer
+from tusk.shared.mcp.mcp_stdio_server import MCPStdioServer, tool_result, tool_schema
+
+TOOL_SCHEMAS = [
+    tool_schema("start_coding_session", "start coding session", {"initial_buffer": "string"}),
+    tool_schema("process_intent", "process intent", {"session_id": "string", "intent": "string"}),
+    tool_schema("stop_coding_session", "stop coding session", {"session_id": "string"}),
+]
 
 
 class CodingServer:
@@ -15,15 +20,13 @@ class CodingServer:
     ) -> None:
         self._sessions: dict[str, str] = {}
         self._planner = planner
-        self._schemas = CodingToolSchemaCatalog().build()
-        self._rpc = MCPStdioServer("coding", lambda: self._schemas, self._call, input_stream, output_stream)
+        self._rpc = MCPStdioServer("coding", lambda: TOOL_SCHEMAS, self._call, input_stream, output_stream)
 
     def serve(self) -> None:
         self._rpc.serve()
 
     def _call(self, name: str, arguments: dict) -> dict:
-        payload = getattr(self, f"_tool_{name}")(arguments)
-        return {"content": [{"type": "text", "text": payload["message"]}], "isError": not payload["success"], "data": payload.get("data")}
+        return tool_result(getattr(self, f"_tool_{name}")(arguments))
 
     def _tool_start_coding_session(self, arguments: dict) -> dict:
         session_id = str(uuid.uuid4())

@@ -2,6 +2,7 @@ import io
 import json
 
 from tusk.shared.mcp import MCPStdioServer
+from tusk.shared.mcp.mcp_stdio_server import tool_result, tool_schema
 
 
 def _serve(lines: list[str], call_tool=None) -> list[dict]:
@@ -63,3 +64,22 @@ def test_tool_exception_becomes_error_payload() -> None:
     result = responses[0]["result"]
     assert result["isError"] is True
     assert "boom" in result["content"][0]["text"]
+
+
+def test_tool_schema_builds_object_input_schema_from_field_types() -> None:
+    schema = tool_schema("type_text", "Type text", {"text": "string"})
+    assert schema == {"name": "type_text", "description": "Type text", "inputSchema": {"type": "object", "properties": {"text": {"type": "string"}}}}
+
+
+def test_tool_schema_can_require_every_field() -> None:
+    schema = tool_schema("mouse_move", "Mouse move", {"x": "string", "y": "string"}, required=True)
+    assert schema["inputSchema"]["required"] == ["x", "y"]
+
+
+def test_tool_result_wraps_payload_in_text_content_envelope() -> None:
+    result = tool_result({"success": False, "message": "nope", "data": {"k": 1}})
+    assert result == {"content": [{"type": "text", "text": "nope"}], "isError": True, "data": {"k": 1}}
+
+
+def test_tool_result_defaults_data_to_none() -> None:
+    assert tool_result({"success": True, "message": "ok"})["data"] is None

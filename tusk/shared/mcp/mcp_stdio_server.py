@@ -3,7 +3,20 @@ import sys
 from collections.abc import Callable
 from typing import TextIO
 
-__all__ = ["MCPStdioServer"]
+__all__ = ["MCPStdioServer", "tool_result", "tool_schema"]
+
+
+def tool_schema(name: str, description: str, fields: dict[str, str], required: bool = False) -> dict:
+    properties = {key: {"type": value} for key, value in fields.items()}
+    input_schema: dict = {"type": "object", "properties": properties}
+    if required:
+        input_schema["required"] = list(fields)
+    return {"name": name, "description": description, "inputSchema": input_schema}
+
+
+def tool_result(payload: dict) -> dict:
+    content = [{"type": "text", "text": payload["message"]}]
+    return {"content": content, "isError": not payload["success"], "data": payload.get("data")}
 
 
 class MCPStdioServer:
@@ -40,7 +53,7 @@ class MCPStdioServer:
         try:
             return self._dispatch(request)
         except Exception as exc:
-            return {"content": [{"type": "text", "text": f"adapter error: {exc}"}], "isError": True, "data": None}
+            return tool_result({"success": False, "message": f"adapter error: {exc}"})
 
     def _dispatch(self, request: dict) -> dict:
         method = request.get("method")

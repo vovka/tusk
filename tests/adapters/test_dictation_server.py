@@ -2,7 +2,7 @@ import io
 import json
 
 from adapters.dictation.dictation_session_store import DictationSessionStore
-from adapters.dictation.server import DictationServer
+from adapters.dictation.server import TOOL_SCHEMAS, DictationServer
 
 
 def test_process_segment_inserts_text_verbatim() -> None:
@@ -93,3 +93,7 @@ def test_serve_answers_tools_list_over_injected_streams() -> None:
     DictationServer(input_stream=io.StringIO(request + "\n"), output_stream=output).serve()
     tools = json.loads(output.getvalue())["result"]["tools"]
     assert {tool["name"] for tool in tools} == {"start_dictation", "process_segment", "stop_dictation"}
+
+
+def test_start_dictation_schema_takes_no_fields() -> None:
+    assert TOOL_SCHEMAS[0] == {"name": "start_dictation", "description": "start dictation", "inputSchema": {"type": "object", "properties": {}}}

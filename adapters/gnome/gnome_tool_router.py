@@ -12,6 +12,7 @@ from adapters.gnome.x11.context_provider import X11ContextProvider
 from adapters.gnome.x11.input_simulator import X11InputSimulator
 from adapters.gnome.x11.window_tools import WindowTools
 from adapters.gnome.x11.windows import X11Windows
+from tusk.shared.mcp.mcp_stdio_server import tool_result
 
 __all__ = ["GnomeToolRouter"]
 
@@ -38,8 +39,7 @@ class GnomeToolRouter:
         return self._schemas
 
     def call(self, name: str, arguments: dict) -> dict:
-        data = self._handlers[name](arguments)
-        return {"content": [{"type": "text", "text": data["message"]}], "isError": not data["success"], "data": data.get("data")}
+        return tool_result(self._handlers[name](arguments))
 
     def _build_handlers(
         self,

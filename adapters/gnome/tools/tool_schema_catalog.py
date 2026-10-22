@@ -1,3 +1,5 @@
+from tusk.shared.mcp.mcp_stdio_server import tool_schema
+
 __all__ = ["ToolSchemaCatalog"]
 
 _DEFINITIONS = [
@@ -28,11 +30,4 @@ _DEFINITIONS = [
 
 class ToolSchemaCatalog:
     def build(self) -> dict[str, dict]:
-        return {name: self._schema(name, description, fields) for name, description, fields in self._definitions()}
-
-    def _schema(self, name: str, description: str, fields: dict[str, str]) -> dict:
-        properties = {key: {"type": value} for key, value in fields.items()}
-        return {"name": name, "description": description, "inputSchema": {"type": "object", "properties": properties, "required": list(fields.keys())}}
-
-    def _definitions(self) -> list[tuple[str, str, dict[str, str]]]:
-        return _DEFINITIONS
+        return {name: tool_schema(name, description, fields, required=True) for name, description, fields in _DEFINITIONS}
