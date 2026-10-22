@@ -1,3 +1,5 @@
+from tusk.shared.mcp.mcp_client import MCPClient
+from tusk.shared.schemas.tools.mcp_tool_schema import MCPToolSchema
 from tusk.shared.schemas.tools.tool_result import ToolResult
 
 __all__ = ["MCPToolProxy"]
@@ -5,7 +7,7 @@ __all__ = ["MCPToolProxy"]
 
 class MCPToolProxy:
     def __init__(
-        self, source: str, schema: object, client: object,
+        self, source: str, schema: MCPToolSchema, client: MCPClient,
         planner_visible: bool = True, sequence_callable: bool = False, settle_ms: int = 0,
     ) -> None:
         self.name = f"{source}.{schema.name}"

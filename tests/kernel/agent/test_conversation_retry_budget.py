@@ -1,6 +1,6 @@
 import types
 
-from tests.kernel_api_support import make_agent, make_registry_tool
+from tests.support.kernel_api import make_agent, make_registry_tool
 from tusk.shared.schemas.tools.tool_call import ToolCall
 from tusk.kernel.tools.tool_registry import ToolRegistry
 

@@ -4,10 +4,10 @@ from types import SimpleNamespace
 
 import pytest
 
-from tests.recording_agent import RecordingAgent
-from tests.recording_log_printer import RecordingLogPrinter
-from tusk.kernel.agent.backends.agent_request import AgentRequest
-from tusk.kernel.agent.backends.codex_exec_agent_backend import CodexExecAgentBackend
+from tests.support.recording_agent import RecordingAgent
+from tests.support.recording_log_printer import RecordingLogPrinter
+from tusk.kernel.agent.backends.backend_request import BackendRequest
+from tusk.kernel.agent.backends.codex_exec.codex_exec_agent_backend import CodexExecAgentBackend
 from tusk.kernel.agent.backends.tusk_agent_backend import TuskAgentBackend
 
 
@@ -19,8 +19,8 @@ def config() -> SimpleNamespace:
     )
 
 
-def request(**overrides: object) -> AgentRequest:
-    return AgentRequest("secret prompt", "command", **overrides)
+def request(**overrides: object) -> BackendRequest:
+    return BackendRequest("secret prompt", "command", **overrides)
 
 
 def completed(stdout: str = "") -> subprocess.CompletedProcess:
@@ -37,7 +37,7 @@ def run_broken_tusk_backend(log_printer: RecordingLogPrinter) -> None:
         def process_command(self, command: str, kind: str = "conversation") -> str:
             raise RuntimeError("boom")
 
-    request = AgentRequest("open", "command", metadata={"request_id": "req-1"})
+    request = BackendRequest("open", "command", metadata={"request_id": "req-1"})
     TuskAgentBackend(BrokenAgent(), log_printer).run(request)
 
 
@@ -83,7 +83,7 @@ def test_codex_exec_backend_handles_none_metadata(monkeypatch) -> None:
 
 def test_tusk_agent_backend_logs_success_lifecycle() -> None:
     log_printer = RecordingLogPrinter()
-    TuskAgentBackend(RecordingAgent(), log_printer).run(AgentRequest("open browser", "command", "session-1"))
+    TuskAgentBackend(RecordingAgent(), log_printer).run(BackendRequest("open browser", "command", "session-1"))
     messages = [message for _, message, _ in log_printer.messages]
     assert messages[0] == "backend start backend=tusk session_id=session-1"
     assert "backend end backend=tusk session_id=session-1" in messages[1]

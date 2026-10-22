@@ -2,19 +2,18 @@ import queue
 import threading
 from collections.abc import Callable, Iterator
 
-from shells.voice.gate_action import GateAction
-from shells.voice.gate_dispatch import GateDispatch
-from shells.voice.gate_state import GateState
+from tusk.shared.schemas.voice.gate_action import GateAction
+from tusk.shared.schemas.voice.gate_dispatch import GateDispatch
 from shells.voice.interfaces.gatekeeper import Gatekeeper
-from shells.voice.interfaces.transcription_buffer import TranscriptionBuffer
 from shells.voice.stages.echo_filter import EchoFilter
 from shells.voice.stages.sanitizer import Sanitizer
 from shells.voice.stages.transcriber import Transcriber
+from shells.voice.stages.transcription_buffer import TranscriptionBuffer
 from shells.voice.stages.utterance_detector import UtteranceDetector
-from tusk.shared.status.interfaces.status_reporter import StatusReporter
+from tusk.shared.observability.status_reporter import StatusReporter
 from tusk.shared.schemas.app_status import AppStatus
 from tusk.shared.schemas.kernel_response import KernelResponse
-from tusk.shared.schemas.utterance import Utterance
+from tusk.shared.schemas.voice.utterance import Utterance
 
 __all__ = ["VoicePipeline"]
 
@@ -95,21 +94,14 @@ class VoicePipeline:
 
     def _dispatch(self, result: GateDispatch, current_id: str, submit: Callable[[str, str, str], KernelResponse | None]) -> KernelResponse | None:
         if result.action == GateAction.INTERRUPT:
-            return self._interrupt(current_id)
+            return self._interrupt()
         if result.action == GateAction.DROP or result.text is None:
-            self._buffer.mark(current_id, GateState.DROPPED)
+            self._buffer.mark_dropped(current_id)
             return None
-        self._mark_accepted(result, current_id)
+        if result.action == GateAction.FORWARD_RECOVERED:
+            self._buffer.mark_recovered(result.recovered_id)
         return self._submit(result.text, result.intent, result.kind, submit)
 
-    def _mark_accepted(self, result: GateDispatch, current_id: str) -> None:
-        if result.action == GateAction.FORWARD_RECOVERED:
-            self._buffer.mark(result.recovered_id, GateState.RECOVERED)
-            self._buffer.mark(current_id, GateState.CONSUMED)
-            return
-        self._buffer.mark(current_id, GateState.FORWARDED)
-
-    def _interrupt(self, current_id: str) -> None:
-        self._buffer.mark(current_id, GateState.CONSUMED)
+    def _interrupt(self) -> None:
         if self._on_interrupt is not None:
             self._on_interrupt()

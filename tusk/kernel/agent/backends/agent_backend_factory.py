@@ -1,16 +1,16 @@
 from tusk.kernel.agent.backends.agent_backend import AgentBackend
-from tusk.kernel.agent.backends.codex_exec_agent_backend import CodexExecAgentBackend
-from tusk.kernel.agent.backends.codex_mcp_agent_backend import CodexMcpAgentBackend
+from tusk.kernel.agent.backends.codex_exec.codex_exec_agent_backend import CodexExecAgentBackend
+from tusk.kernel.agent.backends.codex_mcp.codex_mcp_agent_backend import CodexMcpAgentBackend
 from tusk.kernel.agent.backends.fallback_agent_backend import FallbackAgentBackend
 from tusk.kernel.agent.backends.tusk_agent_backend import TuskAgentBackend
-from tusk.kernel.interfaces.agent import Agent
-from tusk.shared.logging.interfaces.log_printer import LogPrinter
+from tusk.kernel.core.main_agent import MainAgent
+from tusk.shared.interfaces.log_printer import LogPrinter
 
 __all__ = ["AgentBackendFactory"]
 
 
 class AgentBackendFactory:
-    def __init__(self, agent: Agent, config: object, log_printer: LogPrinter) -> None:
+    def __init__(self, agent: MainAgent, config: object, log_printer: LogPrinter) -> None:
         if agent is None:
             raise ValueError("agent cannot be None")
         if config is None:

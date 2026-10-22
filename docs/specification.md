@@ -83,7 +83,7 @@ There is **no kernel-side coding LLM slot**: the coding adapter owns its own mod
 | `GATE_RECOVERY_CANDIDATE_LIMIT` | `int` | `6` | Max recovery candidates per gate call |
 | `TUSK_SHELLS` | `list[str]` | `["voice"]` | Comma-separated: `voice`, `cli`, `tray`, `emulator`. The loader always moves `tray` last (it owns the blocking GUI loop) |
 | `TUSK_ADAPTER_ENV_CACHE_DIR` | `str` | `".tusk_runtime/adapters"` | Managed adapter venv cache |
-| `TUSK_AGENT_SESSION_LOG_DIR` | `str` | `".tusk_runtime/agent_sessions"` | `FileStore` session event logs |
+| `TUSK_AGENT_SESSION_LOG_DIR` | `str` | `".tusk_runtime/agent_sessions"` | `SessionStore` session event logs |
 | `TUSK_TRAY_ICON_THEME` | `str` | `"light"` | `light`, `dark` |
 | `TUSK_TRAY_SHOW_LAST_ACTIVITY` | `bool` | `false` | Opt-in: last command/reply line in the tray menu (the transcript may contain sensitive speech) |
 | `AGENT_BACKEND` | `str` | `"tusk"` | `tusk`, `codex_exec`, `codex_mcp` (§8) |
@@ -175,7 +175,7 @@ On each audio frame:
 
 ## 5. STT Engine Specification
 
-**Interface:** `tusk/shared/stt/interfaces/stt_engine.py`
+**Interface:** `tusk/shared/interfaces/stt_engine.py`
 
 ```python
 def transcribe(self, audio_frames: bytes, sample_rate: int) -> Utterance
@@ -235,13 +235,13 @@ morning`, `good evening`, `hello`, `hey`, `hi`.
 
 ## 7. Command Gatekeeper Specification
 
-**Sources:** `shells/voice/stages/gate/` (`gatekeeper.py`, `llm_client.py`,
-`gatekeeper_parser.py`, `gatekeeper_support.py`, `command_gate_prompt.py`,
-`recovery_gate_prompt.py`, `recent_context_formatter.py`).
+**Sources:** `shells/voice/gate/` (`llm_gatekeeper.py`, `llm_client.py`,
+`gatekeeper_support.py`, `wake_words.py`, `command_gate_prompt.py`,
+`recovery_gate_prompt.py`).
 **Interface:** `shells/voice/interfaces/gatekeeper.py` — a single method:
 
 ```python
-def process(self, utterance, recent, candidates=None) -> GateDispatch
+def process(self, utterance: BufferedUtterance, recent, candidates) -> GateDispatch
 ```
 
 `LLMGatekeeper` is the command-mode implementation. Mode gates (§16) and the playback
@@ -283,7 +283,7 @@ Parsing uses `extract_json_payload` (`tusk/shared/llm/llm_json.py`): tolerates p
 around the JSON (scans for the first decodable `{…}`), unwraps a one-element list, and
 unwraps an `"arguments"` key. `classification` is mapped to the `GateClassification`
 enum (unknown values → `AMBIENT`). `GateResult` (frozen dataclass,
-`tusk/shared/schemas/gate_result.py`): `is_directed_at_tusk` is true for
+`tusk/shared/schemas/voice/gate_result.py`): `is_directed_at_tusk` is true for
 `command`/`conversation`, `cleaned_command` = `cleaned_text`, `confidence=1.0`,
 `classification`. Any parse exception → `GateResult(False, "", 0.0)`.
 
@@ -296,7 +296,7 @@ enum (unknown values → `AMBIENT`). `GateResult` (frozen dataclass,
 2. `command` → `FORWARD_CURRENT` with `cleaned_text` (or raw text if empty).
 3. Anything else → **recovery evaluation** (§7.4):
    - `recover` → `FORWARD_RECOVERED` with the candidate's text and id
-   - `ambiguous` → `FORWARD_CLARIFICATION` with the current text
+   - `ambiguous` → `FORWARD_CURRENT` with the current text
    - `none` → fallback: `conversation` **with a wake word** (`tusk`/`task` as a
      whole word) → `FORWARD_CURRENT`; everything else → `DROP`.
 
@@ -325,7 +325,7 @@ A `recover` decision naming an id outside the candidate list is normalized to `n
 
 **Source:** `tusk/kernel/agent/backends/`
 
-`CommandMode` talks to an `AgentBackend` (ABC: `run(AgentRequest) -> AgentResult`), not
+`CommandMode` talks to an `AgentBackend` (ABC: `run(BackendRequest) -> BackendResult`), not
 to the agent directly. `AgentBackendFactory` selects the implementation from
 `config.agent_backend`:
 
@@ -333,7 +333,7 @@ to the agent directly. `AgentBackendFactory` selects the implementation from
 |---|---|---|
 | `tusk` (default) | `TuskAgentBackend` | Wraps the built-in `MainAgent` (§9–§12); always `handled=True` |
 | `codex_exec` | `CodexExecAgentBackend` | Runs `codex exec --json --output-schema <path> [--model M] [--sandbox S] <extra> <prompt>` as a subprocess |
-| `codex_mcp` | `CodexMcpAgentBackend` | Talks to a Codex MCP server (`codex_mcp/` client, call builder, response reader, result mapper) |
+| `codex_mcp` | `CodexMcpAgentBackend` | Talks to a Codex MCP server (`codex_mcp/` `Client`, `CallBuilder`, `ResultMapper`) |
 | anything else | — | `ValueError` at startup |
 
 With `AGENT_BACKEND_FALLBACK=tusk`, a codex backend is wrapped in
@@ -343,9 +343,9 @@ runs the same request and the primary's failure is attached to the result metada
 
 **Schemas** (frozen dataclasses):
 
-- `AgentRequest(user_text, mode, session_id="", context={}, metadata={}, working_directory="", timeout_seconds=None, environment={})`
-- `AgentResult(handled, reply, session_id="", metadata={}, status="", final_text="", raw_output=None)` —
-  `status` defaults to `success`/`failed` from `handled`; `final_text` defaults to `reply`.
+- `BackendRequest(user_text, mode, session_id="", context={}, metadata={}, working_directory="", timeout_seconds=None, environment={})`
+- `BackendResult(handled, reply, session_id="", metadata={}, status="", raw_output=None)` —
+  `status` defaults to `success`/`failed` from `handled`.
 
 **CodexExecAgentBackend contract:** prompt built by `CodexPromptBuilder` (sections:
 system context — a default desktop-control preamble instructing gnome-MCP-only actions
@@ -362,14 +362,14 @@ codex exec"; otherwise `status`/`reply` are read from the parsed JSON.
 
 ## 9. Conversation Agent Specification
 
-**Sources:** `tusk/kernel/command_mode.py`, `tusk/kernel/main_agent.py`,
-`tusk/kernel/agent_profiles.py`
+**Sources:** `tusk/kernel/core/command_mode.py`, `tusk/kernel/core/main_agent.py`,
+`tusk/kernel/core/agent_profiles.py`
 
-`CommandMode.process_command(text)` builds `AgentRequest(text, "command", session_id)`,
+`CommandMode.process_command(text)` builds `BackendRequest(text, "command", session_id)`,
 runs the backend, stores the returned `session_id` for the next turn, and returns
 `KernelResponse(handled, reply)`.
 
-`MainAgent` (the `tusk` backend, also implementing the `Agent` ABC) runs
+`MainAgent` (wrapped by the `tusk` backend) runs
 `AgentOrchestrator.run(AgentRunRequest(command, "conversation", session_id))`, maps
 `status="cancelled"` to the reply `"Stopped."`, and appends the exchange to
 `SlidingWindowHistory`.
@@ -404,7 +404,7 @@ Use done to finish with the final result.
 
 ### 9.3 History Management
 
-`AgentRuntime` loads prior messages from the session `Store` on each turn (§12).
+`AgentRuntime` loads prior messages from the `SessionStore` on each turn (§12).
 Separately, `MainAgent` appends command + reply to `SlidingWindowHistory(20)` — local
 cross-turn context only, not passed to the LLM runtime. On overflow the history evicts
 the older half and inserts one summary message (`Previous context summary: …`, built
@@ -414,7 +414,7 @@ from the last 6 evicted messages, 120 chars each).
 
 ## 10. Planner Agent Specification
 
-**Sources:** `tusk/kernel/agent_profiles.py` (`planner` profile),
+**Sources:** `tusk/kernel/core/agent_profiles.py` (`planner` profile),
 `tusk/kernel/agent/planner/`
 
 ### 10.1 System Prompt
@@ -438,7 +438,7 @@ Return done with payload containing selected_tool_names, execution_mode, plan_te
 The planner's only tool is `done` (with the `PLANNER_DONE` schema: `payload` requires
 `selected_tool_names`, `execution_mode`, `planned_steps`). The tool catalog is appended
 to the planner's *instruction* by `AgentOrchestrator._enrich_planner` — the text
-`Tool catalog: {"tools": [...]}` from `AgentToolCatalog.prompt_text()`, listing every
+`Tool catalog: {"tools": [...]}` from `ToolCatalog.prompt_text()`, listing every
 planner-visible tool's `name`, `description`, `input_schema`, `source`, and
 `sequence_callable` flag.
 
@@ -447,27 +447,27 @@ planner-visible tool's `name`, `description`, `input_schema`, `source`, and
 After a planner child finishes with `status=done`,
 `ResultValidator` (`planner/result_validator.py`) runs:
 
-1. `StepPlanValidator` on `payload.planned_steps`: parseable plan, 1–8 steps, unique
-   non-empty step ids and tool names, no synthetic tools (`done`,
+1. `PlanValidator.validate_steps` on `payload.planned_steps`: parseable plan, 1–8 steps,
+   unique non-empty step ids and tool names, no synthetic tools (`done`,
    `execute_tool_sequence`, `list_available_tools`, `run_agent`), every tool known to
    the registry, args valid against each tool's schema (`SimpleSchemaValidator`).
    Any violation → the child result is replaced by `status="failed"`.
 2. `selected_tool_names` is **normalized from the plan's step order** (the planner's
    own list is overwritten).
-3. `execution_mode == "normal"` → `SequencePromoter.promote`: the plan is re-validated
-   as a sequence (`PlanValidator`: same step rules **plus** every tool
-   `sequence_callable` and the plan's tool set equal to `selected_tool_names`); if it
-   passes, `execution_mode` is flipped to `sequence` and `payload.sequence_plan` is
-   materialized; if not, the plan stays `normal`.
-4. `execution_mode == "sequence"` → `PlanValidator` must pass, else `failed`.
+3. `PlanValidator.validate_sequence` re-checks the plan as a sequence (same step rules
+   **plus** every tool `sequence_callable` and the plan's tool set equal to
+   `selected_tool_names`). `execution_mode == "normal"` → if it passes, `execution_mode`
+   is flipped to `sequence` and `payload.sequence_plan` is materialized; if not, the
+   plan stays `normal`.
+4. `execution_mode == "sequence"` → `validate_sequence` must pass, else `failed`.
 
 ---
 
 ## 11. Executor Agent Specification
 
-**Sources:** `tusk/kernel/agent_profiles.py` (`executor` profile),
+**Sources:** `tusk/kernel/core/agent_profiles.py` (`executor` profile),
 `tusk/kernel/agent/planner/runtime_tool_resolver.py`,
-`tusk/kernel/agent/agent_toolset_builder.py`
+`tusk/kernel/agent/toolset/toolset_builder.py`
 
 ### 11.1 System Prompt
 
@@ -508,7 +508,7 @@ order if a plan exists, else the request's own names, else the payload's
   the compiled plan travels on the `AgentRunRequest` and is retrieved by the
   dispatcher, never through LLM-provided arguments.
 
-`ExecutorToolGuard`: an executor run with zero runtime tools terminates immediately
+`Delegation.refusal`: an executor run with zero runtime tools terminates immediately
 with `AgentResult(status="need_tools")`.
 
 ---
@@ -516,21 +516,20 @@ with `AgentResult(status="need_tools")`.
 ## 12. AgentRuntime Specification
 
 **Source:** `tusk/kernel/agent/agent_runtime.py` with `runtime/` helpers
-(`MessageHistoryBuilder`, `ResultFactory`, `StepRecorder`, `TurnGuards`).
+(`Transcript`, `ResultFactory`, `TurnGuards`).
 Shared by all profiles.
 
 ### 12.1 Session Lifecycle
 
 1. `session_id = request.session_id or store.create_session_id()`; unknown sessions get
    `store.start_session(session_id, profile_id, parent_session_id, parent_call_id, metadata)`
-2. `MessageHistoryBuilder` loads prior conversation messages from the store and appends
+2. `Transcript` loads prior conversation messages from the store and appends
    one `[session-ref] <digest>` user message per `session_refs` entry
 3. The user instruction is appended to the store and to the message list
 4. The step loop runs until `done`, a guard violation, interrupt, or max steps
 5. `ResultFactory.persist` writes `session_finished` + the assistant reply to the store
 
-The store is the `Store` ABC (`agent/session/store.py`); the wired implementation is
-`FileStore` (`agent/session/file_store.py`), one JSONL event file per session under
+The store is `SessionStore` (`agent/session_store.py`), one JSONL event file per session under
 `TUSK_AGENT_SESSION_LOG_DIR`.
 
 ### 12.2 Step Loop
@@ -539,13 +538,13 @@ Per step (1 … `profile.max_steps`):
 
 1. `InterruptToken` set → `AgentResult(status="cancelled", summary="cancelled by user")`
 2. `profile.llm_provider.complete_tool_call(system_prompt, messages, tools)`; any
-   exception → `ModelFailureReplyBuilder` text → a synthetic
+   exception → `ResultFactory.model_failure_text` → a synthetic
    `done(status="failed", summary=text, text=text)` call
 3. `done` → finish (§12.3)
 4. `TurnGuards.violation` (§13) → `failed`
 5. `RepeatedToolCallGuard`: the **3rd consecutive** identical
    `(tool_name, parameters)` call → `failed` ("repeated identical tool call")
-6. Otherwise the call is dispatched (§14), recorded (`StepRecorder`), appended to the
+6. Otherwise the call is dispatched (§14), recorded (`Transcript`), appended to the
    message history, and observed by the guards
 
 Max steps exhausted → `AgentResult(status="failed", "max steps reached")`.
@@ -568,19 +567,16 @@ Max steps exhausted → `AgentResult(status="failed", "max steps reached")`.
 
 ## 13. Agent Guard Specification
 
-**Sources:** `tusk/kernel/agent/guards/`, `tusk/kernel/agent/runtime/turn_guards.py`,
-`tusk/kernel/tools/repeated_tool_call_guard.py`
+**Sources:** `tusk/kernel/agent/guards/`, `tusk/kernel/agent/runtime/turn_guards.py`
 
 | Guard | Scope | Rule |
 |---|---|---|
-| `AgentRunGuard` | orchestrator, pre-run | Unknown profile → `failed`; delegation depth ≥ 4 → `failed`; a profile already present in the lineage → `failed` ("recursive delegation detected") |
-| `ExecutorToolGuard` | orchestrator, pre-run | Executor with no runtime tools → `need_tools` |
-| `ConversationRunAgentGuard` | per step | After an `executor`/`default` child returns `status=done`, another `run_agent` from `conversation` is a violation |
-| `ConversationFailureBudgetGuard` | per step | After 2 `executor`/`default` child results with status `failed`/`need_tools`, further delegation is a violation |
+| `Delegation.refusal` | orchestrator, pre-run | Unknown profile → `failed`; delegation depth ≥ 4 → `failed`; a profile already present in the lineage → `failed` ("recursive delegation detected"); executor with no runtime tools → `need_tools` |
+| `ConversationDelegationGuard` | per step | After an `executor`/`default` child returns `status=done`, or after 2 such children end `failed`/`need_tools`, another `run_agent` from `conversation` is a violation |
 | `ExecutorClipboardGuard` | per step | After a successful clipboard write/copy: writing different text, or copying again before a paste, is a violation; a paste (`<ctrl>v` variants, `shift+insert`) resets the state |
 | `RepeatedToolCallGuard` | per step | 3 consecutive identical calls → run fails |
 
-`TurnGuards` composes the three per-step guards; violations end the run with
+`TurnGuards` composes the two per-step guards; violations end the run with
 `AgentResult(status="failed", <message>)`.
 
 ---
@@ -612,12 +608,11 @@ class RegisteredTool:
 
 | Method | Description |
 |---|---|
-| `register(tool)` / `unregister_source(source)` | Add one tool / drop all tools of a source (adapter unload) |
+| `register(tool)` | Add one tool (reads `source`/`planner_visible`/`sequence_callable`/`settle_ms` off the object) |
 | `get(name)` | Raises `KeyError` if missing |
-| `all_tools()` | Insertion order |
-| `real_tools()` / `real_tool_names()` | Alphabetically sorted / name set |
-| `planner_tools()` / `planner_tool_names()` | `planner_visible=True` subset |
-| `sequence_tools()` / `sequence_tool_names()` | `sequence_callable=True` subset |
+| `planner_tools()` | `planner_visible=True` subset |
+| `resolve_name(name)` | Full name, or the unique `*.name` suffix match (models drop the adapter prefix) |
+| `all_tools()` / `tool_names()` | Alphabetically sorted / name set |
 | `definitions_for(names)` | Native tool defs for a named subset, sorted; unknown names skipped |
 
 Native definition format (consumed by `LLMProvider.complete_tool_call`):
@@ -628,12 +623,12 @@ Native definition format (consumed by `LLMProvider.complete_tool_call`):
 
 ### 14.3 Dispatch
 
-`OrchestratorToolDispatcher.dispatch(tool_call, run_agent, session_id, allowed, plan)`:
+`AgentOrchestrator._execute` handles `run_agent` itself; everything else goes to
+`OrchestratorToolDispatcher.dispatch(tool_call, session_id, allowed, plan)`:
 
 | Tool name | Handling |
 |---|---|
-| `run_agent` | Delegation via `AgentChildRunner` → recursive orchestrator run; the child result comes back as `ToolResult(data={"child_result": {...}})`, success iff child `status=="done"` |
-| `list_available_tools` | `AgentToolCatalog.list_tools()` (kept dispatchable; in no profile's toolset) |
+| `run_agent` | Delegation via `AgentOrchestrator._run_agent` → recursive orchestrator run; the child result comes back as `ToolResult(data={"child_result": {...}})`, success iff child `status=="done"` |
 | `execute_tool_sequence` | `tool_sequence.Executor.execute_plan(session_id, request.sequence_plan, allowed)` |
 | anything else | Registry lookup (unknown → `ToolResult(False, "unknown tool: …")`), argument validation via `SimpleSchemaValidator` (invalid → failure), then `tool.execute(parameters)` |
 
@@ -656,7 +651,7 @@ the plan's tool set must equal the selected tool names.
 ## 15. Voice Pipeline Specification
 
 **Source:** `shells/voice/pipeline.py`, `shells/voice/stages/`,
-`shells/voice/gate_*.py`, `shells/voice/buffered_utterance.py`
+`tusk/shared/schemas/voice/`
 
 ### 15.1 Threading Model
 
@@ -683,15 +678,14 @@ def _handle_utterance(utterance, submit):
 
 ### 15.3 Dispatch
 
-`GateAction` (StrEnum): `forward_current`, `forward_recovered`,
-`forward_clarification`, `interrupt`, `drop`. `GateState` (StrEnum): `pending`,
-`consumed`, `dropped`, `forwarded`, `recovered`.
+`GateAction` (StrEnum): `forward_current`, `forward_recovered`, `interrupt`, `drop`.
+`BufferedUtterance.dropped` marks recovery candidates.
 
 ```
-INTERRUPT                → mark(current, CONSUMED); on_interrupt()          # before the drop check: interrupt has text=None
-DROP or text is None     → mark(current, DROPPED)
-FORWARD_RECOVERED        → mark(recovered_id, RECOVERED); mark(current, CONSUMED); submit(text)
-anything else forwarded  → mark(current, FORWARDED); submit(text)
+INTERRUPT                → on_interrupt()                                  # before the drop check: interrupt has text=None
+DROP or text is None     → mark_dropped(current)
+FORWARD_RECOVERED        → mark_recovered(recovered_id); submit(text)
+anything else forwarded  → submit(text)
 ```
 
 `on_interrupt` is wired by `ShellLoader` to `kernel.request_interrupt()` +
@@ -700,11 +694,10 @@ before each `submit` and returns to `LISTENING` after each utterance.
 
 ### 15.4 TranscriptionBuffer
 
-Interface `shells/voice/interfaces/transcription_buffer.py`; implementation
-`shells/voice/stages/transcription_buffer.py`: a `deque(maxlen=50)` of
-`BufferedUtterance(id, utterance, received_at, gate_state)` with ids `u1`, `u2`, ….
-`recoverable(count, max_age)` returns the newest `count` entries in state `DROPPED`
-younger than `max_age`; `mark(id, state)` updates and logs the whole buffer state.
+Implementation `shells/voice/stages/transcription_buffer.py` (no ABC): a `deque(maxlen=50)` of
+`BufferedUtterance(id, utterance, received_at, dropped)` with ids `u1`, `u2`, ….
+`recoverable(count, max_age)` returns the newest `count` dropped entries younger than
+`max_age`; `mark_dropped(id)` / `mark_recovered(id)` update and log the whole buffer state.
 
 ### 15.5 Text Shells Path
 
@@ -715,8 +708,8 @@ buffer, or gatekeeper (§16.1, §20).
 
 ## 16. Kernel Routing and Mode Specification
 
-**Sources:** `tusk/kernel/api.py`, `tusk/kernel/modes/`, `shell_loader.py`,
-`shells/voice/gatekeeper_slot.py`, `shells/voice/stages/gate/stop_gatekeeper.py`
+**Sources:** `tusk/kernel/core/kernel_api.py`, `tusk/kernel/modes/`, `composition/shell_loader.py`,
+`shells/voice/gate/gatekeeper_slot.py`, `shells/voice/gate/stop_gatekeeper.py`
 
 ### 16.1 KernelAPI.submit
 
@@ -729,31 +722,31 @@ dictation slot active → dictation.process_text(text)
 otherwise            → command_mode.process_command(text)
 ```
 
-`SubmitStatusReporter` wraps the route call: `REACTING` (with the text as detail) on
-entry, prior status restored when the last concurrent submit finishes.
+`KernelAPI._reported_route` wraps the route call in `try/finally`: `REACTING` (with the
+text as detail) on entry, prior status restored on exit.
 
-### 16.2 ModeSlot and AdapterMode
+### 16.2 ModeSlot and ModeState
 
 `KernelAPI` holds two `ModeSlot`s (`DICTATION`/"Dictation started.",
 `CODING`/"Coding started."). A slot owns the switchable mode lifecycle:
 
-- `attach_router(router)` — wired once at startup by `ToolRuntime`
+- `attach_mode(mode)` — wired once at startup by `KernelToolInstaller`
 - `set_callbacks(on_start, on_stop)` — wired by `ShellLoader` to swap the voice
   gatekeeper (§16.4)
-- `start(state)` — builds an `AdapterMode(state, router, log, tag)`, fires `on_start`,
+- `start(state)` — stores the `ModeState`, fires `on_start`,
   returns the start reply
-- `process_text(text)` → `router.process(state, text)`; `request_stop()` →
-  `mode.stop()` → `router.stop(state)`; `stop()` — clears the mode, fires `on_stop`
+- `process_text(text)` → `mode.process(state, text)`; `request_stop()` →
+  `router.stop(state)` then `stop()`; `stop()` — clears the state, fires `on_stop`
 
-`KernelAPI.start_dictation`/`stop_dictation` additionally report
-`AppMode.DICTATION`/`AppMode.DEFAULT`. Coding does not set an `AppMode` (the enum has
-only `default` and `dictation`).
+`ModeSlot.start`/`stop` also report the slot's `AppMode` (`DICTATION`/`CODING`) and
+`AppMode.DEFAULT` to the injected `StatusReporter`; `KernelAPI` exposes the slots as
+`kernel.dictation`/`kernel.coding`.
 
 ### 16.3 ModeGate
 
 **Source:** `tusk/kernel/modes/mode_gate.py` — one stop-classifier class for both
 modes; the prompt is injected (`DICTATION_GATE_PROMPT` / `CODING_GATE_PROMPT`,
-`tusk/kernel/modes/*_gate_prompt.py`). Both prompts state: the only detectable command
+`tusk/kernel/modes/mode_gate_prompts.py`). Both prompts state: the only detectable command
 is a request to stop the mode; everything else is literal text/instruction.
 
 ```python
@@ -774,7 +767,7 @@ Schema:
 ### 16.4 Voice-Side Mode Gating
 
 `GatekeeperSlot` is the pipeline's gatekeeper — a swappable holder implementing the
-`Gatekeeper` ABC. `ShellLoader` wires each mode's callbacks:
+`Gatekeeper` ABC. `GatekeeperBuilder` wires each mode's callbacks:
 
 - **on_start:** `slot.swap(PlaybackGate(StopGatekeeper(ModeGate(...), request_stop), current_speech_text, SpeechStopGate(...)))`
 - **on_stop:** `slot.swap(llm_gatekeeper)` — back to command-mode classification
@@ -782,7 +775,7 @@ Schema:
 `StopGatekeeper` is the forward-all gate: `should_stop` → invoke the kernel's
 `request_stop` callback and `DROP` the utterance (the stop segment never reaches the
 adapter); otherwise `FORWARD_CURRENT` with the raw text. `PlaybackGate` restricts
-everything to interrupt-or-drop while TUSK's own speech is playing (§30.4).
+stop requests to an interrupt while TUSK's own speech is playing (§30.4).
 
 ---
 
@@ -794,10 +787,10 @@ everything to interrupt-or-drop while TUSK's own speech is playing (§30.4).
 
 1. `ToolRegistry.get("dictation.start_dictation").execute({})`; `KeyError` →
    `ToolResult(False, "dictation adapter is not available")`
-2. Build `DictationState("dictation", data["session_id"], adapter_manager.primary_desktop_source())`
-3. `controller.start_dictation(state)` (→ `ModeSlot.start`, reply "Dictation started.")
+2. Build `ModeState("dictation", data["session_id"], adapter_manager.primary_desktop_source())`
+3. `ModeSlot.start(state)` (reply "Dictation started.")
 
-### 17.2 DictationRouter — `tusk/kernel/modes/dictation_router.py`
+### 17.2 DictationMode — `tusk/kernel/modes/dictation_mode.py`
 
 **process(state, text):**
 1. `{adapter}.process_segment` with `{"session_id", "text"}`; failure or no data →
@@ -807,7 +800,7 @@ everything to interrupt-or-drop while TUSK's own speech is playing (§30.4).
    `"replace"` → `replace_recent_text` with `{"text", "replace_chars": str(n)}`;
    anything else → no-op
 
-**stop(state):** `{adapter}.stop_dictation`, then `controller.stop_dictation()`
+**stop(state):** `{adapter}.stop_dictation`, then `ModeSlot.stop()`
 (clears the slot, restores the command gatekeeper) → "Dictation stopped.".
 
 ### 17.3 DictationServer — `adapters/dictation/server.py`
@@ -824,10 +817,6 @@ MCP stdio server (`MCPStdioServer`); sessions in `DictationSessionStore` with
 **Segment logic:** segments are inserted verbatim (STT output only). A space is
 prepended unless it's the session's first segment, the text is empty, or it starts
 with one of `,.!?:;)]}`. Unknown `session_id` → error ("not found or expired").
-
-> `DictationRefiner` (`adapters/dictation/dictation_refiner.py`) exists but is not
-> wired: small LLMs interpreted instruction-like phrases ("tell me a joke") as commands
-> rather than literal text. LLM proofreading will return once a reliable approach exists.
 
 Stop detection happens at the voice-pipeline level via `ModeGate` + `StopGatekeeper`
 (§16.3–16.4) — a stop segment never reaches `KernelAPI`.
@@ -854,7 +843,7 @@ Shipped adapters: `gnome` (provides context; all window/keyboard/mouse/clipboard
 `sequence_callable: true`), `dictation`, `coding` (lifecycle tools
 `planner_visible: false`).
 
-### 18.2 AdapterManager — `tusk/kernel/adapter_manager.py`
+### 18.2 AdapterManager — `tusk/kernel/tools/adapter_manager.py`
 
 - `start_all()`: every directory under `adapters/`, sorted, → `start_adapter`
 - `start_adapter(dir)`: parse manifest (absent → skip; non-stdio → skip), connect,
@@ -866,7 +855,6 @@ Shipped adapters: `gnome` (provides context; all window/keyboard/mouse/clipboard
   retry with a **managed venv**: if the adapter has `requirements.txt`, create/reuse
   `<cache_dir>/<name>/<version>` (`python -m venv` + `pip install -r` once), prepend
   its `bin` to `PATH`, set `VIRTUAL_ENV`
-- `stop_adapter(name)`: client shutdown + `unregister_source(name)`
 - `start_watcher()`: a `watchdog` observer on `adapters/` — a newly created directory
   hot-plugs via `start_adapter`. Without `watchdog` installed, hot-plug is disabled
   (logged)
@@ -903,7 +891,7 @@ map `isError` → `success=False`.
 ## 19. Coding Specification
 
 Coding mode is the pair-coding sibling of dictation (§17): spoken intent becomes editor
-edits applied through an `EditorDriver` + `EditApplicationStrategy`. TUSK never reads
+edits applied through an `EditApplier` over an `EditorDriver`. TUSK never reads
 or writes files on disk — only the focused editor buffer via input automation.
 
 ### 19.1 StartCodingTool — `tusk/kernel/tools/start_coding_tool.py`
@@ -914,10 +902,10 @@ or writes files on disk — only the focused editor buffer via input automation.
 2. `driver.read_buffer()` — one select-all/copy/clipboard-read round-trip (§19.4)
 3. `coding.start_coding_session` with `{"initial_buffer": buffer}`; `KeyError` →
    `ToolResult(False, "coding adapter is not available")`
-4. `CodingState("coding", session_id, primary_desktop_source)` →
-   `controller.start_coding(state)` (reply "Coding started.")
+4. `ModeState("coding", session_id, primary_desktop_source)` →
+   `ModeSlot.start(state)` (reply "Coding started.")
 
-### 19.2 CodingRouter — `tusk/kernel/modes/coding_router.py`
+### 19.2 CodingMode — `tusk/kernel/modes/coding_mode.py`
 
 **process(state, text):** `coding.process_intent` with `{"session_id", "intent"}`;
 each entry of `data.operations` is converted to a typed
@@ -925,7 +913,7 @@ each entry of `data.operations` is converted to a typed
 `strategy.apply(op, driver)`. Apply-time errors (`RuntimeError`, `KeyError`,
 `TypeError`, `AttributeError`) → `KernelResponse(False, "I couldn't apply that edit.")`.
 
-**stop(state):** `coding.stop_coding_session`, then `controller.stop_coding()` →
+**stop(state):** `coding.stop_coding_session`, then `ModeSlot.stop()` →
 "Coding stopped.".
 
 ### 19.3 CodingServer — `adapters/coding/server.py`
@@ -952,10 +940,9 @@ replaced and a single operation is returned:
  "new_text": <new buffer>, "full_buffer": <new buffer>}
 ```
 
-### 19.4 EditorDriver — `tusk/kernel/interfaces/editor_driver.py`
+### 19.4 EditorDriver — `tusk/kernel/modes/editor/editor_driver.py`
 
-One implementation is wired: **`InputAutomationEditorDriver`**
-(`tusk/kernel/modes/input_automation_editor_driver.py`), editor-agnostic automation
+**`EditorDriver`** is editor-agnostic automation
 over the desktop adapter's tools (DI: `tool_registry`, `desktop_source`):
 
 - `read_buffer()` → inside `ClipboardGuard`: `<ctrl>a`, `<ctrl>c`, settle sleep,
@@ -970,19 +957,19 @@ over the desktop adapter's tools (DI: `tool_registry`, `desktop_source`):
 `_CLIPBOARD_SETTLE_SECONDS = 0.2` — xdotool returns before the target app consumes a
 copy/paste keystroke, so the clipboard must settle before reading or restoring it.
 
-**Clipboard preservation:** `ClipboardGuard` (`tusk/kernel/clipboard_guard.py`) is a
+**Clipboard preservation:** `ClipboardGuard` (`tusk/kernel/modes/editor/clipboard_guard.py`) is a
 context manager that snapshots the user's clipboard on entry and restores it on exit,
 so coding mode never destroys clipboard contents the user was holding.
 
-### 19.5 EditApplicationStrategy — `tusk/kernel/interfaces/edit_application_strategy.py`
+### 19.5 EditApplier — `tusk/kernel/modes/editor/edit_applier.py`
 
-One strategy is implemented and wired: **`FullReplaceEditStrategy`**
-(`tusk/kernel/modes/edit_strategies/full_replace_edit_strategy.py`) —
-`driver.replace_buffer(edit.full_buffer)`, i.e. select-all + paste the authoritative
-buffer. It is drift-proof for a fire-and-forget input-automation driver: the editor
-always ends up exactly matching the adapter's model. (Line-anchored/raw-key/fallback
-strategies and a VS Code driver existed as design contracts in an earlier iteration
-and were removed from the code; see §28.)
+**`EditApplier.apply(edit, driver)`** applies the line-anchored edit (`insert` →
+`goto_line` + `paste`; `replace` → `select_range` + `paste`; `delete` → `select_range`
++ `Delete`), then, when `edit.full_buffer` is set, reads the buffer back and calls
+`driver.replace_buffer(edit.full_buffer)` on mismatch. Line-anchored edits drift under
+fire-and-forget GNOME automation (gedit 46 dropped hunks); the read-back costs one
+clipboard round-trip (~0.4s) per edit. (Raw-key/fallback strategies and a VS Code
+driver existed as design contracts in an earlier iteration and were removed; see §28.)
 
 ### 19.6 Buffer Ownership
 
@@ -994,8 +981,8 @@ and were removed from the code; see §28.)
 - **Limitation:** manual edits mid-session are invisible (no feedback channel) and are
   overwritten by the next TUSK edit's full-buffer repaint.
 
-Wiring: `ToolRuntime.register_tools` (`tusk/kernel/tools/tool_runtime.py`) builds the
-driver + strategy, attaches `DictationRouter`/`CodingRouter` to the kernel's mode
+Wiring: `KernelToolInstaller.install` (`tusk/kernel/tools/kernel_tool_installer.py`) builds the
+driver + applier, attaches `DictationMode`/`CodingMode` to the kernel's mode
 slots, and registers `SwitchModelTool`, `StartDictationTool`, `StartCodingTool`.
 
 ---
@@ -1004,13 +991,13 @@ slots, and registers `SwitchModelTool`, `StartDictationTool`, `StartCodingTool`.
 
 ### 20.1 Shell Registry and Threading
 
-**Source:** `shell_loader.py`, interface `tusk/kernel/interfaces/shell.py`
-(`start(api)`, `stop()`).
+**Source:** `composition/shell_loader.py`, interface `tusk/shared/interfaces/shell.py`
+(`start(submit)`).
 
 Shells are a static registry — no dynamic discovery:
 
 ```python
-_SHELL_CLASSES = {"cli": CLIShell, "emulator": EmulatorShell, "tray": TrayShell, "voice": VoiceShell}
+_SHELL_CLASSES = {"cli": CLIShell, "emulator": EmulatorShell, "tray": TrayShell}  # "voice" → VoiceShellBuilder.build()
 ```
 
 An unknown name in `TUSK_SHELLS` raises `ValueError`. `tray` is always reordered to
@@ -1018,29 +1005,30 @@ the **end** of the list (GTK main loop must own the main thread). Every shell bu
 last runs in a daemon thread; the last blocks the main thread. Each shell's `start`
 receives `kernel.submit`.
 
-`ShellLoader` also builds the voice stack: STT engine via `STTEngineFactory`,
+`VoiceShellBuilder` (`composition/`) builds the voice stack: STT engine via `STTEngineFactory`,
 `CommandWorker` (with `GroqTTS` when `TUSK_TTS` is on, `SpeechPlayback`, the interrupt
 token, and the `TUSK_ACK` flag), the busy/speaking-aware `LLMGatekeeper` inside a
-`GatekeeperSlot`, and the mode gate wiring of §16.4.
+`GatekeeperSlot` (via `GatekeeperBuilder`), the mode gate wiring of §16.4, the stage pipeline
+and the pause gate — and returns a ready `VoiceShell`.
 
 ### 20.2 VoiceShell — `shells/voice/voice_shell.py`
 
 ```python
+def __init__(self, pipeline, worker, reporter, pause_gate): ...
+
 def start(self, submit):
-    if self._worker is not None:
-        self._worker.start()
-    target = self._worker.enqueue if self._worker is not None else submit
-    for result in self._pipeline.run(target):
-        ...log reply...
+    self._worker.start()
+    for _ in self._pipeline.run(self._worker.enqueue):
+        pass
 ```
 
-With a `CommandWorker` injected (normal wiring), the forward target is
-`worker.enqueue`, so the listening loop never blocks on execution or playback. The
-shell owns the pause gate: `pause()` clears it (capture stops, `PAUSED` reported),
+The forward target is always `worker.enqueue`, so the listening loop never blocks on
+execution or playback; the worker logs and speaks the reply. The shell holds the pause
+gate built alongside `AudioCapture`: `pause()` clears it (capture stops, `PAUSED` reported),
 `resume()` sets it (`LISTENING`). The tray drives these methods directly — the voice
 shell *is* the pipeline control object (duck-typed; there is no separate control ABC).
 
-### 20.3 CLIShell — `shells/cli/cli_shell.py`
+### 20.3 CLIShell — `shells/cli_shell.py`
 
 ```python
 while True:
@@ -1050,7 +1038,7 @@ while True:
     if result.reply: print(result.reply)
 ```
 
-### 20.4 EmulatorShell — `shells/emulator/emulator_shell.py`
+### 20.4 EmulatorShell — `shells/emulator_shell.py`
 
 Replays a scripted transcript into `kernel.submit`, standing in for the whole voice
 front end (STT + gatekeeper). Reads `TUSK_TRANSCRIPT` (path; blank lines and
@@ -1062,7 +1050,7 @@ editor automation — runs for real. Example transcripts live in `demos/`.
 
 ## 21. LLM Provider Specification
 
-**Interface:** `tusk/shared/llm/interfaces/llm_provider.py` — `label` property plus
+**Interface:** `tusk/shared/interfaces/llm_provider.py` — `label` property plus
 `complete(system, user, max_tokens=256)`, `complete_messages(system, messages)`,
 `complete_tool_call(system, messages, tools) -> ToolCall`,
 `complete_structured(system, user, schema_name, schema, max_tokens=256)`.
@@ -1070,12 +1058,12 @@ editor automation — runs for real. Example transcripts live in `demos/`.
 ### 21.1 LLMProxy — `tusk/shared/llm/llm_proxy.py`
 
 Every registered slot is an `LLMProxy`. Per call: an `LLMREQUEST` log line (slot,
-provider, kind), a wait indicator (`show_wait`/`clear_wait`) unless the provider logs
-its own payloads, `LLMRetryRunner` around the operation, and response payload logging
+provider, kind), a wait indicator (`show_wait` from `LLMPayloadLogger.before_request`,
+`clear_wait` from the proxy), `LLMRetryRunner` around the operation, and response payload logging
 (`LLMPayloadLogger`, preview length from `LLM_LOG_PREVIEW_CHARS`). `swap(provider)`
 replaces the inner provider atomically — consumers hold the proxy, never the provider.
 
-### 21.2 Retry — `llm_retry_runner.py`, `llm_retry_policy.py`
+### 21.2 Retry — `llm_retry_runner.py`
 
 ```
 attempts = 3, delay = 0.5 * attempt seconds (linear backoff)
@@ -1093,6 +1081,9 @@ Interrupt:   a set InterruptToken abandons pending retries immediately
 
 ### 21.3 GroqLLM — `tusk/providers/llm/groq_llm.py`
 
+Subclass of `ChatCompletionsLLM` (`tusk/providers/llm/chat_completions_llm.py`), which owns the
+shared chat.completions body; Groq adds the client, `verify()` and the response-format hook.
+
 - **Client:** `groq.Groq(api_key, timeout=30.0)`; `max_tokens` 1024 for
   messages/tool calls, 256 default for `complete`
 - **complete_tool_call:** `tool_choice="required"`; on error, first
@@ -1106,6 +1097,8 @@ Interrupt:   a set InterruptToken abandons pending retries immediately
 - **label:** `groq/<model>`
 
 ### 21.4 OpenRouterLLM — `tusk/providers/llm/open_router_llm.py`
+
+Subclass of `ChatCompletionsLLM` adding only the client (no response-format hook).
 
 - **Client:** `openai.OpenAI(base_url="https://openrouter.ai/api/v1", timeout=15.0)`
   with headers `HTTP-Referer: https://github.com/vovka/tusk`, `X-Title: TUSK`
@@ -1123,14 +1116,14 @@ which also refreshes the tray's model list). `model_labels()` feeds the tray men
 
 ## 22. TTS and Speech Playback Specification
 
-**Interface:** `tusk/shared/tts/interfaces/tts_engine.py` — `synthesize(text) -> bytes`
-(WAV).
+**Interface:** `tusk/shared/interfaces/tts_engine.py` — `synthesize_chunks(text) -> Iterator[bytes]`
+(one WAV clip per chunk).
 
 ### 22.1 GroqTTS — `tusk/providers/tts/groq_tts.py`
 
 - **Model:** `canopylabs/orpheus-v1-english`, voice `daniel`, `response_format="wav"`
 - Orpheus caps input at **200 chars**: `TextChunker` splits the reply, each chunk is
-  synthesized separately, and `WavConcatenator` merges the clips into one WAV
+  synthesized separately, and `ChunkedSpeaker` plays each WAV clip in turn
 - Enabled by `TUSK_TTS` (on by default); when off, replies are logged but not spoken
 
 ### 22.2 CommandWorker — `shells/voice/command_worker.py`
@@ -1148,7 +1141,7 @@ between the pipeline and the kernel:
 | token handling | cleared at job start; if set after `submit` returns → cleared again and the reply forced to `"Stopped."` (stale replies are never spoken) |
 | errors | submit/TTS exceptions logged under `ERROR`; the worker thread never dies |
 
-### 22.3 SpeechPlayback — `shells/voice/stages/speech_playback.py`
+### 22.3 SpeechPlayback — `shells/voice/speech/speech_playback.py`
 
 `paplay` subprocess fed WAV bytes from a daemon writer thread. The waiter polls every
 **100 ms**: a set `InterruptToken` → `terminate()`; a hard **30 s cap** → `kill()` (a
@@ -1161,23 +1154,23 @@ swallowed.
 
 ### 23.1 Status Propagation
 
-Producers depend only on the `StatusReporter` ABC and never know a tray exists:
+Producers depend only on `StatusReporter` and never know a tray exists:
 
 ```
 producer → StatusReporter.set_status/set_mode/set_models/set_mic_device
-         → StatusReporterHub  (dedupes unchanged values, builds StatusSnapshot)
+           (dedupes unchanged values, builds StatusSnapshot)
          → StatusSink.publish(snapshot)
               → NullStatusSink  (no-op; wired when no tray is loaded)
               → TrayStatusSink  (marshals onto the GUI thread, updates icon/tooltip/menu)
 ```
 
-`StatusReporterHub._emit` catches every sink exception (a broken sink never reaches a
+`StatusReporter._emit` catches every sink exception (a broken sink never reaches a
 producer). `attach_sink` (called when the tray starts) immediately re-emits the current
 snapshot.
 
 Emit points: the voice pipeline (`LISTENING` idle / `REACTING` around forwards),
-`SubmitStatusReporter` around every `KernelAPI.submit`, `KernelAPI`
-`start_dictation`/`stop_dictation` (`set_mode`), `main.py` `set_models` at startup, and
+`KernelAPI._reported_route` around every `submit`, `ModeSlot`
+`start`/`stop` (`set_mode`), `main.py` `set_models` at startup, and
 the `switch_model` tool after a swap.
 
 ### 23.2 Status and Mode States
@@ -1193,7 +1186,7 @@ the `switch_model` tool after a swap.
 
 `AppMode`: `DEFAULT`, `DICTATION`. There is no coding mode value; a coding session does
 not change the reported mode. Icons resolve to
-`shells/tray/icons/{theme}/{name}.png` (`StatusIconResolver`, theme from
+`shells/tray/icons/{theme}/{name}.png` (`TrayStatusSink.icon_path`, theme from
 `TUSK_TRAY_ICON_THEME`). Tooltip: `TUSK — {status}`, or `TUSK — error: {detail}`.
 `idle` is deliberately not a distinct status — always-listening collapses idle into
 `LISTENING` to avoid icon flicker between utterances.
@@ -1214,7 +1207,7 @@ not change the reported mode. Icons resolve to
 
 ### 23.4 Menu
 
-Built by `TrayMenuBuilder` from a `StatusSnapshot` + injected `TrayMenuActions`:
+Built by `TrayStatusSink` from a `StatusSnapshot` + injected action callables:
 
 | Item | Enabled | Action |
 |---|---|---|
@@ -1267,7 +1260,7 @@ apps start on the host desktop rather than inside the container.
 
 3. **Dependencies point at `tusk/shared`.** The kernel depends on
    `tusk.shared` interfaces and schemas; concrete providers (`tusk/providers/`) and
-   shells are injected from `main.py` / `shell_loader.py` / `tusk/kernel/startup.py`.
+   shells are injected from `main.py` / `composition/` / `tusk/kernel/core/startup.py`.
    The kernel never imports a shell; shells reach the kernel only through
    `KernelAPI.submit` and the wiring callbacks.
 
@@ -1288,7 +1281,7 @@ apps start on the host desktop rather than inside the container.
    repaint of that buffer. TUSK never touches files on disk.
 
 8. **`EditOperation` crosses the adapter→router boundary as a typed object.**
-   `CodingRouter` converts the JSON payload into `EditOperation` instances before any
+   `CodingMode` converts the JSON payload into `EditOperation` instances before any
    strategy runs.
 
 9. **Commands are serial.** `KernelAPI.submit` holds a single lock; the voice shell
@@ -1306,24 +1299,24 @@ apps start on the host desktop rather than inside the container.
 | `LLMClient` (gatekeeper) | structured call fails | falls back to plain `complete` |
 | `LLMClient` (gatekeeper) | both calls fail / parse error | `GateResult(False, "", 0.0)` → utterance takes the recovery/drop path |
 | `ModeGate` | both calls fail / parse error | `should_stop() == False` → treated as literal mode text |
-| `AgentRuntime` | LLM exception | `ModelFailureReplyBuilder` message → synthetic `done(status="failed")` |
+| `AgentRuntime` | LLM exception | `ResultFactory.model_failure_text` → synthetic `done(status="failed")` |
 | `AgentRuntime` | max steps (8/16) / guard violation / 3× repeated call | `AgentResult(status="failed")` |
 | `AgentRuntime` | `InterruptToken` set | `AgentResult(status="cancelled")` at the next step boundary |
-| `ModelFailureReplyBuilder` | rate limit / json_validate_failed / tool_use_failed / empty completion / other | canned user-facing reply per class |
-| `ResultValidator` / `StepPlanValidator` / `PlanValidator` | invalid planner output | child result replaced by `status="failed"` with the violation message |
+| `ResultFactory.model_failure_text` | rate limit / json_validate_failed / tool_use_failed / empty completion / other | canned user-facing reply per class |
+| `ResultValidator` / `PlanValidator` | invalid planner output | child result replaced by `status="failed"` with the violation message |
 | `tool_sequence.Executor` | step failure / interrupt | aborts remaining steps; partial payload with `completed_step_ids`, `failed_step_id` |
 | `OrchestratorToolDispatcher` | unknown tool / invalid args | `ToolResult(False, ...)` back to the LLM |
 | `MCPToolProxy` | transport error / adapter `isError` | `ToolResult(False, message)` |
 | `AdapterManager` | shared-env connect fails | retried once with the managed venv |
 | `AdapterManager` | `watchdog` missing | hot-plug disabled, logged |
-| `CodingRouter` | apply error | `KernelResponse(False, "I couldn't apply that edit.")`; adapter buffer already updated (next edit repaints) |
-| `InputAutomationEditorDriver` | failed desktop tool call | `RuntimeError` (caught by `CodingRouter`) |
+| `CodingMode` | apply error | `KernelResponse(False, "I couldn't apply that edit.")`; adapter buffer already updated (next edit repaints) |
+| `EditorDriver` | failed desktop tool call | `RuntimeError` (caught by `CodingMode`) |
 | `CommandWorker` | exception from `submit`/TTS | logged under `ERROR`; the worker thread keeps processing |
 | `SpeechPlayback` | interrupt / 30 s cap / feeder `OSError` | `terminate()` / `kill()` / swallowed |
 | `FallbackAgentBackend` | primary `status="failed"` | fallback runs; primary failure attached as metadata |
 | `CodexExecAgentBackend` | missing binary / timeout / non-zero exit / bad JSON | `failed` / `timeout` / `failed` (stderr excerpt) / `failed` |
 | `LLMRetryRunner` | retryable / non-retryable | up to 3 attempts with linear backoff / re-raised immediately |
-| `StatusReporterHub` | sink raises | caught and logged; never reaches the producer |
+| `StatusReporter` | sink raises | caught and logged; never reaches the producer |
 | `TrayShell` | backend import fails / GUI loop crashes | headless no-op; daemon shells keep running; process exits on the shutdown callback |
 
 ---
@@ -1375,21 +1368,21 @@ The active runtime no longer contains:
 - `find_tools` / `describe_tool` / `run_tool` broker tools, described-tool tracking,
   learned top-tool injection, and persistent tool-usage ranking
 - Automatic desktop-context injection into agent prompts
-- `list_available_tools` in any profile's toolset (still dispatchable; replaced by the
+- `list_available_tools` tool (replaced by the
   catalog text injected into the planner instruction)
 - `tusk/kernel/tool_call_parser.py` — deleted; tool calls are native
   (`complete_tool_call`) with `ToolUseFailedRecovery` as the salvage path
 - `shell.json` discovery via `importlib` — replaced by the static `_SHELL_CLASSES`
-  registry in `shell_loader.py`
+  registry in `composition/shell_loader.py`
 - Hard-coded stop-phrase matching, and the separate `DictationGate`/`CodingGate` +
   per-mode voice gatekeepers — unified into `ModeGate` + `StopGatekeeper` +
   `GatekeeperSlot` swapping (§16)
 - Separate dictation/coding kernel mode classes — unified into `ModeSlot` +
-  `AdapterMode`
-- `VSCodeEditorDriver`, `LineAnchoredEditStrategy`, `RawKeyEditStrategy`,
-  `FallbackEditStrategy`, and the `TUSK_CODING_EDITOR_DRIVER` /
-  `TUSK_CODING_EDIT_STRATEGY` selection vars — the input-automation driver +
-  full-replace strategy are the implementation (§19.4–19.5)
+  `ModeState`
+- `VSCodeEditorDriver`, `RawKeyEditStrategy`, `FallbackEditStrategy`, the
+  `EditApplicationStrategy` ABC, and the `TUSK_CODING_EDITOR_DRIVER` /
+  `TUSK_CODING_EDIT_STRATEGY` selection vars — `EditApplier` over the
+  input-automation `EditorDriver` is the implementation (§19.4–19.5)
 - The kernel-side `CODING_AGENT_LLM` slot — the coding adapter owns its model via
   `CODING_AGENT_MODEL` in its own process (§19.3)
 - A `PipelineControl` ABC — the tray drives the voice shell's `pause()`/`resume()`
@@ -1440,7 +1433,7 @@ sequenceDiagram
     Note over W: ready for next command
 ```
 
-### 30.2 InterruptToken — `tusk/shared/interrupt/interrupt_token.py`
+### 30.2 InterruptToken — `tusk/shared/interrupt_token.py`
 
 `threading.Event` wrapper: `interrupt()`, `is_interrupted`, `clear()`. One instance is
 created in `main.py` and injected everywhere. Checkpoints:
@@ -1464,17 +1457,16 @@ their results are discarded; already-executed desktop actions are not rolled bac
   are ignored (the busy check in `LLMGatekeeper`).
 - **Any mode, while TUSK speaks:** `PlaybackGate` (§30.4).
 
-### 30.4 PlaybackGate — `shells/voice/playback_gate.py`
+### 30.4 PlaybackGate — `shells/voice/gate/playback_gate.py`
 
 Wraps the forward-all mode gates while `worker.current_speech_text` is set: every
 utterance heard during playback goes to `SpeechStopGate`
-(`shells/voice/stages/gate/speech_stop_gate.py`) — a yes/no structured classification
+(`shells/voice/gate/speech_stop_gate.py`) — a yes/no structured classification
 (`{"stop": bool, "reason": str}`, 128 max tokens, gatekeeper slot) with the spoken
 sentence as context and an explicit echo rule ("utterances that repeat fragments of
 TUSK's own sentence are its own voice: not a stop request"). `stop=true` →
-`GateDispatch(INTERRUPT)`; anything else → `DROP`. Nothing is ever forwarded, so TUSK's
-own voice is never typed into the editor. Command mode needs no wrapper — the
-busy/speaking-aware prompt covers it in the same single gatekeeper call.
+`GateDispatch(INTERRUPT)`; an utterance whose words are a substring of the spoken text →
+`GateDispatch(DROP)` (an echo of TUSK's own voice); anything else is delegated to the wrapped gate.
 
 ### 30.5 Out of Scope
 

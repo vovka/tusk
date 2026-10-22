@@ -1,5 +1,4 @@
 import json
-from dataclasses import asdict
 
 from adapters.gnome.app_catalog import AppCatalog
 from adapters.gnome.wayland.shell_bus import ShellBus
@@ -25,9 +24,6 @@ class WaylandContextProvider:
             open_windows=windows,
             available_applications=self._catalog.list_apps(),
         )
-
-    def get_context_dict(self) -> dict:
-        return asdict(self.get_context())
 
     def _window(self, item: dict) -> WindowInfo:
         geometry = (item["x"], item["y"], item["width"], item["height"])

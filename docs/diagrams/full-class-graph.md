@@ -1,6 +1,6 @@
 # TUSK — Full Class Graph (experiment)
 
-One SVG with all ~220 public classes across the whole codebase, laid out by
+One SVG with all ~180 public classes across the whole codebase, laid out by
 Graphviz's `fdp` (force-directed) engine instead of tiled by hand. Open
 `full-class-graph.svg` in a browser: Ctrl+scroll (or Ctrl +/-) to zoom,
 scrollbars/space-drag to pan. A small white "Legend" box is embedded in the
@@ -23,11 +23,11 @@ examples so you don't have to hold the rule in your head.
 
 - Classes are grouped into 8 colored top-level clusters matching the package
   split in [class-diagrams.md](../class-diagrams.md) (kernel.core, kernel.agent,
-  kernel.agent_backends, shared.contracts, shared.schemas, providers, shells,
+  kernel.agent.backends, shared.contracts, shared.schemas, providers, shells,
   adapters), and each of those is further split into nested sub-clusters by
-  immediate subpackage — e.g. `shells` contains `voice`/`cli`/`tray`/`emulator`
+  immediate subpackage — e.g. `shells` contains `voice`/`tray`
   boxes, `adapters` contains `gnome`/`dictation`/`coding`, `shared.contracts`
-  contains `llm`/`stt`/`tts`/`mcp`/`config`/`status`/`logging`/`interrupt`.
+  contains `interfaces`/`observability`/`mcp`/`llm`/`config`.
   `fdp` supports true nested clusters, so each sub-cluster lays out as its own
   tight group first, then those groups get placed within the parent cluster.
 - Within and between clusters (and sub-clusters), position is decided by
@@ -45,7 +45,7 @@ examples so you don't have to hold the rule in your head.
 
 ## Caveat
 
-Only ~40 edges get drawn across ~220 classes. This codebase leans on
+Only ~50 edges get drawn across ~180 classes. This codebase leans on
 constructor-injected duck typing (per `architecture.md`), which static
 analysis can't see — so most placement within a cluster is just compact
 packing, not a relationship signal. Cross-cluster lines are real detected
@@ -74,8 +74,8 @@ kept as plain DOT in `full-class-graph-legend.gv` next to the script.
 ## Known rough edges (v2, unreviewed)
 
 - A few long edges cut straight through unrelated clusters — cosmetic only.
-- `kernel.core` and `kernel.agent_backends` clusters sit flush against each
+- `kernel.core` and `kernel.agent.backends` clusters sit flush against each
   other with no gap; bump `sep`/`esep` in the script if that should change.
 - Sub-clusters are undecorated rounded boxes (border only, no fill) so the
   parent's fill color still shows through — if a package gets a 3rd nesting
-  level (e.g. `shells.voice.stages.gate`) it isn't broken out separately yet.
+  level (e.g. `shells.voice.gate`) it isn't broken out separately yet.

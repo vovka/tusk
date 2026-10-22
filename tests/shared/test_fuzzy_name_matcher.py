@@ -1,4 +1,4 @@
-from tusk.shared.desktop.fuzzy_name_matcher import FuzzyNameMatcher
+from tusk.shared.fuzzy_name_matcher import FuzzyNameMatcher
 
 _NAMES = ["gedit", "firefox", "gnome-calculator", "Terminal"]
 

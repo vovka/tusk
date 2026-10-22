@@ -6,13 +6,15 @@
 
 The current codebase uses a kernel/shell/adapter split instead of the earlier core/extensions layout. The current implementation ships:
 
-- `tusk/lib` as the infrastructure layer (LLM providers, STT providers, MCP client, config)
-- `tusk/kernel` as the in-process agent runtime (pipeline, agents, gatekeeper, planner, tool registry)
-- `shells/voice` and `shells/cli`
+- `tusk/shared` as the infrastructure layer (ABCs, schemas, config, LLM access, MCP client)
+- `tusk/providers` for the LLM, STT, and TTS implementations
+- `tusk/kernel` as the in-process agent runtime (agents, planner, modes, tool registry)
+- `shells/voice` (with the gatekeeper), `shells/tray`, `shells/cli_shell.py`, and `shells/emulator_shell.py`
 - `adapters/gnome` for desktop control and context
 - `adapters/dictation` for dictation cleanup/refinement
+- `adapters/coding` for pair-coding edit planning
 
-The kernel uses a **planner/executor split**: a conversation agent calls `execute_task`, a one-shot planner selects tools from a compact catalog, and an execution agent runs those tools against MCP adapters. Desktop context is not auto-injected — it is pulled by the execution agent through selected adapter tools.
+The kernel uses a **planner/executor split**: a conversation agent delegates through `run_agent`, a one-shot planner selects tools from a compact catalog, and an execution agent runs those tools against MCP adapters. Desktop context is not auto-injected — it is pulled by the execution agent through selected adapter tools.
 
 The rest of this brief remains the broader product vision rather than a line-by-line mirror of the current code.
 
@@ -130,7 +132,7 @@ Both tiers are fully configurable. By default, the gatekeeper runs the cheapest 
 
 **The terms "cheap" and "smart" are relative and user-defined.** TUSK doesn't hardcode model tiers — it provides two configurable slots (gatekeeper + main agent) and lets the user decide what goes where.
 
-*Implementation note: the current runtime uses **four** LLM slots — `gatekeeper`, `planner` (one-shot tool subset selection), `agent` (main conversation + execution), and `utility` (summaries, text cleanup) — all independently configurable.*
+*Implementation note: the current runtime uses **eight** LLM slots — `gatekeeper`, `stop_gate` (mode stop and playback stop checks), `conversation_agent`, `command_agent` (one-shot commands), `planner_agent` (tool subset selection), `executor_agent`, `default_agent`, and `utility` (summaries, text cleanup) — all independently configurable.*
 
 ### 3.4 Intent Detection (Hybrid)
 

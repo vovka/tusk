@@ -51,9 +51,9 @@ exceed 2^31. `ActiveWindow` from the first draft was dropped: the focused flag i
   and enables it; on Wayland it loads only after logging out and in.
 - `adapters/gnome/wayland/` — `ShellBus` (`gdbus call` wrapper; arguments are JSON, which is valid
   GVariant text), `WaylandInputSimulator` and `WaylandWindowTools` (subclass the X11 classes to
-  reuse key normalisation and geometry parsing), `WaylandTextPaster`, `WaylandContextProvider`.
-- `GnomeToolRouter` takes optional `window_tools`; when it has `list_windows()`, `ApplicationTools`
-  uses it (`window_lister`) to detect the launched app's window instead of `wmctrl`.
+  reuse key normalisation and geometry parsing), `WaylandContextProvider`.
+- `server.py` alone picks the backend: it passes `GnomeToolRouter` the window tools and the window
+  lister (X11: `WindowTools` + `X11Windows` from `adapters/gnome/x11/`; Wayland: one `WaylandWindowTools` for both).
 - `docker-compose.yml` passes `XDG_SESSION_TYPE`, `WAYLAND_DISPLAY`, `XDG_RUNTIME_DIR` and mounts
   the Wayland socket (`/dev/null` stands in on X11 hosts). `apparmor=unconfined` lives in the opt-in
   `docker-compose.wayland.yml`: the host dbus-daemon rejects clients confined by Docker's default
@@ -71,7 +71,7 @@ exceed 2^31. `ActiveWindow` from the first draft was dropped: the focused flag i
 ## Plan and verification
 
 1. Extension + install script (`scripts/install-gnome-extension.sh`).
-2. Wayland adapter classes with unit tests mirroring `tests/adapters/test_gnome_*`.
+2. Wayland adapter classes with unit tests mirroring `tests/adapters/gnome/`.
 3. Docker/compose: Wayland socket and session bus are reachable; X11 mounts kept.
 4. End-to-end (evidence in `docs/features/wayland-e2e/`, all scripts rerunnable):
    - `scripts/wayland_e2e.sh`: headless `gnome-shell --wayland` on a private dbus-daemon and temp

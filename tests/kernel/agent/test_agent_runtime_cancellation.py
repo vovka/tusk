@@ -1,7 +1,7 @@
 import types
 
-from tests.kernel_api_support import HistoryRecorder, make_agent
-from tusk.shared.interrupt import InterruptToken
+from tests.support.kernel_api import HistoryRecorder, make_agent
+from tusk.shared.interrupt_token import InterruptToken
 from tusk.shared.schemas.tools.tool_call import ToolCall
 
 

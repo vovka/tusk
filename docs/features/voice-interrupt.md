@@ -20,8 +20,8 @@ flowchart LR
 ```
 
 While TUSK speaks in forward-all modes (dictation/coding), `PlaybackGate` wraps the mode
-gate: `SpeechStopGate` (yes/no LLM) decides interrupt-or-drop, so TUSK's own voice is
-never typed into the editor.
+gate: `SpeechStopGate` (yes/no LLM) decides interrupt; an echo of the text TUSK is speaking
+is dropped; anything else is delegated, so TUSK's own voice is never typed into the editor.
 
 ## Interrupt lifecycle
 
@@ -46,14 +46,14 @@ sequenceDiagram
 
 | File | Role |
 |---|---|
-| `tusk/shared/interrupt/interrupt_token.py` | one shared token (Event wrapper), created in `main.py` |
+| `tusk/shared/interrupt_token.py` | one shared token (Event wrapper), created in `main.py` |
 | `shells/voice/command_worker.py` | runs submit + TTS + playback off the listening thread; survives submit exceptions; clears token / forces "Stopped." |
-| `shells/voice/stages/command_gate_prompt.py` | busy clause (stop intent → interrupt) + speaking clause (echoes → ambient) |
-| `shells/voice/stages/gatekeeper.py` | busy-aware classification; `interrupt` honored only while busy |
-| `shells/voice/playback_gate.py` + `stages/speech_stop_gate.py` | interrupt-or-drop while speaking in dictation/coding |
-| `shells/voice/stages/speech_playback.py` | token poll → terminate; stdin closed via `with` (no fd leak) |
-| `tusk/kernel/agent/agent_runtime.py`, `tool_sequence_executor.py`, `tusk/shared/llm/llm_retry_runner.py` | token checks: per step, between sequence steps, before retries |
-| `tusk/kernel/main_agent.py` | `cancelled` → "Stopped." |
+| `shells/voice/gate/command_gate_prompt.py` | busy clause (stop intent → interrupt) + speaking clause (echoes → ambient) |
+| `shells/voice/gate/llm_gatekeeper.py` | busy-aware classification; `interrupt` honored only while busy |
+| `shells/voice/gate/playback_gate.py` + `shells/voice/gate/speech_stop_gate.py` | interrupt-or-drop while speaking in dictation/coding |
+| `shells/voice/speech/speech_playback.py` | token poll → terminate; stdin closed via `with` (no fd leak) |
+| `tusk/kernel/agent/agent_runtime.py`, `tusk/kernel/agent/tool_sequence/executor.py`, `tusk/shared/llm/llm_retry_runner.py` | token checks: per step, between sequence steps, before retries |
+| `tusk/kernel/core/main_agent.py` | `cancelled` → "Stopped." |
 
 ## Rules worth knowing
 
@@ -66,10 +66,10 @@ sequenceDiagram
 ## Testing
 
 - Unit: `docker compose exec tusk pytest tests/` (`test_interrupt_token`, `test_command_worker`,
-  `test_speech_playback`, `test_gatekeeper_interrupt`, `test_playback_gate`, `test_pipeline_interrupt`,
+  `test_speech_playback`, `test_llm_gatekeeper_context`, `test_playback_gate`, `test_pipeline_interrupt`,
   `test_agent_runtime_cancellation`, `test_llm_retry_interrupt`, …)
 - E2E (real Groq calls, scripted audio edges, no MCP adapters):
-  `docker compose exec tusk python -m e2e.run_voice_e2e` — 5 scenarios: interrupt mid-run,
+  `docker compose exec tusk python -m e2e.run_e2e voice` — 5 scenarios: interrupt mid-run,
   interrupt mid-speech, echo ignored, idle stop, ready-after.
 
 ## Known limits

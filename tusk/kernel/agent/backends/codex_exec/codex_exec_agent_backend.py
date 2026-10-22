@@ -1,0 +1,106 @@
+import os
+import subprocess
+from pathlib import Path
+
+from tusk.kernel.agent.backends.agent_backend import AgentBackend
+from tusk.kernel.agent.backends.backend_request import BackendRequest
+from tusk.kernel.agent.backends.backend_result import BackendResult
+from tusk.kernel.agent.backends.backend_run_logger import BackendRunLogger
+from tusk.kernel.agent.backends.codex_exec.command_builder import CommandBuilder
+from tusk.kernel.agent.backends.codex_exec.result_parser import ResultParser
+from tusk.kernel.agent.backends.codex_prompt_builder import CodexPromptBuilder
+from tusk.shared.interfaces.log_printer import LogPrinter
+
+__all__ = ["CodexExecAgentBackend"]
+
+
+class CodexExecAgentBackend(AgentBackend):
+    def __init__(self, config: object, log_printer: LogPrinter) -> None:
+        self._config = config
+        self._command_builder = CommandBuilder(config)
+        self._prompt_builder = CodexPromptBuilder()
+        self._parser = ResultParser()
+        self._log_printer = log_printer
+        self._run_logger = BackendRunLogger(log_printer, self.name)
+
+    @property
+    def name(self) -> str:
+        return "codex_exec"
+
+    def run(self, request: BackendRequest) -> BackendResult:
+        started_at = self._run_logger.start(request)
+        result = self._run_process(request)
+        self._run_logger.end(request, started_at, result)
+        return result
+
+    def _run_process(self, request: BackendRequest) -> BackendResult:
+        try:
+            completed = self._execute(request)
+        except FileNotFoundError:
+            return self._failure(request, "missing binary for codex exec backend", "failed")
+        except subprocess.TimeoutExpired:
+            return self._failure(request, "Codex exec timed out", "timeout")
+        return self._completed(request, completed)
+
+    def _execute(self, request: BackendRequest) -> subprocess.CompletedProcess:
+        request_env = request.environment or {}
+        return subprocess.run(
+            self._command_builder.build(self._prompt_builder.build(request)),
+            cwd=self._cwd(request), timeout=self._timeout(request),
+            env={**os.environ, **request_env}, capture_output=True, text=True, stdin=subprocess.DEVNULL,
+        )
+
+    def _completed(self, request: BackendRequest, completed: subprocess.CompletedProcess) -> BackendResult:
+        self._log_completion(completed)
+        if completed.returncode != 0:
+            return self._failure(request, self._exit_message(completed), "failed", completed.returncode)
+        return self._parsed(request, completed.stdout)
+
+    def _parsed(self, request: BackendRequest, output: str) -> BackendResult:
+        parsed = self._parser.parse(output)
+        if parsed is None:
+            self._run_logger.schema(request, False, "invalid_json")
+            return self._failure(request, "Invalid JSON from codex exec", "failed")
+        self._run_logger.schema(request, True, "json_parsed")
+        return self._structured_result(request, parsed)
+
+    def _structured_result(self, request: BackendRequest, parsed: object) -> BackendResult:
+        status = self._status(parsed)
+        reply = self._reply(parsed)
+        return BackendResult(status == "success", reply, request.session_id, self._metadata(request), status, parsed)
+
+    def _failure(
+        self, request: BackendRequest, message: str, status: str, exit_code: int | None = None
+    ) -> BackendResult:
+        metadata = self._metadata(request)
+        if exit_code is not None:
+            metadata = {**metadata, "codex_exit_code": exit_code}
+        return BackendResult(False, message, request.session_id, metadata, status)
+
+    def _metadata(self, request: BackendRequest) -> dict[str, object]:
+        return {**(request.metadata or {}), "backend": self.name, "mode": request.mode}
+
+    def _status(self, parsed: object) -> str:
+        return str(parsed.get("status", "success")) if isinstance(parsed, dict) else "success"
+
+    def _reply(self, parsed: object) -> str:
+        return str(parsed.get("reply") or parsed.get("final_text") or "") if isinstance(parsed, dict) else str(parsed)
+
+    def _cwd(self, request: BackendRequest) -> str | None:
+        directory = request.working_directory or self._config.codex_exec_workdir.strip()
+        return str(Path(directory)) if directory else None
+
+    def _timeout(self, request: BackendRequest) -> float:
+        if request.timeout_seconds is not None:
+            return request.timeout_seconds
+        return self._config.codex_exec_timeout_seconds
+
+    def _exit_message(self, completed: subprocess.CompletedProcess) -> str:
+        summary = str(completed.stderr or "").strip()[:300]
+        return f"Codex exec failed with exit code {completed.returncode}: {summary}"
+
+    def _log_completion(self, completed: subprocess.CompletedProcess) -> None:
+        message = f"codex exec completed with exit code {completed.returncode}"
+        if self._config.codex_exec_log_raw_events:
+            message = f"{message}; stdout={completed.stdout}; stderr={completed.stderr}"
+        self._log_printer.log("codex_exec", message, "agent")

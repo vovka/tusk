@@ -1,25 +1,30 @@
-from tusk.shared.llm.interfaces.llm_provider import LLMProvider
+from collections.abc import Callable
+from typing import TypeVar
+
+from tusk.shared.interfaces.llm_provider import LLMProvider
+from tusk.shared.interfaces.log_printer import LogPrinter
+from tusk.shared.interfaces.tracer import Tracer
+from tusk.shared.interrupt_token import InterruptToken
 from tusk.shared.llm.llm_payload_logger import LLMPayloadLogger
 from tusk.shared.llm.llm_retry_runner import LLMRetryRunner
-from tusk.shared.logging.interfaces.log_printer import LogPrinter
+from tusk.shared.observability.null_tracer import NullTracer
 from tusk.shared.schemas.tools.tool_call import ToolCall
-from tusk.shared.tracing.interfaces.tracer import Tracer
-from tusk.shared.tracing.null_tracer import NullTracer
 
 __all__ = ["LLMProxy"]
 
 _RESPONSE_PREVIEW_CHARS = 240
+T = TypeVar("T")
 
 
 class LLMProxy(LLMProvider):
-    def __init__(self, initial_provider: LLMProvider, log_printer: LogPrinter | None = None, slot_name: str = "", retry_runner: LLMRetryRunner | None = None, enabled_log_groups: frozenset[str] = frozenset(), preview_chars: int = 120, interrupt_token: object | None = None, tracer: Tracer | None = None) -> None:
+    def __init__(self, initial_provider: LLMProvider, log_printer: LogPrinter | None = None, slot_name: str = "", retry_runner: LLMRetryRunner | None = None, enabled_log_groups: frozenset[str] = frozenset(), preview_chars: int = 120, interrupt_token: InterruptToken | None = None, tracer: Tracer | None = None) -> None:
         self._inner = initial_provider
         self._log = log_printer
         self._slot = slot_name or initial_provider.label
         self._retry = retry_runner or LLMRetryRunner(interrupt_token=interrupt_token)
         self._payload_logger = LLMPayloadLogger(log_printer, self._slot, enabled_log_groups, preview_chars)
-        self._provider_logs_wait = self._bind(initial_provider)
         self._tracer = tracer or NullTracer()
+        initial_provider.set_payload_logger(self._payload_logger)
 
     @property
     def label(self) -> str:
@@ -43,9 +48,9 @@ class LLMProxy(LLMProvider):
 
     def swap(self, provider: LLMProvider) -> None:
         self._inner = provider
-        self._provider_logs_wait = self._bind(provider)
+        provider.set_payload_logger(self._payload_logger)
 
-    def _logged(self, kind: str, operation: object) -> object:
+    def _logged(self, kind: str, operation: Callable[[], T]) -> T:
         attributes = {"slot": self._slot, "provider": self.label, "kind": kind}
         with self._tracer.span(f"llm.{self._slot}", attributes) as span:
             result = self._completed(operation)
@@ -53,24 +58,12 @@ class LLMProxy(LLMProvider):
         self._payload_logger.log_response(result)
         return result
 
-    def _completed(self, operation: object) -> object:
-        self._show_wait()
+    def _completed(self, operation: Callable[[], T]) -> T:
         try:
             return self._retry.run(operation, self._log_retry)
         finally:
             if self._log:
                 self._log.clear_wait()
-
-    def _bind(self, provider: object) -> bool:
-        setter = getattr(provider, "set_payload_logger", None)
-        if not callable(setter):
-            return False
-        setter(self._payload_logger)
-        return True
-
-    def _show_wait(self) -> None:
-        if self._log and not self._provider_logs_wait:
-            self._log.show_wait(self.label, "llm-wait")
 
     def _log_request(self, kind: str) -> None:
         if self._log:

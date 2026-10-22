@@ -1,15 +1,15 @@
 import time
 from typing import Callable
 
-from tusk.kernel.interfaces.action_confirmation import ActionConfirmation
+from tusk.kernel.agent.confirmation.confirmation_gate import ConfirmationGate
 from tusk.kernel.agent.tool_sequence.plan_validator import PlanValidator
 from tusk.kernel.agent.tool_sequence.recorder import Recorder
 from tusk.kernel.tools.tool_registry import ToolRegistry
+from tusk.shared.interfaces.tracer import Tracer
+from tusk.shared.observability.null_tracer import NullTracer
 from tusk.shared.schemas.tools.tool_result import ToolResult
 from tusk.shared.schemas.tools.tool_sequence_plan import ToolSequencePlan
 from tusk.shared.schemas.tools.tool_sequence_step import ToolSequenceStep
-from tusk.shared.tracing.interfaces.tracer import Tracer
-from tusk.shared.tracing.null_tracer import NullTracer
 
 __all__ = ["Executor"]
 
@@ -17,7 +17,7 @@ __all__ = ["Executor"]
 class Executor:
     def __init__(self, registry: ToolRegistry, session_store: object, interrupt_token: object | None = None,
                  sleep: Callable[[float], None] = time.sleep, tracer: Tracer | None = None,
-                 *, confirmation: ActionConfirmation) -> None:
+                 *, confirmation: ConfirmationGate) -> None:
         self._registry = registry
         self._validator = PlanValidator(registry)
         self._record = Recorder(session_store)
@@ -26,18 +26,10 @@ class Executor:
         self._tracer = tracer or NullTracer()
         self._confirmation = confirmation
 
-    def execute(self, session_id: str, parameters: dict[str, object], allowed: set[str]) -> ToolResult:
-        message = self._validator.validate(parameters, allowed)
-        if message is not None:
-            return self._invalid(session_id, message)
-        plan = ToolSequencePlan.from_dict(parameters)
-        assert plan is not None
-        return self._run(session_id, plan)
-
     def execute_plan(self, session_id: str, plan: ToolSequencePlan | None, allowed: set[str]) -> ToolResult:
         if plan is None:
             return self._invalid(session_id, "execute_tool_sequence requires a resolved sequence_plan")
-        message = self._validator.validate(plan.to_dict(), allowed)
+        message = self._validator.validate_sequence(plan, allowed)
         return self._invalid(session_id, message) if message is not None else self._run(session_id, plan)
 
     def _invalid(self, session_id: str, message: str) -> ToolResult:

@@ -3,8 +3,13 @@ import uuid
 from typing import TextIO
 
 from adapters.dictation.dictation_session_store import DictationSessionStore
-from adapters.dictation.dictation_tool_schema_catalog import DictationToolSchemaCatalog
-from tusk.shared.mcp.mcp_stdio_server import MCPStdioServer
+from tusk.shared.mcp.mcp_stdio_server import MCPStdioServer, tool_result, tool_schema
+
+TOOL_SCHEMAS = [
+    tool_schema("start_dictation", "start dictation", {}),
+    tool_schema("process_segment", "process segment", {"session_id": "string", "text": "string"}),
+    tool_schema("stop_dictation", "stop dictation", {"session_id": "string"}),
+]
 
 
 class DictationServer:
@@ -13,8 +18,7 @@ class DictationServer:
         input_stream: TextIO = sys.stdin, output_stream: TextIO = sys.stdout,
     ) -> None:
         self._sessions = sessions or DictationSessionStore()
-        self._schemas = DictationToolSchemaCatalog().build()
-        self._rpc = MCPStdioServer("dictation", lambda: self._schemas, self._call, input_stream, output_stream)
+        self._rpc = MCPStdioServer("dictation", lambda: TOOL_SCHEMAS, self._call, input_stream, output_stream)
 
     def serve(self) -> None:
         self._rpc.serve()
@@ -22,12 +26,8 @@ class DictationServer:
     def _call(self, name: str, arguments: dict) -> dict:
         handler = getattr(self, f"_tool_{name}", None)
         if handler is None:
-            return self._error_content(f"unknown tool: {name}")
-        payload = handler(arguments)
-        return {"content": [{"type": "text", "text": payload["message"]}], "isError": not payload["success"], "data": payload.get("data")}
-
-    def _error_content(self, message: str) -> dict:
-        return {"content": [{"type": "text", "text": message}], "isError": True, "data": None}
+            return tool_result({"success": False, "message": f"unknown tool: {name}"})
+        return tool_result(handler(arguments))
 
     def _tool_start_dictation(self, arguments: dict) -> dict:
         # ponytail: prune only here — sessions are only created here, so growth stays bounded.

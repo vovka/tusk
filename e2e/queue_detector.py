@@ -1,7 +1,7 @@
 import queue
 from collections.abc import Iterator
 
-from tusk.shared.schemas.utterance import Utterance
+from tusk.shared.schemas.voice.utterance import Utterance
 
 __all__ = ["QueueDetector"]
 

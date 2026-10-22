@@ -1,20 +1,17 @@
 import threading
 import uuid
-from collections.abc import Callable
 
-from tusk.kernel.modes.coding_gate_prompt import CODING_GATE_PROMPT
-from tusk.kernel.modes.dictation_gate_prompt import DICTATION_GATE_PROMPT
-from tusk.kernel.modes.mode_gate import ModeGate
+from tusk.kernel.core.command_mode import CommandMode
 from tusk.kernel.modes.mode_slot import ModeSlot
-from tusk.kernel.core.submit_status_reporter import SubmitStatusReporter
-from tusk.shared.schemas.app_mode import MODE_BYPASS_KIND_PREFIX, AppMode
-from tusk.shared.schemas.kernel_response import KernelResponse
-from tusk.shared.interrupt.interrupt_token import InterruptToken
+from tusk.shared.interfaces.log_printer import LogPrinter
+from tusk.shared.interfaces.tracer import Tracer
+from tusk.shared.interrupt_token import InterruptToken
 from tusk.shared.llm.llm_registry import LLMRegistry
-from tusk.shared.logging.interfaces.log_printer import LogPrinter
-from tusk.shared.status.interfaces.status_reporter import StatusReporter
-from tusk.shared.tracing.interfaces.tracer import Tracer
-from tusk.shared.tracing.null_tracer import NullTracer
+from tusk.shared.observability.null_tracer import NullTracer
+from tusk.shared.observability.status_reporter import StatusReporter
+from tusk.shared.schemas.app_mode import MODE_BYPASS_KIND_PREFIX, AppMode
+from tusk.shared.schemas.app_status import AppStatus
+from tusk.shared.schemas.kernel_response import KernelResponse
 
 __all__ = ["KernelAPI"]
 
@@ -23,7 +20,7 @@ _TEXT_PREVIEW_CHARS = 240
 
 class KernelAPI:
     def __init__(
-        self, command_mode: object, llm_registry: LLMRegistry | None, log: LogPrinter | None = None,
+        self, command_mode: CommandMode, llm_registry: LLMRegistry | None, log: LogPrinter | None = None,
         reporter: StatusReporter | None = None, interrupt_token: InterruptToken | None = None,
         dictation_slot: ModeSlot | None = None, coding_slot: ModeSlot | None = None,
         tracer: Tracer | None = None,
@@ -34,18 +31,29 @@ class KernelAPI:
         self._log = log
         self._reporter = reporter
         self._interrupt_token = interrupt_token
-        self._submit_reporter = SubmitStatusReporter(reporter) if reporter is not None else None
         self._submit_lock = threading.Lock()
-        self._dictation = dictation_slot or ModeSlot("DICTATION", "Dictation started.")
-        self._coding = coding_slot or ModeSlot("CODING", "Coding started.")
+        self._dictation = dictation_slot or ModeSlot(AppMode.DICTATION, "Dictation started.", log, reporter)
+        self._coding = coding_slot or ModeSlot(AppMode.CODING, "Coding started.", log, reporter)
 
     def request_interrupt(self) -> None:
         if self._interrupt_token is not None:
             self._interrupt_token.interrupt()
 
     @property
-    def interrupt_token(self) -> object | None:
+    def interrupt_token(self) -> InterruptToken | None:
         return self._interrupt_token
+
+    @property
+    def llm_registry(self) -> LLMRegistry | None:
+        return self._llm_registry
+
+    @property
+    def dictation(self) -> ModeSlot:
+        return self._dictation
+
+    @property
+    def coding(self) -> ModeSlot:
+        return self._coding
 
     def submit(self, text: str, kind: str = "conversation") -> KernelResponse:
         # ponytail: one global lock — commands are serial by design (single user voice stream)
@@ -58,9 +66,14 @@ class KernelAPI:
                 return response
 
     def _reported_route(self, text: str, kind: str) -> KernelResponse:
-        if self._submit_reporter is None:
+        if self._reporter is None:
             return self._route(text, kind)
-        return self._submit_reporter.run(text, lambda routed_text: self._route(routed_text, kind))
+        previous = self._reporter.status
+        self._reporter.set_status(AppStatus.REACTING, text)
+        try:
+            return self._route(text, kind)
+        finally:
+            self._reporter.set_status(previous)
 
     def _log_input(self, text: str) -> None:
         if self._log is not None:
@@ -73,57 +86,3 @@ class KernelAPI:
         if self._dictation.active and not kind.startswith(MODE_BYPASS_KIND_PREFIX):
             return self._dictation.process_text(text)
         return self._command_mode.process_command(text, kind.removeprefix(MODE_BYPASS_KIND_PREFIX))
-
-    def _report_mode(self, mode: AppMode) -> None:
-        if self._reporter is not None:
-            self._reporter.set_mode(mode)
-
-    def set_dictation_callbacks(self, on_start: Callable[[], None], on_stop: Callable[[], None]) -> None:
-        self._dictation.set_callbacks(on_start, on_stop)
-
-    def request_dictation_stop(self) -> KernelResponse:
-        return self._dictation.request_stop()
-
-    def attach_dictation_router(self, router: object) -> None:
-        self._dictation.attach_router(router)
-
-    def start_dictation(self, state: object) -> KernelResponse:
-        response = self._dictation.start(state, self._log)
-        self._report_mode(AppMode.DICTATION)
-        return response
-
-    def stop_dictation(self) -> None:
-        self._dictation.stop()
-        self._report_mode(AppMode.DEFAULT)
-
-    def set_coding_callbacks(self, on_start: Callable[[], None], on_stop: Callable[[], None]) -> None:
-        self._coding.set_callbacks(on_start, on_stop)
-
-    def request_coding_stop(self) -> KernelResponse:
-        return self._coding.request_stop()
-
-    def attach_coding_router(self, router: object) -> None:
-        self._coding.attach_router(router)
-
-    @property
-    def coding_active(self) -> bool:
-        return self._coding.active
-
-    def start_coding(self, state: object) -> KernelResponse:
-        return self._coding.start(state, self._log)
-
-    def stop_coding(self) -> None:
-        self._coding.stop()
-
-    def get_llm_registry(self) -> LLMRegistry | None:
-        return self._llm_registry
-
-    def dictation_gate(self) -> ModeGate:
-        return self._mode_gate("dictation", DICTATION_GATE_PROMPT)
-
-    def coding_gate(self) -> ModeGate:
-        return self._mode_gate("coding", CODING_GATE_PROMPT)
-
-    def _mode_gate(self, mode_name: str, prompt: str) -> ModeGate:
-        stop_gate_llm = self._llm_registry.get_with_fallback("stop_gate", "gatekeeper") if self._llm_registry else None
-        return ModeGate(stop_gate_llm, mode_name, prompt, self._log)

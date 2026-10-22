@@ -1,8 +1,12 @@
-from tusk.shared.llm.interfaces.llm_provider import LLMProvider
+from tusk.kernel.modes.mode_gate_prompts import CODING_GATE_PROMPT, DICTATION_GATE_PROMPT
+from tusk.shared.interfaces.llm_provider import LLMProvider
+from tusk.shared.interfaces.log_printer import LogPrinter
 from tusk.shared.llm.llm_json import extract_json_payload
-from tusk.shared.logging.interfaces.log_printer import LogPrinter
+from tusk.shared.llm.llm_registry import LLMRegistry
 
 __all__ = ["ModeGate"]
+
+_PROMPTS = {"dictation": DICTATION_GATE_PROMPT, "coding": CODING_GATE_PROMPT}
 
 _SCHEMA = {
     "type": "object",
@@ -26,6 +30,11 @@ class ModeGate:
         self._tag = f"{mode_name.upper()}GATE"
         self._group = f"{mode_name}-gate"
         self._schema_name = f"{mode_name}_gatekeeper"
+
+    @classmethod
+    def for_mode(cls, llm_registry: LLMRegistry | None, mode_name: str, log_printer: LogPrinter | None) -> "ModeGate":
+        stop_gate_llm = llm_registry.get_with_fallback("stop_gate", "gatekeeper") if llm_registry else None
+        return cls(stop_gate_llm, mode_name, _PROMPTS[mode_name], log_printer)
 
     def should_stop(self, text: str) -> bool:
         data = self._parsed(self._complete(text))

@@ -1,3 +1,4 @@
+import threading
 from collections.abc import Iterator
 
 try:
@@ -9,7 +10,7 @@ __all__ = ["AudioCapture"]
 
 
 class AudioCapture:
-    def __init__(self, sample_rate: int, frame_duration_ms: int, pause_gate: object | None = None) -> None:
+    def __init__(self, sample_rate: int, frame_duration_ms: int, pause_gate: threading.Event) -> None:
         if sd is None:
             raise RuntimeError("sounddevice package is not installed")
         self._sample_rate = sample_rate
@@ -25,11 +26,10 @@ class AudioCapture:
                     yield bytes(data)
 
     def _is_resumed(self) -> bool:
-        return self._pause_gate is None or self._pause_gate.is_set()
+        return self._pause_gate.is_set()
 
     def _open_stream(self) -> object:
         return sd.RawInputStream(samplerate=self._sample_rate, blocksize=self._frame_size, dtype="int16", channels=1)
 
     def _await_resume(self) -> None:
-        if self._pause_gate is not None:
-            self._pause_gate.wait()
+        self._pause_gate.wait()

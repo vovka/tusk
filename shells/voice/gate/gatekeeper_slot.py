@@ -1,0 +1,17 @@
+from tusk.shared.schemas.voice.buffered_utterance import BufferedUtterance
+from tusk.shared.schemas.voice.gate_dispatch import GateDispatch
+from shells.voice.interfaces.gatekeeper import Gatekeeper
+from tusk.shared.schemas.voice.utterance import Utterance
+
+__all__ = ["GatekeeperSlot"]
+
+
+class GatekeeperSlot(Gatekeeper):
+    def __init__(self, inner: Gatekeeper) -> None:
+        self._inner = inner
+
+    def swap(self, gatekeeper: Gatekeeper) -> None:
+        self._inner = gatekeeper
+
+    def process(self, utterance: BufferedUtterance, recent: list[Utterance], candidates: list[BufferedUtterance]) -> GateDispatch:
+        return self._inner.process(utterance, recent, candidates)

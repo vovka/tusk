@@ -2,10 +2,10 @@ import json
 import types
 from pathlib import Path
 
-from adapters.coding.coding_tool_schema_catalog import CodingToolSchemaCatalog
-from adapters.dictation.dictation_tool_schema_catalog import DictationToolSchemaCatalog
+from adapters.coding.server import TOOL_SCHEMAS as CODING_SCHEMAS
+from adapters.dictation.server import TOOL_SCHEMAS as DICTATION_SCHEMAS
 from adapters.gnome.tools.tool_schema_catalog import ToolSchemaCatalog
-from tests.kernel_api_support import make_agent, make_registry_tool
+from tests.support.kernel_api import make_agent, make_registry_tool
 from tusk.kernel.tools.switch_model_tool import SwitchModelTool
 from tusk.kernel.tools.tool_registry import ToolRegistry
 from tusk.shared.schemas.tools.tool_call import ToolCall
@@ -46,8 +46,8 @@ def test_open_editor_and_type_takes_three_calls_under_token_budget() -> None:
 
 def _desktop_registry(executed: list[str]) -> ToolRegistry:
     registry = ToolRegistry()
-    for source, catalog in (("gnome", ToolSchemaCatalog()), ("coding", CodingToolSchemaCatalog()), ("dictation", DictationToolSchemaCatalog())):
-        _register_adapter(registry, source, catalog.build(), executed)
+    for source, schemas in (("gnome", ToolSchemaCatalog().build()), ("coding", CODING_SCHEMAS), ("dictation", DICTATION_SCHEMAS)):
+        _register_adapter(registry, source, schemas, executed)
     registry.register(SwitchModelTool(types.SimpleNamespace(slot_names=_SLOTS)))
     for name in ("start_coding", "start_dictation"):
         registry.register(make_registry_tool(name, f"Start {name.split('_')[1]} mode", input_schema={"type": "object", "properties": {}}))

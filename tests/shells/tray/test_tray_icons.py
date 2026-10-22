@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from shells.tray.status_icon_resolver import StatusIconResolver
+from shells.tray.tray_status_sink import TrayStatusSink
 from tusk.shared.schemas.app_status import AppStatus
 
 THEMES = ("light", "dark")
@@ -47,9 +47,9 @@ def test_states_are_visually_distinct(image_module: object) -> None:
         assert len(rendered) == len(NAMES)
 
 
-def test_resolver_paths_exist() -> None:
-    resolver = StatusIconResolver("light")
+def test_icon_paths_exist() -> None:
+    sink = TrayStatusSink(None, lambda: None, lambda: None, lambda: None, lambda: None, lambda: None, theme="light")
     for status in AppStatus:
-        path = resolver.resolve(status)
+        path = sink.icon_path(status)
         if path:
             assert Path(path).exists()

@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from tusk.shared.llm.interfaces.llm_provider import LLMProvider
+from tusk.shared.interfaces.llm_provider import LLMProvider
 
 __all__ = ["AgentProfile"]
 

@@ -42,91 +42,76 @@ digraph tusk_interfaces {
 
   // ---------------- kernel-defined interfaces ----------------
 
-  subgraph cluster_agent {
-    label="tusk/kernel/interfaces"; fontsize=13; style=filled; fillcolor="#fbe5c8"; margin=12;
-    I_Agent [label="«interface»\nAgent", penwidth=2];
-  }
-  subgraph cluster_shell {
-    label="tusk/kernel/interfaces"; fontsize=13; style=filled; fillcolor="#fbe5c8"; margin=12;
-    I_Shell [label="«interface»\nShell", penwidth=2];
-    VoiceShell; CLIShell; EmulatorShell; TrayShell;
-    VoiceShell -> I_Shell [arrowhead=empty, style=dashed];
-    CLIShell -> I_Shell [arrowhead=empty, style=dashed];
-    EmulatorShell -> I_Shell [arrowhead=empty, style=dashed];
-    TrayShell -> I_Shell [arrowhead=empty, style=dashed];
-  }
-  subgraph cluster_history {
-    label="tusk/kernel/interfaces"; fontsize=13; style=filled; fillcolor="#fbe5c8"; margin=12;
-    I_ConversationHistory [label="«interface»\nConversationHistory", penwidth=2];
-    SlidingWindowHistory -> I_ConversationHistory [arrowhead=empty];
-  }
-  subgraph cluster_driver {
-    label="tusk/kernel/interfaces"; fontsize=13; style=filled; fillcolor="#fbe5c8"; margin=12;
-    I_EditorDriver [label="«interface»\nEditorDriver", penwidth=2];
-    InputAutomationEditorDriver [label="InputAutomationEditorDriver\n(kernel.modes)"];
-    InputAutomationEditorDriver -> I_EditorDriver [arrowhead=empty];
-  }
-  subgraph cluster_strategy {
-    label="tusk/kernel/interfaces"; fontsize=13; style=filled; fillcolor="#fbe5c8"; margin=12;
-    I_EditApplicationStrategy [label="«interface»\nEditApplicationStrategy", penwidth=2];
-    FullReplaceEditStrategy [label="FullReplaceEditStrategy\n(kernel.modes)"];
-    FullReplaceEditStrategy -> I_EditApplicationStrategy [arrowhead=empty];
-  }
   subgraph cluster_backend {
-    label="tusk/kernel/agent_backends"; fontsize=13; style=filled; fillcolor="#fbe5c8"; margin=12;
+    label="tusk/kernel/agent/backends"; fontsize=13; style=filled; fillcolor="#fbe5c8"; margin=12;
     I_AgentBackend [label="«interface»\nAgentBackend", penwidth=2];
-    MainAgent [label="MainAgent\n(kernel)"];
     TuskAgentBackend; CodexExecAgentBackend; CodexMcpAgentBackend; FallbackAgentBackend;
-    MainAgent -> I_AgentBackend [arrowhead=empty];
     TuskAgentBackend -> I_AgentBackend [arrowhead=empty];
     CodexExecAgentBackend -> I_AgentBackend [arrowhead=empty];
     CodexMcpAgentBackend -> I_AgentBackend [arrowhead=empty];
     FallbackAgentBackend -> I_AgentBackend [arrowhead=empty];
   }
-  subgraph cluster_store {
-    label="tusk/kernel/agent/session"; fontsize=13; style=filled; fillcolor="#fbe5c8"; margin=12;
-    I_Store [label="«interface»\nStore (sessions)", penwidth=2];
-    FileStore -> I_Store [arrowhead=empty];
-  }
 
   // ---------------- shared-defined interfaces ----------------
 
+  subgraph cluster_shell {
+    label="tusk/shared/interfaces"; fontsize=13; style=filled; fillcolor="#d7f0d3"; margin=12;
+    I_Shell [label="«interface»\nShell", penwidth=2];
+    VoiceShell; CLIShell; EmulatorShell; TrayShell;
+    VoiceShell -> I_Shell [arrowhead=empty];
+    CLIShell -> I_Shell [arrowhead=empty];
+    EmulatorShell -> I_Shell [arrowhead=empty];
+    TrayShell -> I_Shell [arrowhead=empty];
+  }
   subgraph cluster_llm {
-    label="tusk/shared/llm/interfaces"; fontsize=13; style=filled; fillcolor="#d7f0d3"; margin=12;
+    label="tusk/shared/interfaces"; fontsize=13; style=filled; fillcolor="#d7f0d3"; margin=12;
     I_LLMProvider [label="«interface»\nLLMProvider", penwidth=2];
+    ChatCompletionsLLM [label="ChatCompletionsLLM\n(providers)"];
     GroqLLM [label="GroqLLM\n(providers)"];
     OpenRouterLLM [label="OpenRouterLLM\n(providers)"];
     LLMProxy [label="LLMProxy\n(retry + swap wrapper)"];
-    GroqLLM -> I_LLMProvider [arrowhead=empty];
-    OpenRouterLLM -> I_LLMProvider [arrowhead=empty];
+    RotatingLLMProvider [label="RotatingLLMProvider\n(round-robin wrapper)"];
+    ChatCompletionsLLM -> I_LLMProvider [arrowhead=empty];
+    GroqLLM -> ChatCompletionsLLM [arrowhead=empty];
+    OpenRouterLLM -> ChatCompletionsLLM [arrowhead=empty];
     LLMProxy -> I_LLMProvider [arrowhead=empty];
+    RotatingLLMProvider -> I_LLMProvider [arrowhead=empty];
   }
   subgraph cluster_llmfactory {
-    label="tusk/shared/llm/interfaces"; fontsize=13; style=filled; fillcolor="#d7f0d3"; margin=12;
+    label="tusk/shared/interfaces"; fontsize=13; style=filled; fillcolor="#d7f0d3"; margin=12;
     I_LLMProviderFactory [label="«interface»\nLLMProviderFactory", penwidth=2];
     ConfigurableLLMFactory [label="ConfigurableLLMFactory\n(providers)"];
     ConfigurableLLMFactory -> I_LLMProviderFactory [arrowhead=empty];
   }
   subgraph cluster_log {
-    label="tusk/shared/logging/interfaces"; fontsize=13; style=filled; fillcolor="#d7f0d3"; margin=12;
+    label="tusk/shared/interfaces"; fontsize=13; style=filled; fillcolor="#d7f0d3"; margin=12;
     I_LogPrinter [label="«interface»\nLogPrinter", penwidth=2];
     ColorLogPrinter -> I_LogPrinter [arrowhead=empty];
   }
-  subgraph cluster_reporter {
-    label="tusk/shared/status/interfaces"; fontsize=13; style=filled; fillcolor="#d7f0d3"; margin=12;
-    I_StatusReporter [label="«interface»\nStatusReporter", penwidth=2];
-    StatusReporterHub -> I_StatusReporter [arrowhead=empty];
-  }
   subgraph cluster_sink {
-    label="tusk/shared/status/interfaces"; fontsize=13; style=filled; fillcolor="#d7f0d3"; margin=12;
+    label="tusk/shared/interfaces"; fontsize=13; style=filled; fillcolor="#d7f0d3"; margin=12;
     I_StatusSink [label="«interface»\nStatusSink", penwidth=2];
     NullStatusSink;
     TrayStatusSink [label="TrayStatusSink\n(shells.tray)"];
     NullStatusSink -> I_StatusSink [arrowhead=empty];
     TrayStatusSink -> I_StatusSink [arrowhead=empty];
   }
+  subgraph cluster_tracer {
+    label="tusk/shared/interfaces"; fontsize=13; style=filled; fillcolor="#d7f0d3"; margin=12;
+    I_Tracer [label="«interface»\nTracer", penwidth=2];
+    NullTracer; OTelTracer;
+    NullTracer -> I_Tracer [arrowhead=empty];
+    OTelTracer -> I_Tracer [arrowhead=empty];
+  }
+  subgraph cluster_span {
+    label="tusk/shared/interfaces"; fontsize=13; style=filled; fillcolor="#d7f0d3"; margin=12;
+    I_SpanHandle [label="«interface»\nSpanHandle", penwidth=2];
+    NullSpanHandle; OTelSpanHandle;
+    NullSpanHandle -> I_SpanHandle [arrowhead=empty];
+    OTelSpanHandle -> I_SpanHandle [arrowhead=empty];
+  }
   subgraph cluster_stt {
-    label="tusk/shared/stt/interfaces"; fontsize=13; style=filled; fillcolor="#d7f0d3"; margin=12;
+    label="tusk/shared/interfaces"; fontsize=13; style=filled; fillcolor="#d7f0d3"; margin=12;
     I_STTEngine [label="«interface»\nSTTEngine", penwidth=2];
     GroqSTT [label="GroqSTT\n(providers)"];
     WhisperSTT [label="WhisperSTT\n(providers)"];
@@ -134,10 +119,12 @@ digraph tusk_interfaces {
     WhisperSTT -> I_STTEngine [arrowhead=empty];
   }
   subgraph cluster_tts {
-    label="tusk/shared/tts/interfaces"; fontsize=13; style=filled; fillcolor="#d7f0d3"; margin=12;
+    label="tusk/shared/interfaces"; fontsize=13; style=filled; fillcolor="#d7f0d3"; margin=12;
     I_TTSEngine [label="«interface»\nTTSEngine", penwidth=2];
     GroqTTS [label="GroqTTS\n(providers)"];
+    OpenAICompatibleTTS [label="OpenAICompatibleTTS\n(providers)"];
     GroqTTS -> I_TTSEngine [arrowhead=empty];
+    OpenAICompatibleTTS -> I_TTSEngine [arrowhead=empty];
   }
 
   // ---------------- shell-defined interfaces ----------------
@@ -146,18 +133,14 @@ digraph tusk_interfaces {
     label="shells/voice/interfaces"; fontsize=13; style=filled; fillcolor="#f3e3fa"; margin=12;
     I_Gatekeeper [label="«interface»\nGatekeeper", penwidth=2];
     LLMGatekeeper; StopGatekeeper;
+    ConfirmationAnswerGate [label="ConfirmationAnswerGate\n(yes/no to a pending question)"];
     GatekeeperSlot [label="GatekeeperSlot\n(swappable holder)"];
     PlaybackGate [label="PlaybackGate\n(wrapper while TUSK speaks)"];
     LLMGatekeeper -> I_Gatekeeper [arrowhead=empty];
     StopGatekeeper -> I_Gatekeeper [arrowhead=empty];
+    ConfirmationAnswerGate -> I_Gatekeeper [arrowhead=empty];
     GatekeeperSlot -> I_Gatekeeper [arrowhead=empty];
     PlaybackGate -> I_Gatekeeper [arrowhead=empty];
-  }
-  subgraph cluster_buffer {
-    label="shells/voice/interfaces"; fontsize=13; style=filled; fillcolor="#f3e3fa"; margin=12;
-    I_TranscriptionBuffer [label="«interface»\nTranscriptionBuffer", penwidth=2];
-    TranscriptionBufferImpl [label="TranscriptionBuffer\n(stages)"];
-    TranscriptionBufferImpl -> I_TranscriptionBuffer [arrowhead=empty];
   }
   subgraph cluster_tray {
     label="shells/tray/interfaces"; fontsize=13; style=filled; fillcolor="#f3e3fa"; margin=12;
@@ -165,32 +148,24 @@ digraph tusk_interfaces {
     AppIndicatorTrayBackend -> I_TrayBackend [arrowhead=empty];
   }
 
-  // ---------------- cross-cluster relations ----------------
-
-  MainAgent -> I_Agent [arrowhead=empty, style=dashed];
-  TuskAgentBackend -> I_Agent [arrowhead=vee, style=dashed, color="#777777"];
-  MainAgent -> I_ConversationHistory [arrowhead=vee, style=dashed, color="#777777"];
-
   // ---------------- consumers ----------------
 
   node [color="#888888", fontcolor="#444444"];
 
   CommandMode -> I_AgentBackend [arrowhead=vee, style=dashed, color="#777777"];
   ShellLoader -> I_Shell [arrowhead=vee, style=dashed, color="#777777"];
-  KernelAPI -> I_StatusReporter [arrowhead=vee, style=dashed, color="#777777"];
-  AgentRuntime -> I_Store [arrowhead=vee, style=dashed, color="#777777"];
   AgentRuntime -> I_LLMProvider [arrowhead=vee, style=dashed, color="#777777", label=" via AgentProfile"];
   ModeGate [label="ModeGate\n(kernel.modes)"];
   ModeGate -> I_LLMProvider [arrowhead=vee, style=dashed, color="#777777"];
+  LLMClient [label="LLMClient\n(shells.voice.gate)"];
+  LLMClient -> I_LLMProvider [arrowhead=vee, style=dashed, color="#777777"];
   LLMRegistry -> I_LLMProviderFactory [arrowhead=vee, style=dashed, color="#777777"];
-  CodingRouter [label="CodingRouter\n(kernel.modes)"];
-  CodingRouter -> I_EditorDriver [arrowhead=vee, style=dashed, color="#777777"];
-  CodingRouter -> I_EditApplicationStrategy [arrowhead=vee, style=dashed, color="#777777"];
+  StatusReporter -> I_StatusSink [arrowhead=vee, style=dashed, color="#777777"];
+  KernelAPI -> I_Tracer [arrowhead=vee, style=dashed, color="#777777"];
+  AgentOrchestrator -> I_Tracer [arrowhead=vee, style=dashed, color="#777777"];
+  I_Tracer -> I_SpanHandle [arrowhead=vee, style=dashed, color="#777777", label=" span()"];
   Transcriber -> I_STTEngine [arrowhead=vee, style=dashed, color="#777777"];
-  CommandWorker -> I_TTSEngine [arrowhead=vee, style=dashed, color="#777777"];
+  ChunkedSpeaker -> I_TTSEngine [arrowhead=vee, style=dashed, color="#777777"];
   VoicePipeline -> I_Gatekeeper [arrowhead=vee, style=dashed, color="#777777"];
-  VoicePipeline -> I_TranscriptionBuffer [arrowhead=vee, style=dashed, color="#777777"];
-  VoicePipeline -> I_StatusReporter [arrowhead=vee, style=dashed, color="#777777"];
-  StatusReporterHub -> I_StatusSink [arrowhead=vee, style=dashed, color="#777777"];
   TrayShell -> I_TrayBackend [arrowhead=vee, style=dashed, color="#777777"];
 }

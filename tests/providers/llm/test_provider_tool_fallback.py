@@ -1,0 +1,62 @@
+from tusk.providers.llm.tool_response import tool_or_done
+from tusk.providers.llm.tool_use_failed_recovery import ToolUseFailedRecovery
+
+
+def test_tool_fallback_converts_text_to_done() -> None:
+    result = tool_or_done(_response("The text has been entered."))
+    assert result.tool_name == "done"
+
+
+def test_tool_fallback_carries_text_as_done_reply() -> None:
+    result = tool_or_done(_response("Finished."))
+    assert result.parameters["reply"] == "Finished."
+
+
+def test_tool_use_failed_recovery_extracts_tool_call() -> None:
+    exc = RuntimeError(_tool_use_failed_text())
+    result = ToolUseFailedRecovery().recover(exc)
+    assert result is not None
+    assert result.tool_name == "gnome.type_text"
+    assert result.parameters["text"] == "hello"
+
+
+def test_tool_use_failed_recovery_best_effort_recovers_done() -> None:
+    exc = RuntimeError(_broken_done_text())
+    result = ToolUseFailedRecovery().recover(exc)
+    assert result is not None
+    assert result.tool_name == "done"
+    assert result.parameters["status"] == "done"
+    assert result.parameters["summary"] == "Poem pasted into gedit"
+    assert result.parameters["text"].startswith("Ozymandias")
+
+
+def test_tool_use_failed_recovery_best_effort_accepts_done_alias() -> None:
+    exc = RuntimeError(_broken_done_text().replace('"name": "done"', '"name": "functions.done"'))
+    result = ToolUseFailedRecovery().recover(exc)
+    assert result is not None and result.tool_name == "done"
+
+
+def _response(text: str) -> object:
+    message = type("Message", (), {"tool_calls": [], "content": text})()
+    choice = type("Choice", (), {"message": message})()
+    return type("Response", (), {"choices": [choice]})()
+
+
+def _tool_use_failed_text() -> str:
+    return (
+        "Error code: 400 - {'error': {'message': 'Failed to parse tool call arguments as JSON', "
+        "'type': 'invalid_request_error', 'code': 'tool_use_failed', "
+        '\'failed_generation\': \'{"name": "gnome.type_text", "arguments": {"text": "hello"}}\'}}'
+    )
+
+
+def _broken_done_text() -> str:
+    return (
+        "Error code: 400 - {'error': {'message': 'Failed to parse tool call arguments as JSON', "
+        "'type': 'invalid_request_error', 'code': 'tool_use_failed', "
+        '\'failed_generation\': \'{"name": "done", "arguments": {"artifact_refs":[],"payload":{},'
+        '"status":"done","summary":"Poem pasted into gedit","text":"Ozymandias\\n\\n'
+        "I met a traveler from an antique land\\nWho said, 'I am amazed by a statue in his hand: "
+        'It’s the ruins of a colossal stone statue in the desert, in a shape that is a statue of a king '
+        "that was once so great that it still holds power.'\"\"}'}}"
+    )

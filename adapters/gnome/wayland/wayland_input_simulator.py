@@ -1,10 +1,10 @@
-from adapters.gnome.gnome_input_simulator import GnomeInputSimulator
+from adapters.gnome.x11.x11_input_simulator import X11InputSimulator
 from adapters.gnome.wayland.shell_bus import ShellBus
 
 __all__ = ["WaylandInputSimulator"]
 
 
-class WaylandInputSimulator(GnomeInputSimulator):
+class WaylandInputSimulator(X11InputSimulator):
     """Sends keyboard and pointer input through the tusk-shell extension's virtual devices."""
 
     def __init__(self, bus: ShellBus) -> None:
@@ -15,6 +15,10 @@ class WaylandInputSimulator(GnomeInputSimulator):
 
     def _type_segment(self, text: str) -> None:
         self._bus.call("TypeText", [text])
+
+    def replace_text(self, char_count: int, text: str) -> None:
+        # The extension types "\b" as BackSpace, so deletion and text go in one call.
+        self._bus.call("TypeText", ["\b" * max(char_count, 0) + text])
 
     def mouse_click(self, x: int, y: int, button: int, clicks: int) -> None:
         self.mouse_move(x, y)

@@ -1,13 +1,19 @@
-from tusk.shared.llm.interfaces.llm_provider import LLMProvider
+from collections.abc import Callable
+from typing import TypeVar
+
+from tusk.shared.interfaces.llm_provider import LLMProvider
+from tusk.shared.llm.llm_payload_logger import LLMPayloadLogger
 from tusk.shared.schemas.tools.tool_call import ToolCall
 
 __all__ = ["RotatingLLMProvider"]
+
+T = TypeVar("T")
 
 
 class RotatingLLMProvider(LLMProvider):
     """Spreads requests round-robin over models that each have their own rate limit; a 429 moves to the next one."""
 
-    def __init__(self, providers: list[LLMProvider], on_failover: object | None = None) -> None:
+    def __init__(self, providers: list[LLMProvider], on_failover: Callable[[Exception, str], None] | None = None) -> None:
         self._providers = providers
         self._next = 0
         self._on_failover = on_failover
@@ -28,13 +34,11 @@ class RotatingLLMProvider(LLMProvider):
     def complete_structured(self, system_prompt: str, user_message: str, schema_name: str, schema: dict, max_tokens: int = 256) -> str:
         return self._rotate(lambda p: p.complete_structured(system_prompt, user_message, schema_name, schema, max_tokens))
 
-    def set_payload_logger(self, payload_logger: object) -> None:
+    def set_payload_logger(self, logger: LLMPayloadLogger) -> None:
         for provider in self._providers:
-            setter = getattr(provider, "set_payload_logger", None)
-            if callable(setter):
-                setter(payload_logger)
+            provider.set_payload_logger(logger)
 
-    def _rotate(self, operation: object) -> object:
+    def _rotate(self, operation: Callable[[LLMProvider], T]) -> T:
         # all models rate-limited: the last 429 propagates so the proxy's retry runner sleeps once
         for _ in range(len(self._providers) - 1):
             try:

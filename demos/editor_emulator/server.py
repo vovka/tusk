@@ -7,7 +7,7 @@ try:
 except ImportError:  # pragma: no cover - in-process import path
     from demos.editor_emulator.emulated_editor import EmulatedEditor
 
-from tusk.shared.mcp.mcp_stdio_server import MCPStdioServer
+from tusk.shared.mcp.mcp_stdio_server import MCPStdioServer, tool_result, tool_schema
 
 _SNAPSHOT_PATH = Path(__file__).resolve().parents[2] / ".tusk_runtime" / "editor_emulator_buffer.txt"
 
@@ -27,7 +27,7 @@ class EditorEmulatorServer:
     def _call(self, name: str, arguments: dict) -> dict:
         payload = getattr(self, f"_tool_{name}")(arguments)
         self._snapshot()
-        return {"content": [{"type": "text", "text": payload["message"]}], "isError": False, "data": payload.get("data")}
+        return tool_result({"success": True, **payload})
 
     def _tool_press_keys(self, arguments: dict) -> dict:
         self._editor.press_keys(arguments["keys"])
@@ -46,15 +46,11 @@ class EditorEmulatorServer:
 
     def _schemas(self) -> list[dict]:
         return [
-            self._schema("press_keys", {"keys": "string"}),
-            self._schema("type_text", {"text": "string"}),
-            self._schema("read_clipboard", {}),
-            self._schema("write_clipboard", {"text": "string"}),
+            tool_schema("press_keys", "press keys", {"keys": "string"}),
+            tool_schema("type_text", "type text", {"text": "string"}),
+            tool_schema("read_clipboard", "read clipboard", {}),
+            tool_schema("write_clipboard", "write clipboard", {"text": "string"}),
         ]
-
-    def _schema(self, name: str, properties: dict[str, str]) -> dict:
-        fields = {key: {"type": value} for key, value in properties.items()}
-        return {"name": name, "description": name.replace("_", " "), "inputSchema": {"type": "object", "properties": fields}}
 
     def _snapshot(self) -> None:
         self._snapshot_path.parent.mkdir(parents=True, exist_ok=True)

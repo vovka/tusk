@@ -1,5 +1,5 @@
-from tusk.shared.llm.interfaces.llm_provider import LLMProvider
-from tusk.shared.llm.interfaces.llm_provider_factory import LLMProviderFactory
+from tusk.shared.interfaces.llm_provider import LLMProvider
+from tusk.shared.interfaces.llm_provider_factory import LLMProviderFactory
 from tusk.shared.llm.llm_proxy import LLMProxy
 
 __all__ = ["LLMRegistry"]

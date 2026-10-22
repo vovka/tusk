@@ -11,11 +11,6 @@ class ToolRegistry:
         entry = self._entry(tool)
         self._tools[entry.name] = entry
 
-    def unregister_source(self, source: str) -> None:
-        names = [name for name, tool in self._tools.items() if tool.source == source]
-        for name in names:
-            self._tools.pop(name, None)
-
     def get(self, name: str) -> RegisteredTool:
         return self._tools[name]
 
@@ -27,25 +22,13 @@ class ToolRegistry:
         return matches[0] if len(matches) == 1 else name
 
     def all_tools(self) -> list[RegisteredTool]:
-        return list(self._tools.values())
-
-    def real_tools(self) -> list[RegisteredTool]:
         return sorted(self._tools.values(), key=lambda item: item.name)
 
-    def real_tool_names(self) -> set[str]:
-        return {tool.name for tool in self.real_tools()}
-
-    def planner_tool_names(self) -> set[str]:
-        return {tool.name for tool in self.planner_tools()}
+    def tool_names(self) -> set[str]:
+        return set(self._tools)
 
     def planner_tools(self) -> list[RegisteredTool]:
-        return [tool for tool in self.real_tools() if tool.planner_visible]
-
-    def sequence_tool_names(self) -> set[str]:
-        return {tool.name for tool in self.sequence_tools()}
-
-    def sequence_tools(self) -> list[RegisteredTool]:
-        return [tool for tool in self.real_tools() if tool.sequence_callable]
+        return [tool for tool in self.all_tools() if tool.planner_visible]
 
     def definitions_for(self, names: set[str]) -> list[dict[str, object]]:
         tools = [self._tools[name] for name in sorted(names) if name in self._tools]

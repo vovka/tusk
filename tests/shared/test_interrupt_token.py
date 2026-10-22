@@ -1,4 +1,4 @@
-from tusk.shared.interrupt import InterruptToken
+from tusk.shared.interrupt_token import InterruptToken
 
 
 def test_token_starts_uninterrupted() -> None:

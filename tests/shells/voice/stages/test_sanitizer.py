@@ -1,0 +1,73 @@
+import types
+
+from shells.voice.stages.sanitizer import Sanitizer
+from tusk.shared.schemas.voice.utterance import Utterance
+
+
+def _utterance(text: str, duration: float = 1.0) -> Utterance:
+    return Utterance(text=text, audio_frames=b"", duration_seconds=duration)
+
+
+def test_rejects_ghost_phrase() -> None:
+    assert Sanitizer().process(_utterance("Thank you.")) is None
+
+
+def test_rejects_punctuation_only() -> None:
+    assert Sanitizer().process(_utterance(".")) is None
+
+
+def test_rejects_short_duration() -> None:
+    assert Sanitizer().process(_utterance("hi", duration=0.2)) is None
+
+
+def test_accepts_desktop_command() -> None:
+    assert Sanitizer().process(_utterance("open Firefox")) == _utterance("open Firefox")
+
+
+def test_sanitizer_logs_drop_reason() -> None:
+    logs: list[tuple[str, str, str]] = []
+    assert Sanitizer(_log(logs)).process(_utterance("Thank you.")) is None
+    assert logs == [("SANITIZER", "dropped reason=ghost-phrase text='Thank you.'", "sanitizer")]
+
+
+def test_sanitizer_logs_passed_text() -> None:
+    logs: list[tuple[str, str, str]] = []
+    utterance = _utterance("open Firefox")
+    assert Sanitizer(_log(logs)).process(utterance) == utterance
+    assert logs == [("SANITIZER", "passed text='open Firefox'", "sanitizer")]
+
+
+def _log(logs: list[tuple[str, str, str]]) -> object:
+    return types.SimpleNamespace(log=lambda *args: logs.append(args))
+
+
+_VOCABULARY = "TUSK, gedit, Thunar File Manager, xfce4-settings-manager"
+
+
+# Regression: on silence Whisper "transcribed" its own vocabulary prompt and the junk reached the gatekeeper.
+def test_sanitizer_drops_vocabulary_prompt_echo() -> None:
+    echo = "xfce4-settings-manager, xfce4-settings-manager, gedit, Thunar File Manager."
+    assert Sanitizer(vocabulary=_VOCABULARY).process(_utterance(echo)) is None
+
+
+def test_sanitizer_keeps_command_naming_vocabulary_apps() -> None:
+    utterance = _utterance("Tusk, open the Thunar file manager")
+    assert Sanitizer(vocabulary=_VOCABULARY).process(utterance) == utterance
+
+
+_XFCE_VOCABULARY = "TUSK, Activity Log Manager, Bulk Rename, Files, File Manager, Visual Studio Code, Xfce Terminal"
+
+
+# Regression: Whisper's silence echoes of the prompt came back mangled and slipped past an exact word match.
+def test_sanitizer_drops_mangled_vocabulary_list_echoes() -> None:
+    sanitizer = Sanitizer(vocabulary=_XFCE_VOCABULARY)
+    echoes = [
+        "Ego, Xfce Termin, Vip Rename, Files, Aptivity Lod, Files, Aptivity Lod, Files, Rune, Files, Rune, Tinh.",
+        "Ava, File Manager, Vilsai Mane, File Mane, Fisual Ssas, P",
+    ]
+    assert [sanitizer.process(_utterance(echo)) for echo in echoes] == [None, None]
+
+
+def test_sanitizer_keeps_comma_separated_command_with_app_names() -> None:
+    utterance = _utterance("Tusk, open Files, then the terminal")
+    assert Sanitizer(vocabulary=_XFCE_VOCABULARY).process(utterance) == utterance

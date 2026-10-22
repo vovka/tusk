@@ -20,9 +20,9 @@ Website: https://tusk.shcherbyna.me
 1. The **voice shell** captures microphone audio, runs VAD, and feeds speech segments to the kernel. The **CLI shell** accepts typed text directly.
 2. The **hallucination filter** rejects STT artifacts (ghost phrases, sub-400 ms segments, punctuation-only output).
 3. The **gatekeeper** classifies the utterance as `command`, `conversation`, or `ambient` (discarded) using a fast LLM with structured output.
-4. The **conversation agent** maintains dialogue history and calls `execute_task` when a desktop action or dictation is needed.
-5. The **planner** receives a compact `name: description` catalog of all registered tools and returns a JSON list of tool names required for the task.
-6. The **execution agent** receives only the selected tool schemas and drives an MCP tool-call loop against the desktop adapter.
+4. The **conversation agent** maintains dialogue history and calls `run_agent` to delegate when a desktop action or dictation is needed. A one-shot command (`kind="command"`) starts at the **command** profile instead: it acts directly through one `call_tool` tool in a fresh session.
+5. The **planner** receives a compact `name: description` catalog of all registered tools and returns the selected tool names in its `done` payload.
+6. The **executor** receives only the selected tool schemas and drives an MCP tool-call loop against the desktop adapter.
 7. **MCP adapters** (`adapters/gnome`, `adapters/dictation`) run as out-of-process stdio servers, hot-plugged at startup via `adapter.json` manifests.
 
 The agent request is intentionally compact — no full desktop snapshot or complete tool schema set is sent on each
@@ -284,7 +284,7 @@ end-to-end; only the microphone, STT, TTS, and speaker are faked. Requires a rea
 `GROQ_API_KEY` in `.env`:
 
 ```bash
-docker compose run --rm --no-deps tusk python -m e2e.run_voice_e2e
+docker compose run --rm --no-deps tusk python -m e2e.run_e2e voice
 ```
 
 **Pair-coding transcript e2e** (`demos/`) — replays a scripted coding session through the
@@ -313,34 +313,20 @@ planner → MCP adapter) using the emulator shell and a mock editor.
 
 ```
 tusk/
-├── tusk/
-│   ├── kernel/         # Business logic: KernelAPI, agent orchestrator, planner, modes, tool registry
-│   ├── providers/      # Concrete LLM providers (Groq, OpenRouter) and STT engines (Groq, Whisper)
-│   └── shared/         # Infrastructure: config, schemas, LLM proxy/registry, MCP client, logging
-├── shells/
-│   ├── voice/          # AudioCapture, UtteranceDetector (VAD), gatekeeper, VoiceShell
-│   ├── cli/            # CliShell (REPL)
-│   ├── tray/           # System tray status indicator
-│   └── emulator/       # Transcript-driven shell for scripted e2e runs
-├── adapters/
-│   ├── gnome/          # GNOME desktop MCP server (windows, input, mouse, clipboard)
-│   ├── dictation/      # Dictation refinement MCP server
-│   └── coding/         # Voice pair-coding MCP server
-├── e2e/                # Voice e2e harness: real pipeline + kernel, fake mic/STT/TTS
-├── demos/              # Pair-coding transcripts + editor_emulator mock desktop adapter
-└── main.py             # Startup wiring: build kernel, attach shells, run adapters
+├── tusk/          # kernel (agent, modes, tools), shared (ABCs, schemas, plumbing), providers (LLM, STT, TTS)
+├── shells/        # voice, tray, CLI, and emulator shells
+├── adapters/      # out-of-process MCP servers: gnome, dictation, coding
+├── composition/   # composition root: ShellLoader, VoiceShellBuilder, GatekeeperBuilder
+├── launcher/      # host-side launcher daemon
+├── e2e/           # e2e harness: real pipeline + kernel, fake mic/STT/TTS
+├── demos/         # pair-coding transcripts + editor_emulator mock adapter
+├── tests/         # test suite (mirrors the source tree)
+└── main.py        # entry point
 ```
 
-See `docs/brief.md` for the project vision, `docs/architecture.md` for the current runtime
-architecture, and `docs/specification.md` for the concrete technical contract.
-
-The current runtime uses a planner/executor split:
-
-- No automatic desktop snapshot is injected into the agent conversation
-- The conversation agent sees only `execute_task` plus terminal tools
-- The planner sees the full tool catalog as compact text only
-- The execution agent sees only the selected native tool schemas for the current task
-- If execution lacks capability, it returns `need_tools` and the kernel replans with the missing capability
+See [docs/architecture.md](docs/architecture.md) for the full directory tree and the runtime
+architecture, `docs/brief.md` for the project vision, and `docs/specification.md` for the
+concrete technical contract.
 
 ## Not Yet Implemented
 

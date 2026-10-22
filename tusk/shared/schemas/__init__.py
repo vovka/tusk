@@ -5,8 +5,8 @@ from tusk.shared.schemas.buffer_selection import BufferSelection
 from tusk.shared.schemas.desktop.desktop_context import DesktopContext
 from tusk.shared.schemas.chat_message import ChatMessage
 from tusk.shared.schemas.edit_operation import EditOperation
-from tusk.shared.schemas.gate_classification import GateClassification
-from tusk.shared.schemas.gate_result import GateResult
+from tusk.shared.schemas.voice.gate_classification import GateClassification
+from tusk.shared.schemas.voice.gate_result import GateResult
 from tusk.shared.schemas.kernel_response import KernelResponse
 from tusk.shared.schemas.llm_slot_config import LLMSlotConfig
 from tusk.shared.schemas.tools.mcp_tool_result import MCPToolResult
@@ -16,7 +16,7 @@ from tusk.shared.schemas.tools.tool_call import ToolCall
 from tusk.shared.schemas.tools.tool_sequence_plan import ToolSequencePlan
 from tusk.shared.schemas.tools.tool_sequence_step import ToolSequenceStep
 from tusk.shared.schemas.tools.tool_result import ToolResult
-from tusk.shared.schemas.utterance import Utterance
+from tusk.shared.schemas.voice.utterance import Utterance
 from tusk.shared.schemas.desktop.window_info import WindowInfo
 
 __all__ = [

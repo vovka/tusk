@@ -1,0 +1,18 @@
+from tests.support.kernel_api import make_registry_tool
+from tusk.kernel.agent.planner.tool_catalog import ToolCatalog
+from tusk.kernel.tools.tool_registry import ToolRegistry
+
+
+def test_registry_tracks_sequence_callable_tools() -> None:
+    registry = ToolRegistry()
+    registry.register(make_registry_tool("gnome.type_text", "type", sequence_callable=True))
+    registry.register(make_registry_tool("gnome.list_windows", "list"))
+    sequence_callable = [tool.name for tool in registry.planner_tools() if tool.sequence_callable]
+    assert sequence_callable == ["gnome.type_text"]
+
+
+def test_catalog_exposes_sequence_callable_flag() -> None:
+    registry = ToolRegistry()
+    registry.register(make_registry_tool("gnome.type_text", "type", sequence_callable=True))
+    tool = ToolCatalog(registry).list_tools().data["tools"][0]
+    assert tool["sequence_callable"] is True

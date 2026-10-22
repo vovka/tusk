@@ -1,6 +1,6 @@
 from tusk.providers.stt.groq_stt import GroqSTT
 from tusk.providers.stt.whisper_stt import WhisperSTT
-from tusk.shared.stt.interfaces.stt_engine import STTEngine
+from tusk.shared.interfaces.stt_engine import STTEngine
 
 __all__ = ["STTEngineFactory"]
 

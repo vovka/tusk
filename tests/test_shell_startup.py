@@ -28,11 +28,12 @@ def test_main_publishes_initial_model_labels(monkeypatch) -> None:
 def _stub_main(monkeypatch, captured: dict) -> None:
     config = types.SimpleNamespace(shells=["cli"])
     registry = types.SimpleNamespace(model_labels=lambda: (("gatekeeper", "groq/llama"),))
-    kernel = types.SimpleNamespace(get_llm_registry=lambda: registry)
-    monkeypatch.setattr(main.StartupOptions, "from_sources", lambda argv=None: types.SimpleNamespace())
+    kernel = types.SimpleNamespace(llm_registry=registry)
+    monkeypatch.setattr(main.StartupOptions, "from_sources", lambda argv=None: types.SimpleNamespace(version=False, log_groups=frozenset(), hidden_groups=frozenset()))
     monkeypatch.setattr(main.Config, "from_env", lambda: config)
-    monkeypatch.setattr(main, "_build_log", lambda options: types.SimpleNamespace(log=lambda *a: None))
-    monkeypatch.setattr(main, "StatusReporterHub", lambda sink, logger: _reporter(captured))
+    monkeypatch.setattr(main, "ColorLogPrinter", lambda shown, hidden: types.SimpleNamespace(log=lambda *a: None))
+    monkeypatch.setattr(main, "TracerFactory", lambda: types.SimpleNamespace(create=lambda endpoint: None))
+    monkeypatch.setattr(main, "StatusReporter", lambda sink, logger: _reporter(captured))
     monkeypatch.setattr(main, "_build_kernel", lambda c, l, o, reporter, token, tracer, meter: captured.__setitem__("kernel_meter", meter) or kernel)
     monkeypatch.setattr(main, "ShellLoader", lambda c, k, l, reporter, meter: captured.__setitem__("loader_meter", meter.__self__) or _loader(captured, reporter))
 

@@ -1,0 +1,75 @@
+import types
+
+from tusk.kernel.modes.dictation_mode import DictationMode
+from tusk.kernel.modes.mode_state import ModeState
+from tusk.shared.schemas.tools.tool_result import ToolResult
+
+
+def test_dictation_mode_logs_segment_and_apply() -> None:
+    calls: list[tuple[str, dict]] = []
+    logs: list[tuple[str, str]] = []
+    mode = DictationMode(_registry(calls, True), _log(logs))
+    result = mode.process(_state(), "hello world")
+    assert result.handled is True
+    assert calls[-1] == ("gnome.type_text", {"text": "hello world"})
+    assert logs == _expected_logs()
+
+
+def test_dictation_mode_reports_desktop_apply_failure() -> None:
+    logs: list[tuple[str, str]] = []
+    mode = DictationMode(_registry([], False), _log(logs))
+    result = mode.process(_state(), "hello world")
+    assert result.handled is False
+    assert result.reply == "typing failed"
+    assert logs[-1] == ("DICTATION", "apply failed via gnome: typing failed")
+
+
+def test_dictation_mode_stops_via_adapter_stop_tool() -> None:
+    calls: list[tuple[str, dict]] = []
+    mode = DictationMode(_registry(calls, True), _log([]))
+    result = mode.stop(_state())
+    assert result.handled is True
+    assert result.reply == "Dictation stopped."
+    assert calls[-1] == ("dictation.stop_dictation", {"session_id": "session-1"})
+
+
+def _registry(calls: list[tuple[str, dict]], success: bool) -> object:
+    def get(name: str) -> object:
+        if name == "dictation.process_segment":
+            return _tool(calls, name, ToolResult(True, "dictation updated", _segment()))
+        if name == "dictation.stop_dictation":
+            return _tool(calls, name, ToolResult(True, "dictation stopped"))
+        if name == "gnome.get_active_window":
+            return _tool(calls, name, ToolResult(True, "active window: Editor -> gedit"))
+        return _tool(calls, name, ToolResult(success, "typed" if success else "typing failed"))
+
+    return types.SimpleNamespace(get=get)
+
+
+def _tool(calls: list[tuple[str, dict]], name: str, result: ToolResult) -> object:
+    return types.SimpleNamespace(execute=lambda args: _record(calls, name, args, result))
+
+
+def _record(calls: list[tuple[str, dict]], name: str, args: dict, result: ToolResult) -> ToolResult:
+    calls.append((name, args))
+    return result
+
+
+def _segment() -> dict:
+    return {"operation": "insert", "text": "hello world", "should_stop": False}
+
+
+def _state() -> ModeState:
+    return ModeState("dictation", "session-1", "gnome")
+
+
+def _log(logs: list[tuple[str, str]]) -> object:
+    return types.SimpleNamespace(log=lambda group, message, source=None: logs.append((group, message)))
+
+
+def _expected_logs() -> list[tuple[str, str]]:
+    return [
+        ("DICTATION", "segment='hello world'"),
+        ("DICTATION", "active window: Editor -> gedit"),
+        ("DICTATION", "apply insert via gnome"),
+    ]

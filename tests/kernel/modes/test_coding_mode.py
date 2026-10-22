@@ -1,0 +1,94 @@
+import types
+
+from tusk.kernel.modes.coding_mode import CodingMode
+from tusk.kernel.modes.mode_state import ModeState
+from tusk.shared.schemas.kernel_response import KernelResponse
+from tusk.shared.schemas.edit_operation import EditOperation
+from tusk.shared.schemas.tools.tool_result import ToolResult
+
+
+def test_process_applies_each_operation_via_applier() -> None:
+    applied: list[EditOperation] = []
+    mode = CodingMode(_registry([], True), object(), _applier(applied), _log())
+    result = mode.process(_state(), "rename the function")
+    assert result.handled is True
+    assert applied == [EditOperation("replace", 1, 1, "def renamed():", "def renamed():")]
+
+
+def test_process_replies_silently_on_success() -> None:
+    mode = CodingMode(_registry([], True), object(), _applier([]), _log())
+    result = mode.process(_state(), "rename the function")
+    assert result.reply == ""
+
+
+def test_process_reports_failure_when_apply_raises() -> None:
+    def boom(edit: object, driver: object) -> None:
+        raise RuntimeError("xdotool missing")
+
+    applier = types.SimpleNamespace(apply=boom)
+    mode = CodingMode(_registry([], True), object(), applier, _log())
+    result = mode.process(_state(), "rename the function")
+    assert result.handled is False
+    assert "couldn't apply" in result.reply.lower()
+
+
+def test_process_reports_failure_when_adapter_errors() -> None:
+    mode = CodingMode(_registry([], False), object(), _applier([]), _log())
+    result = mode.process(_state(), "do thing")
+    assert result.handled is False
+    assert result.reply == "planning failed"
+
+
+def test_process_reports_failure_on_malformed_operation() -> None:
+    malformed = ToolResult(True, "ok", {"operations": [{"unexpected": 1}]})
+    registry = types.SimpleNamespace(get=lambda name: _tool([], name, malformed))
+    mode = CodingMode(registry, object(), _applier([]), _log())
+    result = mode.process(_state(), "rename the function")
+    assert result.handled is False
+    assert "couldn't apply" in result.reply.lower()
+
+
+def test_process_reports_failure_when_data_is_not_a_dict() -> None:
+    malformed = ToolResult(True, "ok", ["operations"])
+    registry = types.SimpleNamespace(get=lambda name: _tool([], name, malformed))
+    mode = CodingMode(registry, object(), _applier([]), _log())
+    result = mode.process(_state(), "rename the function")
+    assert result.handled is False
+    assert "couldn't apply" in result.reply.lower()
+
+
+def test_stop_calls_adapter_stop_tool() -> None:
+    calls: list[tuple[str, dict]] = []
+    mode = CodingMode(_registry(calls, True), object(), _applier([]), _log())
+    result = mode.stop(_state())
+    assert result == KernelResponse(True, "Coding stopped.")
+    assert calls == [("coding.stop_coding_session", {"session_id": "s1"})]
+
+
+def _registry(calls: list, success: bool) -> object:
+    def get(name: str) -> object:
+        if name == "coding.process_intent":
+            return _tool(calls, name, ToolResult(success, "ok" if success else "planning failed", _ops() if success else None))
+        return _tool(calls, name, ToolResult(True, "stopped"))
+
+    return types.SimpleNamespace(get=get)
+
+
+def _tool(calls: list, name: str, result: ToolResult) -> object:
+    return types.SimpleNamespace(execute=lambda args: calls.append((name, args)) or result)
+
+
+def _ops() -> dict:
+    return {"operations": [{"kind": "replace", "target_start": 1, "target_end": 1, "new_text": "def renamed():", "full_buffer": "def renamed():"}]}
+
+
+def _applier(applied: list) -> object:
+    return types.SimpleNamespace(apply=lambda edit, driver: applied.append(edit))
+
+
+def _state() -> ModeState:
+    return ModeState("coding", "s1", "gnome")
+
+
+def _log() -> object:
+    return types.SimpleNamespace(log=lambda *args: None)

@@ -3,11 +3,11 @@ import types
 
 import pytest
 
-from shells.voice.buffered_utterance import BufferedUtterance
-from shells.voice.gate_dispatch import GateDispatch
+from tusk.shared.schemas.voice.buffered_utterance import BufferedUtterance
+from tusk.shared.schemas.voice.gate_dispatch import GateDispatch
 from shells.voice.pipeline import VoicePipeline
 from tusk.shared.schemas.kernel_response import KernelResponse
-from tusk.shared.schemas.utterance import Utterance
+from tusk.shared.schemas.voice.utterance import Utterance
 
 
 def test_capture_keeps_running_while_submit_is_busy() -> None:
@@ -45,7 +45,7 @@ def _pipeline(detector: object) -> VoicePipeline:
         types.SimpleNamespace(process=lambda utterance: transcribed),
         types.SimpleNamespace(process=lambda utterance: utterance),
         _buffer(),
-        types.SimpleNamespace(process=lambda utterance, recent, candidates=None: GateDispatch("forward_current", "open Firefox")),
+        types.SimpleNamespace(process=lambda utterance, recent, candidates: GateDispatch("forward_current", "open Firefox")),
     )
 
 
@@ -86,4 +86,4 @@ def _busy_submitter(drained: threading.Event, submits: list[str]) -> object:
 
 def _buffer() -> object:
     entries = iter([BufferedUtterance("u1", Utterance("open Firefox", b"", 1.0), 1.0), BufferedUtterance("u2", Utterance("open Firefox", b"", 1.0), 2.0)])
-    return types.SimpleNamespace(process=lambda utterance: next(entries), recent=lambda count: [], recoverable=lambda count, window: [], mark=lambda entry_id, state: None)
+    return types.SimpleNamespace(process=lambda utterance: next(entries), recent=lambda count: [], recoverable=lambda count, window: [], mark_dropped=lambda entry_id: None, mark_recovered=lambda entry_id: None)

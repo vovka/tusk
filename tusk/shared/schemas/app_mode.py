@@ -9,3 +9,4 @@ MODE_BYPASS_KIND_PREFIX = "mode-bypass:"
 class AppMode(Enum):
     DEFAULT = "default"
     DICTATION = "dictation"
+    CODING = "coding"

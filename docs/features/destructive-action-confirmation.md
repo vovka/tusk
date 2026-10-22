@@ -19,7 +19,7 @@ misrouted command. Such tool calls are held until the user says "Tusk, yes".
    compared after splitting on `+`, `<`, `>`, so `Ctrl+W` and `<ctrl>w` are both held.
 3. A destructive call is not run. The gate stores one `PendingAction` and returns
    `needs_confirmation: Close window 'X'? Say 'Tusk, yes' to confirm.` A sequence stops at that step.
-4. `ConfirmingCommandMode` (wired in `startup.build_api`) replaces the agent's reply with the
+4. `CommandMode` (wired in `startup.build_api`) replaces the agent's reply with the
    question, so it is spoken. On the next utterance it calls `ConfirmationGate.resolve` first:
    "yes"/"confirm"/"do it" runs the action, "no"/"cancel" replies "Cancelled.", anything else
    drops the action and is routed as a normal command. Actions expire after 30 s.

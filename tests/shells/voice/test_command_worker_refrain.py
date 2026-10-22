@@ -1,8 +1,10 @@
 import threading
 import types
 
-from tests.command_worker_support import await_condition, make_worker, recording_submit, working_tts
-from tusk.shared.interrupt import InterruptToken
+from shells.voice.command_worker import CommandWorker
+from shells.voice.speech.chunked_speaker import ChunkedSpeaker
+from tests.support.command_worker import await_condition, make_worker, recording_submit, working_tts
+from tusk.shared.interrupt_token import InterruptToken
 from tusk.shared.schemas.kernel_response import KernelResponse
 
 
@@ -103,3 +105,21 @@ def test_interrupt_during_ack_does_not_fake_cancellation_of_a_completed_command(
     await_condition(lambda: ("TUSK", "a reply") in logs and not worker.is_busy)
     assert submits == ["open gedit"]
     assert ("TUSK", "Stopped.") not in logs
+
+
+def _worker(calls: list[tuple[str, str]]) -> CommandWorker:
+    def submit(text: str, kind: str) -> KernelResponse:
+        calls.append((text, kind))
+        return KernelResponse(True, "")
+
+    log = types.SimpleNamespace(log=lambda *args: None)
+    speaker = ChunkedSpeaker(None, types.SimpleNamespace(play=lambda wav: None), log)
+    worker = CommandWorker(submit, speaker, log, InterruptToken())
+    worker.start()
+    return worker
+
+
+def test_worker_forwards_kind_to_kernel_submit() -> None:
+    calls: list[tuple[str, str]] = []
+    _worker(calls).enqueue("open gedit", "Opening gedit", "command")
+    await_condition(lambda: calls == [("open gedit", "command")])

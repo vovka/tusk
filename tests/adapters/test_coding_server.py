@@ -1,6 +1,6 @@
 import types
 
-from adapters.coding.server import CodingServer
+from adapters.coding.server import TOOL_SCHEMAS, CodingServer
 
 
 def test_start_coding_session_seeds_buffer_and_returns_session_id() -> None:
@@ -53,3 +53,10 @@ def test_serve_answers_tools_list_over_injected_streams() -> None:
     CodingServer(_planner(""), input_stream=io.StringIO(request + "\n"), output_stream=output).serve()
     tools = json.loads(output.getvalue())["result"]["tools"]
     assert {tool["name"] for tool in tools} == {"start_coding_session", "process_intent", "stop_coding_session"}
+
+
+def test_tool_schemas_describe_each_tool_by_its_spaced_name() -> None:
+    assert TOOL_SCHEMAS[1] == {
+        "name": "process_intent", "description": "process intent",
+        "inputSchema": {"type": "object", "properties": {"session_id": {"type": "string"}, "intent": {"type": "string"}}},
+    }

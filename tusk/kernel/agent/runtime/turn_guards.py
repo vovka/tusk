@@ -1,8 +1,7 @@
 from tusk.shared.schemas.tools.tool_call import ToolCall
 from tusk.shared.schemas.tools.tool_result import ToolResult
 from tusk.kernel.agent.guards.consecutive_typing_guard import ConsecutiveTypingGuard
-from tusk.kernel.agent.guards.conversation_failure_budget_guard import ConversationFailureBudgetGuard
-from tusk.kernel.agent.guards.conversation_run_agent_guard import ConversationRunAgentGuard
+from tusk.kernel.agent.guards.conversation_delegation_guard import ConversationDelegationGuard
 from tusk.kernel.agent.guards.executor_clipboard_guard import ExecutorClipboardGuard
 
 __all__ = ["TurnGuards"]
@@ -10,7 +9,7 @@ __all__ = ["TurnGuards"]
 
 class TurnGuards:
     def __init__(self) -> None:
-        self._guards = [ConversationRunAgentGuard(), ConversationFailureBudgetGuard(), ExecutorClipboardGuard()]
+        self._guards = [ConversationDelegationGuard(), ExecutorClipboardGuard()]
         self._typing = ConsecutiveTypingGuard()
         self._last_success: str | None = None
 
