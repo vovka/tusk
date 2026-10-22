@@ -7,7 +7,8 @@ def test_registry_tracks_sequence_callable_tools() -> None:
     registry = ToolRegistry()
     registry.register(make_registry_tool("gnome.type_text", "type", sequence_callable=True))
     registry.register(make_registry_tool("gnome.list_windows", "list"))
-    assert registry.sequence_tool_names() == {"gnome.type_text"}
+    sequence_callable = [tool.name for tool in registry.planner_tools() if tool.sequence_callable]
+    assert sequence_callable == ["gnome.type_text"]
 
 
 def test_catalog_exposes_sequence_callable_flag() -> None:

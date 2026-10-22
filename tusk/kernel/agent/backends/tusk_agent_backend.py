@@ -19,10 +19,6 @@ class TuskAgentBackend(AgentBackend):
     def name(self) -> str:
         return "tusk"
 
-    @property
-    def supports_streaming(self) -> bool:
-        return False
-
     def run(self, request: AgentRequest) -> AgentResult:
         if request is None: raise ValueError("request cannot be None")
         started_at = self._run_logger.start(request) if self._run_logger else None

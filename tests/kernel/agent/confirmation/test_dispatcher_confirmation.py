@@ -25,5 +25,5 @@ def _dispatch(seen: list[dict], call: ToolCall) -> ToolResult:
     registry = ToolRegistry()
     for name in ("gnome.close_window", "gnome.press_keys"):
         registry.register(make_registry_tool(name, "ok", execute=lambda arguments: seen.append(arguments) or ToolResult(True, "ok")))
-    dispatcher = OrchestratorToolDispatcher(registry, types.SimpleNamespace(), types.SimpleNamespace(), confirmation=ConfirmationGate(registry))
+    dispatcher = OrchestratorToolDispatcher(registry, types.SimpleNamespace(), confirmation=ConfirmationGate(registry))
     return dispatcher.dispatch(call, lambda tool_call: ToolResult(False, "unused"))

@@ -33,7 +33,7 @@ class StepPlanValidator:
         for step in plan.steps:
             if step.tool_name in _FORBIDDEN_TOOLS:
                 return f"{step.step_id}: synthetic tools are not allowed in planned_steps"
-            if step.tool_name not in self._registry.real_tool_names():
+            if step.tool_name not in self._registry.tool_names():
                 return f"{step.step_id}: unknown tool: {step.tool_name}"
         return None
 

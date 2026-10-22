@@ -16,7 +16,6 @@ class RecordingAgent:
 def test_tusk_agent_backend_exposes_backend_metadata() -> None:
     backend = TuskAgentBackend(RecordingAgent())
     assert backend.name == "tusk"
-    assert backend.supports_streaming is False
 
 
 def test_tusk_agent_backend_normalizes_legacy_reply() -> None:

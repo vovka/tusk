@@ -4,7 +4,6 @@ from dataclasses import replace
 from tusk.shared.schemas.tools.tool_call import ToolCall
 from tusk.shared.schemas.tools.tool_result import ToolResult
 from tusk.kernel.tools.tool_registry import ToolRegistry
-from tusk.kernel.agent.agent_tool_catalog import AgentToolCatalog
 from tusk.kernel.agent.simple_schema_validator import SimpleSchemaValidator
 from tusk.kernel.agent.tool_sequence.executor import Executor
 from tusk.kernel.interfaces.action_confirmation import ActionConfirmation
@@ -16,9 +15,8 @@ __all__ = ["OrchestratorToolDispatcher"]
 
 
 class OrchestratorToolDispatcher:
-    def __init__(self, tool_registry: ToolRegistry, catalog: AgentToolCatalog, sequence_executor: Executor, validator: SimpleSchemaValidator | None = None, tracer: Tracer | None = None, *, confirmation: ActionConfirmation) -> None:
+    def __init__(self, tool_registry: ToolRegistry, sequence_executor: Executor, validator: SimpleSchemaValidator | None = None, tracer: Tracer | None = None, *, confirmation: ActionConfirmation) -> None:
         self._registry = tool_registry
-        self._catalog = catalog
         self._sequence = sequence_executor
         self._validator = validator or SimpleSchemaValidator()
         self._tracer = tracer or NullTracer()
@@ -34,8 +32,6 @@ class OrchestratorToolDispatcher:
     ) -> ToolResult:
         if tool_call.tool_name == "run_agent":
             return run_agent(tool_call)
-        if tool_call.tool_name == "list_available_tools":
-            return self._catalog.list_tools()
         if tool_call.tool_name == "execute_tool_sequence":
             return self._execute_sequence(session_id, allowed_tool_names, sequence_plan)
         return self._real_tool(self._with_full_name(tool_call))

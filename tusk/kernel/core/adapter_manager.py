@@ -44,18 +44,6 @@ class AdapterManager:
         client = self._connect_stdio(path, manifest)
         self._register(name, client, manifest, client.list_tools())
 
-    def stop_adapter(self, name: str) -> None:
-        client = self._clients.pop(name, None)
-        if client is not None:
-            client.shutdown()
-        self.tool_registry.unregister_source(name)
-        if self._context_adapter == name:
-            self._context_adapter = None
-
-    def stop_all(self) -> None:
-        for name in list(self._clients):
-            self.stop_adapter(name)
-
     def start_watcher(self) -> None:
         if Observer is None:
             self._log.log("PIPELINE", "watchdog not installed; adapter hot-plug disabled")

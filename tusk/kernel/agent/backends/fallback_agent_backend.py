@@ -20,10 +20,6 @@ class FallbackAgentBackend(AgentBackend):
     def name(self) -> str:
         return self._primary.name
 
-    @property
-    def supports_streaming(self) -> bool:
-        return self._primary.supports_streaming
-
     def run(self, request: AgentRequest) -> AgentResult:
         primary_result = self._primary.run(request)
         if primary_result.status != "failed":

@@ -27,10 +27,6 @@ class CodexExecAgentBackend(AgentBackend):
     def name(self) -> str:
         return "codex_exec"
 
-    @property
-    def supports_streaming(self) -> bool:
-        return False
-
     def run(self, request: AgentRequest) -> AgentResult:
         started_at = self._run_logger.start(request)
         result = self._run_process(request)

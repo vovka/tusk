@@ -52,7 +52,7 @@ class AgentToolsetBuilder:
         # a delegated or recovered child never carries gate_command, so it stays narrowed
         if self._full_catalogue(request):
             return {tool.name for tool in self._registry.planner_tools()}
-        real = self._registry.real_tool_names()
+        real = self._registry.tool_names()
         return {name for name in names if name in real}
 
     def _full_catalogue(self, request: AgentRunRequest) -> bool:

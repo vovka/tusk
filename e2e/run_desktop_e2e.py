@@ -13,21 +13,10 @@ from e2e.desktop_scenarios import SCENARIOS
 from e2e.voice_e2e_harness import VoiceE2EHarness
 
 
-def _wire_echo_filter(h: VoiceE2EHarness) -> bool:
-    # the harness builds its pipeline without the filter, so poke it in where the branch provides one
-    try:
-        from shells.voice.stages.echo_filter import EchoFilter
-    except ImportError:
-        return False
-    h._shell._pipeline._echo_filter = EchoFilter(lambda: h.worker.recent_speech, h._log)
-    return True
-
-
 def main() -> int:
     kernel, tool_registry, token, log = build_desktop_app()
     harness = VoiceE2EHarness(kernel, token, log)
     harness.playback.seconds_per_play = 2.0
-    print(f"echo filter wired: {_wire_echo_filter(harness)}", flush=True)
     harness.start()
     probe = DesktopProbe(tool_registry)
     failures = sum(_run_one(harness, probe, scenario) for scenario in SCENARIOS)

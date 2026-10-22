@@ -1,3 +1,1 @@
-from adapters.dictation.session_response import DictationEdit
-
-__all__ = ["DictationEdit"]
+__all__: list[str] = []

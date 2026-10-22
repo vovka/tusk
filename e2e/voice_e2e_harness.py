@@ -8,6 +8,7 @@ from e2e.queue_detector import QueueDetector
 from shells.voice.command_worker import CommandWorker
 from shells.voice.pipeline import VoicePipeline
 from shells.voice.stages.chunked_speaker import ChunkedSpeaker
+from shells.voice.stages.echo_filter import EchoFilter
 from shells.voice.stages.gate.gatekeeper import LLMGatekeeper
 from shells.voice.stages.sanitizer import Sanitizer
 from shells.voice.stages.transcription_buffer import TranscriptionBuffer
@@ -73,6 +74,7 @@ class VoiceE2EHarness:
         return VoicePipeline(
             self.detector, transcriber, Sanitizer(self._log), TranscriptionBuffer(self._log),
             self._gatekeeper(), on_interrupt=self._on_interrupt,
+            echo_filter=EchoFilter(lambda: self.worker.recent_speech, self._log),
         )
 
     def _gatekeeper(self) -> LLMGatekeeper:

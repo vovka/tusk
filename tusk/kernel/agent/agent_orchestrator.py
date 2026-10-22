@@ -53,7 +53,7 @@ class AgentOrchestrator:
         self._resolved_tools = RuntimeToolResolver(store)
         self._tools = AgentToolsetBuilder(registry)
         sequence_executor = Executor(registry, store, token, tracer=tracer, confirmation=confirmation)
-        self._dispatcher = OrchestratorToolDispatcher(registry, self._catalog, sequence_executor, tracer=tracer, confirmation=confirmation)
+        self._dispatcher = OrchestratorToolDispatcher(registry, sequence_executor, tracer=tracer, confirmation=confirmation)
 
     def run(self, request: AgentRunRequest) -> AgentResult:
         return self._run(request, ())
@@ -79,7 +79,7 @@ class AgentOrchestrator:
 
     def _prepared(self, request: AgentRunRequest) -> AgentRunRequest:
         request = self._enrich_planner(request)
-        return self._resolved_tools.resolve(request, self._registry.real_tool_names())
+        return self._resolved_tools.resolve(request, self._registry.tool_names())
 
     def _enrich_planner(self, request: AgentRunRequest) -> AgentRunRequest:
         if request.profile_id != "planner":

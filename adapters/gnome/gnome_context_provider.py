@@ -1,5 +1,4 @@
 import subprocess
-from dataclasses import asdict
 
 from adapters.gnome.app_catalog import AppCatalog
 from tusk.shared.schemas.desktop.desktop_context import DesktopContext
@@ -22,9 +21,6 @@ class GnomeContextProvider:
             open_windows=windows,
             available_applications=self._catalog.list_apps(),
         )
-
-    def get_context_dict(self) -> dict:
-        return asdict(self.get_context())
 
     def _list_windows(self) -> list[WindowInfo]:
         result = subprocess.run(["wmctrl", "-l", "-G"], capture_output=True, text=True)

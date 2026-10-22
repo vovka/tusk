@@ -31,10 +31,6 @@ class CodexMcpAgentBackend(AgentBackend):
     def name(self) -> str:
         return "codex_mcp"
 
-    @property
-    def supports_streaming(self) -> bool:
-        return False
-
     def run(self, request: AgentRequest) -> AgentResult:
         started_at = self._run_logger.start(request)
         with self._lock:

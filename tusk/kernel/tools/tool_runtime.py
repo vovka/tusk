@@ -5,7 +5,11 @@ from tusk.kernel.modes.input_automation_editor_driver import InputAutomationEdit
 from tusk.kernel.modes.mode_slot import ModeSlot
 from tusk.kernel.modes.edit_strategies.line_anchored_edit_strategy import LineAnchoredEditStrategy
 from tusk.kernel.modes.edit_strategies.verified_edit_strategy import VerifiedEditStrategy
-from tusk.kernel.tools.internal_tools import CodingRouter, DictationRouter, StartCodingTool, StartDictationTool, SwitchModelTool
+from tusk.kernel.modes.coding_router import CodingRouter
+from tusk.kernel.modes.dictation_router import DictationRouter
+from tusk.kernel.tools.start_coding_tool import StartCodingTool
+from tusk.kernel.tools.start_dictation_tool import StartDictationTool
+from tusk.kernel.tools.switch_model_tool import SwitchModelTool
 from tusk.kernel.tools.tool_registry import ToolRegistry
 from tusk.shared.llm.llm_registry import LLMRegistry
 from tusk.shared.logging.interfaces.log_printer import LogPrinter

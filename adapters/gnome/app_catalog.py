@@ -3,7 +3,6 @@ import glob
 import os
 import re
 from collections.abc import Callable
-from dataclasses import asdict
 
 from adapters.gnome.app_ranking import DEFAULT_CATEGORIES, ranked, system_default_app
 from tusk.shared.desktop.fuzzy_name_matcher import FuzzyNameMatcher
@@ -33,9 +32,6 @@ class AppCatalog:
         paths = [p for d in self._dirs for p in glob.glob(f"{d}/*.desktop")]
         entries = [self._parse(p) for p in paths]
         return sorted([e for e in entries if e], key=lambda e: e.name)
-
-    def list_dicts(self) -> list[dict]:
-        return [asdict(item) for item in self.list_apps()]
 
     def search(self, query: str, limit: int = 10) -> list[AppEntry]:
         matches = [rank for rank in (ranked(item, query.casefold()) for item in self.list_apps()) if rank]

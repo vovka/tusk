@@ -596,7 +596,7 @@ from this history.
 
 When the executor profile receives `session_refs=[planner_session_id]`,
 `planner.RuntimeToolResolver` reads the planner's persisted `done` payload and resolves:
-- `runtime_tool_names` — validated against `ToolRegistry.real_tool_names()`; with a
+- `runtime_tool_names` — validated against `ToolRegistry.tool_names()`; with a
   `sequence_plan` present, derived from `plan.ordered_tool_names()` instead.
 - `execution_mode` — `"normal"` or `"sequence"`.
 - `sequence_plan` — a `ToolSequencePlan` materialized from the planner payload.
@@ -643,13 +643,11 @@ Central store for all executable tools. Every entry is a `RegisteredTool` frozen
 adapter name), `planner_visible` (default `True`), `sequence_callable` (default `False`).
 Adapter tools are registered as `adapter_name.tool_name` (e.g. `gnome.launch_application`);
 per-tool flags come from the adapter's manifest (see Adapter Model). The registry exposes
-lookups by name and filtered views (`real_tools`, `planner_tools`, `sequence_tools`,
+lookups by name and filtered views (`all_tools`, `planner_tools`,
 `definitions_for(names)`) — see the class for the exact API.
 
 The planner receives the full catalog as text in its request context via
 `AgentToolCatalog` (name, description, parameters, `sequence_callable` flag per tool).
-The synthetic `list_available_tools` tool is retained in `OrchestratorToolDispatcher` for
-backward compatibility but is no longer exposed to any profile.
 
 Kernel-internal tools (registered by `ToolRuntime`): `start_dictation`, `start_coding`,
 `switch_model`. Synthetic tools (`done`, `run_agent`, `execute_tool_sequence`) are built
@@ -1016,8 +1014,7 @@ GNOME tools.
 
 ## Notes
 
-- HTTP MCP transport is not implemented (`MCPClient.connect_http()` raises
-  `NotImplementedError`).
+- Only the stdio MCP transport is implemented.
 - Dangerous-action confirmation and cross-session memory remain out of scope.
 - The tray indicator uses the StatusNotifierItem/AppIndicator D-Bus protocol; on
   GNOME/Wayland the icon appears only with the "AppIndicator and KStatusNotifierItem

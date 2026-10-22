@@ -6,13 +6,14 @@ from tusk.kernel.agent.session.file_store import FileStore
 from tusk.kernel.agent.tool_sequence.executor import Executor
 from tusk.kernel.tools.tool_registry import ToolRegistry
 from tusk.shared.schemas.tools.tool_result import ToolResult
+from tusk.shared.schemas.tools.tool_sequence_plan import ToolSequencePlan
 
 
 def test_sequence_executor_runs_steps_in_order() -> None:
     seen: list[dict[str, object]] = []
     registry = ToolRegistry()
     registry.register(make_registry_tool("gnome.type_text", "typed", sequence_callable=True, execute=_record(seen)))
-    result = _executor(registry).execute("s1", _plan("hello"), {"gnome.type_text"})
+    result = _executor(registry).execute_plan("s1", ToolSequencePlan.from_dict(_plan("hello")), {"gnome.type_text"})
     assert result.success is True
     assert seen == [{"text": "hello"}]
     assert result.data["completed_step_ids"] == ["s1"]
@@ -21,7 +22,7 @@ def test_sequence_executor_runs_steps_in_order() -> None:
 def test_sequence_executor_aborts_on_failed_step() -> None:
     registry = ToolRegistry()
     registry.register(make_registry_tool("gnome.type_text", "typed", sequence_callable=True, execute=_fail))
-    result = _executor(registry).execute("s1", _plan("hello"), {"gnome.type_text"})
+    result = _executor(registry).execute_plan("s1", ToolSequencePlan.from_dict(_plan("hello")), {"gnome.type_text"})
     assert result.success is False
     assert result.data["failed_step_id"] == "s1"
 
@@ -56,7 +57,7 @@ def test_sequence_executor_cancels_between_steps() -> None:
     registry = ToolRegistry()
     execute = _record_then_interrupt(seen, token)
     registry.register(make_registry_tool("gnome.type_text", "typed", sequence_callable=True, execute=execute))
-    result = _cancellable_executor(registry, token).execute("s1", _two_step_plan(), {"gnome.type_text"})
+    result = _cancellable_executor(registry, token).execute_plan("s1", ToolSequencePlan.from_dict(_two_step_plan()), {"gnome.type_text"})
     assert result.success is False
     assert result.data["status"] == "cancelled"
     assert len(seen) == 1
@@ -103,7 +104,7 @@ def test_sequence_executor_settles_after_launch_style_steps() -> None:
     ]
     plan = {"goal": "Open and type", "steps": steps}
     allowed = {"gnome.launch_application", "gnome.type_text"}
-    result = _settling_executor(_settle_registry(), sleeps).execute("s1", plan, allowed)
+    result = _settling_executor(_settle_registry(), sleeps).execute_plan("s1", ToolSequencePlan.from_dict(plan), allowed)
     assert result.success is True
     assert sleeps == [2.0]
 
@@ -111,7 +112,7 @@ def test_sequence_executor_settles_after_launch_style_steps() -> None:
 def test_sequence_executor_skips_settle_on_last_step() -> None:
     sleeps: list[float] = []
     plan = {"goal": "Open app", "steps": [{"id": "s1", "tool_name": "gnome.launch_application", "args": {"text": "gedit"}}]}
-    result = _settling_executor(_settle_registry(), sleeps).execute("s1", plan, {"gnome.launch_application"})
+    result = _settling_executor(_settle_registry(), sleeps).execute_plan("s1", ToolSequencePlan.from_dict(plan), {"gnome.launch_application"})
     assert result.success is True
     assert sleeps == []
 
@@ -121,7 +122,7 @@ def test_sequence_executor_stops_at_destructive_step() -> None:
     registry = ToolRegistry()
     registry.register(make_registry_tool("gnome.close_window", "closed", sequence_callable=True, execute=_record(seen)))
     plan = {"goal": "Close", "steps": [{"id": "s1", "tool_name": "gnome.close_window", "args": {"window_title": "X"}}]}
-    result = _executor(registry).execute("s1", plan, {"gnome.close_window"})
+    result = _executor(registry).execute_plan("s1", ToolSequencePlan.from_dict(plan), {"gnome.close_window"})
     assert result.success is False
     assert "needs_confirmation" in result.message
     assert seen == []

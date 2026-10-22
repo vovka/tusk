@@ -39,7 +39,7 @@ class PlanValidator:
     def _tool(self, name: str) -> str | None:
         if name in _FORBIDDEN_TOOLS:
             return "synthetic tools are not allowed in sequence_plan"
-        if name not in self._registry.real_tool_names():
+        if name not in self._registry.tool_names():
             return f"unknown tool: {name}"
         tool = self._registry.get(name)
         return None if tool.sequence_callable else f"tool is not sequence_callable: {name}"

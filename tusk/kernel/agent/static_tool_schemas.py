@@ -1,7 +1,6 @@
 __all__ = [
     "DEFAULT_DONE",
     "EXECUTE_TOOL_SEQUENCE",
-    "LIST_TOOLS",
     "PLANNER_DONE",
     "RUN_AGENT",
 ]
@@ -73,5 +72,4 @@ RUN_AGENT: dict[str, object] = {
     "additionalProperties": False,
 }
 
-LIST_TOOLS: dict[str, object] = {"type": "object", "properties": {}, "additionalProperties": False}
 EXECUTE_TOOL_SEQUENCE: dict[str, object] = {"type": "object", "properties": {}, "additionalProperties": False}

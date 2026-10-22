@@ -12,7 +12,7 @@ def _dispatcher(names: tuple[str, ...], seen: list[str]) -> OrchestratorToolDisp
     registry = ToolRegistry()
     for name in names:
         registry.register(make_registry_tool(name, "ok", execute=lambda arguments, name=name: seen.append(name) or ToolResult(True, "ok")))
-    return OrchestratorToolDispatcher(registry, types.SimpleNamespace(), types.SimpleNamespace(), confirmation=ConfirmationGate(registry))
+    return OrchestratorToolDispatcher(registry, types.SimpleNamespace(), confirmation=ConfirmationGate(registry))
 
 
 def test_unprefixed_name_runs_the_unique_matching_tool() -> None:

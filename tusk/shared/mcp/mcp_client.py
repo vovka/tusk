@@ -27,9 +27,6 @@ class MCPClient:
             self._transport = None
             raise
 
-    def connect_http(self, url: str) -> None:
-        raise NotImplementedError(f"HTTP transport is not implemented: {url}")
-
     def list_tools(self) -> list[MCPToolSchema]:
         payload = self._request("tools/list", {})
         return [

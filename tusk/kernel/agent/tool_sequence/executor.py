@@ -26,14 +26,6 @@ class Executor:
         self._tracer = tracer or NullTracer()
         self._confirmation = confirmation
 
-    def execute(self, session_id: str, parameters: dict[str, object], allowed: set[str]) -> ToolResult:
-        message = self._validator.validate(parameters, allowed)
-        if message is not None:
-            return self._invalid(session_id, message)
-        plan = ToolSequencePlan.from_dict(parameters)
-        assert plan is not None
-        return self._run(session_id, plan)
-
     def execute_plan(self, session_id: str, plan: ToolSequencePlan | None, allowed: set[str]) -> ToolResult:
         if plan is None:
             return self._invalid(session_id, "execute_tool_sequence requires a resolved sequence_plan")

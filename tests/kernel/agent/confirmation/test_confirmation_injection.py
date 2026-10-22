@@ -9,7 +9,7 @@ from tusk.kernel.tools.tool_registry import ToolRegistry
 
 def test_dispatcher_requires_an_injected_confirmation() -> None:
     with pytest.raises(TypeError):
-        OrchestratorToolDispatcher(ToolRegistry(), types.SimpleNamespace(), types.SimpleNamespace())
+        OrchestratorToolDispatcher(ToolRegistry(), types.SimpleNamespace())
 
 
 def test_sequence_executor_requires_an_injected_confirmation() -> None:

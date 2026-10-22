@@ -92,7 +92,7 @@ def _raise_key_error(name: str) -> object:
 def test_result_event_keeps_full_message() -> None:
     events: list[tuple[str, str, dict]] = []
     store = types.SimpleNamespace(append_event=lambda sid, name, data: events.append((sid, name, data)))
-    registry = types.SimpleNamespace(sequence_tool_names=lambda: set())
+    registry = types.SimpleNamespace()
     result = ToolResult(False, "x" * 2000, None)
     StepRecorder(store, registry).result("s1", 1, ToolCall("gnome.press_keys", {}, "c1"), result)
     assert events[0][2]["message"] == "x" * 2000

@@ -5,24 +5,25 @@ from tusk.kernel.agent.confirmation.confirmation_gate import ConfirmationGate
 from tusk.kernel.agent.tool_sequence.executor import Executor
 from tusk.kernel.tools.tool_registry import ToolRegistry
 from tusk.shared.schemas.tools.tool_result import ToolResult
+from tusk.shared.schemas.tools.tool_sequence_plan import ToolSequencePlan
 
 
 def test_success_message_prompts_the_done_tool() -> None:
     store, _events = _capturing_store()
-    result = _executor(_typing_registry(), store).execute("s1", _plan(), {"gnome.type_text"})
+    result = _executor(_typing_registry(), store).execute_plan("s1", ToolSequencePlan.from_dict(_plan()), {"gnome.type_text"})
     assert result.success is True
     assert "call the done tool" in result.message.lower()
 
 
 def test_success_recorded_summary_stays_plain() -> None:
     store, events = _capturing_store()
-    _executor(_typing_registry(), store).execute("s1", _plan(), {"gnome.type_text"})
+    _executor(_typing_registry(), store).execute_plan("s1", ToolSequencePlan.from_dict(_plan()), {"gnome.type_text"})
     assert _finished_summary(events) == "Type text completed"
 
 
 def test_failed_message_omits_the_done_prompt() -> None:
     store, _events = _capturing_store()
-    result = _executor(_typing_registry(_fail), store).execute("s1", _plan(), {"gnome.type_text"})
+    result = _executor(_typing_registry(_fail), store).execute_plan("s1", ToolSequencePlan.from_dict(_plan()), {"gnome.type_text"})
     assert result.success is False
     assert "call the done tool" not in result.message.lower()
 
