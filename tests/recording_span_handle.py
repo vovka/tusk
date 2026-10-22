@@ -1,4 +1,4 @@
-from tusk.shared.tracing.interfaces.span_handle import SpanHandle
+from tusk.shared.interfaces.span_handle import SpanHandle
 
 __all__ = ["RecordingSpanHandle"]
 

@@ -4,7 +4,7 @@ import types
 
 from shells.voice.command_worker import CommandWorker
 from shells.voice.stages.chunked_speaker import ChunkedSpeaker
-from tusk.shared.interrupt import InterruptToken
+from tusk.shared.interrupt_token import InterruptToken
 from tusk.shared.schemas.kernel_response import KernelResponse
 
 

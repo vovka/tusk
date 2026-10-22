@@ -3,10 +3,10 @@ from collections.abc import Callable
 from tusk.kernel.modes.coding_mode import CodingMode
 from tusk.kernel.modes.dictation_mode import DictationMode
 from tusk.kernel.modes.mode_state import ModeState
-from tusk.shared.logging.interfaces.log_printer import LogPrinter
+from tusk.shared.interfaces.log_printer import LogPrinter
+from tusk.shared.observability.status_reporter import StatusReporter
 from tusk.shared.schemas.app_mode import AppMode
 from tusk.shared.schemas.kernel_response import KernelResponse
-from tusk.shared.status.status_reporter import StatusReporter
 
 __all__ = ["ModeSlot"]
 

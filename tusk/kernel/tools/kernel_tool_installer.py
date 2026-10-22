@@ -9,9 +9,9 @@ from tusk.kernel.tools.start_coding_tool import StartCodingTool
 from tusk.kernel.tools.start_dictation_tool import StartDictationTool
 from tusk.kernel.tools.switch_model_tool import SwitchModelTool
 from tusk.kernel.tools.tool_registry import ToolRegistry
+from tusk.shared.interfaces.log_printer import LogPrinter
 from tusk.shared.llm.llm_registry import LLMRegistry
-from tusk.shared.logging.interfaces.log_printer import LogPrinter
-from tusk.shared.status.status_reporter import StatusReporter
+from tusk.shared.observability.status_reporter import StatusReporter
 
 __all__ = ["KernelToolInstaller"]
 

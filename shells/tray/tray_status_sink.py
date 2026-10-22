@@ -3,9 +3,9 @@ from collections.abc import Callable
 from shells.tray.status_icon_resolver import StatusIconResolver
 from shells.tray.tray_menu_actions import TrayMenuActions
 from shells.tray.tray_menu_builder import TrayMenuBuilder
+from tusk.shared.interfaces.status_sink import StatusSink
 from tusk.shared.schemas.app_status import AppStatus
 from tusk.shared.schemas.status_snapshot import StatusSnapshot
-from tusk.shared.status.interfaces.status_sink import StatusSink
 
 __all__ = ["TrayStatusSink"]
 

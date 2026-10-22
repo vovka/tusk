@@ -4,7 +4,7 @@ Last updated: 2026-10-01
 
 ## Measurement
 
-- `LatencyMeter` (`tusk/shared/status/latency_meter.py`) is created in `main.py` and shared by the voice shell and kernel.
+- `LatencyMeter` (`tusk/shared/observability/latency_meter.py`) is created in `main.py` and shared by the voice shell and kernel.
 - `UtteranceDetector` calls `on_speech_end(seconds_ago)` when it emits an utterance. `seconds_ago` is the trailing
   silence it waited for, so the stamp marks the real end of speech and endpointing is part of the number.
 - `ConfirmationGate.execute` (every real tool call goes through it) calls `mark_tool_call()`. The first call after a

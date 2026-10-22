@@ -2,9 +2,9 @@ import json
 import shlex
 from pathlib import Path
 
-from tusk.shared.mcp import AdapterEnvironmentBuilder, AdapterWatcher, MCPClient, MCPToolProxy
 from tusk.kernel.tools.tool_registry import ToolRegistry
-from tusk.shared.logging.interfaces.log_printer import LogPrinter
+from tusk.shared.interfaces.log_printer import LogPrinter
+from tusk.shared.mcp import AdapterEnvironmentBuilder, AdapterWatcher, MCPClient, MCPToolProxy
 from tusk.shared.schemas.tools.mcp_tool_schema import MCPToolSchema
 
 try:

@@ -5,8 +5,8 @@ from collections import deque
 from collections.abc import Generator, Iterator
 
 from shells.voice.stages.speech_playback import SpeechPlayback
-from tusk.shared.logging.interfaces.log_printer import LogPrinter
-from tusk.shared.tts.interfaces.tts_engine import TTSEngine
+from tusk.shared.interfaces.log_printer import LogPrinter
+from tusk.shared.interfaces.tts_engine import TTSEngine
 
 __all__ = ["ChunkedSpeaker"]
 

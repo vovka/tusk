@@ -2,8 +2,8 @@ from contextlib import contextmanager
 from collections.abc import Iterator
 
 from tests.recording_span_handle import RecordingSpanHandle
-from tusk.shared.tracing.interfaces.span_handle import SpanHandle
-from tusk.shared.tracing.interfaces.tracer import Tracer
+from tusk.shared.interfaces.span_handle import SpanHandle
+from tusk.shared.interfaces.tracer import Tracer
 
 __all__ = ["RecordingTracer"]
 

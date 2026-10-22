@@ -2,7 +2,7 @@ import threading
 import types
 
 from tests.command_worker_support import await_condition, make_worker, recording_submit, working_tts
-from tusk.shared.interrupt import InterruptToken
+from tusk.shared.interrupt_token import InterruptToken
 from tusk.shared.schemas.kernel_response import KernelResponse
 
 

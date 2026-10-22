@@ -1,9 +1,9 @@
 import types
 
-from tusk.shared.interrupt import InterruptToken
+from tusk.shared.interrupt_token import InterruptToken
 from tusk.shared.llm import LLMRegistryBuilder, RotatingLLMProvider
+from tusk.shared.observability.null_tracer import NullTracer
 from tusk.shared.schemas.llm_slot_config import LLMSlotConfig
-from tusk.shared.tracing.null_tracer import NullTracer
 
 _SLOT_NAMES = ("gatekeeper", "stop_gate", "conversation_agent", "command_agent", "planner_agent", "executor_agent", "default_agent", "utility")
 

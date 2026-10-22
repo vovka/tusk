@@ -2,7 +2,7 @@ import types
 
 import voice_shell_builder
 from tusk.providers.tts import OpenAICompatibleTTS
-from tusk.shared.interrupt import InterruptToken
+from tusk.shared.interrupt_token import InterruptToken
 from voice_shell_builder import VoiceShellBuilder
 
 

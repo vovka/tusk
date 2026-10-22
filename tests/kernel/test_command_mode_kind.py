@@ -2,7 +2,7 @@ import types
 
 from tests.recording_backend import RecordingBackend
 from tusk.kernel.core.command_mode import CommandMode
-from tusk.shared.logging.interfaces.log_printer import LogPrinter
+from tusk.shared.interfaces.log_printer import LogPrinter
 
 
 class _NullLog(LogPrinter):

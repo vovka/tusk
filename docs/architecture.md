@@ -280,17 +280,17 @@ tusk/                        (repo root)
 │   │                        #   kernel tools: start_dictation, start_coding, switch_model
 │   ├── shared/              # Contracts + cross-layer plumbing; depends on nothing else
 │   │   ├── config/          # Config (frozen), ConfigFactory (env), StartupOptions (CLI)
-│   │   ├── interrupt/       # InterruptToken
+│   │   ├── interfaces/      # All shared ABCs: LLMProvider(+Factory), LogPrinter, StatusSink,
+│   │   │                    #   Tracer/SpanHandle, STTEngine, TTSEngine
 │   │   ├── llm/             # LLMProxy, LLMRegistry, retry policy/runner, payload logging, JSON helpers
-│   │   │   └── interfaces/  # LLMProvider, LLMProviderFactory
-│   │   ├── logging/         # LogPrinter ABC, ColorLogPrinter, tag palette
 │   │   ├── mcp/             # MCPClient, MCPToolProxy, MCPStdioServer/Transport, env builder, hot-plug watcher
+│   │   ├── observability/   # ColorLogPrinter + tag palette, StatusReporter/NullStatusSink/LatencyMeter,
+│   │   │                    #   Null/OTel tracers + TracerFactory
 │   │   ├── schemas/         # Frozen dataclasses for all inter-layer data
 │   │   │   ├── desktop/     # DesktopContext, WindowInfo, AppEntry
 │   │   │   └── tools/       # ToolCall/ToolResult, MCPToolSchema/Result, ToolSequencePlan/Step
-│   │   ├── status/          # StatusSink ABC, StatusReporter, NullStatusSink
-│   │   ├── stt/             # STTEngine ABC
-│   │   └── tts/             # TTSEngine ABC
+│   │   ├── fuzzy_name_matcher.py  # FuzzyNameMatcher
+│   │   └── interrupt_token.py     # InterruptToken
 │   └── providers/           # Swappable implementations behind shared ABCs
 │       ├── llm/             # GroqLLM, OpenRouterLLM, ConfigurableLLMFactory
 │       ├── stt/             # GroqSTT, WhisperSTT, STTEngineFactory
@@ -323,7 +323,7 @@ tusk/                        (repo root)
 | A new desktop/app capability (MCP server) | `adapters/<name>/` + `adapter.json` |
 | Decision logic, routing, agent behavior | `tusk/kernel/` |
 | A data shape crossing layers | `tusk/shared/schemas/` |
-| Cross-layer plumbing (config, logging, MCP, status, interrupt) | `tusk/shared/<area>/` |
+| Cross-layer plumbing (config, MCP, observability) | `tusk/shared/<area>/` |
 | An engine implementation behind a shared ABC (LLM/STT/TTS) | `tusk/providers/<kind>/` |
 | Tests | `tests/<mirror of source package>`; cross-tree tests and shared helpers at `tests/` root |
 | Composition/wiring | `main.py` / `shell_loader.py` — the only places allowed to import everything |
@@ -346,12 +346,12 @@ source files; this table is the index:
 |---|---|---|---|
 | `Shell` | `tusk/kernel/interfaces/shell.py` | `VoiceShell`, `CLIShell`, `EmulatorShell`, `TrayShell` (structural) | `ShellLoader` |
 | `AgentBackend` | `tusk/kernel/agent/backends/agent_backend.py` | `TuskAgentBackend`, `CodexExecAgentBackend`, `CodexMcpAgentBackend`, `FallbackAgentBackend` | `CommandMode` |
-| `LLMProvider` | `tusk/shared/llm/interfaces/llm_provider.py` | `GroqLLM`, `OpenRouterLLM`, `LLMProxy` (wrapper) | agent profiles, gatekeepers, `ModeGate` |
-| `LLMProviderFactory` | `tusk/shared/llm/interfaces/llm_provider_factory.py` | `ConfigurableLLMFactory` | `LLMRegistry` |
-| `LogPrinter` | `tusk/shared/logging/interfaces/log_printer.py` | `ColorLogPrinter` | everything |
-| `StatusSink` | `tusk/shared/status/interfaces/status_sink.py` | `NullStatusSink`, `TrayStatusSink` | `StatusReporter` |
-| `STTEngine` | `tusk/shared/stt/interfaces/stt_engine.py` | `GroqSTT`, `WhisperSTT` | `Transcriber` |
-| `TTSEngine` | `tusk/shared/tts/interfaces/tts_engine.py` | `GroqTTS` | `CommandWorker` |
+| `LLMProvider` | `tusk/shared/interfaces/llm_provider.py` | `GroqLLM`, `OpenRouterLLM`, `LLMProxy` (wrapper) | agent profiles, gatekeepers, `ModeGate` |
+| `LLMProviderFactory` | `tusk/shared/interfaces/llm_provider_factory.py` | `ConfigurableLLMFactory` | `LLMRegistry` |
+| `LogPrinter` | `tusk/shared/interfaces/log_printer.py` | `ColorLogPrinter` | everything |
+| `StatusSink` | `tusk/shared/interfaces/status_sink.py` | `NullStatusSink`, `TrayStatusSink` | `StatusReporter` |
+| `STTEngine` | `tusk/shared/interfaces/stt_engine.py` | `GroqSTT`, `WhisperSTT` | `Transcriber` |
+| `TTSEngine` | `tusk/shared/interfaces/tts_engine.py` | `GroqTTS` | `CommandWorker` |
 | `Gatekeeper` | `shells/voice/interfaces/gatekeeper.py` | `LLMGatekeeper`, `StopGatekeeper`, `GatekeeperSlot`, `PlaybackGate` | `VoicePipeline` |
 | `TrayBackend` | `shells/tray/interfaces/tray_backend.py` | `AppIndicatorTrayBackend` | `TrayShell` |
 

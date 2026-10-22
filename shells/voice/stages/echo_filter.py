@@ -3,7 +3,7 @@ import time
 from collections.abc import Callable
 
 from shells.voice.stages.gate.gatekeeper_support import starts_with_wake_word as _starts_with_wake_word
-from tusk.shared.logging.interfaces.log_printer import LogPrinter
+from tusk.shared.interfaces.log_printer import LogPrinter
 from tusk.shared.schemas.utterance import Utterance
 
 __all__ = ["EchoFilter"]

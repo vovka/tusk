@@ -11,11 +11,11 @@ from shells.voice.stages.transcriber import Transcriber
 from shells.voice.stages.transcription_buffer import TranscriptionBuffer
 from shells.voice.stages.utterance_detector import UtteranceDetector
 from tusk.shared.config.config import Config
-from tusk.shared.logging.interfaces.log_printer import LogPrinter
+from tusk.shared.interfaces.log_printer import LogPrinter
+from tusk.shared.interfaces.stt_engine import STTEngine
+from tusk.shared.observability.status_reporter import StatusReporter
 from tusk.shared.schemas.app_status import AppStatus
 from tusk.shared.schemas.kernel_response import KernelResponse
-from tusk.shared.status.status_reporter import StatusReporter
-from tusk.shared.stt.interfaces.stt_engine import STTEngine
 
 __all__ = ["VoiceShell"]
 

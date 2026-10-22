@@ -4,7 +4,7 @@ from shells.voice.buffered_utterance import BufferedUtterance
 from shells.voice.gate_action import GateAction
 from shells.voice.gate_dispatch import GateDispatch
 from shells.voice.recovery_decision import RecoveryDecision
-from tusk.shared.logging.interfaces.log_printer import LogPrinter
+from tusk.shared.interfaces.log_printer import LogPrinter
 from tusk.shared.schemas.gate_classification import GateClassification
 from tusk.shared.schemas.gate_result import GateResult
 from tusk.shared.schemas.utterance import Utterance

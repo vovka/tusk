@@ -1,16 +1,15 @@
 from tusk.kernel import CommandMode, KernelAPI, MainAgent, SlidingWindowHistory, ToolRegistry
-from tusk.kernel.core.adapter_manager import AdapterManager
 from tusk.kernel.agent import AgentOrchestrator, SessionStore
-from tusk.kernel.agent.confirmation import ConfirmationGate
 from tusk.kernel.agent.backends import AgentBackendFactory
+from tusk.kernel.agent.confirmation import ConfirmationGate
+from tusk.kernel.core.adapter_manager import AdapterManager
 from tusk.kernel.core.agent_profiles import build_agent_profiles
 from tusk.kernel.tools.kernel_tool_installer import KernelToolInstaller
 from tusk.shared.config import Config
-from tusk.shared.interrupt import InterruptToken
+from tusk.shared.interfaces.tracer import Tracer
+from tusk.shared.interrupt_token import InterruptToken
 from tusk.shared.llm import LLMRegistry
-from tusk.shared.logging import ColorLogPrinter
-from tusk.shared.status import LatencyMeter, StatusReporter
-from tusk.shared.tracing.interfaces.tracer import Tracer
+from tusk.shared.observability import ColorLogPrinter, LatencyMeter, StatusReporter
 
 
 def build_kernel(config: Config, log: ColorLogPrinter, llm_registry: LLMRegistry, reporter: StatusReporter, token: InterruptToken | None = None, tracer: Tracer | None = None, latency_meter: LatencyMeter | None = None, tool_registry: ToolRegistry | None = None, with_adapters: bool = True) -> KernelAPI:

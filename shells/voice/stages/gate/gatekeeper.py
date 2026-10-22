@@ -7,12 +7,12 @@ from shells.voice.gate_dispatch import GateDispatch
 from shells.voice.interfaces.gatekeeper import Gatekeeper
 from shells.voice.recovery_decision import RecoveryDecision
 from shells.voice.stages.gate.command_gate_prompt import build_command_gate_prompt
-from shells.voice.stages.gate.llm_client import LLMClient
 from shells.voice.stages.gate.gatekeeper_support import fallback_dispatch, has_wake_word, recovered_dispatch, starts_with_wake_word, recovery_worthwhile, to_utterance
+from shells.voice.stages.gate.llm_client import LLMClient
 from shells.voice.stages.gate.recent_context_formatter import RecentContextFormatter
 from shells.voice.stages.gate.recovery_gate_prompt import build_recovery_gate_prompt
-from tusk.shared.llm.interfaces.llm_provider import LLMProvider
-from tusk.shared.logging.interfaces.log_printer import LogPrinter
+from tusk.shared.interfaces.llm_provider import LLMProvider
+from tusk.shared.interfaces.log_printer import LogPrinter
 from tusk.shared.schemas import GateClassification, GateResult, Utterance
 
 __all__ = ["LLMGatekeeper"]

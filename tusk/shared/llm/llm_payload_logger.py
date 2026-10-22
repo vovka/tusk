@@ -1,5 +1,5 @@
+from tusk.shared.interfaces.log_printer import LogPrinter
 from tusk.shared.llm.llm_log_text import inline_json, message_line, pretty_json, response_line, tool_line
-from tusk.shared.logging.interfaces.log_printer import LogPrinter
 from tusk.shared.schemas.tools.tool_call import ToolCall
 
 __all__ = ["LLMPayloadLogger"]

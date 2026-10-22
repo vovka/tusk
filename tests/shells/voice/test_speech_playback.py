@@ -3,7 +3,7 @@ import time
 
 import shells.voice.stages.speech_playback as playback_module
 from shells.voice.stages.speech_playback import SpeechPlayback
-from tusk.shared.interrupt import InterruptToken
+from tusk.shared.interrupt_token import InterruptToken
 
 
 class _FakeProcess:

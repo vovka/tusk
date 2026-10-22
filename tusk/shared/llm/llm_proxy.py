@@ -1,10 +1,10 @@
-from tusk.shared.llm.interfaces.llm_provider import LLMProvider
+from tusk.shared.interfaces.llm_provider import LLMProvider
+from tusk.shared.interfaces.log_printer import LogPrinter
+from tusk.shared.interfaces.tracer import Tracer
 from tusk.shared.llm.llm_payload_logger import LLMPayloadLogger
 from tusk.shared.llm.llm_retry_runner import LLMRetryRunner
-from tusk.shared.logging.interfaces.log_printer import LogPrinter
+from tusk.shared.observability.null_tracer import NullTracer
 from tusk.shared.schemas.tools.tool_call import ToolCall
-from tusk.shared.tracing.interfaces.tracer import Tracer
-from tusk.shared.tracing.null_tracer import NullTracer
 
 __all__ = ["LLMProxy"]
 

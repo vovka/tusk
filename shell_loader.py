@@ -11,8 +11,8 @@ from shells.voice.stages.echo_filter import EchoFilter
 from shells.voice.voice_shell import VoiceShell
 from tusk.kernel.core.kernel_api import KernelAPI
 from tusk.shared.config.config import Config
-from tusk.shared.logging.interfaces.log_printer import LogPrinter
-from tusk.shared.status.status_reporter import StatusReporter
+from tusk.shared.interfaces.log_printer import LogPrinter
+from tusk.shared.observability.status_reporter import StatusReporter
 from voice_shell_builder import VoiceShellBuilder
 
 __all__ = ["ShellLoader"]

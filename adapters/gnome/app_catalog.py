@@ -5,7 +5,7 @@ import re
 from collections.abc import Callable
 
 from adapters.gnome.app_ranking import DEFAULT_CATEGORIES, ranked, system_default_app
-from tusk.shared.desktop.fuzzy_name_matcher import FuzzyNameMatcher
+from tusk.shared.fuzzy_name_matcher import FuzzyNameMatcher
 from tusk.shared.schemas.desktop.app_entry import AppEntry
 
 __all__ = ["AppCatalog"]

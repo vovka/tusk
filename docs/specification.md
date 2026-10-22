@@ -175,7 +175,7 @@ On each audio frame:
 
 ## 5. STT Engine Specification
 
-**Interface:** `tusk/shared/stt/interfaces/stt_engine.py`
+**Interface:** `tusk/shared/interfaces/stt_engine.py`
 
 ```python
 def transcribe(self, audio_frames: bytes, sample_rate: int) -> Utterance
@@ -1051,7 +1051,7 @@ editor automation — runs for real. Example transcripts live in `demos/`.
 
 ## 21. LLM Provider Specification
 
-**Interface:** `tusk/shared/llm/interfaces/llm_provider.py` — `label` property plus
+**Interface:** `tusk/shared/interfaces/llm_provider.py` — `label` property plus
 `complete(system, user, max_tokens=256)`, `complete_messages(system, messages)`,
 `complete_tool_call(system, messages, tools) -> ToolCall`,
 `complete_structured(system, user, schema_name, schema, max_tokens=256)`.
@@ -1112,7 +1112,7 @@ which also refreshes the tray's model list). `model_labels()` feeds the tray men
 
 ## 22. TTS and Speech Playback Specification
 
-**Interface:** `tusk/shared/tts/interfaces/tts_engine.py` — `synthesize(text) -> bytes`
+**Interface:** `tusk/shared/interfaces/tts_engine.py` — `synthesize(text) -> bytes`
 (WAV).
 
 ### 22.1 GroqTTS — `tusk/providers/tts/groq_tts.py`
@@ -1429,7 +1429,7 @@ sequenceDiagram
     Note over W: ready for next command
 ```
 
-### 30.2 InterruptToken — `tusk/shared/interrupt/interrupt_token.py`
+### 30.2 InterruptToken — `tusk/shared/interrupt_token.py`
 
 `threading.Event` wrapper: `interrupt()`, `is_interrupted`, `clear()`. One instance is
 created in `main.py` and injected everywhere. Checkpoints:

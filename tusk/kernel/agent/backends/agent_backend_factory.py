@@ -4,7 +4,7 @@ from tusk.kernel.agent.backends.codex_mcp.codex_mcp_agent_backend import CodexMc
 from tusk.kernel.agent.backends.fallback_agent_backend import FallbackAgentBackend
 from tusk.kernel.agent.backends.tusk_agent_backend import TuskAgentBackend
 from tusk.kernel.core.main_agent import MainAgent
-from tusk.shared.logging.interfaces.log_printer import LogPrinter
+from tusk.shared.interfaces.log_printer import LogPrinter
 
 __all__ = ["AgentBackendFactory"]
 

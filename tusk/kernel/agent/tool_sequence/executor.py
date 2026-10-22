@@ -5,11 +5,11 @@ from tusk.kernel.agent.confirmation.confirmation_gate import ConfirmationGate
 from tusk.kernel.agent.tool_sequence.plan_validator import PlanValidator
 from tusk.kernel.agent.tool_sequence.recorder import Recorder
 from tusk.kernel.tools.tool_registry import ToolRegistry
+from tusk.shared.interfaces.tracer import Tracer
+from tusk.shared.observability.null_tracer import NullTracer
 from tusk.shared.schemas.tools.tool_result import ToolResult
 from tusk.shared.schemas.tools.tool_sequence_plan import ToolSequencePlan
 from tusk.shared.schemas.tools.tool_sequence_step import ToolSequenceStep
-from tusk.shared.tracing.interfaces.tracer import Tracer
-from tusk.shared.tracing.null_tracer import NullTracer
 
 __all__ = ["Executor"]
 

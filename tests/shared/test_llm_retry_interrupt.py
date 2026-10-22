@@ -1,6 +1,6 @@
 import pytest
 
-from tusk.shared.interrupt import InterruptToken
+from tusk.shared.interrupt_token import InterruptToken
 from tusk.shared.llm.llm_retry_runner import LLMRetryRunner
 
 

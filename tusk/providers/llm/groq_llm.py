@@ -4,7 +4,7 @@ except ImportError:  # pragma: no cover
     Groq = None
 
 from tusk.providers.llm.tool_response import message_content, needs_tool_fallback, tool_or_done
-from tusk.shared.llm.interfaces.llm_provider import LLMProvider
+from tusk.shared.interfaces.llm_provider import LLMProvider
 from tusk.shared.llm.tool_use_failed_recovery import ToolUseFailedRecovery
 from tusk.shared.schemas.tools.tool_call import ToolCall
 

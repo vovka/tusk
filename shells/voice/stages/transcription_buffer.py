@@ -3,7 +3,7 @@ from collections import deque
 
 from shells.voice.buffered_utterance import BufferedUtterance
 from shells.voice.gate_state import GateState
-from tusk.shared.logging.interfaces.log_printer import LogPrinter
+from tusk.shared.interfaces.log_printer import LogPrinter
 from tusk.shared.schemas.utterance import Utterance
 
 __all__ = ["TranscriptionBuffer"]

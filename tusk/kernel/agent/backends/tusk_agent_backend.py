@@ -1,9 +1,9 @@
 from tusk.kernel.agent.backends.agent_backend import AgentBackend
-from tusk.kernel.agent.backends.backend_run_logger import BackendRunLogger
 from tusk.kernel.agent.backends.backend_request import BackendRequest
 from tusk.kernel.agent.backends.backend_result import BackendResult
+from tusk.kernel.agent.backends.backend_run_logger import BackendRunLogger
 from tusk.kernel.core.main_agent import MainAgent
-from tusk.shared.logging.interfaces.log_printer import LogPrinter
+from tusk.shared.interfaces.log_printer import LogPrinter
 
 __all__ = ["TuskAgentBackend"]
 

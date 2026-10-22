@@ -13,7 +13,7 @@ docker compose exec tusk bash  # then, from the repo root:
 pyreverse -o mmd --filter-mode=PUB_ONLY -d /tmp/dg -p kernel_core tusk/kernel/*.py tusk/kernel/interfaces tusk/kernel/modes
 pyreverse -o mmd --filter-mode=PUB_ONLY -d /tmp/dg -p kernel_agent tusk/kernel/agent
 pyreverse -o mmd --filter-mode=PUB_ONLY -d /tmp/dg -p kernel_backends tusk/kernel/agent_backends
-pyreverse -o mmd --filter-mode=PUB_ONLY -d /tmp/dg -p shared_contracts tusk/shared/{llm,stt,tts,mcp,config,interrupt,logging,status}
+pyreverse -o mmd --filter-mode=PUB_ONLY -d /tmp/dg -p shared_contracts tusk/shared/{interfaces,llm,mcp,config,observability}
 pyreverse -o mmd --filter-mode=PUB_ONLY -d /tmp/dg -p shared_schemas tusk/shared/schemas
 pyreverse -o mmd --filter-mode=PUB_ONLY -d /tmp/dg -p providers tusk/providers
 pyreverse -o mmd --filter-mode=PUB_ONLY -d /tmp/dg -p shells shells
@@ -306,7 +306,7 @@ classDiagram
 
 ## Shared — contracts
 
-`tusk/shared` ABCs and infrastructure: LLM/STT/TTS/MCP, config, interrupt, logging, status.
+`tusk/shared` ABCs and infrastructure: interfaces (LLM/STT/TTS/log/status/tracing), LLM, MCP, config, observability.
 
 ```mermaid
 classDiagram

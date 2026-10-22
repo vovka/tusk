@@ -6,7 +6,7 @@ except ImportError:  # pragma: no cover
     Groq = None
 
 from tusk.providers.tts.text_chunker import TextChunker
-from tusk.shared.tts.interfaces.tts_engine import TTSEngine
+from tusk.shared.interfaces.tts_engine import TTSEngine
 
 __all__ = ["GroqTTS"]
 

@@ -3,8 +3,8 @@ import types
 
 from shells.tray import tray_shell
 from shells.tray.tray_shell import TrayShell
-from tusk.shared.status.null_status_sink import NullStatusSink
-from tusk.shared.status.status_reporter import StatusReporter
+from tusk.shared.observability.null_status_sink import NullStatusSink
+from tusk.shared.observability.status_reporter import StatusReporter
 
 
 def _config() -> object:

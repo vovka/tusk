@@ -88,7 +88,7 @@ def test_request_stop_stops_mode_then_slot() -> None:
 
 def test_request_stop_logs_always_visible_mode_ended_line() -> None:
     # E2E: a bare "stop pair coding mode" left the mode with nothing in the default log
-    from tusk.shared.logging.log_tag_palette import is_always_visible
+    from tusk.shared.observability.log_tag_palette import is_always_visible
     logs: list[tuple] = []
     slot = _slot(logs=logs)
     slot.attach_mode(_mode([]))

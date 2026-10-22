@@ -3,7 +3,7 @@ import types
 import pytest
 
 from shell_loader import ShellLoader
-from tusk.shared.interrupt import InterruptToken
+from tusk.shared.interrupt_token import InterruptToken
 from voice_shell_builder import VoiceShellBuilder
 
 

@@ -186,9 +186,8 @@ shells/voice/
 The voice shell depends only on the **shared** layer:
 
 - `tusk.shared.schemas` — `Utterance`, `GateResult`
-- `tusk.shared.llm` — `LLMProvider` ABC (used by `LLMGatekeeper`)
-- `tusk.shared.logging` — `LogPrinter` ABC
-- `tusk.shared.stt` — `STTEngine` ABC (injected into `Transcriber`)
+- `tusk.shared.interfaces` — `LLMProvider` ABC (used by `LLMGatekeeper`), `LogPrinter` ABC,
+  `STTEngine` ABC (injected into `Transcriber`)
 
 It does **not** import from `tusk.kernel`. The kernel is reached only through the
 `submit(text)` callable passed to `VoiceShell.start()`.

@@ -5,7 +5,7 @@ from shells.voice.command_worker import CommandWorker
 from shells.voice.stages.chunked_speaker import ChunkedSpeaker
 from shells.voice.stages.gate.gatekeeper import LLMGatekeeper
 from tests.command_worker_support import await_condition
-from tusk.shared.interrupt import InterruptToken
+from tusk.shared.interrupt_token import InterruptToken
 from tusk.shared.schemas.kernel_response import KernelResponse
 from tusk.shared.schemas.utterance import Utterance
 

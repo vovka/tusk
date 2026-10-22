@@ -16,10 +16,10 @@ from tusk.kernel.modes.mode_slot import ModeSlot
 from tusk.providers.stt import STTEngineFactory
 from tusk.providers.tts import GroqTTS, OpenAICompatibleTTS
 from tusk.shared.config.config import Config
-from tusk.shared.llm.interfaces.llm_provider import LLMProvider
-from tusk.shared.logging.interfaces.log_printer import LogPrinter
-from tusk.shared.stt.interfaces.stt_engine import STTEngine
-from tusk.shared.tts.interfaces.tts_engine import TTSEngine
+from tusk.shared.interfaces.llm_provider import LLMProvider
+from tusk.shared.interfaces.log_printer import LogPrinter
+from tusk.shared.interfaces.stt_engine import STTEngine
+from tusk.shared.interfaces.tts_engine import TTSEngine
 
 __all__ = ["VoiceShellBuilder"]
 

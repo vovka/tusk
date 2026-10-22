@@ -1,7 +1,7 @@
 import types
 
 from tusk.kernel.core.kernel_api import KernelAPI
-from tusk.shared.interrupt import InterruptToken
+from tusk.shared.interrupt_token import InterruptToken
 
 
 def test_request_interrupt_sets_token() -> None:

@@ -6,7 +6,7 @@ except ImportError:  # pragma: no cover
     webrtcvad = None
 
 from shells.voice.stages.audio_capture import AudioCapture
-from tusk.shared.logging.interfaces.log_printer import LogPrinter
+from tusk.shared.interfaces.log_printer import LogPrinter
 from tusk.shared.schemas.utterance import Utterance
 
 __all__ = ["UtteranceDetector"]

@@ -4,9 +4,9 @@ from collections.abc import Callable
 from tusk.kernel.agent.confirmation.destructive_action_policy import DestructiveActionPolicy
 from tusk.kernel.agent.confirmation.pending_action import PendingAction
 from tusk.kernel.tools.tool_registry import ToolRegistry
+from tusk.shared.observability.latency_meter import LatencyMeter
 from tusk.shared.schemas.kernel_response import KernelResponse
 from tusk.shared.schemas.tools.tool_result import ToolResult
-from tusk.shared.status.latency_meter import LatencyMeter
 
 __all__ = ["ConfirmationGate"]
 

@@ -1,8 +1,8 @@
 from tusk.kernel.modes.mode_gate_prompts import CODING_GATE_PROMPT, DICTATION_GATE_PROMPT
-from tusk.shared.llm.interfaces.llm_provider import LLMProvider
+from tusk.shared.interfaces.llm_provider import LLMProvider
+from tusk.shared.interfaces.log_printer import LogPrinter
 from tusk.shared.llm.llm_json import extract_json_payload
 from tusk.shared.llm.llm_registry import LLMRegistry
-from tusk.shared.logging.interfaces.log_printer import LogPrinter
 
 __all__ = ["ModeGate"]
 

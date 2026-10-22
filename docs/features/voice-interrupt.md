@@ -46,7 +46,7 @@ sequenceDiagram
 
 | File | Role |
 |---|---|
-| `tusk/shared/interrupt/interrupt_token.py` | one shared token (Event wrapper), created in `main.py` |
+| `tusk/shared/interrupt_token.py` | one shared token (Event wrapper), created in `main.py` |
 | `shells/voice/command_worker.py` | runs submit + TTS + playback off the listening thread; survives submit exceptions; clears token / forces "Stopped." |
 | `shells/voice/stages/command_gate_prompt.py` | busy clause (stop intent → interrupt) + speaking clause (echoes → ambient) |
 | `shells/voice/stages/gatekeeper.py` | busy-aware classification; `interrupt` honored only while busy |

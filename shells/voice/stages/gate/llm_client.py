@@ -2,8 +2,8 @@ from shells.voice.buffered_utterance import BufferedUtterance
 from shells.voice.recovery_decision import RecoveryDecision
 from shells.voice.stages.gate.gatekeeper_parser import parse_gate_result, parse_recovery_decision
 from shells.voice.stages.gate.gatekeeper_support import PRIMARY_SCHEMA, RECOVERY_SCHEMA, log_gate_result, log_recovery, normalize_recovery
-from tusk.shared.llm.interfaces.llm_provider import LLMProvider
-from tusk.shared.logging.interfaces.log_printer import LogPrinter
+from tusk.shared.interfaces.llm_provider import LLMProvider
+from tusk.shared.interfaces.log_printer import LogPrinter
 from tusk.shared.schemas import GateResult
 
 __all__ = ["LLMClient"]

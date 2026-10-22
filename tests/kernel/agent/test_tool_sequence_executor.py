@@ -57,7 +57,7 @@ def _fail(arguments: dict[str, object]) -> ToolResult:
 
 
 def test_sequence_executor_cancels_between_steps() -> None:
-    from tusk.shared.interrupt import InterruptToken
+    from tusk.shared.interrupt_token import InterruptToken
     token = InterruptToken()
     seen: list[dict[str, object]] = []
     registry = ToolRegistry()

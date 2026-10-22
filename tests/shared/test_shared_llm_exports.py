@@ -1,6 +1,5 @@
 import tusk.providers.llm as providers
 import tusk.shared.llm as llm
-import tusk.shared.llm.interfaces as interfaces
 
 
 def test_shared_llm_exports_present() -> None:
@@ -16,9 +15,7 @@ def test_shared_llm_retry_exports_present() -> None:
     assert "ToolUseFailedRecovery" in llm.__all__
 
 
-def test_shared_llm_nested_exports_present() -> None:
-    assert "LLMProvider" in interfaces.__all__
-    assert "LLMProviderFactory" in interfaces.__all__
+def test_llm_provider_exports_present() -> None:
     assert "ConfigurableLLMFactory" in providers.__all__
     assert "GroqLLM" in providers.__all__
     assert "OpenRouterLLM" in providers.__all__

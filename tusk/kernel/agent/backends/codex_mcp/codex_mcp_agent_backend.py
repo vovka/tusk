@@ -9,7 +9,7 @@ from tusk.kernel.agent.backends.codex_mcp.call_builder import CallBuilder
 from tusk.kernel.agent.backends.codex_mcp.client import Client
 from tusk.kernel.agent.backends.codex_mcp.result_mapper import ResultMapper
 from tusk.kernel.agent.backends.codex_prompt_builder import CodexPromptBuilder
-from tusk.shared.logging.interfaces.log_printer import LogPrinter
+from tusk.shared.interfaces.log_printer import LogPrinter
 
 __all__ = ["CodexMcpAgentBackend"]
 

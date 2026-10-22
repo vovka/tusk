@@ -92,7 +92,7 @@ digraph tusk_interfaces {
   // ---------------- shared-defined interfaces ----------------
 
   subgraph cluster_llm {
-    label="tusk/shared/llm/interfaces"; fontsize=13; style=filled; fillcolor="#d7f0d3"; margin=12;
+    label="tusk/shared/interfaces"; fontsize=13; style=filled; fillcolor="#d7f0d3"; margin=12;
     I_LLMProvider [label="«interface»\nLLMProvider", penwidth=2];
     GroqLLM [label="GroqLLM\n(providers)"];
     OpenRouterLLM [label="OpenRouterLLM\n(providers)"];
@@ -102,23 +102,23 @@ digraph tusk_interfaces {
     LLMProxy -> I_LLMProvider [arrowhead=empty];
   }
   subgraph cluster_llmfactory {
-    label="tusk/shared/llm/interfaces"; fontsize=13; style=filled; fillcolor="#d7f0d3"; margin=12;
+    label="tusk/shared/interfaces"; fontsize=13; style=filled; fillcolor="#d7f0d3"; margin=12;
     I_LLMProviderFactory [label="«interface»\nLLMProviderFactory", penwidth=2];
     ConfigurableLLMFactory [label="ConfigurableLLMFactory\n(providers)"];
     ConfigurableLLMFactory -> I_LLMProviderFactory [arrowhead=empty];
   }
   subgraph cluster_log {
-    label="tusk/shared/logging/interfaces"; fontsize=13; style=filled; fillcolor="#d7f0d3"; margin=12;
+    label="tusk/shared/observability/interfaces"; fontsize=13; style=filled; fillcolor="#d7f0d3"; margin=12;
     I_LogPrinter [label="«interface»\nLogPrinter", penwidth=2];
     ColorLogPrinter -> I_LogPrinter [arrowhead=empty];
   }
   subgraph cluster_reporter {
-    label="tusk/shared/status/interfaces"; fontsize=13; style=filled; fillcolor="#d7f0d3"; margin=12;
+    label="tusk/shared/observability/interfaces"; fontsize=13; style=filled; fillcolor="#d7f0d3"; margin=12;
     I_StatusReporter [label="«interface»\nStatusReporter", penwidth=2];
     StatusReporterHub -> I_StatusReporter [arrowhead=empty];
   }
   subgraph cluster_sink {
-    label="tusk/shared/status/interfaces"; fontsize=13; style=filled; fillcolor="#d7f0d3"; margin=12;
+    label="tusk/shared/observability/interfaces"; fontsize=13; style=filled; fillcolor="#d7f0d3"; margin=12;
     I_StatusSink [label="«interface»\nStatusSink", penwidth=2];
     NullStatusSink;
     TrayStatusSink [label="TrayStatusSink\n(shells.tray)"];
@@ -126,7 +126,7 @@ digraph tusk_interfaces {
     TrayStatusSink -> I_StatusSink [arrowhead=empty];
   }
   subgraph cluster_stt {
-    label="tusk/shared/stt/interfaces"; fontsize=13; style=filled; fillcolor="#d7f0d3"; margin=12;
+    label="tusk/shared/interfaces"; fontsize=13; style=filled; fillcolor="#d7f0d3"; margin=12;
     I_STTEngine [label="«interface»\nSTTEngine", penwidth=2];
     GroqSTT [label="GroqSTT\n(providers)"];
     WhisperSTT [label="WhisperSTT\n(providers)"];
@@ -134,7 +134,7 @@ digraph tusk_interfaces {
     WhisperSTT -> I_STTEngine [arrowhead=empty];
   }
   subgraph cluster_tts {
-    label="tusk/shared/tts/interfaces"; fontsize=13; style=filled; fillcolor="#d7f0d3"; margin=12;
+    label="tusk/shared/interfaces"; fontsize=13; style=filled; fillcolor="#d7f0d3"; margin=12;
     I_TTSEngine [label="«interface»\nTTSEngine", penwidth=2];
     GroqTTS [label="GroqTTS\n(providers)"];
     GroqTTS -> I_TTSEngine [arrowhead=empty];

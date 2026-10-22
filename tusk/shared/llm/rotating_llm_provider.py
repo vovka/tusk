@@ -1,4 +1,4 @@
-from tusk.shared.llm.interfaces.llm_provider import LLMProvider
+from tusk.shared.interfaces.llm_provider import LLMProvider
 from tusk.shared.schemas.tools.tool_call import ToolCall
 
 __all__ = ["RotatingLLMProvider"]
