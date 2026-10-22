@@ -21,7 +21,7 @@ class _Windows:
 
 def _input_tools(guard: LaunchedWindowGuard, typed: list[str]) -> InputTools:
     simulator = types.SimpleNamespace(type_text=typed.append)
-    return InputTools(simulator, object(), types.SimpleNamespace(split=lambda text: [text]), guard)
+    return InputTools(simulator, guard)
 
 
 def test_typing_after_launch_focuses_launched_window_first() -> None:

@@ -35,6 +35,23 @@ def test_type_text_presses_return_for_newlines() -> None:
     assert commands[1][:2] == ["xdotool", "key"]
 
 
+def test_replace_text_sends_backspaces_then_types_text() -> None:
+    commands: list[list[str]] = []
+    with patch("adapters.gnome.gnome_input_simulator.subprocess.run", side_effect=_capture_all(commands)):
+        GnomeInputSimulator().replace_text(3, "hi")
+    assert commands == [
+        ["xdotool", "key", "--delay", "0", "--repeat", "3", "BackSpace"],
+        ["xdotool", "type", "--delay", "0", "--", "hi"],
+    ]
+
+
+def test_replace_text_skips_backspace_for_zero_chars() -> None:
+    commands: list[list[str]] = []
+    with patch("adapters.gnome.gnome_input_simulator.subprocess.run", side_effect=_capture_all(commands)):
+        GnomeInputSimulator().replace_text(0, "hi")
+    assert commands == [["xdotool", "type", "--delay", "0", "--", "hi"]]
+
+
 def test_mouse_click_raises_on_failure() -> None:
     _assert_mouse_raises(lambda sim: sim.mouse_click(1, 2, 1, 1), "mouse_click")
 

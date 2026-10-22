@@ -6,8 +6,16 @@ __all__ = ["GnomeInputSimulator"]
 class GnomeInputSimulator:
     def press_keys(self, keys: str) -> None:
         normalized = self._normalize_keys(keys)
-        result = subprocess.run(["xdotool", "key", "--clearmodifiers", "--delay", "0", normalized], check=False, capture_output=True, text=True)
-        self._raise_on_failure(result, normalized)
+        self._run_key(["--clearmodifiers", "--delay", "0", normalized], normalized)
+
+    def replace_text(self, char_count: int, text: str) -> None:
+        if char_count > 0:
+            self._run_key(["--delay", "0", "--repeat", str(char_count), "BackSpace"], "BackSpace")
+        self.type_text(text)
+
+    def _run_key(self, args: list[str], keys: str) -> None:
+        result = subprocess.run(["xdotool", "key", *args], check=False, capture_output=True, text=True)
+        self._raise_on_failure(result, keys)
 
     def _normalize_keys(self, keys: str) -> str:
         normalized = self._angle_bracket_keys(keys)

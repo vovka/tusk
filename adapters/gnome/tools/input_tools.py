@@ -1,19 +1,14 @@
+from adapters.gnome.gnome_input_simulator import GnomeInputSimulator
 from adapters.gnome.tools.launched_window_guard import LaunchedWindowGuard
 
 __all__ = ["InputTools"]
 
+_MAX_CHARS = 300
+
 
 class InputTools:
-    def __init__(
-        self,
-        input_simulator: object,
-        text_paster: object,
-        text_chunker: object,
-        launched: LaunchedWindowGuard | None = None,
-    ) -> None:
+    def __init__(self, input_simulator: GnomeInputSimulator, launched: LaunchedWindowGuard | None = None) -> None:
         self._input = input_simulator
-        self._paster = text_paster
-        self._chunks = text_chunker
         self._launched = launched
 
     def press_keys(self, arguments: dict) -> dict:
@@ -36,7 +31,7 @@ class InputTools:
         return {"success": True, "message": f"typed literal text ({len(text)} chars)"}
 
     def replace_recent_text(self, arguments: dict) -> dict:
-        self._paster.replace(int(arguments["replace_chars"]), arguments["text"])
+        self._input.replace_text(int(arguments["replace_chars"]), arguments["text"])
         return {"success": True, "message": "replaced"}
 
     def mouse_click(self, arguments: dict) -> dict:
@@ -82,5 +77,8 @@ class InputTools:
         return self._launched.ensure_active() if self._launched is not None else None
 
     def _type_chunks(self, text: str) -> None:
-        for chunk in self._chunks.split(text):
+        for chunk in self._chunks(text):
             self._input.type_text(chunk)
+
+    def _chunks(self, text: str) -> list[str]:
+        return [text[index:index + _MAX_CHARS] for index in range(0, len(text), _MAX_CHARS)] or [""]

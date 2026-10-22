@@ -1,5 +1,4 @@
 from adapters.gnome.wayland.wayland_input_simulator import WaylandInputSimulator
-from adapters.gnome.wayland.wayland_text_paster import WaylandTextPaster
 from tests.adapters.wayland_fake_bus import FakeBus
 
 
@@ -28,7 +27,7 @@ def test_mouse_scroll_sends_direction_and_clicks() -> None:
     assert bus.calls == [("Scroll", [True, 3])]
 
 
-def test_text_paster_replace_types_backspaces_then_text() -> None:
+def test_replace_text_types_backspaces_and_text_in_one_call() -> None:
     bus = FakeBus()
-    WaylandTextPaster(bus).replace(2, "hi")
+    WaylandInputSimulator(bus).replace_text(2, "hi")
     assert bus.calls == [("TypeText", ["\b\bhi"])]
