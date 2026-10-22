@@ -284,7 +284,7 @@ end-to-end; only the microphone, STT, TTS, and speaker are faked. Requires a rea
 `GROQ_API_KEY` in `.env`:
 
 ```bash
-docker compose run --rm --no-deps tusk python -m e2e.run_voice_e2e
+docker compose run --rm --no-deps tusk python -m e2e.run_e2e voice
 ```
 
 **Pair-coding transcript e2e** (`demos/`) — replays a scripted coding session through the

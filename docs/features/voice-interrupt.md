@@ -69,7 +69,7 @@ sequenceDiagram
   `test_speech_playback`, `test_gatekeeper_interrupt`, `test_playback_gate`, `test_pipeline_interrupt`,
   `test_agent_runtime_cancellation`, `test_llm_retry_interrupt`, …)
 - E2E (real Groq calls, scripted audio edges, no MCP adapters):
-  `docker compose exec tusk python -m e2e.run_voice_e2e` — 5 scenarios: interrupt mid-run,
+  `docker compose exec tusk python -m e2e.run_e2e voice` — 5 scenarios: interrupt mid-run,
   interrupt mid-speech, echo ignored, idle stop, ready-after.
 
 ## Known limits

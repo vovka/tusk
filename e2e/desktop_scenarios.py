@@ -17,11 +17,11 @@ def scenario_status_reply(h: VoiceE2EHarness, probe: DesktopProbe) -> str:
 
 def scenario_reply_echo_is_ignored(h: VoiceE2EHarness, probe: DesktopProbe) -> str:
     echo = h.replies[-1] if h.replies else "I am doing fine, thanks for asking."
-    enqueued_before = len(h.enqueued)
+    submitted_before = len(h.submitted)
     h.say(" ".join(echo.split()[:12]), duration=3.0)
     time.sleep(10.0)
     h.wait_idle()
-    assert len(h.enqueued) == enqueued_before, f"own speech echoed back was enqueued: {h.enqueued[-1]!r}"
+    assert len(h.submitted) == submitted_before, f"own speech echoed back was submitted: {h.submitted[-1]!r}"
     return "echoed reply was not treated as a command"
 
 
