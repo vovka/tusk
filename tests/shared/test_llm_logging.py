@@ -30,7 +30,8 @@ def test_llm_proxy_logs_request_payload_wait_and_response_in_order() -> None:
     assert [item[:2] for item in logged] == [("log", "LLMREQUEST"), ("log", "LLMPAYLOAD"), ("wait", "groq/model"), ("clear",), ("log", "LLMRESPONSE")]
     assert '"slot"' not in logged[1][2]
     assert "chars more" in logged[1][2]
-    assert '{ "role": "system", "content": "' in logged[1][2]
+    assert '"role": "system"' in logged[1][2]
+    assert logged[1][2].count("\n") == 1
 
 
 def test_llm_proxy_shows_wait_once_per_request_and_rebinds_on_swap() -> None:
@@ -58,6 +59,23 @@ def test_llm_proxy_logs_tools_separately_and_full_modes_replace_compact() -> Non
     assert '"parameters": {' in logged[2][2]
     assert any(item[1] == "LLMRESPONSE" and item[3] == "llm-response-full" and '"call_id": "call-1"' in item[2] for item in logged if item[0] == "log")
     assert not any(item[3] == "llm-payload" for item in logged if item[0] == "log")
+
+
+def test_llm_proxy_compact_tools_trim_long_descriptions() -> None:
+    logged = []
+    tools = [{"type": "function", "function": {"name": "done", "description": "start " + ("d" * 200) + " finish"}}]
+    proxy = LLMProxy(LoggedProvider(ToolCall("done", {}, "call-1")), _proxy_log(logged), "agent", enabled_log_groups=_groups("llm-tools"))
+    proxy.complete_tool_call("sys", [{"role": "user", "content": "hello"}], tools)
+    assert [item[1:4:2] for item in logged if item[0] == "log"] == [("LLMREQUEST", "llm-request"), ("LLMTOOLS", "llm-tools")]
+    assert "chars more" in logged[1][2]
+    assert '"name": "done"' in logged[1][2]
+
+
+def test_llm_proxy_logs_nothing_when_no_log_groups_enabled() -> None:
+    logged = []
+    proxy = LLMProxy(LoggedProvider("assistant reply"), _proxy_log(logged), "agent")
+    proxy.complete("sys", "hello")
+    assert [item[1] for item in logged if item[0] == "log"] == ["LLMREQUEST"]
 
 
 def test_llm_payload_keeps_text_when_truncation_saves_too_little() -> None:
