@@ -7,7 +7,7 @@ except ImportError:  # pragma: no cover
 
 from shells.voice.stages.audio_capture import AudioCapture
 from tusk.shared.interfaces.log_printer import LogPrinter
-from tusk.shared.schemas.utterance import Utterance
+from tusk.shared.schemas.voice.utterance import Utterance
 
 __all__ = ["UtteranceDetector"]
 

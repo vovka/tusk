@@ -8,7 +8,7 @@ except ImportError:  # pragma: no cover
     Groq = None
 
 from tusk.shared.interfaces.stt_engine import STTEngine
-from tusk.shared.schemas.utterance import Utterance
+from tusk.shared.schemas.voice.utterance import Utterance
 
 __all__ = ["GroqSTT"]
 

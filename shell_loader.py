@@ -5,8 +5,8 @@ from shells.cli.cli_shell import CLIShell
 from shells.emulator.emulator_shell import EmulatorShell
 from shells.tray.tray_shell import TrayShell
 from shells.voice.command_worker import CommandWorker
-from shells.voice.confirmation_answer_gate import ConfirmationAnswerGate
-from shells.voice.stages.confirmation_reply import ConfirmationReply
+from shells.voice.gate.confirmation_answer_gate import ConfirmationAnswerGate
+from shells.voice.speech.confirmation_reply import ConfirmationReply
 from shells.voice.stages.echo_filter import EchoFilter
 from shells.voice.voice_shell import VoiceShell
 from tusk.kernel.core.kernel_api import KernelAPI

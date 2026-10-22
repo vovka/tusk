@@ -1,10 +1,10 @@
 import time
 from collections import deque
 
-from shells.voice.buffered_utterance import BufferedUtterance
-from shells.voice.gate_state import GateState
+from tusk.shared.schemas.voice.buffered_utterance import BufferedUtterance
+from tusk.shared.schemas.voice.gate_state import GateState
 from tusk.shared.interfaces.log_printer import LogPrinter
-from tusk.shared.schemas.utterance import Utterance
+from tusk.shared.schemas.voice.utterance import Utterance
 
 __all__ = ["TranscriptionBuffer"]
 

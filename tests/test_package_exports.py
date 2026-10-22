@@ -12,6 +12,7 @@ import tusk.shared.llm as llm
 import tusk.shared.mcp as mcp
 import tusk.shared.observability as observability
 import tusk.shared.schemas as schemas
+import tusk.shared.schemas.voice as voice_schemas
 
 
 def test_root_and_kernel_exports_present() -> None:
@@ -21,6 +22,7 @@ def test_root_and_kernel_exports_present() -> None:
     assert "MainAgent" in kernel.__all__
     assert "Shell" in interfaces.__all__
     assert "ToolCall" in schemas.__all__
+    assert {"GateDispatch", "BufferedUtterance", "Utterance"} <= set(voice_schemas.__all__)
     assert {"BackendRequest", "BackendResult"} <= set(backends.__all__)
     assert "AgentResult" not in backends.__all__
 

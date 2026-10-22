@@ -3,11 +3,11 @@ import types
 
 import pytest
 
-from shells.voice.buffered_utterance import BufferedUtterance
-from shells.voice.gate_dispatch import GateDispatch
+from tusk.shared.schemas.voice.buffered_utterance import BufferedUtterance
+from tusk.shared.schemas.voice.gate_dispatch import GateDispatch
 from shells.voice.pipeline import VoicePipeline
 from tusk.shared.schemas.kernel_response import KernelResponse
-from tusk.shared.schemas.utterance import Utterance
+from tusk.shared.schemas.voice.utterance import Utterance
 
 
 def test_capture_keeps_running_while_submit_is_busy() -> None:

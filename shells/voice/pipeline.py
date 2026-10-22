@@ -2,9 +2,9 @@ import queue
 import threading
 from collections.abc import Callable, Iterator
 
-from shells.voice.gate_action import GateAction
-from shells.voice.gate_dispatch import GateDispatch
-from shells.voice.gate_state import GateState
+from tusk.shared.schemas.voice.gate_action import GateAction
+from tusk.shared.schemas.voice.gate_dispatch import GateDispatch
+from tusk.shared.schemas.voice.gate_state import GateState
 from shells.voice.interfaces.gatekeeper import Gatekeeper
 from shells.voice.stages.echo_filter import EchoFilter
 from shells.voice.stages.sanitizer import Sanitizer
@@ -14,7 +14,7 @@ from shells.voice.stages.utterance_detector import UtteranceDetector
 from tusk.shared.observability.status_reporter import StatusReporter
 from tusk.shared.schemas.app_status import AppStatus
 from tusk.shared.schemas.kernel_response import KernelResponse
-from tusk.shared.schemas.utterance import Utterance
+from tusk.shared.schemas.voice.utterance import Utterance
 
 __all__ = ["VoicePipeline"]
 

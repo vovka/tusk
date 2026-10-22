@@ -3,7 +3,7 @@ import re
 import threading
 from collections.abc import Callable
 
-from shells.voice.stages.chunked_speaker import ChunkedSpeaker
+from shells.voice.speech.chunked_speaker import ChunkedSpeaker
 from tusk.shared.interfaces.log_printer import LogPrinter
 from tusk.shared.interrupt_token import InterruptToken
 from tusk.shared.schemas.kernel_response import KernelResponse

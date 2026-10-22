@@ -1,6 +1,6 @@
 from tusk.shared.interfaces.log_printer import LogPrinter
 from tusk.shared.interfaces.stt_engine import STTEngine
-from tusk.shared.schemas.utterance import Utterance
+from tusk.shared.schemas.voice.utterance import Utterance
 
 __all__ = ["Transcriber"]
 

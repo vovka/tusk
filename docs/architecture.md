@@ -150,7 +150,7 @@ the differences live entirely in the injected prompt, mode, and adapter:
 | Kernel mode holder | `ModeSlot` (`tusk/kernel/modes/mode_slot.py`) | log tag + start reply |
 | Active mode state | `ModeState` | none — `ModeSlot` routes text to the attached mode |
 | Stop classifier | `ModeGate` (utility for the gatekeeper LLM) | prompt: `DICTATION_GATE_PROMPT` / `CODING_GATE_PROMPT` |
-| Voice-side gatekeeper | `StopGatekeeper` (`shells/voice/stages/gate/`) | none — wraps the mode's `ModeGate` |
+| Voice-side gatekeeper | `StopGatekeeper` (`shells/voice/gate/`) | none — wraps the mode's `ModeGate` |
 | Mode behaviour | `DictationMode` / `CodingMode` | dictation types text; coding applies `EditOperation`s via `EditorDriver` |
 | Adapter | `dictation` / `coding` MCP server | segment refinement vs. LLM edit planning over `BufferModel` |
 
@@ -288,6 +288,7 @@ tusk/                        (repo root)
 │   │   │                    #   Null/OTel tracers + TracerFactory
 │   │   ├── schemas/         # Frozen dataclasses for all inter-layer data
 │   │   │   ├── desktop/     # DesktopContext, WindowInfo, AppEntry
+│   │   │   ├── voice/       # Utterance, BufferedUtterance, GateAction/Dispatch/State, GateResult/Classification, RecoveryDecision
 │   │   │   └── tools/       # ToolCall/ToolResult, MCPToolSchema/Result, ToolSequencePlan/Step
 │   │   ├── fuzzy_name_matcher.py  # FuzzyNameMatcher
 │   │   └── interrupt_token.py     # InterruptToken
@@ -297,10 +298,11 @@ tusk/                        (repo root)
 │       └── tts/             # GroqTTS + text chunking / WAV concatenation
 ├── shells/
 │   ├── voice/               # Voice pipeline shell (see shells/voice/README.md): VoiceShell, VoicePipeline,
-│   │   │                    #   CommandWorker, GatekeeperSlot, PlaybackGate, buffer/dispatch schemas
-│   │   ├── interfaces/      # Gatekeeper, TranscriptionBuffer ABCs
-│   │   └── stages/          # AudioCapture, UtteranceDetector, Transcriber, Sanitizer, TranscriptionBuffer
-│   │       └── gate/        # LLMGatekeeper, StopGatekeeper, SpeechStopGate, prompts, parsing
+│   │   │                    #   CommandWorker
+│   │   ├── interfaces/      # Gatekeeper ABC
+│   │   ├── stages/          # AudioCapture, UtteranceDetector, Transcriber, Sanitizer, EchoFilter, TranscriptionBuffer
+│   │   ├── gate/            # LLMGatekeeper, StopGatekeeper, PlaybackGate, SpeechStopGate, ConfirmationAnswerGate, GatekeeperSlot, prompts, parsing
+│   │   └── speech/          # ChunkedSpeaker, SpeechPlayback, ConfirmationReply
 │   ├── cli/                 # CLIShell — stdin REPL
 │   ├── emulator/            # EmulatorShell — replays a scripted transcript as kernel input
 │   └── tray/                # TrayShell, TrayBackend ABC, AppIndicator backend, status sink, menu builder, icons
@@ -371,7 +373,7 @@ All inter-component data is passed as immutable frozen dataclasses (or enums). N
 dicts cross component boundaries. Fields are declared in the source files — one glance at
 the dataclass is the authoritative schema. Index:
 
-| Schema | Module (`tusk/shared/schemas/`) | Carries |
+| Schema | Module (`tusk/shared/schemas/voice/`) | Carries |
 |---|---|---|
 | `Utterance` | `utterance.py` | transcribed text + raw audio + duration + confidence |
 | `GateResult` | `gate_result.py` | gatekeeper verdict + cleaned command + `metadata` (incl. `classification`) |
@@ -832,7 +834,7 @@ this same path: it is spoken before the reply and is likewise silent when `TUSK_
 
 ## Gatekeeper Specification
 
-**Source:** `shells/voice/stages/gate/` — `LLMGatekeeper` orchestrates; `LLMClient` runs
+**Source:** `shells/voice/gate/` — `LLMGatekeeper` orchestrates; `LLMClient` runs
 the LLM calls; `gatekeeper_parser`/`gatekeeper_support` handle schemas and parsing;
 prompts live in `command_gate_prompt.py` / `recovery_gate_prompt.py`.
 

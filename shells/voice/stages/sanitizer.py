@@ -1,9 +1,9 @@
 import re
 
-from shells.voice.stages.confirmation_reply import ConfirmationReply
+from shells.voice.speech.confirmation_reply import ConfirmationReply
 from tusk.shared.fuzzy_name_matcher import FuzzyNameMatcher
 from tusk.shared.interfaces.log_printer import LogPrinter
-from tusk.shared.schemas.utterance import Utterance
+from tusk.shared.schemas.voice.utterance import Utterance
 
 __all__ = ["Sanitizer"]
 

@@ -235,7 +235,7 @@ morning`, `good evening`, `hello`, `hey`, `hi`.
 
 ## 7. Command Gatekeeper Specification
 
-**Sources:** `shells/voice/stages/gate/` (`gatekeeper.py`, `llm_client.py`,
+**Sources:** `shells/voice/gate/` (`llm_gatekeeper.py`, `llm_client.py`,
 `gatekeeper_parser.py`, `gatekeeper_support.py`, `command_gate_prompt.py`,
 `recovery_gate_prompt.py`, `recent_context_formatter.py`).
 **Interface:** `shells/voice/interfaces/gatekeeper.py` — a single method:
@@ -283,7 +283,7 @@ Parsing uses `extract_json_payload` (`tusk/shared/llm/llm_json.py`): tolerates p
 around the JSON (scans for the first decodable `{…}`), unwraps a one-element list, and
 unwraps an `"arguments"` key. `classification` is mapped to the `GateClassification`
 enum (unknown values → `AMBIENT`). `GateResult` (frozen dataclass,
-`tusk/shared/schemas/gate_result.py`): `is_directed_at_tusk` is true for
+`tusk/shared/schemas/voice/gate_result.py`): `is_directed_at_tusk` is true for
 `command`/`conversation`, `cleaned_command` = `cleaned_text`, `confidence=1.0`,
 `classification`. Any parse exception → `GateResult(False, "", 0.0)`.
 
@@ -651,7 +651,7 @@ the plan's tool set must equal the selected tool names.
 ## 15. Voice Pipeline Specification
 
 **Source:** `shells/voice/pipeline.py`, `shells/voice/stages/`,
-`shells/voice/gate_*.py`, `shells/voice/buffered_utterance.py`
+`tusk/shared/schemas/voice/`
 
 ### 15.1 Threading Model
 
@@ -711,7 +711,7 @@ buffer, or gatekeeper (§16.1, §20).
 ## 16. Kernel Routing and Mode Specification
 
 **Sources:** `tusk/kernel/api.py`, `tusk/kernel/modes/`, `shell_loader.py`,
-`shells/voice/gatekeeper_slot.py`, `shells/voice/stages/gate/stop_gatekeeper.py`
+`shells/voice/gate/gatekeeper_slot.py`, `shells/voice/gate/stop_gatekeeper.py`
 
 ### 16.1 KernelAPI.submit
 
@@ -1142,7 +1142,7 @@ between the pipeline and the kernel:
 | token handling | cleared at job start; if set after `submit` returns → cleared again and the reply forced to `"Stopped."` (stale replies are never spoken) |
 | errors | submit/TTS exceptions logged under `ERROR`; the worker thread never dies |
 
-### 22.3 SpeechPlayback — `shells/voice/stages/speech_playback.py`
+### 22.3 SpeechPlayback — `shells/voice/speech/speech_playback.py`
 
 `paplay` subprocess fed WAV bytes from a daemon writer thread. The waiter polls every
 **100 ms**: a set `InterruptToken` → `terminate()`; a hard **30 s cap** → `kill()` (a
@@ -1458,11 +1458,11 @@ their results are discarded; already-executed desktop actions are not rolled bac
   are ignored (the busy check in `LLMGatekeeper`).
 - **Any mode, while TUSK speaks:** `PlaybackGate` (§30.4).
 
-### 30.4 PlaybackGate — `shells/voice/playback_gate.py`
+### 30.4 PlaybackGate — `shells/voice/gate/playback_gate.py`
 
 Wraps the forward-all mode gates while `worker.current_speech_text` is set: every
 utterance heard during playback goes to `SpeechStopGate`
-(`shells/voice/stages/gate/speech_stop_gate.py`) — a yes/no structured classification
+(`shells/voice/gate/speech_stop_gate.py`) — a yes/no structured classification
 (`{"stop": bool, "reason": str}`, 128 max tokens, gatekeeper slot) with the spoken
 sentence as context and an explicit echo rule ("utterances that repeat fragments of
 TUSK's own sentence are its own voice: not a stop request"). `stop=true` →

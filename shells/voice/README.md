@@ -103,7 +103,7 @@ The buffer also tracks gate state for each utterance (`pending`, `forwarded`, `d
 retrospective recovery within a bounded window, so a later correction like "that previous
 one was for TUSK" can recover the earlier dropped text.
 
-### Gatekeeper (`stages/gatekeeper.py`)
+### Gatekeeper (`gate/llm_gatekeeper.py`)
 
 Cheap LLM call that classifies each utterance as `command`, `conversation`, or `ambient`.
 Only `command` and `conversation` are forwarded to the kernel; `ambient` is silently dropped.
@@ -159,24 +159,36 @@ a test double or an alternative implementation without touching the others.
 shells/voice/
 ├── pipeline.py              # VoicePipeline — assembles stages, dispatches GateDispatch
 ├── voice_shell.py           # VoiceShell — entry point, builds pipeline, calls submit()
-├── buffered_utterance.py    # BufferedUtterance — Utterance + id + gate_state
-├── gate_dispatch.py         # GateDispatch — action + text + recovered_id
-├── recovery_decision.py     # RecoveryDecision — action + candidate_id + reason
+├── command_worker.py        # CommandWorker — runs kernel submits + speech off the pipeline thread
 ├── interfaces/
-│   ├── gatekeeper.py        # Gatekeeper ABC
-│   └── transcription_buffer.py  # TranscriptionBuffer ABC
-└── stages/
-    ├── audio_capture.py         # AudioCapture — raw PCM from microphone
-    ├── utterance_detector.py    # UtteranceDetector — VAD + boundary buffering
-    ├── transcriber.py           # Transcriber — wraps STTEngine
-    ├── sanitizer.py             # Sanitizer — hallucination filter
-    ├── transcription_buffer.py  # TranscriptionBuffer — rolling window + state tracking
-    ├── gatekeeper.py            # LLMGatekeeper — primary classify + recovery
-    ├── gatekeeper_parser.py     # JSON parsing for gate and recovery LLM responses
-    ├── gatekeeper_support.py    # Helpers: schemas, dispatch builders, wake-word check
-    ├── command_gate_prompt.py   # Prompt builder for the primary classification call
-    ├── recovery_gate_prompt.py  # Prompt builder for the recovery LLM call
-    └── recent_context_formatter.py  # Formats recent utterances for context
+│   └── gatekeeper.py        # Gatekeeper ABC
+├── stages/                  # input side: microphone → text
+│   ├── audio_capture.py         # AudioCapture — raw PCM from microphone
+│   ├── utterance_detector.py    # UtteranceDetector — VAD + boundary buffering
+│   ├── transcriber.py           # Transcriber — wraps STTEngine
+│   ├── sanitizer.py             # Sanitizer — hallucination filter
+│   ├── echo_filter.py           # EchoFilter — drops echoes of TUSK's own speech
+│   └── transcription_buffer.py  # TranscriptionBuffer — rolling window + state tracking
+├── gate/                    # every Gatekeeper implementation + its helpers
+│   ├── llm_gatekeeper.py        # LLMGatekeeper — primary classify + recovery
+│   ├── stop_gatekeeper.py       # StopGatekeeper — mode stop phrases
+│   ├── playback_gate.py         # PlaybackGate — interrupt/echo handling while TUSK speaks
+│   ├── speech_stop_gate.py      # SpeechStopGate — yes/no "stop" classifier
+│   ├── confirmation_answer_gate.py  # ConfirmationAnswerGate — yes/no to a pending confirmation
+│   ├── gatekeeper_slot.py       # GatekeeperSlot — swappable inner gatekeeper
+│   ├── llm_client.py            # LLMClient — runs the gate LLM calls
+│   ├── gatekeeper_parser.py     # JSON parsing for gate and recovery LLM responses
+│   ├── gatekeeper_support.py    # Helpers: schemas, dispatch builders, wake-word check
+│   ├── command_gate_prompt.py   # Prompt builder for the primary classification call
+│   ├── recovery_gate_prompt.py  # Prompt builder for the recovery LLM call
+│   └── recent_context_formatter.py  # Formats recent utterances for context
+└── speech/                  # output side: text → audio
+    ├── chunked_speaker.py       # ChunkedSpeaker — TTS in sentence chunks
+    ├── speech_playback.py       # SpeechPlayback — audio output
+    └── confirmation_reply.py    # ConfirmationReply — pending yes/no question state
+
+Typed records (BufferedUtterance, GateAction, GateDispatch, GateState, RecoveryDecision,
+GateResult, GateClassification, Utterance) live in `tusk/shared/schemas/voice/`.
 ```
 
 ---

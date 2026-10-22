@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 
-from shells.voice.buffered_utterance import BufferedUtterance
-from shells.voice.gate_dispatch import GateDispatch
-from tusk.shared.schemas.utterance import Utterance
+from tusk.shared.schemas.voice.buffered_utterance import BufferedUtterance
+from tusk.shared.schemas.voice.gate_dispatch import GateDispatch
+from tusk.shared.schemas.voice.utterance import Utterance
 
 __all__ = ["Gatekeeper"]
 

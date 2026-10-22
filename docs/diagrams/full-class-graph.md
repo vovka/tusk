@@ -78,4 +78,4 @@ kept as plain DOT in `full-class-graph-legend.gv` next to the script.
   other with no gap; bump `sep`/`esep` in the script if that should change.
 - Sub-clusters are undecorated rounded boxes (border only, no fill) so the
   parent's fill color still shows through — if a package gets a 3rd nesting
-  level (e.g. `shells.voice.stages.gate`) it isn't broken out separately yet.
+  level (e.g. `shells.voice.gate`) it isn't broken out separately yet.

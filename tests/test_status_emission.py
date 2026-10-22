@@ -3,8 +3,8 @@ import types
 
 import pytest
 
-from shells.voice.buffered_utterance import BufferedUtterance
-from shells.voice.gate_dispatch import GateDispatch
+from tusk.shared.schemas.voice.buffered_utterance import BufferedUtterance
+from tusk.shared.schemas.voice.gate_dispatch import GateDispatch
 from shells.voice.pipeline import VoicePipeline
 from shells.voice.voice_shell import VoiceShell
 from tusk.kernel.core.kernel_api import KernelAPI
@@ -13,7 +13,7 @@ from tusk.shared.observability.status_reporter import StatusReporter
 from tusk.shared.schemas.app_mode import AppMode
 from tusk.shared.schemas.app_status import AppStatus
 from tusk.shared.schemas.kernel_response import KernelResponse
-from tusk.shared.schemas.utterance import Utterance
+from tusk.shared.schemas.voice.utterance import Utterance
 
 
 def _hub() -> tuple[StatusReporter, list]:
