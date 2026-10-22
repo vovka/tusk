@@ -4,9 +4,9 @@ from pathlib import Path
 
 from tusk.kernel.agent.backends.agent_backend import AgentBackend
 from tusk.kernel.agent.backends.backend_run_logger import BackendRunLogger
-from tusk.kernel.agent.backends.codex_exec_command_builder import CodexExecCommandBuilder
+from tusk.kernel.agent.backends.codex_exec.command_builder import CommandBuilder
 from tusk.kernel.agent.backends.codex_prompt_builder import CodexPromptBuilder
-from tusk.kernel.agent.backends.codex_result_parser import CodexResultParser
+from tusk.kernel.agent.backends.codex_exec.result_parser import ResultParser
 from tusk.kernel.agent.backends.backend_request import BackendRequest
 from tusk.kernel.agent.backends.backend_result import BackendResult
 from tusk.shared.logging.interfaces.log_printer import LogPrinter
@@ -17,9 +17,9 @@ __all__ = ["CodexExecAgentBackend"]
 class CodexExecAgentBackend(AgentBackend):
     def __init__(self, config: object, log_printer: LogPrinter) -> None:
         self._config = config
-        self._command_builder = CodexExecCommandBuilder(config)
+        self._command_builder = CommandBuilder(config)
         self._prompt_builder = CodexPromptBuilder()
-        self._parser = CodexResultParser()
+        self._parser = ResultParser()
         self._log_printer = log_printer
         self._run_logger = BackendRunLogger(log_printer, self.name)
 

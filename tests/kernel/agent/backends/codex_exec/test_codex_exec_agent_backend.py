@@ -4,7 +4,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock
 
 from tusk.kernel.agent.backends.backend_request import BackendRequest
-from tusk.kernel.agent.backends.codex_exec_agent_backend import CodexExecAgentBackend
+from tusk.kernel.agent.backends.codex_exec.codex_exec_agent_backend import CodexExecAgentBackend
 
 
 def stream(payload: str) -> str:

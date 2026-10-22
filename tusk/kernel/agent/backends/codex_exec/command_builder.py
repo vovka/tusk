@@ -1,10 +1,10 @@
 import shlex
 from pathlib import Path
 
-__all__ = ["CodexExecCommandBuilder"]
+__all__ = ["CommandBuilder"]
 
 
-class CodexExecCommandBuilder:
+class CommandBuilder:
     def __init__(self, config: object) -> None:
         self._config = config
 

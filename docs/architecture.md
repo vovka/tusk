@@ -267,7 +267,8 @@ tusk/                        (repo root)
 │   │   ├── interfaces/      # Shell, EditorDriver, EditApplicationStrategy
 │   │   ├── agent/           # Agentic loop: AgentOrchestrator, AgentRuntime, tool catalog/toolset, dispatcher
 │   │   │   ├── backends/    # AgentBackend ABC; tusk / codex_exec / codex_mcp / fallback backends
-│   │   │   │   └── codex_mcp/ # Persistent codex mcp-server session (Client, CallBuilder, ResponseReader, ResultMapper)
+│   │   │   │   ├── codex_exec/ # One-shot `codex exec --json` backend (CommandBuilder, ResultParser)
+│   │   │   │   └── codex_mcp/ # Persistent codex mcp-server session backend (Client, CallBuilder, ResultMapper)
 │   │   │   ├── guards/      # Turn guards (delegation, failure budget, clipboard, typing)
 │   │   │   ├── planner/     # Planner output validation, sequence promotion, runtime tool resolution
 │   │   │   ├── runtime/     # Message history builder, result factory, step recorder, guard composition
@@ -481,8 +482,8 @@ flowchart TD
 - **`tusk`** (default) — `TuskAgentBackend` wraps `MainAgent`, running the in-process
   conversation → planner → executor loop documented under [Agent Structure](#agent-structure).
 - **`codex_exec`** — `CodexExecAgentBackend` shells out to `codex exec --json`
-  (`CodexExecCommandBuilder` builds argv, `CodexPromptBuilder` adds the desktop-assistant
-  context), then parses the final `agent_message` event (`CodexResultParser`) against
+  (`CommandBuilder` builds argv, `CodexPromptBuilder` adds the desktop-assistant
+  context), then parses the final `agent_message` event (`ResultParser`) against
   `codex_agent_result.schema.json`. Codex reaches the desktop through its **own** adapter
   instances: `docker/codex-entrypoint.sh` runs `tools/codex_mcp_config_generator.py`, which
   emits `config.toml` `[mcp_servers.*]` sections from the same `adapters/*/adapter.json`

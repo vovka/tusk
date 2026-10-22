@@ -7,7 +7,7 @@ import pytest
 from tests.recording_agent import RecordingAgent
 from tests.recording_log_printer import RecordingLogPrinter
 from tusk.kernel.agent.backends.backend_request import BackendRequest
-from tusk.kernel.agent.backends.codex_exec_agent_backend import CodexExecAgentBackend
+from tusk.kernel.agent.backends.codex_exec.codex_exec_agent_backend import CodexExecAgentBackend
 from tusk.kernel.agent.backends.tusk_agent_backend import TuskAgentBackend
 
 

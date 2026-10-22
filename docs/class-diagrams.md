@@ -315,7 +315,7 @@ classDiagram
     name : str
     run(request: BackendRequest) BackendResult
   }
-  class CodexExecCommandBuilder {
+  class CommandBuilder {
     build(prompt: str) list[str]
   }
   class CodexMcpAgentBackend {
@@ -325,15 +325,12 @@ classDiagram
   class CodexPromptBuilder {
     build(request: BackendRequest) str
   }
-  class CodexResultParser {
+  class ResultParser {
     parse(output: str) dict | None
   }
   class FallbackAgentBackend {
     name : str
     run(request: BackendRequest) BackendResult
-  }
-  class ResponseReader {
-    read(request_id: int, method: str) dict
   }
   class ResultMapper {
     failure(request: BackendRequest, message: str, status: str) BackendResult

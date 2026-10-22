@@ -97,3 +97,29 @@ def test_client_stop_terminates_server() -> None:
     instance = client(_SERVER)
     instance.stop()
     assert instance.is_running() is False
+
+
+_STALE_ID = """
+import json, sys
+for line in sys.stdin:
+    message = json.loads(line)
+    if "id" not in message:
+        continue
+    if message.get("method") == "tools/call":
+        stale = {"jsonrpc": "2.0", "id": message["id"] - 1, "result": {"stale": True}}
+        sys.stdout.write(json.dumps(stale) + "\\n")
+    sys.stdout.write(json.dumps({"jsonrpc": "2.0", "id": message["id"], "result": {"ok": True}}) + "\\n")
+    sys.stdout.flush()
+"""
+_INVALID_JSON = "import sys\nsys.stdin.readline()\nsys.stdout.write('not json\\n')\nsys.stdout.flush()\n"
+
+
+def test_client_skips_responses_with_mismatched_id() -> None:
+    instance = client(_STALE_ID)
+    assert instance.call_tool("codex", {"prompt": "hi"}) == {"ok": True}
+    instance.stop()
+
+
+def test_client_raises_runtime_error_on_invalid_json() -> None:
+    with pytest.raises(RuntimeError, match="invalid JSON"):
+        client(_INVALID_JSON)

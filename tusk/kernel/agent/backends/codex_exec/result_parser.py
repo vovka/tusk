@@ -1,9 +1,9 @@
 import json
 
-__all__ = ["CodexResultParser"]
+__all__ = ["ResultParser"]
 
 
-class CodexResultParser:
+class ResultParser:
     """Extracts the schema-conforming payload from a `codex exec --json` stream.
 
     Codex emits one JSON event per line; the structured result is the JSON text

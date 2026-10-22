@@ -3,10 +3,10 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from tusk.kernel.agent.backends.backend_request import BackendRequest
-from tusk.kernel.agent.backends.codex_mcp_agent_backend import CodexMcpAgentBackend
+from tusk.kernel.agent.backends.codex_mcp.codex_mcp_agent_backend import CodexMcpAgentBackend
 from tests.recording_log_printer import RecordingLogPrinter
 
-_CLIENT = "tusk.kernel.agent.backends.codex_mcp_agent_backend.Client"
+_CLIENT = "tusk.kernel.agent.backends.codex_mcp.codex_mcp_agent_backend.Client"
 
 
 class FakeClient:

@@ -3,7 +3,7 @@ import time
 from unittest.mock import patch
 
 from tusk.kernel.agent.backends.backend_request import BackendRequest
-from tests.kernel.agent.backends.test_codex_mcp_agent_backend import _CLIENT, FakeClient, backend, success
+from tests.kernel.agent.backends.codex_mcp.test_codex_mcp_agent_backend import _CLIENT, FakeClient, backend, success
 
 
 def _warmed_client(instance: object) -> FakeClient:
