@@ -13,12 +13,12 @@ from tusk.shared.schemas.app_mode import AppMode
 from tusk.shared.schemas.app_status import AppStatus
 from tusk.shared.schemas.kernel_response import KernelResponse
 from tusk.shared.schemas.utterance import Utterance
-from tusk.shared.status.status_reporter_hub import StatusReporterHub
+from tusk.shared.status.status_reporter import StatusReporter
 
 
-def _hub() -> tuple[StatusReporterHub, list]:
+def _hub() -> tuple[StatusReporter, list]:
     published: list = []
-    return StatusReporterHub(types.SimpleNamespace(publish=published.append)), published
+    return StatusReporter(types.SimpleNamespace(publish=published.append)), published
 
 
 def test_kernel_submit_emits_reacting_then_restores_prior_status() -> None:
@@ -70,7 +70,7 @@ def test_switch_model_does_not_report_on_failure() -> None:
     assert reported == []
 
 
-def _pipeline(hub: StatusReporterHub) -> VoicePipeline:
+def _pipeline(hub: StatusReporter) -> VoicePipeline:
     detector = types.SimpleNamespace(stream_utterances=lambda: iter([Utterance("", b"a", 1.0)]))
     return VoicePipeline(detector, _transcriber(), _passthrough(), _buffer(), _gatekeeper(), reporter=hub)
 

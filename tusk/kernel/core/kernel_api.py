@@ -8,7 +8,7 @@ from tusk.shared.schemas.kernel_response import KernelResponse
 from tusk.shared.interrupt.interrupt_token import InterruptToken
 from tusk.shared.llm.llm_registry import LLMRegistry
 from tusk.shared.logging.interfaces.log_printer import LogPrinter
-from tusk.shared.status.interfaces.status_reporter import StatusReporter
+from tusk.shared.status.status_reporter import StatusReporter
 from tusk.shared.tracing.interfaces.tracer import Tracer
 from tusk.shared.tracing.null_tracer import NullTracer
 

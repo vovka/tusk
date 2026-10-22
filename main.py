@@ -11,7 +11,7 @@ from tusk.shared.interrupt import InterruptToken
 from tusk.shared.llm import LLMProxy, LLMRegistry, RotatingLLMProvider
 from tusk.shared.llm.interfaces.llm_provider import LLMProvider
 from tusk.shared.logging import ColorLogPrinter
-from tusk.shared.status import LatencyMeter, NullStatusSink, StatusReporterHub
+from tusk.shared.status import LatencyMeter, NullStatusSink, StatusReporter
 from tusk.shared.tracing import TracerFactory
 from tusk.shared.tracing.interfaces.tracer import Tracer
 
@@ -31,7 +31,7 @@ def _build_llm_registry(config: Config, log: ColorLogPrinter, options: StartupOp
     return registry
 
 
-def _build_kernel(config: Config, log: ColorLogPrinter, options: StartupOptions, reporter: StatusReporterHub, token: InterruptToken, tracer: Tracer, latency_meter: LatencyMeter) -> KernelAPI:
+def _build_kernel(config: Config, log: ColorLogPrinter, options: StartupOptions, reporter: StatusReporter, token: InterruptToken, tracer: Tracer, latency_meter: LatencyMeter) -> KernelAPI:
     registry = _build_llm_registry(config, log, options, token, tracer)
     return build_kernel(config, log, registry, reporter, token, tracer, latency_meter)
 
@@ -72,7 +72,7 @@ def main() -> None:
     config = Config.from_env()
     log = _build_log(options)
     tracer = _build_tracer()
-    reporter = StatusReporterHub(NullStatusSink(), log)
+    reporter = StatusReporter(NullStatusSink(), log)
     latency_meter = LatencyMeter(log, reporter)
     kernel = _build_kernel(config, log, options, reporter, InterruptToken(), tracer, latency_meter)
     reporter.set_models(kernel.llm_registry.model_labels())

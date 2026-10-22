@@ -264,7 +264,7 @@ tusk/                        (repo root)
 │   ├── kernel/              # Thin orchestration layer
 │   │   ├── core/            # KernelAPI, CommandMode, MainAgent, AdapterManager,
 │   │   │   │                #   agent profiles, SlidingWindowHistory, startup wiring
-│   │   ├── interfaces/      # Shell, ConversationHistory, EditorDriver, EditApplicationStrategy
+│   │   ├── interfaces/      # Shell, EditorDriver, EditApplicationStrategy
 │   │   ├── agent/           # Agentic loop: AgentOrchestrator, AgentRuntime, tool catalog/toolset, dispatcher
 │   │   │   ├── backends/    # AgentBackend ABC; tusk / codex_exec / codex_mcp / fallback backends
 │   │   │   │   └── codex_mcp/ # Persistent codex mcp-server session (Client, CallBuilder, ResponseReader, ResultMapper)
@@ -287,7 +287,7 @@ tusk/                        (repo root)
 │   │   ├── schemas/         # Frozen dataclasses for all inter-layer data
 │   │   │   ├── desktop/     # DesktopContext, WindowInfo, AppEntry
 │   │   │   └── tools/       # ToolCall/ToolResult, MCPToolSchema/Result, ToolSequencePlan/Step
-│   │   ├── status/          # StatusReporter/StatusSink ABCs, StatusReporterHub, NullStatusSink
+│   │   ├── status/          # StatusSink ABC, StatusReporter, NullStatusSink
 │   │   ├── stt/             # STTEngine ABC
 │   │   └── tts/             # TTSEngine ABC
 │   └── providers/           # Swappable implementations behind shared ABCs
@@ -344,7 +344,6 @@ source files; this table is the index:
 | ABC | Defined in | Implementations | Key consumers |
 |---|---|---|---|
 | `Shell` | `tusk/kernel/interfaces/shell.py` | `VoiceShell`, `CLIShell`, `EmulatorShell`, `TrayShell` (structural) | `ShellLoader` |
-| `ConversationHistory` | `tusk/kernel/interfaces/conversation_history.py` | `SlidingWindowHistory` | `MainAgent` |
 | `EditorDriver` | `tusk/kernel/interfaces/editor_driver.py` | `InputAutomationEditorDriver` | `CodingRouter`, `StartCodingTool`, strategies |
 | `EditApplicationStrategy` | `tusk/kernel/interfaces/edit_application_strategy.py` | `FullReplaceEditStrategy` | `CodingRouter` |
 | `AgentBackend` | `tusk/kernel/agent/backends/agent_backend.py` | `TuskAgentBackend`, `CodexExecAgentBackend`, `CodexMcpAgentBackend`, `FallbackAgentBackend` | `CommandMode` |
@@ -352,12 +351,10 @@ source files; this table is the index:
 | `LLMProvider` | `tusk/shared/llm/interfaces/llm_provider.py` | `GroqLLM`, `OpenRouterLLM`, `LLMProxy` (wrapper) | agent profiles, gatekeepers, `ModeGate` |
 | `LLMProviderFactory` | `tusk/shared/llm/interfaces/llm_provider_factory.py` | `ConfigurableLLMFactory` | `LLMRegistry` |
 | `LogPrinter` | `tusk/shared/logging/interfaces/log_printer.py` | `ColorLogPrinter` | everything |
-| `StatusReporter` | `tusk/shared/status/interfaces/status_reporter.py` | `StatusReporterHub` | `VoicePipeline`, `KernelAPI`, `ToolRuntime` |
-| `StatusSink` | `tusk/shared/status/interfaces/status_sink.py` | `NullStatusSink`, `TrayStatusSink` | `StatusReporterHub` |
+| `StatusSink` | `tusk/shared/status/interfaces/status_sink.py` | `NullStatusSink`, `TrayStatusSink` | `StatusReporter` |
 | `STTEngine` | `tusk/shared/stt/interfaces/stt_engine.py` | `GroqSTT`, `WhisperSTT` | `Transcriber` |
 | `TTSEngine` | `tusk/shared/tts/interfaces/tts_engine.py` | `GroqTTS` | `CommandWorker` |
 | `Gatekeeper` | `shells/voice/interfaces/gatekeeper.py` | `LLMGatekeeper`, `StopGatekeeper`, `GatekeeperSlot`, `PlaybackGate` | `VoicePipeline` |
-| `TranscriptionBuffer` | `shells/voice/interfaces/transcription_buffer.py` | `TranscriptionBuffer` (stages) | `VoicePipeline` |
 | `TrayBackend` | `shells/tray/interfaces/tray_backend.py` | `AppIndicatorTrayBackend` | `TrayShell` |
 
 "Structural" means the concrete class satisfies the ABC's methods without inheriting it
@@ -743,7 +740,7 @@ selected by name from `TUSK_SHELLS` (default `voice`). There are no shell manife
 - **`EmulatorShell`** — replays a scripted transcript into the kernel, standing in for
   voice input (used by demos).
 - **`TrayShell`** — optional status-and-control indicator. Registers a `TrayStatusSink`
-  into the `StatusReporterHub`, renders the icon from `AppStatus` (`StatusIconResolver`),
+  into the `StatusReporter`, renders the icon from `AppStatus` (`StatusIconResolver`),
   and builds the menu (`TrayMenuBuilder`) wired to injected actions — pause/resume call the
   `VoiceShell` reference injected by the loader; open logs; restart; exit via a shutdown
   event. It holds no business logic and the kernel never imports it. The `TrayBackend`
@@ -877,7 +874,7 @@ main()
   → StartupOptions.from_sources(argv)          # verbosity + log groups
   → Config.from_env()                          # all env settings
   → ColorLogPrinter(options)
-  → StatusReporterHub(NullStatusSink(), log)   # real sink attached later by the tray
+  → StatusReporter(NullStatusSink(), log)   # real sink attached later by the tray
   → build_kernel(config, log, llm_registry, reporter, InterruptToken())   # startup.py
       → ToolRegistry()
       → AdapterManager("adapters", ...).start_all() + start_watcher()
@@ -932,7 +929,7 @@ LLM slot proxies for agents carry the `InterruptToken`; gatekeeper/utility do no
    `MainAgent`, and `CommandMode` are platform-agnostic.
 
 7. **Status notifications never block producers.** `StatusSink.publish` returns
-   immediately; the tray marshals onto its GUI thread; `StatusReporterHub` swallows sink
+   immediately; the tray marshals onto its GUI thread; `StatusReporter` swallows sink
    exceptions so a broken UI can never propagate into audio or kernel threads.
 
 8. **`AppStatus` is the single source of truth for the tray icon** — the icon is a pure
@@ -962,7 +959,7 @@ LLM slot proxies for agents carry the `InterruptToken`; gatekeeper/utility do no
 | `VoicePipeline` | Stage returns `None` | Utterance silently dropped |
 | `LLMRetryRunner` | Retryable error | Up to 3 attempts, delay `0.5 * attempt` s; non-retryable re-raises |
 | `TrayShell` | Tray library `ImportError` / GUI-loop crash | Logs; blocks on the shutdown event so daemon shells keep running headless |
-| `StatusReporterHub` | `StatusSink.publish` raises | Caught + logged; never propagates to the producer |
+| `StatusReporter` | `StatusSink.publish` raises | Caught + logged; never propagates to the producer |
 | Host launcher | Launch command fails | Replies `error: ...` on the socket; adapter returns a failed `ToolResult` |
 
 ---

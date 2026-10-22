@@ -12,7 +12,7 @@ from tusk.shared.config import Config, StartupOptions
 from tusk.shared.interrupt import InterruptToken
 from tusk.shared.llm import LLMRegistry
 from tusk.shared.logging import ColorLogPrinter
-from tusk.shared.status import NullStatusSink, StatusReporterHub
+from tusk.shared.status import NullStatusSink, StatusReporter
 from tusk.shared.tracing.null_tracer import NullTracer
 
 __all__ = ["build_desktop_app"]
@@ -29,7 +29,7 @@ def build_desktop_app() -> tuple[KernelAPI, ToolRegistry, InterruptToken, ColorL
 
 
 def _kernel(config: Config, log: ColorLogPrinter, llm_registry: LLMRegistry, token: InterruptToken) -> tuple[KernelAPI, ToolRegistry]:
-    reporter = StatusReporterHub(NullStatusSink(), log)
+    reporter = StatusReporter(NullStatusSink(), log)
     tool_registry = ToolRegistry()
     adapter_manager = build_adapter_manager(config, log, tool_registry)
     confirmation = ConfirmationGate(tool_registry)

@@ -20,7 +20,7 @@ from tusk.kernel.agent.planner.runtime_tool_resolver import RuntimeToolResolver
 from tusk.kernel.agent.tool_sequence.executor import Executor
 from tusk.shared.logging.interfaces.log_printer import LogPrinter
 from tusk.shared.tracing.interfaces.tracer import Tracer
-from tusk.kernel.interfaces.action_confirmation import ActionConfirmation
+from tusk.kernel.agent.confirmation.confirmation_gate import ConfirmationGate
 
 __all__ = ["AgentOrchestrator"]
 
@@ -35,7 +35,7 @@ class AgentOrchestrator:
         interrupt_token: object | None = None,
         tracer: Tracer | None = None,
         *,
-        confirmation: ActionConfirmation,
+        confirmation: ConfirmationGate,
     ) -> None:
         self._profiles = profiles
         self._registry = tool_registry
@@ -43,7 +43,7 @@ class AgentOrchestrator:
         self._init_components(session_store, log_printer, tool_registry, interrupt_token, tracer, confirmation)
 
     def _init_components(self, store: Store, log: LogPrinter, registry: ToolRegistry, token: object | None, tracer: Tracer | None,
-                         confirmation: ActionConfirmation) -> None:
+                         confirmation: ConfirmationGate) -> None:
         self._runtime = AgentRuntime(store, log, StepRecorder(store, registry), token)
         self._guard = AgentRunGuard()
         self._children = AgentChildRunner(store)

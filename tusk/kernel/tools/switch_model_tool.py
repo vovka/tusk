@@ -2,7 +2,7 @@ import re
 
 from tusk.shared.schemas.tools.tool_result import ToolResult
 from tusk.shared.llm.llm_registry import LLMRegistry
-from tusk.shared.status.interfaces.status_reporter import StatusReporter
+from tusk.shared.status.status_reporter import StatusReporter
 
 __all__ = ["SwitchModelTool"]
 

@@ -4,14 +4,14 @@ from typing import Any
 
 from tusk.kernel.agent import AgentOrchestrator, AgentRunRequest
 from tusk.kernel.agent.session.store import Store
-from tusk.kernel.interfaces.conversation_history import ConversationHistory
+from tusk.kernel.core.sliding_window_history import SlidingWindowHistory
 from tusk.shared.schemas.chat_message import ChatMessage
 
 __all__ = ["MainAgent"]
 
 
 class MainAgent:
-    def __init__(self, orchestrator: AgentOrchestrator, history: ConversationHistory, session_store: Store | None = None) -> None:
+    def __init__(self, orchestrator: AgentOrchestrator, history: SlidingWindowHistory, session_store: Store | None = None) -> None:
         self._orchestrator = orchestrator
         self._history = history
         self._store = session_store

@@ -32,7 +32,7 @@ def _stub_main(monkeypatch, captured: dict) -> None:
     monkeypatch.setattr(main.StartupOptions, "from_sources", lambda argv=None: types.SimpleNamespace())
     monkeypatch.setattr(main.Config, "from_env", lambda: config)
     monkeypatch.setattr(main, "_build_log", lambda options: types.SimpleNamespace(log=lambda *a: None))
-    monkeypatch.setattr(main, "StatusReporterHub", lambda sink, logger: _reporter(captured))
+    monkeypatch.setattr(main, "StatusReporter", lambda sink, logger: _reporter(captured))
     monkeypatch.setattr(main, "_build_kernel", lambda c, l, o, reporter, token, tracer, meter: captured.__setitem__("kernel_meter", meter) or kernel)
     monkeypatch.setattr(main, "ShellLoader", lambda c, k, l, reporter, meter: captured.__setitem__("loader_meter", meter.__self__) or _loader(captured, reporter))
 

@@ -1,14 +1,14 @@
+from tusk.shared.logging.interfaces.log_printer import LogPrinter
 from tusk.shared.schemas.app_mode import AppMode
 from tusk.shared.schemas.app_status import AppStatus
 from tusk.shared.schemas.status_snapshot import StatusSnapshot
-from tusk.shared.status.interfaces.status_reporter import StatusReporter
 from tusk.shared.status.interfaces.status_sink import StatusSink
 
-__all__ = ["StatusReporterHub"]
+__all__ = ["StatusReporter"]
 
 
-class StatusReporterHub(StatusReporter):
-    def __init__(self, sink: StatusSink, log: object | None = None) -> None:
+class StatusReporter:
+    def __init__(self, sink: StatusSink, log: LogPrinter | None = None) -> None:
         self._sink = sink
         self._log = log
         self._status = AppStatus.STARTING

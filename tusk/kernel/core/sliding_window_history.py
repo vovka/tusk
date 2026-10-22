@@ -1,4 +1,3 @@
-from tusk.kernel.interfaces.conversation_history import ConversationHistory
 from tusk.shared.schemas.chat_message import ChatMessage
 
 __all__ = ["SlidingWindowHistory"]
@@ -6,7 +5,7 @@ __all__ = ["SlidingWindowHistory"]
 _SUMMARY_PREFIX = "Previous context summary: "
 
 
-class SlidingWindowHistory(ConversationHistory):
+class SlidingWindowHistory:
     def __init__(self, max_messages: int) -> None:
         self._max = max_messages
         self._messages: list[ChatMessage] = []

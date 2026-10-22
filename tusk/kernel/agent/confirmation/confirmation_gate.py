@@ -4,7 +4,6 @@ from collections.abc import Callable
 from tusk.kernel.agent.confirmation.active_window_probe import ActiveWindowProbe
 from tusk.kernel.agent.confirmation.destructive_action_policy import DestructiveActionPolicy
 from tusk.kernel.agent.confirmation.pending_action import PendingAction
-from tusk.kernel.interfaces.action_confirmation import ActionConfirmation
 from tusk.kernel.tools.tool_registry import ToolRegistry
 from tusk.shared.schemas.kernel_response import KernelResponse
 from tusk.shared.schemas.tools.tool_result import ToolResult
@@ -16,7 +15,7 @@ _CONFIRM_WORDS = {"yes", "confirm", "yes confirm", "do it", "yes do it", "yes pl
 _DECLINE_WORDS = {"no", "cancel", "stop", "no thanks"}
 
 
-class ConfirmationGate(ActionConfirmation):
+class ConfirmationGate:
     def __init__(self, registry: ToolRegistry, policy: DestructiveActionPolicy | None = None,
                  probe: ActiveWindowProbe | None = None, clock: Callable[[], float] = time.monotonic,
                  ttl_seconds: float = 30.0, latency_meter: LatencyMeter | None = None) -> None:

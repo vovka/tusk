@@ -101,8 +101,7 @@ reads the last N utterances via `recent(n)` to build context for its classificat
 The buffer also tracks gate state for each utterance (`pending`, `forwarded`, `dropped`,
 `recovered`, `consumed`). Recent utterances dropped by the gatekeeper remain eligible for
 retrospective recovery within a bounded window, so a later correction like "that previous
-one was for TUSK" can recover the earlier dropped text. Implements `TranscriptionBuffer`
-ABC (`interfaces/transcription_buffer.py`).
+one was for TUSK" can recover the earlier dropped text.
 
 ### Gatekeeper (`stages/gatekeeper.py`)
 
@@ -151,7 +150,6 @@ a test double or an alternative implementation without touching the others.
 | ABC | File | Key methods |
 |---|---|---|
 | `Gatekeeper` | `interfaces/gatekeeper.py` | `evaluate(utterance, recent)`, `process(utterance, recent, candidates) → GateDispatch` |
-| `TranscriptionBuffer` | `interfaces/transcription_buffer.py` | `process(utterance) → BufferedUtterance`, `recent(n)`, `recoverable(n, secs)`, `mark_*(id)` |
 
 ---
 

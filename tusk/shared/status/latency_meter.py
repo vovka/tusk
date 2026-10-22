@@ -4,7 +4,7 @@ from collections import deque
 from collections.abc import Callable
 
 from tusk.shared.logging.interfaces.log_printer import LogPrinter
-from tusk.shared.status.interfaces.status_reporter import StatusReporter
+from tusk.shared.status.status_reporter import StatusReporter
 
 __all__ = ["LatencyMeter"]
 

@@ -6,7 +6,7 @@ from tusk.shared.schemas.tools.tool_result import ToolResult
 from tusk.kernel.tools.tool_registry import ToolRegistry
 from tusk.kernel.agent.simple_schema_validator import SimpleSchemaValidator
 from tusk.kernel.agent.tool_sequence.executor import Executor
-from tusk.kernel.interfaces.action_confirmation import ActionConfirmation
+from tusk.kernel.agent.confirmation.confirmation_gate import ConfirmationGate
 from tusk.shared.schemas.tools.tool_sequence_plan import ToolSequencePlan
 from tusk.shared.tracing.interfaces.tracer import Tracer
 from tusk.shared.tracing.null_tracer import NullTracer
@@ -15,7 +15,7 @@ __all__ = ["OrchestratorToolDispatcher"]
 
 
 class OrchestratorToolDispatcher:
-    def __init__(self, tool_registry: ToolRegistry, sequence_executor: Executor, validator: SimpleSchemaValidator | None = None, tracer: Tracer | None = None, *, confirmation: ActionConfirmation) -> None:
+    def __init__(self, tool_registry: ToolRegistry, sequence_executor: Executor, validator: SimpleSchemaValidator | None = None, tracer: Tracer | None = None, *, confirmation: ConfirmationGate) -> None:
         self._registry = tool_registry
         self._sequence = sequence_executor
         self._validator = validator or SimpleSchemaValidator()

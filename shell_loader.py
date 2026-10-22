@@ -12,7 +12,7 @@ from shells.voice.voice_shell import VoiceShell
 from tusk.kernel.core.kernel_api import KernelAPI
 from tusk.shared.config.config import Config
 from tusk.shared.logging.interfaces.log_printer import LogPrinter
-from tusk.shared.status.status_reporter_hub import StatusReporterHub
+from tusk.shared.status.status_reporter import StatusReporter
 from voice_shell_builder import VoiceShellBuilder
 
 __all__ = ["ShellLoader"]
@@ -26,7 +26,7 @@ class ShellLoader:
         config: Config,
         kernel: KernelAPI,
         log: LogPrinter,
-        reporter: StatusReporterHub,
+        reporter: StatusReporter,
         on_speech_end: Callable[[float], None] | None = None,
     ) -> None:
         self._config = config

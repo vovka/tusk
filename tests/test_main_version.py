@@ -30,7 +30,7 @@ def test_main_normal_flow_without_version_flag(monkeypatch) -> None:
     monkeypatch.setattr(main.Config, "from_env", lambda: object())
     monkeypatch.setattr(main, "_build_log", lambda options: object())
     monkeypatch.setattr(main, "_build_tracer", lambda: object())
-    monkeypatch.setattr(main, "StatusReporterHub", lambda sink, log: _reporter())
+    monkeypatch.setattr(main, "StatusReporter", lambda sink, log: _reporter())
     monkeypatch.setattr(main, "_build_kernel", lambda *args: _kernel())
     monkeypatch.setattr(main, "ShellLoader", lambda *args: _loader(started))
     main.main()

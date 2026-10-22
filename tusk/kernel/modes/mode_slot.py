@@ -4,7 +4,7 @@ from tusk.kernel.modes.adapter_mode import AdapterMode
 from tusk.shared.logging.interfaces.log_printer import LogPrinter
 from tusk.shared.schemas.app_mode import AppMode
 from tusk.shared.schemas.kernel_response import KernelResponse
-from tusk.shared.status.interfaces.status_reporter import StatusReporter
+from tusk.shared.status.status_reporter import StatusReporter
 
 __all__ = ["ModeSlot"]
 

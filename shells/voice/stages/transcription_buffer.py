@@ -3,14 +3,13 @@ from collections import deque
 
 from shells.voice.buffered_utterance import BufferedUtterance
 from shells.voice.gate_state import GateState
-from shells.voice.interfaces.transcription_buffer import TranscriptionBuffer as TranscriptionBufferABC
 from tusk.shared.logging.interfaces.log_printer import LogPrinter
 from tusk.shared.schemas.utterance import Utterance
 
 __all__ = ["TranscriptionBuffer"]
 
 
-class TranscriptionBuffer(TranscriptionBufferABC):
+class TranscriptionBuffer:
     def __init__(
         self,
         log_printer: LogPrinter | None = None,

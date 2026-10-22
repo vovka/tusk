@@ -6,12 +6,12 @@ from shells.voice.gate_action import GateAction
 from shells.voice.gate_dispatch import GateDispatch
 from shells.voice.gate_state import GateState
 from shells.voice.interfaces.gatekeeper import Gatekeeper
-from shells.voice.interfaces.transcription_buffer import TranscriptionBuffer
+from shells.voice.stages.transcription_buffer import TranscriptionBuffer
 from shells.voice.stages.echo_filter import EchoFilter
 from shells.voice.stages.sanitizer import Sanitizer
 from shells.voice.stages.transcriber import Transcriber
 from shells.voice.stages.utterance_detector import UtteranceDetector
-from tusk.shared.status.interfaces.status_reporter import StatusReporter
+from tusk.shared.status.status_reporter import StatusReporter
 from tusk.shared.schemas.app_status import AppStatus
 from tusk.shared.schemas.kernel_response import KernelResponse
 from tusk.shared.schemas.utterance import Utterance
