@@ -1,12 +1,12 @@
 from dataclasses import dataclass, field
 
-from tusk.kernel.agent.backends import AgentBackend, AgentRequest, AgentResult
+from tusk.kernel.agent.backends import AgentBackend, BackendRequest, BackendResult
 
 
 @dataclass
 class RecordingBackend(AgentBackend):
-    requests: list[AgentRequest] = field(default_factory=list)
+    requests: list[BackendRequest] = field(default_factory=list)
 
-    def run(self, request: AgentRequest) -> AgentResult:
+    def run(self, request: BackendRequest) -> BackendResult:
         self.requests.append(request)
-        return AgentResult(True, "Done.", "next-session")
+        return BackendResult(True, "Done.", "next-session")

@@ -1,4 +1,4 @@
-from tusk.kernel.agent.backends import AgentBackend, AgentRequest
+from tusk.kernel.agent.backends import AgentBackend, BackendRequest
 from tusk.kernel.agent.confirmation.confirmation_gate import ConfirmationGate
 from tusk.shared.logging.interfaces.log_printer import LogPrinter
 from tusk.shared.schemas.kernel_response import KernelResponse
@@ -28,7 +28,7 @@ class CommandMode:
             self._session_id = result.session_id
         return KernelResponse(result.handled, result.reply)
 
-    def _request(self, command: str, kind: str) -> AgentRequest:
+    def _request(self, command: str, kind: str) -> BackendRequest:
         # commands are one-shot: a transient session keeps them off the shared conversation thread
         session_id = "" if kind == "command" else self._session_id
-        return AgentRequest(command, kind, session_id)
+        return BackendRequest(command, kind, session_id)

@@ -1,4 +1,4 @@
-from tusk.kernel.agent.backends.agent_request import AgentRequest
+from tusk.kernel.agent.backends.backend_request import BackendRequest
 from tusk.kernel.agent.backends.codex_prompt_builder import CodexPromptBuilder
 
 
@@ -15,7 +15,7 @@ def test_codex_prompt_builder_includes_request_fields() -> None:
 
 
 def test_codex_prompt_builder_skips_empty_request_fields() -> None:
-    request = AgentRequest("say hi", "agent", context={"available_tools": [None, ""]})
+    request = BackendRequest("say hi", "agent", context={"available_tools": [None, ""]})
 
     prompt = CodexPromptBuilder().build(request)
 
@@ -28,7 +28,7 @@ def test_codex_prompt_builder_skips_empty_request_fields() -> None:
 def test_codex_prompt_builder_defaults_system_context_to_desktop_guidance() -> None:
     """Without guidance codex treats commands as terminal tasks (launched gedit
     in its own container shell instead of the gnome MCP tools)."""
-    prompt = CodexPromptBuilder().build(AgentRequest("open gedit", "command"))
+    prompt = CodexPromptBuilder().build(BackendRequest("open gedit", "command"))
 
     assert prompt.startswith("## System context\n")
     assert "gnome MCP tools" in prompt
@@ -36,8 +36,8 @@ def test_codex_prompt_builder_defaults_system_context_to_desktop_guidance() -> N
     assert "## User command\nopen gedit" in prompt
 
 
-def _full_request() -> AgentRequest:
-    return AgentRequest(
+def _full_request() -> BackendRequest:
+    return BackendRequest(
         "summarize this file",
         "agent",
         context=_full_context(),

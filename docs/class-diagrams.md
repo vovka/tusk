@@ -278,12 +278,12 @@ classDiagram
 ```mermaid
 classDiagram
   class AgentBackend {
-    run(request: AgentRequest)* AgentResult
+    run(request: BackendRequest)* BackendResult
   }
   class AgentBackendFactory {
     create() AgentBackend
   }
-  class AgentRequest {
+  class BackendRequest {
     context : dict[str, object]
     environment : dict[str, str]
     metadata : dict[str, object]
@@ -293,8 +293,7 @@ classDiagram
     user_text : str
     working_directory : str
   }
-  class AgentResult {
-    final_text : str
+  class BackendResult {
     handled : bool
     metadata : dict[str, object]
     raw_output : Optional[object]
@@ -303,10 +302,10 @@ classDiagram
     status : str
   }
   class BackendRunLogger {
-    end(request: AgentRequest, started_at: float, result: AgentResult) None
-    failure(request: AgentRequest, started_at: float, status: str, error: str) None
-    schema(request: AgentRequest, success: bool, detail: str) None
-    start(request: AgentRequest) float
+    end(request: BackendRequest, started_at: float, result: BackendResult) None
+    failure(request: BackendRequest, started_at: float, status: str, error: str) None
+    schema(request: BackendRequest, success: bool, detail: str) None
+    start(request: BackendRequest) float
   }
   class CallBuilder {
     build(prompt: str, working_directory: str, thread_id: str) tuple[str, dict]
@@ -318,35 +317,35 @@ classDiagram
   }
   class CodexExecAgentBackend {
     name : str
-    run(request: AgentRequest) AgentResult
+    run(request: BackendRequest) BackendResult
   }
   class CodexExecCommandBuilder {
     build(prompt: str) list[str]
   }
   class CodexMcpAgentBackend {
     name : str
-    run(request: AgentRequest) AgentResult
+    run(request: BackendRequest) BackendResult
   }
   class CodexPromptBuilder {
-    build(request: AgentRequest) str
+    build(request: BackendRequest) str
   }
   class CodexResultParser {
     parse(output: str) dict | None
   }
   class FallbackAgentBackend {
     name : str
-    run(request: AgentRequest) AgentResult
+    run(request: BackendRequest) BackendResult
   }
   class ResponseReader {
     read(request_id: int, method: str) dict
   }
   class ResultMapper {
-    failure(request: AgentRequest, message: str, status: str) AgentResult
-    success(request: AgentRequest, payload: dict) AgentResult
+    failure(request: BackendRequest, message: str, status: str) BackendResult
+    success(request: BackendRequest, payload: dict) BackendResult
   }
   class TuskAgentBackend {
     name : str
-    run(request: AgentRequest) AgentResult
+    run(request: BackendRequest) BackendResult
   }
   CodexExecAgentBackend --|> AgentBackend
   CodexMcpAgentBackend --|> AgentBackend

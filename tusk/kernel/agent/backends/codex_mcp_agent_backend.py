@@ -2,8 +2,8 @@ import atexit
 import threading
 
 from tusk.kernel.agent.backends.agent_backend import AgentBackend
-from tusk.kernel.agent.backends.agent_request import AgentRequest
-from tusk.kernel.agent.backends.agent_result import AgentResult
+from tusk.kernel.agent.backends.backend_request import BackendRequest
+from tusk.kernel.agent.backends.backend_result import BackendResult
 from tusk.kernel.agent.backends.backend_run_logger import BackendRunLogger
 from tusk.kernel.agent.backends.codex_mcp.call_builder import CallBuilder
 from tusk.kernel.agent.backends.codex_mcp.client import Client
@@ -31,14 +31,14 @@ class CodexMcpAgentBackend(AgentBackend):
     def name(self) -> str:
         return "codex_mcp"
 
-    def run(self, request: AgentRequest) -> AgentResult:
+    def run(self, request: BackendRequest) -> BackendResult:
         started_at = self._run_logger.start(request)
         with self._lock:
             result = self._run_locked(request)
         self._run_logger.end(request, started_at, result)
         return result
 
-    def _run_locked(self, request: AgentRequest) -> AgentResult:
+    def _run_locked(self, request: BackendRequest) -> BackendResult:
         try:
             return self._turn(request)
         except FileNotFoundError:
@@ -50,7 +50,7 @@ class CodexMcpAgentBackend(AgentBackend):
             self._drop_client_if_dead()
             return self._mapper.failure(request, str(error)[:300], "failed")
 
-    def _turn(self, request: AgentRequest) -> AgentResult:
+    def _turn(self, request: BackendRequest) -> BackendResult:
         if not request.session_id:
             return self._attempt(request, "")
         try:
@@ -60,7 +60,7 @@ class CodexMcpAgentBackend(AgentBackend):
             self._drop_client_if_dead()
             return self._attempt(request, "")
 
-    def _attempt(self, request: AgentRequest, thread_id: str) -> AgentResult:
+    def _attempt(self, request: BackendRequest, thread_id: str) -> BackendResult:
         prompt = self._prompt_builder.build(request)
         tool, arguments = self._call_builder.build(prompt, request.working_directory, thread_id)
         payload = self._client_or_spawn().call_tool(tool, arguments)

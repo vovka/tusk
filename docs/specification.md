@@ -325,7 +325,7 @@ A `recover` decision naming an id outside the candidate list is normalized to `n
 
 **Source:** `tusk/kernel/agent/backends/`
 
-`CommandMode` talks to an `AgentBackend` (ABC: `run(AgentRequest) -> AgentResult`), not
+`CommandMode` talks to an `AgentBackend` (ABC: `run(BackendRequest) -> BackendResult`), not
 to the agent directly. `AgentBackendFactory` selects the implementation from
 `config.agent_backend`:
 
@@ -343,9 +343,9 @@ runs the same request and the primary's failure is attached to the result metada
 
 **Schemas** (frozen dataclasses):
 
-- `AgentRequest(user_text, mode, session_id="", context={}, metadata={}, working_directory="", timeout_seconds=None, environment={})`
-- `AgentResult(handled, reply, session_id="", metadata={}, status="", final_text="", raw_output=None)` —
-  `status` defaults to `success`/`failed` from `handled`; `final_text` defaults to `reply`.
+- `BackendRequest(user_text, mode, session_id="", context={}, metadata={}, working_directory="", timeout_seconds=None, environment={})`
+- `BackendResult(handled, reply, session_id="", metadata={}, status="", raw_output=None)` —
+  `status` defaults to `success`/`failed` from `handled`.
 
 **CodexExecAgentBackend contract:** prompt built by `CodexPromptBuilder` (sections:
 system context — a default desktop-control preamble instructing gnome-MCP-only actions
@@ -365,7 +365,7 @@ codex exec"; otherwise `status`/`reply` are read from the parsed JSON.
 **Sources:** `tusk/kernel/command_mode.py`, `tusk/kernel/main_agent.py`,
 `tusk/kernel/agent_profiles.py`
 
-`CommandMode.process_command(text)` builds `AgentRequest(text, "command", session_id)`,
+`CommandMode.process_command(text)` builds `BackendRequest(text, "command", session_id)`,
 runs the backend, stores the returned `session_id` for the next turn, and returns
 `KernelResponse(handled, reply)`.
 

@@ -3,7 +3,7 @@ import subprocess
 from types import SimpleNamespace
 from unittest.mock import Mock
 
-from tusk.kernel.agent.backends.agent_request import AgentRequest
+from tusk.kernel.agent.backends.backend_request import BackendRequest
 from tusk.kernel.agent.backends.codex_exec_agent_backend import CodexExecAgentBackend
 
 
@@ -32,8 +32,8 @@ def completed(command: list[str], stdout: str = "") -> subprocess.CompletedProce
     return subprocess.CompletedProcess(command, 0, stdout or stream('{"reply":"Done."}'), "")
 
 
-def request(**overrides: object) -> AgentRequest:
-    return AgentRequest("secret prompt", "command", **overrides)
+def request(**overrides: object) -> BackendRequest:
+    return BackendRequest("secret prompt", "command", **overrides)
 
 
 def test_codex_exec_backend_builds_command(monkeypatch) -> None:
@@ -100,7 +100,7 @@ def test_codex_exec_backend_preserves_zero_timeout(monkeypatch) -> None:
 def test_codex_exec_backend_uses_config_defaults_and_parsed_status(monkeypatch) -> None:
     monkeypatch.setattr(subprocess, "run", lambda command, **kwargs: completed(command, stream('{"status":"failed","reply":"No"}')))
     result = backend(codex_exec_workdir="/tmp/default", codex_exec_sandbox_mode="", codex_exec_extra_args=None).run(
-        AgentRequest("prompt", "command")
+        BackendRequest("prompt", "command")
     )
     assert result.status == "failed"
     assert result.metadata["backend"] == "codex_exec"
@@ -108,28 +108,28 @@ def test_codex_exec_backend_uses_config_defaults_and_parsed_status(monkeypatch) 
 
 def test_codex_exec_backend_handles_process_failures(monkeypatch) -> None:
     monkeypatch.setattr(subprocess, "run", Mock(side_effect=FileNotFoundError("codex")))
-    result = backend().run(AgentRequest("prompt", "command"))
+    result = backend().run(BackendRequest("prompt", "command"))
     assert result.status == "failed"
     assert "missing binary" in result.reply
 
 
 def test_codex_exec_backend_handles_timeout(monkeypatch) -> None:
     monkeypatch.setattr(subprocess, "run", Mock(side_effect=subprocess.TimeoutExpired("codex", 1)))
-    result = backend().run(AgentRequest("prompt", "command"))
+    result = backend().run(BackendRequest("prompt", "command"))
     assert result.status == "timeout"
     assert result.handled is False
 
 
 def test_codex_exec_backend_handles_nonzero(monkeypatch) -> None:
     monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: subprocess.CompletedProcess(["codex"], 7, "", "bad"))
-    result = backend().run(AgentRequest("prompt", "command"))
+    result = backend().run(BackendRequest("prompt", "command"))
     assert result.status == "failed"
     assert "exit code 7" in result.reply
 
 
 def test_codex_exec_backend_handles_invalid_json(monkeypatch) -> None:
     monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: completed(["codex"], "not-json"))
-    result = backend().run(AgentRequest("prompt", "command"))
+    result = backend().run(BackendRequest("prompt", "command"))
     assert result.status == "failed"
     assert "Invalid JSON" in result.reply
 

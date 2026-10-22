@@ -1,4 +1,4 @@
-from tusk.kernel.agent.backends.agent_request import AgentRequest
+from tusk.kernel.agent.backends.backend_request import BackendRequest
 
 __all__ = ["CodexPromptBuilder"]
 
@@ -13,11 +13,11 @@ DEFAULT_SYSTEM_CONTEXT = (
 
 
 class CodexPromptBuilder:
-    def build(self, request: AgentRequest) -> str:
+    def build(self, request: BackendRequest) -> str:
         sections = [self._section(title, value) for title, value in self._fields(request)]
         return "\n\n".join(section for section in sections if section)
 
-    def _fields(self, request: AgentRequest) -> list[tuple[str, object]]:
+    def _fields(self, request: BackendRequest) -> list[tuple[str, object]]:
         return [
             ("System context", request.context.get("system_context") or DEFAULT_SYSTEM_CONTEXT),
             ("User command", request.user_text),

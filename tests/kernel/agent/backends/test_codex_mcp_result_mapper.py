@@ -1,4 +1,4 @@
-from tusk.kernel.agent.backends.agent_request import AgentRequest
+from tusk.kernel.agent.backends.backend_request import BackendRequest
 from tusk.kernel.agent.backends.codex_mcp.result_mapper import ResultMapper
 
 
@@ -6,8 +6,8 @@ def mapper() -> ResultMapper:
     return ResultMapper("codex_mcp")
 
 
-def request(session_id: str = "") -> AgentRequest:
-    return AgentRequest("open gedit", "command", session_id, metadata={"request_id": "r-1"})
+def request(session_id: str = "") -> BackendRequest:
+    return BackendRequest("open gedit", "command", session_id, metadata={"request_id": "r-1"})
 
 
 def test_success_maps_structured_content_and_thread_id_to_session_id() -> None:

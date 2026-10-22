@@ -2,7 +2,7 @@ import time
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from tusk.kernel.agent.backends.agent_request import AgentRequest
+from tusk.kernel.agent.backends.backend_request import BackendRequest
 from tusk.kernel.agent.backends.codex_mcp_agent_backend import CodexMcpAgentBackend
 from tests.recording_log_printer import RecordingLogPrinter
 
@@ -50,7 +50,7 @@ def test_first_turn_uses_codex_tool_with_built_prompt_and_returns_thread_id() ->
     instance = backend()
     with patch(_CLIENT, FakeClient):
         FakeClient.pending = [success("t-7")]
-        result = instance.run(AgentRequest("open gedit", "command"))
+        result = instance.run(BackendRequest("open gedit", "command"))
     client = FakeClient.instances[0]
     assert client.command == ["codex", "mcp-server"]
     assert client.calls[0][0] == "codex"
@@ -63,9 +63,9 @@ def test_session_id_routes_to_codex_reply_on_same_client() -> None:
     instance = backend()
     with patch(_CLIENT, FakeClient):
         FakeClient.pending = [success()]
-        instance.run(AgentRequest("open gedit", "command"))
+        instance.run(BackendRequest("open gedit", "command"))
         FakeClient.instances[0].responses = [success()]
-        instance.run(AgentRequest("now close it", "command", "t-1"))
+        instance.run(BackendRequest("now close it", "command", "t-1"))
     assert len(FakeClient.instances) == 1
     assert FakeClient.instances[0].calls[1][0] == "codex-reply"
     assert FakeClient.instances[0].calls[1][1]["threadId"] == "t-1"
@@ -74,7 +74,7 @@ def test_session_id_routes_to_codex_reply_on_same_client() -> None:
 def test_missing_binary_returns_failed_result() -> None:
     instance = backend()
     with patch(_CLIENT, side_effect=FileNotFoundError("codex")):
-        result = instance.run(AgentRequest("open gedit", "command"))
+        result = instance.run(BackendRequest("open gedit", "command"))
     assert result.handled is False
     assert "missing binary" in result.reply
     assert result.status == "failed"
@@ -84,9 +84,9 @@ def test_timeout_returns_timeout_status_and_respawns_on_next_run() -> None:
     instance = backend()
     with patch(_CLIENT, FakeClient):
         FakeClient.pending = [TimeoutError()]
-        result = instance.run(AgentRequest("open gedit", "command"))
+        result = instance.run(BackendRequest("open gedit", "command"))
         FakeClient.pending = [success("t-2")]
-        second = instance.run(AgentRequest("try again", "command"))
+        second = instance.run(BackendRequest("try again", "command"))
     assert result.status == "timeout"
     assert FakeClient.instances[0].running is False
     assert len(FakeClient.instances) == 2
@@ -97,9 +97,9 @@ def test_failed_codex_reply_recovers_with_fresh_thread() -> None:
     instance = backend()
     with patch(_CLIENT, FakeClient):
         FakeClient.pending = [success()]
-        instance.run(AgentRequest("open gedit", "command"))
+        instance.run(BackendRequest("open gedit", "command"))
         FakeClient.instances[0].responses = [RuntimeError("thread not found"), success("t-9")]
-        result = instance.run(AgentRequest("now close it", "command", "t-1"))
+        result = instance.run(BackendRequest("now close it", "command", "t-1"))
     assert [name for name, _ in FakeClient.instances[0].calls] == ["codex", "codex-reply", "codex"]
     assert result.handled is True
     assert result.session_id == "t-9"
@@ -109,7 +109,7 @@ def test_runtime_error_without_session_fails_after_single_attempt() -> None:
     instance = backend()
     with patch(_CLIENT, FakeClient):
         FakeClient.pending = [RuntimeError("boom")]
-        result = instance.run(AgentRequest("open gedit", "command"))
+        result = instance.run(BackendRequest("open gedit", "command"))
     assert result.handled is False
     assert result.status == "failed"
     assert len(FakeClient.instances[0].calls) == 1

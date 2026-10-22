@@ -1,5 +1,6 @@
 import tusk
 import tusk.kernel as kernel
+import tusk.kernel.agent.backends as backends
 import tusk.kernel.interfaces as interfaces
 import tusk.providers as providers
 import tusk.providers.llm as llm_providers
@@ -23,6 +24,8 @@ def test_root_and_kernel_exports_present() -> None:
     assert "MainAgent" in kernel.__all__
     assert "Shell" in interfaces.__all__
     assert "ToolCall" in schemas.__all__
+    assert {"BackendRequest", "BackendResult"} <= set(backends.__all__)
+    assert "AgentResult" not in backends.__all__
 
 
 def test_shared_layer_exports_present() -> None:

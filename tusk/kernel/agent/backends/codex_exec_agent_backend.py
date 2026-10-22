@@ -7,8 +7,8 @@ from tusk.kernel.agent.backends.backend_run_logger import BackendRunLogger
 from tusk.kernel.agent.backends.codex_exec_command_builder import CodexExecCommandBuilder
 from tusk.kernel.agent.backends.codex_prompt_builder import CodexPromptBuilder
 from tusk.kernel.agent.backends.codex_result_parser import CodexResultParser
-from tusk.kernel.agent.backends.agent_request import AgentRequest
-from tusk.kernel.agent.backends.agent_result import AgentResult
+from tusk.kernel.agent.backends.backend_request import BackendRequest
+from tusk.kernel.agent.backends.backend_result import BackendResult
 from tusk.shared.logging.interfaces.log_printer import LogPrinter
 
 __all__ = ["CodexExecAgentBackend"]
@@ -27,13 +27,13 @@ class CodexExecAgentBackend(AgentBackend):
     def name(self) -> str:
         return "codex_exec"
 
-    def run(self, request: AgentRequest) -> AgentResult:
+    def run(self, request: BackendRequest) -> BackendResult:
         started_at = self._run_logger.start(request)
         result = self._run_process(request)
         self._run_logger.end(request, started_at, result)
         return result
 
-    def _run_process(self, request: AgentRequest) -> AgentResult:
+    def _run_process(self, request: BackendRequest) -> BackendResult:
         try:
             completed = self._execute(request)
         except FileNotFoundError:
@@ -42,7 +42,7 @@ class CodexExecAgentBackend(AgentBackend):
             return self._failure(request, "Codex exec timed out", "timeout")
         return self._completed(request, completed)
 
-    def _execute(self, request: AgentRequest) -> subprocess.CompletedProcess:
+    def _execute(self, request: BackendRequest) -> subprocess.CompletedProcess:
         request_env = request.environment or {}
         return subprocess.run(
             self._command_builder.build(self._prompt_builder.build(request)),
@@ -50,13 +50,13 @@ class CodexExecAgentBackend(AgentBackend):
             env={**os.environ, **request_env}, capture_output=True, text=True, stdin=subprocess.DEVNULL,
         )
 
-    def _completed(self, request: AgentRequest, completed: subprocess.CompletedProcess) -> AgentResult:
+    def _completed(self, request: BackendRequest, completed: subprocess.CompletedProcess) -> BackendResult:
         self._log_completion(completed)
         if completed.returncode != 0:
             return self._failure(request, self._exit_message(completed), "failed", completed.returncode)
         return self._parsed(request, completed.stdout)
 
-    def _parsed(self, request: AgentRequest, output: str) -> AgentResult:
+    def _parsed(self, request: BackendRequest, output: str) -> BackendResult:
         parsed = self._parser.parse(output)
         if parsed is None:
             self._run_logger.schema(request, False, "invalid_json")
@@ -64,22 +64,20 @@ class CodexExecAgentBackend(AgentBackend):
         self._run_logger.schema(request, True, "json_parsed")
         return self._structured_result(request, parsed)
 
-    def _structured_result(self, request: AgentRequest, parsed: object) -> AgentResult:
+    def _structured_result(self, request: BackendRequest, parsed: object) -> BackendResult:
         status = self._status(parsed)
         reply = self._reply(parsed)
-        return AgentResult(
-            status == "success", reply, request.session_id, self._metadata(request), status, reply, parsed
-        )
+        return BackendResult(status == "success", reply, request.session_id, self._metadata(request), status, parsed)
 
     def _failure(
-        self, request: AgentRequest, message: str, status: str, exit_code: int | None = None
-    ) -> AgentResult:
+        self, request: BackendRequest, message: str, status: str, exit_code: int | None = None
+    ) -> BackendResult:
         metadata = self._metadata(request)
         if exit_code is not None:
             metadata = {**metadata, "codex_exit_code": exit_code}
-        return AgentResult(False, message, request.session_id, metadata, status, message)
+        return BackendResult(False, message, request.session_id, metadata, status)
 
-    def _metadata(self, request: AgentRequest) -> dict[str, object]:
+    def _metadata(self, request: BackendRequest) -> dict[str, object]:
         return {**(request.metadata or {}), "backend": self.name, "mode": request.mode}
 
     def _status(self, parsed: object) -> str:
@@ -88,11 +86,11 @@ class CodexExecAgentBackend(AgentBackend):
     def _reply(self, parsed: object) -> str:
         return str(parsed.get("reply") or parsed.get("final_text") or "") if isinstance(parsed, dict) else str(parsed)
 
-    def _cwd(self, request: AgentRequest) -> str | None:
+    def _cwd(self, request: BackendRequest) -> str | None:
         directory = request.working_directory or self._config.codex_exec_workdir.strip()
         return str(Path(directory)) if directory else None
 
-    def _timeout(self, request: AgentRequest) -> float:
+    def _timeout(self, request: BackendRequest) -> float:
         if request.timeout_seconds is not None:
             return request.timeout_seconds
         return self._config.codex_exec_timeout_seconds

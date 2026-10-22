@@ -1,23 +1,19 @@
 from dataclasses import dataclass, field
 
-__all__ = ["AgentResult"]
+__all__ = ["BackendResult"]
 
 
 @dataclass(frozen=True)
-class AgentResult:
+class BackendResult:
     handled: bool
     reply: str
     session_id: str = ""
     metadata: dict[str, object] = field(default_factory=dict)
     status: str = ""
-    final_text: str = ""
     raw_output: object = None
 
     def __post_init__(self) -> None:
-        status = self.status or _status_from_handled(self.handled)
-        final_text = self.final_text or self.reply or ""
-        object.__setattr__(self, "status", status)
-        object.__setattr__(self, "final_text", final_text)
+        object.__setattr__(self, "status", self.status or _status_from_handled(self.handled))
 
 
 def _status_from_handled(handled: bool) -> str:

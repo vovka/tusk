@@ -1,10 +1,10 @@
 from dataclasses import dataclass, field
 
-__all__ = ["AgentRequest"]
+__all__ = ["BackendRequest"]
 
 
 @dataclass(frozen=True)
-class AgentRequest:
+class BackendRequest:
     user_text: str
     mode: str
     session_id: str = ""

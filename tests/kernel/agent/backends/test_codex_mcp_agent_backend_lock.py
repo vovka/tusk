@@ -2,18 +2,18 @@ import threading
 import time
 from unittest.mock import patch
 
-from tusk.kernel.agent.backends.agent_request import AgentRequest
+from tusk.kernel.agent.backends.backend_request import BackendRequest
 from tests.kernel.agent.backends.test_codex_mcp_agent_backend import _CLIENT, FakeClient, backend, success
 
 
 def _warmed_client(instance: object) -> FakeClient:
     FakeClient.pending = [success()]
-    instance.run(AgentRequest("warm up", "command"))
+    instance.run(BackendRequest("warm up", "command"))
     return FakeClient.instances[0]
 
 
 def _turn_threads(instance: object, count: int) -> list[threading.Thread]:
-    request = AgentRequest("go", "command")
+    request = BackendRequest("go", "command")
     return [threading.Thread(target=instance.run, args=(request,)) for _ in range(count)]
 
 

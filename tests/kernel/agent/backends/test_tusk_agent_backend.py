@@ -1,6 +1,6 @@
 import pytest
 
-from tusk.kernel.agent.backends import AgentRequest, AgentResult
+from tusk.kernel.agent.backends import BackendRequest
 from tusk.kernel.agent.backends.tusk_agent_backend import TuskAgentBackend
 
 
@@ -20,11 +20,10 @@ def test_tusk_agent_backend_exposes_backend_metadata() -> None:
 
 def test_tusk_agent_backend_normalizes_legacy_reply() -> None:
     agent = RecordingAgent()
-    request = AgentRequest("open browser", "command", "session-1", metadata={"trace_id": "abc"})
+    request = BackendRequest("open browser", "command", "session-1", metadata={"trace_id": "abc"})
     result = TuskAgentBackend(agent).run(request)
     assert agent.commands == [("open browser", "command")]
     assert result.status == "success"
-    assert result.final_text == "Done."
     assert result.reply == "Done."
     assert result.handled is True
     assert result.metadata == {"trace_id": "abc", "backend": "tusk", "mode": "command"}
@@ -46,10 +45,5 @@ def test_tusk_agent_backend_lets_programmer_errors_surface() -> None:
             raise RuntimeError("boom")
 
     with pytest.raises(RuntimeError, match="boom"):
-        TuskAgentBackend(BrokenAgent()).run(AgentRequest("open", "command"))
-
-
-def test_agent_result_uses_empty_string_when_reply_is_missing() -> None:
-    result = AgentResult(True, None)
-    assert result.final_text == ""
+        TuskAgentBackend(BrokenAgent()).run(BackendRequest("open", "command"))
 

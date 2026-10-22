@@ -61,7 +61,7 @@ sequenceDiagram
     participant MCP as MCP Adapter
     participant HX as SlidingWindowHistory
 
-    CMD->>MA: run(AgentRequest)
+    CMD->>MA: run(BackendRequest)
     MA->>ORC: run(AgentRunRequest, profile="conversation")
 
     Note over ORC,RT: AgentRuntime is shared by all profiles
@@ -418,7 +418,7 @@ AudioCapture.stream_frames()
     → CommandWorker.enqueue(text)              # worker thread — listening never blocks
       → KernelAPI.submit(text)                 # serialized by one submit lock
         → active ModeSlot (coding, then dictation) or CommandMode.process_command(text)
-            → AgentBackend.run(AgentRequest)   # tusk backend: MainAgent → AgentOrchestrator
+            → AgentBackend.run(BackendRequest)   # tusk backend: MainAgent → AgentOrchestrator
     → KernelResponse(handled, reply) → TTS → SpeechPlayback
 
 # Recovery path (gatekeeper returns FORWARD_RECOVERED):
@@ -445,14 +445,14 @@ stdin (CLI) or scripted transcript (emulator)
 
 ## Agent Backends
 
-`CommandMode` never talks to the agent pipeline directly — it submits an `AgentRequest` to an
+`CommandMode` never talks to the agent pipeline directly — it submits a `BackendRequest` to an
 `AgentBackend` (`tusk/kernel/agent/backends/`). `AgentBackendFactory` picks the implementation
-from `AGENT_BACKEND`. All backends return an `AgentResult` and drive the same
+from `AGENT_BACKEND`. All backends return a `BackendResult` and drive the same
 gnome/dictation MCP tools, so the choice is invisible to the shells.
 
 ```mermaid
 flowchart TD
-    CM[CommandMode] -->|AgentRequest| SEL{AGENT_BACKEND}
+    CM[CommandMode] -->|BackendRequest| SEL{AGENT_BACKEND}
     SEL -->|tusk default| TUSK[TuskAgentBackend]
     SEL -->|codex_exec| CODEX[CodexExecAgentBackend]
     SEL -->|codex_mcp| MCPB[CodexMcpAgentBackend]
@@ -473,9 +473,9 @@ flowchart TD
     MCPB -. status = failed .-> FALL
     FALL -. retry .-> TUSK
 
-    ORC -->|AgentResult| CM
-    PROC -->|AgentResult| CM
-    SRV -->|AgentResult<br/>session_id = threadId| CM
+    ORC -->|BackendResult| CM
+    PROC -->|BackendResult| CM
+    SRV -->|BackendResult<br/>session_id = threadId| CM
 ```
 
 - **`tusk`** (default) — `TuskAgentBackend` wraps `MainAgent`, running the in-process
@@ -491,7 +491,7 @@ flowchart TD
   (spawned lazily on the first turn, reused across turns; `codex_mcp.Client` over the shared
   `MCPStdioTransport`). Each turn calls the `codex` MCP tool — or `codex-reply` when the
   request carries a session — with `approval-policy: "never"` and the same prompt/config as
-  `codex_exec`. The returned codex `threadId` becomes `AgentResult.session_id`, which
+  `codex_exec`. The returned codex `threadId` becomes `BackendResult.session_id`, which
   `CommandMode` feeds back on the next turn, so the conversation stays on one codex thread.
   A failed `codex-reply` (stale thread, restarted server) recovers once on a fresh thread.
   `CODEX_EXEC_TIMEOUT_SECONDS` acts as an **inactivity** timeout here (codex's progress
