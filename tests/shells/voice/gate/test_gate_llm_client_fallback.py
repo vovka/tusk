@@ -37,6 +37,16 @@ def test_structured_budget_leaves_room_for_reasoning() -> None:
     assert budgets == [1024]
 
 
+def test_structured_only_client_skips_fallback_and_logs_to_its_group() -> None:
+    fallback_calls: list[int] = []
+    logs: list[tuple] = []
+    log = types.SimpleNamespace(log=lambda *a: logs.append(a))
+    client = LLMClient(_llm(fallback_calls), log, error_group="speech-stop", allow_fallback=False)
+    assert client.complete("prompt", "hello", "speech_stop_gate", {}) == {}
+    assert fallback_calls == []
+    assert [entry[2] for entry in logs] == ["speech-stop"]
+
+
 def test_structured_failure_is_logged_as_error() -> None:
     # E2E: a gatekeeper 400 json_validate_failed never surfaced as ERROR
     tags: list[str] = []

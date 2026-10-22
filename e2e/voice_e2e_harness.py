@@ -12,7 +12,6 @@ from shells.voice.stages.echo_filter import EchoFilter
 from shells.voice.gate.llm_gatekeeper import LLMGatekeeper
 from shells.voice.stages.sanitizer import Sanitizer
 from shells.voice.stages.transcription_buffer import TranscriptionBuffer
-from shells.voice.voice_shell import VoiceShell
 from tusk.kernel.core.kernel_api import KernelAPI
 from tusk.shared.interfaces.log_printer import LogPrinter
 from tusk.shared.interrupt_token import InterruptToken
@@ -31,13 +30,14 @@ class VoiceE2EHarness:
         self.detector = QueueDetector()
         self.playback = FakePlayback(token)
         self.replies: list[str] = []
-        self.submitted: list[str] = []
+        self.enqueued: list[str] = []
         self.interrupts = 0
         self.worker = self._build_worker()
-        self._shell = VoiceShell(self._build_pipeline(), self.worker, None, _open_gate())
+        self._pipeline = self._build_pipeline()
 
     def start(self) -> None:
-        threading.Thread(target=self._shell.start, args=(self._kernel.submit,), daemon=True).start()
+        self.worker.start()
+        threading.Thread(target=self._listen, daemon=True).start()
 
     def say(self, text: str, duration: float = 2.0) -> None:
         self._log.log("E2E", f"say: {text!r}")
@@ -59,10 +59,19 @@ class VoiceE2EHarness:
         speaker = ChunkedSpeaker(tts, self.playback, self._log)
         return CommandWorker(self._submit, speaker, self._log, self.token)
 
+    def _listen(self) -> None:
+        for _ in self._pipeline.run(self._enqueue):
+            pass
+
+    def _enqueue(self, text: str, refrain: str, kind: str) -> None:
+        # counted before the worker can drop a duplicate or flush the queue, so every forwarded echo shows
+        self.enqueued.append(text)
+        self.worker.enqueue(text, refrain, kind)
+
     def _submit(self, text: str, kind: str) -> KernelResponse:
-        self.submitted.append(text)
         response = self._kernel.submit(text, kind)
-        self.replies.append(response.reply)
+        if response.reply:
+            self.replies.append(response.reply)
         return response
 
     def _build_pipeline(self) -> VoicePipeline:
@@ -85,9 +94,3 @@ class VoiceE2EHarness:
         self.interrupts += 1
         self._kernel.request_interrupt()
         self.worker.flush()
-
-
-def _open_gate() -> threading.Event:
-    gate = threading.Event()
-    gate.set()
-    return gate

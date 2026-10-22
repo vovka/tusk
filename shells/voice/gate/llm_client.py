@@ -23,11 +23,15 @@ _RECOVERY_SCHEMA = {
 
 
 class LLMClient:
-    """Runs a structured gate LLM call (plain completion as fallback) and returns the parsed, logged JSON payload."""
+    """Runs a structured gate LLM call (optional plain completion as fallback) and returns the parsed, logged JSON payload."""
 
-    def __init__(self, llm_provider: LLMProvider, log_printer: LogPrinter) -> None:
+    def __init__(
+        self, llm_provider: LLMProvider, log_printer: LogPrinter, error_group: str = "gatekeeper", allow_fallback: bool = True,
+    ) -> None:
         self._llm = llm_provider
         self._log = log_printer
+        self._error_group = error_group
+        self._allow_fallback = allow_fallback
 
     def primary(self, prompt: str, text: str) -> GateResult:
         data = self.complete(prompt, text, "command_gatekeeper", _PRIMARY_SCHEMA)
@@ -50,14 +54,17 @@ class LLMClient:
         try:
             return extract_json_payload(raw) if raw else {}
         except ValueError as exc:
-            self._log.log("ERROR", f"{name} parse error: {exc}", "gatekeeper")
+            self._log.log("ERROR", f"{name} parse error: {exc}", self._error_group)
             return {}
 
     def _raw(self, prompt: str, text: str, name: str, schema: dict, max_tokens: int) -> str:
         try:
             return self._llm.complete_structured(prompt, text, name, schema, max_tokens)
         except Exception as exc:
-            self._log.log("ERROR", f"{name} structured output failed: {exc}", "gatekeeper")
+            self._log.log("ERROR", f"{name} structured output failed: {exc}", self._error_group)
+        return self._fallback(prompt, text, name, max_tokens) if self._allow_fallback else ""
+
+    def _fallback(self, prompt: str, text: str, name: str, max_tokens: int) -> str:
         try:
             return self._llm.complete(prompt, text, max_tokens)
         except Exception as exc:

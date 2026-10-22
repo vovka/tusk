@@ -42,5 +42,11 @@ def test_replace_recent_text_delegates_to_simulator() -> None:
     assert calls == [(3, "hi")]
 
 
+def test_replace_recent_text_reports_input_failure() -> None:
+    failing = types.SimpleNamespace(replace_text=lambda count, text: (_ for _ in ()).throw(RuntimeError("BackSpace: boom")))
+    result = InputTools(failing).replace_recent_text({"replace_chars": "3", "text": "hi"})
+    assert result == {"success": False, "message": "BackSpace: boom"}
+
+
 def _input() -> object:
     return types.SimpleNamespace(type_text=lambda text: (_ for _ in ()).throw(AssertionError("should not be called")))

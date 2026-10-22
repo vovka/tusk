@@ -27,14 +27,14 @@ def scenario_interrupt_during_speech(h: VoiceE2EHarness, probe: DesktopProbe) ->
 
 
 def scenario_echo_does_not_self_trigger(h: VoiceE2EHarness, probe: DesktopProbe) -> str:
-    interrupts_before, submitted_before = h.interrupts, len(h.submitted)
+    interrupts_before, enqueued_before = h.interrupts, len(h.enqueued)
     h.say("Tusk, tell me one more very short story about the sea")
     h.wait(lambda: h.worker.current_speech_text is not None, 90, "TUSK speaking")
     spoken = h.worker.current_speech_text or "the story of the sea continues"
     h.say(" ".join(spoken.split()[:8]), duration=3.0)
     h.wait_idle(timeout=120)
     assert h.interrupts == interrupts_before, "echo triggered an interrupt"
-    assert len(h.submitted) == submitted_before + 1, "echo was forwarded as a command"
+    assert len(h.enqueued) == enqueued_before + 1, "echo was forwarded as a command"
     assert not h.playback.last["interrupted"], "playback did not run to completion"
     return f"echo ignored; playback finished full {h.playback.last['played']:.1f}s"
 

@@ -1,4 +1,5 @@
 import types
+from collections.abc import Callable
 
 from tusk.shared.schemas.voice.buffered_utterance import BufferedUtterance
 from tusk.shared.schemas.voice.gate_dispatch import GateDispatch
@@ -14,8 +15,8 @@ def _buffered(text: str) -> BufferedUtterance:
     return BufferedUtterance(id="x", utterance=_utterance(text), received_at=0.0)
 
 
-def _gate(stops: bool) -> object:
-    return types.SimpleNamespace(should_stop=lambda text: stops)
+def _gate(stops: bool) -> Callable[[str], bool]:
+    return lambda text: stops
 
 
 def test_forwards_non_stop_utterance() -> None:
@@ -71,19 +72,15 @@ def test_utterance_without_wake_word_stays_a_mode_instruction() -> None:
     assert result == GateDispatch("forward_current", "stop the loop after ten iterations")
 
 
-def _unused_gate() -> object:
-    return types.SimpleNamespace(should_stop=lambda text: (_ for _ in ()).throw(AssertionError("LLM gate called")))
-
-
 def _command_gate(result: GateDispatch | None = None) -> object:
     dispatch = result or GateDispatch("forward_current", "use GPT OSS 120B for the main agent", kind="command")
     return types.SimpleNamespace(process=lambda utterance, recent, candidates: dispatch)
 
 
-def _unused_gate() -> object:
+def _unused_gate() -> Callable[[str], bool]:
     def fail(text: str) -> bool:
         raise AssertionError("LLM gate must not be called")
-    return types.SimpleNamespace(should_stop=fail)
+    return fail
 
 
 def test_bare_stop_phrase_stops_without_llm_gate() -> None:

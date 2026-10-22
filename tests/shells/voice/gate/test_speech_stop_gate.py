@@ -23,14 +23,15 @@ def test_prompt_requires_unambiguous_stop_intent() -> None:
     assert "I'm going to go" in prompts[0]
 
 
-def test_llm_failure_returns_false_and_logs_an_error() -> None:
+def test_llm_failure_returns_false_without_fallback_and_logs_an_error() -> None:
     def broken(*args: object) -> str:
         raise RuntimeError("llm down")
     logs: list[tuple] = []
     log = types.SimpleNamespace(log=lambda *a: logs.append(a))
-    llm = types.SimpleNamespace(complete_structured=broken, complete=broken)
-    assert not SpeechStopGate(LLMClient(llm, log), log).should_stop("stop", "reply")
-    assert logs[0][0] == "ERROR"
+    llm = types.SimpleNamespace(complete_structured=broken)
+    client = LLMClient(llm, log, error_group="speech-stop", allow_fallback=False)
+    assert not SpeechStopGate(client, log).should_stop("stop", "reply")
+    assert logs[0][0] == "ERROR" and logs[0][2] == "speech-stop"
 
 
 def test_stop_call_uses_its_own_name_and_small_budget() -> None:

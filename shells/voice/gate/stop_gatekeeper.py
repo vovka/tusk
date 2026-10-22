@@ -24,8 +24,10 @@ _STOP_PHRASE = re.compile(
 class StopGatekeeper(Gatekeeper):
     """Forward-all gatekeeper for an active mode: only a stop intent or a wake-word command breaks the flow."""
 
-    def __init__(self, gate: object, stop_callback: Callable[[], None], command_gatekeeper: Gatekeeper | None = None) -> None:
-        self._gate = gate
+    def __init__(
+        self, should_stop: Callable[[str], bool], stop_callback: Callable[[], None], command_gatekeeper: Gatekeeper | None = None,
+    ) -> None:
+        self._should_stop = should_stop
         self._stop = stop_callback
         self._commands = command_gatekeeper
 
@@ -37,7 +39,7 @@ class StopGatekeeper(Gatekeeper):
             return self._stopped()
         if woken and self._commands is not None:
             return self._wake_word_command(utterance, recent, candidates)
-        if self._gate.should_stop(text):
+        if self._should_stop(text):
             return self._stopped()
         return GateDispatch(GateAction.FORWARD_CURRENT, text)
 

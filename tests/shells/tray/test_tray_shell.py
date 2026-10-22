@@ -29,16 +29,23 @@ def _control() -> object:
 def test_start_attaches_sink_runs_backend_and_returns_when_shutdown_set() -> None:
     backend, control, event = _backend(), _control(), threading.Event()
     event.set()
-    TrayShell(StatusReporter(NullStatusSink()), control, event, _config(), backend).start(lambda text: None)
+    TrayShell(StatusReporter(NullStatusSink()), control.pause, control.resume, event, _config(), backend).start(lambda text: None)
     assert backend.ran and backend.menu
 
 
 def test_pause_menu_item_is_wired_to_pipeline_control() -> None:
     backend, control, event = _backend(), _control(), threading.Event()
     event.set()
-    TrayShell(StatusReporter(NullStatusSink()), control, event, _config(), backend).start(lambda text: None)
+    TrayShell(StatusReporter(NullStatusSink()), control.pause, control.resume, event, _config(), backend).start(lambda text: None)
     next(item for item in backend.menu if item.label == "Pause").action()
     assert control.calls == ["pause"]
+
+
+def test_start_without_voice_shell_gives_pause_item_no_action() -> None:
+    backend, event = _backend(), threading.Event()
+    event.set()
+    TrayShell(StatusReporter(NullStatusSink()), None, None, event, _config(), backend).start(lambda text: None)
+    assert next(item for item in backend.menu if item.label == "Pause").action is None
 
 
 def test_icon_is_primed_before_run_when_render_is_deferred() -> None:
@@ -48,7 +55,7 @@ def test_icon_is_primed_before_run_when_render_is_deferred() -> None:
     backend.run = lambda: setattr(state, "icon_at_run", state.icon)
     event = threading.Event()
     event.set()
-    shell = TrayShell(StatusReporter(NullStatusSink()), _control(), event, _config(), backend)
+    shell = TrayShell(StatusReporter(NullStatusSink()), None, None, event, _config(), backend)
     shell._marshal = lambda render: None  # GLib defers the first render until after run()
     shell.start(lambda text: None)
     assert state.icon_at_run is not None
@@ -57,13 +64,13 @@ def test_icon_is_primed_before_run_when_render_is_deferred() -> None:
 def test_gui_crash_degrades_to_headless_without_raising() -> None:
     backend = _backend()
     backend.run = _raise
-    shell = TrayShell(StatusReporter(NullStatusSink()), _control(), threading.Event(), _config(), backend)
+    shell = TrayShell(StatusReporter(NullStatusSink()), None, None, threading.Event(), _config(), backend)
     shell._run_backend(backend)
     assert backend.stopped
 
 
 def test_missing_backend_library_runs_no_op() -> None:
-    shell = TrayShell(StatusReporter(NullStatusSink()), _control(), threading.Event(), _config(), backend=None)
+    shell = TrayShell(StatusReporter(NullStatusSink()), None, None, threading.Event(), _config(), backend=None)
     shell._build_backend = lambda: None
     event = threading.Event()
     event.set()
@@ -78,7 +85,7 @@ def _raise() -> None:
 def test_open_logs_opens_agent_session_dir(monkeypatch) -> None:
     opened: list[list[str]] = []
     monkeypatch.setattr(tray_shell.subprocess, "Popen", lambda args: opened.append(args))
-    shell = TrayShell(StatusReporter(NullStatusSink()), _control(), threading.Event(), _config(), _backend())
+    shell = TrayShell(StatusReporter(NullStatusSink()), None, None, threading.Event(), _config(), _backend())
     shell._open_logs()
     assert opened == [["xdg-open", "/tmp/sessions"]]
 
@@ -86,6 +93,6 @@ def test_open_logs_opens_agent_session_dir(monkeypatch) -> None:
 def test_marshal_catches_render_errors() -> None:
     logs: list[tuple] = []
     config = types.SimpleNamespace(**_config().__dict__, log=lambda *args: logs.append(args))
-    shell = TrayShell(StatusReporter(NullStatusSink()), _control(), threading.Event(), config, _backend())
+    shell = TrayShell(StatusReporter(NullStatusSink()), None, None, threading.Event(), config, _backend())
     assert shell._safe_render(_raise) is False
     assert logs and logs[0][0] == "TRAY"

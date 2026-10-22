@@ -24,8 +24,8 @@ class TrayStatusSink(StatusSink):
     def __init__(
         self,
         backend: TrayBackend,
-        pause: Action,
-        resume: Action,
+        pause: Action | None,
+        resume: Action | None,
         open_logs: Action,
         restart: Action,
         exit: Action,

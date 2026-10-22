@@ -11,7 +11,7 @@ __all__ = ["EmulatorShell"]
 class EmulatorShell(Shell):
     """Replays a scripted transcript into the kernel, standing in for voice input."""
 
-    def __init__(self, sleep: object = time.sleep) -> None:
+    def __init__(self, sleep: Callable[[float], None] = time.sleep) -> None:
         self._sleep = sleep
 
     def start(self, submit: Callable[[str], KernelResponse]) -> None:

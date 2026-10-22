@@ -2,6 +2,7 @@ import types
 
 from composition.gatekeeper_builder import GatekeeperBuilder
 from shells.voice.gate.playback_gate import PlaybackGate
+from tusk.kernel.modes.mode_gate import ModeGate
 from tusk.shared.interrupt_token import InterruptToken
 
 
@@ -37,6 +38,21 @@ def test_gatekeeper_wiring_resolves_stop_gate_slot_with_fallback() -> None:
     slot = _builder(_mode_kernel(requested)).gatekeeper(_worker())
     assert ("get", "gatekeeper") in requested and ("fallback", "stop_gate", "gatekeeper") in requested
     assert isinstance(slot._inner, PlaybackGate)
+
+
+def test_speech_stop_gate_client_has_no_fallback_completion() -> None:
+    # the stop check runs while TUSK speaks; a second LLM round trip would delay the interrupt
+    slot = _builder(_mode_kernel([])).gatekeeper(_worker())
+    client = slot._inner._stop_gate._client
+    assert client._allow_fallback is False and client._error_group == "speech-stop"
+
+
+def test_mode_start_wires_the_mode_gate_stop_check_into_stop_gatekeeper() -> None:
+    kernel, starts = _mode_kernel([]), []
+    kernel.coding = types.SimpleNamespace(set_callbacks=lambda on_start, on_stop: starts.append(on_start), request_stop=lambda: None)
+    slot = _builder(kernel).gatekeeper(_worker())
+    starts[0]()
+    assert slot._inner._inner._should_stop.__func__ is ModeGate.should_stop
 
 
 def test_gatekeeper_tolerates_missing_registry() -> None:

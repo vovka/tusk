@@ -27,13 +27,20 @@ def test_start_logs_ready_and_runs_last_shell_on_main_thread() -> None:
     assert ("READY", "TUSK is ready.", "startup") in logs and started == [loader._kernel.submit]
 
 
-def test_voice_shell_comes_from_builder_and_becomes_tray_control(monkeypatch) -> None:
-    shell = types.SimpleNamespace(kind="voice")
+def test_voice_shell_comes_from_builder_and_feeds_tray_pause_resume(monkeypatch) -> None:
+    shell = types.SimpleNamespace(kind="voice", pause=lambda: None, resume=lambda: None)
     monkeypatch.setattr("composition.shell_loader.VoiceShellBuilder", lambda *args: types.SimpleNamespace(build=lambda: shell))
     loader = _loader(["voice", "tray"])
     loader._load_class = lambda name: _tray_class()
     shells = [loader._build(name) for name in loader._ordered_names()]
-    assert shells[0] is shell and shells[1].control is shell
+    assert shells[0] is shell and (shells[1].pause, shells[1].resume) == (shell.pause, shell.resume)
+
+
+def test_tray_without_voice_gets_no_pause_resume() -> None:
+    loader = _loader(["tray"])
+    loader._load_class = lambda name: _tray_class()
+    tray = loader._build("tray")
+    assert (tray.pause, tray.resume) == (None, None)
 
 
 def test_builder_receives_loader_collaborators_and_speech_end_callback(monkeypatch) -> None:
@@ -59,4 +66,4 @@ def test_unknown_shell_name_is_rejected() -> None:
 
 
 def _tray_class() -> object:
-    return lambda reporter, control, event, config: types.SimpleNamespace(kind="tray", control=control)
+    return lambda reporter, pause, resume, event, config: types.SimpleNamespace(kind="tray", pause=pause, resume=resume)

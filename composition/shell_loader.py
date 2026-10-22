@@ -54,8 +54,14 @@ class ShellLoader:
             return self._build_voice()
         shell_class = self._load_class(name)
         if name == "tray":
-            return shell_class(self._reporter, self._control, self._shutdown_event, self._config)
+            return self._build_tray(shell_class)
         return shell_class()
+
+    def _build_tray(self, tray_class: type[Shell]) -> Shell:
+        voice = self._control
+        if voice is None:
+            return tray_class(self._reporter, None, None, self._shutdown_event, self._config)
+        return tray_class(self._reporter, voice.pause, voice.resume, self._shutdown_event, self._config)
 
     def _build_voice(self) -> VoiceShell:
         self._control = VoiceShellBuilder(self._config, self._kernel, self._log, self._reporter, self._on_speech_end).build()

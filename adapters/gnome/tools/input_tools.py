@@ -31,7 +31,10 @@ class InputTools:
         return {"success": True, "message": f"typed literal text ({len(text)} chars)"}
 
     def replace_recent_text(self, arguments: dict) -> dict:
-        self._input.replace_text(int(arguments["replace_chars"]), arguments["text"])
+        try:
+            self._input.replace_text(int(arguments["replace_chars"]), arguments["text"])
+        except RuntimeError as exc:
+            return {"success": False, "message": str(exc)}
         return {"success": True, "message": "replaced"}
 
     def mouse_click(self, arguments: dict) -> dict:

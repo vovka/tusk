@@ -7,7 +7,6 @@ from collections.abc import Callable
 from shells.tray.appindicator_tray_backend import AppIndicatorTrayBackend
 from shells.tray.interfaces.tray_backend import TrayBackend
 from shells.tray.tray_status_sink import TrayStatusSink
-from shells.voice.voice_shell import VoiceShell
 from tusk.shared.config.config import Config
 from tusk.shared.interfaces.shell import Shell
 from tusk.shared.observability.status_reporter import StatusReporter
@@ -20,13 +19,14 @@ class TrayShell(Shell):
     def __init__(
         self,
         reporter: StatusReporter,
-        pipeline_control: VoiceShell,
+        pause: Callable[[], None] | None,
+        resume: Callable[[], None] | None,
         shutdown_event: threading.Event,
         config: Config,
         backend: TrayBackend | None = None,
     ) -> None:
         self._reporter = reporter
-        self._control = pipeline_control
+        self._pause, self._resume = pause, resume
         self._shutdown_event = shutdown_event
         self._config = config
         self._backend = backend
@@ -58,7 +58,7 @@ class TrayShell(Shell):
 
     def _sink(self, backend: TrayBackend) -> TrayStatusSink:
         return TrayStatusSink(
-            backend, self._control.pause, self._control.resume, self._open_logs, self._restart, self.stop,
+            backend, self._pause, self._resume, self._open_logs, self._restart, self.stop,
             theme=self._config.tray_icon_theme,
             show_last_activity=self._config.tray_show_last_activity,
             marshal=self._marshal,

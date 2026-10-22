@@ -52,6 +52,25 @@ def test_replace_text_skips_backspace_for_zero_chars() -> None:
     assert commands == [["xdotool", "type", "--delay", "0", "--", "hi"]]
 
 
+def test_replace_text_presses_return_for_newlines() -> None:
+    commands: list[list[str]] = []
+    with patch("adapters.gnome.x11.input_simulator.subprocess.run", side_effect=_capture_all(commands)):
+        X11InputSimulator().replace_text(0, "x\ny")
+    assert [command[1] for command in commands] == ["type", "key", "type"]
+    assert [command[-1] for command in commands] == ["x", "Return", "y"]
+
+
+def test_replace_text_raises_when_backspace_fails() -> None:
+    result = types.SimpleNamespace(returncode=1, stderr="boom")
+    with patch("adapters.gnome.x11.input_simulator.subprocess.run", return_value=result):
+        try:
+            X11InputSimulator().replace_text(2, "hi")
+        except RuntimeError as exc:
+            assert "BackSpace: boom" in str(exc)
+        else:
+            raise AssertionError("expected RuntimeError")
+
+
 def test_mouse_click_raises_on_failure() -> None:
     _assert_mouse_raises(lambda sim: sim.mouse_click(1, 2, 1, 1), "mouse_click")
 

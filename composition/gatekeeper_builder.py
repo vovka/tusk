@@ -46,9 +46,13 @@ class GatekeeperBuilder:
 
     def _wire_mode(self, slot: GatekeeperSlot, base: Gatekeeper, stop_llm: LLMProvider | None, worker: CommandWorker,
                    gate: ModeGate, mode: ModeSlot) -> None:
-        make = lambda: self._guarded(StopGatekeeper(gate, mode.request_stop, base), stop_llm, worker)
+        make = lambda: self._guarded(StopGatekeeper(gate.should_stop, mode.request_stop, base), stop_llm, worker)
         mode.set_callbacks(lambda: slot.swap(make()), lambda: slot.swap(base))
 
     def _guarded(self, inner: Gatekeeper, stop_llm: LLMProvider | None, worker: CommandWorker) -> PlaybackGate:
         # while TUSK's own voice plays, only stop_gate (STOP_GATE_LLM) may interrupt; otherwise delegate to inner
-        return PlaybackGate(inner, lambda: worker.current_speech_text, SpeechStopGate(LLMClient(stop_llm, self._log), self._log))
+        return PlaybackGate(inner, lambda: worker.current_speech_text, SpeechStopGate(self._stop_client(stop_llm), self._log))
+
+    def _stop_client(self, stop_llm: LLMProvider | None) -> LLMClient:
+        # no plain-completion fallback: a second LLM round trip while TUSK speaks would delay the interrupt
+        return LLMClient(stop_llm, self._log, error_group="speech-stop", allow_fallback=False)
