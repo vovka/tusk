@@ -265,7 +265,6 @@ tusk/                        (repo root)
 │   ├── kernel/              # Thin orchestration layer
 │   │   ├── core/            # KernelAPI, CommandMode, MainAgent,
 │   │   │   │                #   agent profiles, SlidingWindowHistory, startup wiring
-│   │   ├── interfaces/      # Shell
 │   │   ├── agent/           # Agentic loop: AgentOrchestrator, AgentRuntime, tool catalog/toolset, dispatcher
 │   │   │   ├── backends/    # AgentBackend ABC; tusk / codex_exec / codex_mcp / fallback backends
 │   │   │   │   ├── codex_exec/ # One-shot `codex exec --json` backend (CommandBuilder, ResultParser)
@@ -304,8 +303,8 @@ tusk/                        (repo root)
 │   │   ├── stages/          # AudioCapture, UtteranceDetector, Transcriber, Sanitizer, EchoFilter, TranscriptionBuffer
 │   │   ├── gate/            # LLMGatekeeper, StopGatekeeper, PlaybackGate, SpeechStopGate, ConfirmationAnswerGate, GatekeeperSlot, prompts, parsing
 │   │   └── speech/          # ChunkedSpeaker, SpeechPlayback, ConfirmationReply
-│   ├── cli/                 # CLIShell — stdin REPL
-│   ├── emulator/            # EmulatorShell — replays a scripted transcript as kernel input
+│   ├── cli_shell.py         # CLIShell — stdin REPL
+│   ├── emulator_shell.py    # EmulatorShell — replays a scripted transcript as kernel input
 │   └── tray/                # TrayShell, TrayBackend ABC, AppIndicator backend, status sink, icons
 ├── adapters/                # Out-of-process MCP servers, discovered from adapter.json manifests
 │   ├── gnome/               # Desktop control: windows, input, mouse, clipboard, context (tools/ subpackage)
@@ -347,7 +346,7 @@ source files; this table is the index:
 
 | ABC | Defined in | Implementations | Key consumers |
 |---|---|---|---|
-| `Shell` | `tusk/kernel/interfaces/shell.py` | `VoiceShell`, `CLIShell`, `EmulatorShell`, `TrayShell` (structural) | `ShellLoader` |
+| `Shell` | `tusk/shared/interfaces/shell.py` | `VoiceShell`, `CLIShell`, `EmulatorShell`, `TrayShell` | `ShellLoader` |
 | `AgentBackend` | `tusk/kernel/agent/backends/agent_backend.py` | `TuskAgentBackend`, `CodexExecAgentBackend`, `CodexMcpAgentBackend`, `FallbackAgentBackend` | `CommandMode` |
 | `LLMProvider` | `tusk/shared/interfaces/llm_provider.py` | `GroqLLM`, `OpenRouterLLM`, `LLMProxy` (wrapper) | agent profiles, gatekeepers, `ModeGate` |
 | `LLMProviderFactory` | `tusk/shared/interfaces/llm_provider_factory.py` | `ConfigurableLLMFactory` | `LLMRegistry` |
@@ -722,7 +721,7 @@ the exec command to the socket and reads back `ok` / `error: ...`.
 
 ## Shell Model
 
-Shells are plain classes satisfying the `Shell` contract (`start(submit)` / `stop()`),
+Shells subclass the `Shell` ABC (`start(submit)`),
 selected by name from `TUSK_SHELLS` (default `voice`). There are no shell manifests —
 `ShellLoader` maps names to classes directly (`_SHELL_CLASSES`: `voice`, `cli`,
 `emulator`, `tray`).

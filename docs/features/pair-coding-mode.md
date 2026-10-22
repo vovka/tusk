@@ -21,7 +21,7 @@ focused editor via select-all + clipboard automation.
 5. If the instruction names a line number beyond the buffer's end (e.g. "go to line seven" on a 3-line buffer), the planner is instructed to place the change structurally instead of padding with blank lines — verified working in e2e.
 
 ## E2E Test Harness (no X11 needed)
-- `shells/emulator/` — replays a transcript as utterances (`TUSK_SHELLS=emulator`, `TUSK_TRANSCRIPT`, `TUSK_UTTERANCE_PAUSE`)
+- `shells/emulator_shell.py` — replays a transcript as utterances (`TUSK_SHELLS=emulator`, `TUSK_TRANSCRIPT`, `TUSK_UTTERANCE_PAUSE`)
 - `demos/editor_emulator/` — mock desktop adapter (in-memory editor with select-all/copy/paste semantics, `provides_context: true`); bind-mount into `adapters/` so it claims the desktop-source slot ahead of gnome (sorted order); snapshots buffer to `.tusk_runtime/editor_emulator_buffer.txt`
 - Run commands: see headers of `demos/coding_session_emulated.txt` (original bug-reproduction transcript) and `demos/coding_session_target_flow.txt` (the user's exact desired flow, used to verify the rewrite)
 - Standalone adapter replay (no kernel, no conversation/planner LLM overhead): see the JSON-RPC loop pattern in that harness — `initialize` / `tools/call` line-delimited JSON on stdio; useful for isolating adapter-level behavior per step

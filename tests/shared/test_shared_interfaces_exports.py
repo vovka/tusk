@@ -3,16 +3,8 @@ import tusk.shared.interfaces as interfaces
 
 
 def test_shared_interfaces_export_every_abc() -> None:
-    assert set(interfaces.__all__) == {
-        "LLMProvider",
-        "LLMProviderFactory",
-        "LogPrinter",
-        "STTEngine",
-        "SpanHandle",
-        "StatusSink",
-        "TTSEngine",
-        "Tracer",
-    }
+    expected = {"LLMProvider", "LLMProviderFactory", "LogPrinter", "STTEngine", "Shell", "SpanHandle", "StatusSink", "TTSEngine", "Tracer"}
+    assert set(interfaces.__all__) == expected
 
 
 def test_stt_provider_exports_present() -> None:

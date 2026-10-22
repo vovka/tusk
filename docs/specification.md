@@ -992,8 +992,8 @@ slots, and registers `SwitchModelTool`, `StartDictationTool`, `StartCodingTool`.
 
 ### 20.1 Shell Registry and Threading
 
-**Source:** `shell_loader.py`, interface `tusk/kernel/interfaces/shell.py`
-(`start(api)`, `stop()`).
+**Source:** `shell_loader.py`, interface `tusk/shared/interfaces/shell.py`
+(`start(submit)`).
 
 Shells are a static registry — no dynamic discovery:
 
@@ -1020,7 +1020,7 @@ def __init__(self, pipeline, worker, reporter, pause_gate): ...
 def start(self, submit):
     self._worker.start()
     for _ in self._pipeline.run(self._worker.enqueue):
-        if not self._running: return
+        pass
 ```
 
 The forward target is always `worker.enqueue`, so the listening loop never blocks on
@@ -1029,7 +1029,7 @@ gate built alongside `AudioCapture`: `pause()` clears it (capture stops, `PAUSED
 `resume()` sets it (`LISTENING`). The tray drives these methods directly — the voice
 shell *is* the pipeline control object (duck-typed; there is no separate control ABC).
 
-### 20.3 CLIShell — `shells/cli/cli_shell.py`
+### 20.3 CLIShell — `shells/cli_shell.py`
 
 ```python
 while True:
@@ -1039,7 +1039,7 @@ while True:
     if result.reply: print(result.reply)
 ```
 
-### 20.4 EmulatorShell — `shells/emulator/emulator_shell.py`
+### 20.4 EmulatorShell — `shells/emulator_shell.py`
 
 Replays a scripted transcript into `kernel.submit`, standing in for the whole voice
 front end (STT + gatekeeper). Reads `TUSK_TRANSCRIPT` (path; blank lines and

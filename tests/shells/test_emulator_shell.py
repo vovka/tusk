@@ -1,6 +1,6 @@
 import types
 
-from shells.emulator.emulator_shell import EmulatorShell
+from shells.emulator_shell import EmulatorShell
 
 
 def test_start_submits_only_spoken_lines_in_order(tmp_path, monkeypatch) -> None:

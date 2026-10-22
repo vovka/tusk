@@ -10,7 +10,7 @@ Regenerate (public members only) inside the dev container:
 ```bash
 docker compose exec tusk pip install pylint  # provides pyreverse
 docker compose exec tusk bash  # then, from the repo root:
-pyreverse -o mmd --filter-mode=PUB_ONLY -d /tmp/dg -p kernel_core tusk/kernel/*.py tusk/kernel/interfaces tusk/kernel/modes
+pyreverse -o mmd --filter-mode=PUB_ONLY -d /tmp/dg -p kernel_core tusk/kernel/*.py tusk/kernel/modes
 pyreverse -o mmd --filter-mode=PUB_ONLY -d /tmp/dg -p kernel_agent tusk/kernel/agent
 pyreverse -o mmd --filter-mode=PUB_ONLY -d /tmp/dg -p kernel_backends tusk/kernel/agent_backends
 pyreverse -o mmd --filter-mode=PUB_ONLY -d /tmp/dg -p shared_contracts tusk/shared/{interfaces,llm,mcp,config,observability}
@@ -91,10 +91,6 @@ classDiagram
     set_callbacks(on_start: Callable[[], None], on_stop: Callable[[], None]) None
     start(state: ModeState) KernelResponse
     stop() None
-  }
-  class Shell {
-    start(api: object)* None
-    stop()* None
   }
   class SlidingWindowHistory {
     append(message: ChatMessage) None
@@ -399,6 +395,9 @@ classDiagram
   class LLMRetryRunner {
     run(operation: Callable[[], T], on_retry: RetryListener | None) T
   }
+  class Shell {
+    start(submit: Callable[[str], KernelResponse])* None
+  }
   class LogPrinter {
     clear_wait()* None
     log(tag: str, message: str, group: str | None)* None
@@ -651,8 +650,7 @@ classDiagram
     utterance : Utterance
   }
   class CLIShell {
-    start(submit: object) None
-    stop() None
+    start(submit: Callable[[str], KernelResponse]) None
   }
   class CommandWorker {
     current_speech_text : str | None
@@ -662,8 +660,7 @@ classDiagram
     start() None
   }
   class EmulatorShell {
-    start(submit: object) None
-    stop() None
+    start(submit: Callable[[str], KernelResponse]) None
   }
   class GateAction {
     name
@@ -756,7 +753,6 @@ classDiagram
     pause() None
     resume() None
     start(submit: Callable[[str], KernelResponse]) None
-    stop() None
   }
   AppIndicatorTrayBackend --|> TrayBackend
   GatekeeperSlot --|> Gatekeeper

@@ -9,13 +9,14 @@ from shells.tray.interfaces.tray_backend import TrayBackend
 from shells.tray.tray_status_sink import TrayStatusSink
 from shells.voice.voice_shell import VoiceShell
 from tusk.shared.config.config import Config
+from tusk.shared.interfaces.shell import Shell
 from tusk.shared.observability.status_reporter import StatusReporter
 from tusk.shared.schemas.kernel_response import KernelResponse
 
 __all__ = ["TrayShell"]
 
 
-class TrayShell:
+class TrayShell(Shell):
     def __init__(
         self,
         reporter: StatusReporter,

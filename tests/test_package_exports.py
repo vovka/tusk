@@ -1,7 +1,6 @@
 import tusk
 import tusk.kernel as kernel
 import tusk.kernel.agent.backends as backends
-import tusk.kernel.interfaces as interfaces
 import tusk.providers as providers
 import tusk.providers.llm as llm_providers
 import tusk.providers.stt as stt_providers
@@ -20,7 +19,6 @@ def test_root_and_kernel_exports_present() -> None:
     assert "providers" in tusk.__all__
     assert "lib" not in tusk.__all__
     assert "MainAgent" in kernel.__all__
-    assert "Shell" in interfaces.__all__
     assert "ToolCall" in schemas.__all__
     assert {"GateDispatch", "BufferedUtterance", "Utterance"} <= set(voice_schemas.__all__)
     assert {"BackendRequest", "BackendResult"} <= set(backends.__all__)
@@ -32,6 +30,7 @@ def test_shared_layer_exports_present() -> None:
     assert "Config" in config.__all__
     assert "LLMProxy" in llm.__all__
     assert "LLMProvider" in shared_interfaces.__all__
+    assert "Shell" in shared_interfaces.__all__
 
 
 def test_shared_nested_exports_present() -> None:

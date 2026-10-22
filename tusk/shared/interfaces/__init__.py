@@ -1,6 +1,7 @@
 from tusk.shared.interfaces.llm_provider import LLMProvider
 from tusk.shared.interfaces.llm_provider_factory import LLMProviderFactory
 from tusk.shared.interfaces.log_printer import LogPrinter
+from tusk.shared.interfaces.shell import Shell
 from tusk.shared.interfaces.span_handle import SpanHandle
 from tusk.shared.interfaces.status_sink import StatusSink
 from tusk.shared.interfaces.stt_engine import STTEngine
@@ -12,6 +13,7 @@ __all__ = [
     "LLMProviderFactory",
     "LogPrinter",
     "STTEngine",
+    "Shell",
     "SpanHandle",
     "StatusSink",
     "TTSEngine",

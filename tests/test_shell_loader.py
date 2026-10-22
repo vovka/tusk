@@ -2,7 +2,9 @@ import types
 
 import pytest
 
-from shell_loader import ShellLoader
+from shell_loader import _SHELL_CLASSES, ShellLoader
+from shells.voice.voice_shell import VoiceShell
+from tusk.shared.interfaces.shell import Shell
 
 
 def _loader(shells: list[str], log: object | None = None) -> ShellLoader:
@@ -45,6 +47,10 @@ def test_builder_receives_loader_collaborators_and_speech_end_callback(monkeypat
 def test_registry_resolves_every_class_backed_shell() -> None:
     names = {name: _loader(["cli"])._load_class(name).__name__ for name in ("cli", "emulator", "tray")}
     assert names == {"cli": "CLIShell", "emulator": "EmulatorShell", "tray": "TrayShell"}
+
+
+def test_every_shell_implements_the_shell_abc() -> None:
+    assert all(issubclass(cls, Shell) for cls in (*_SHELL_CLASSES.values(), VoiceShell))
 
 
 def test_unknown_shell_name_is_rejected() -> None:

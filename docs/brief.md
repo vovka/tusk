@@ -8,7 +8,7 @@ The current codebase uses a kernel/shell/adapter split instead of the earlier co
 
 - `tusk/lib` as the infrastructure layer (LLM providers, STT providers, MCP client, config)
 - `tusk/kernel` as the in-process agent runtime (pipeline, agents, gatekeeper, planner, tool registry)
-- `shells/voice` and `shells/cli`
+- `shells/voice` and `shells/cli_shell.py`
 - `adapters/gnome` for desktop control and context
 - `adapters/dictation` for dictation cleanup/refinement
 
