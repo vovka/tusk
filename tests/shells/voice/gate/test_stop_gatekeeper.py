@@ -20,33 +20,27 @@ def _gate(stops: bool) -> object:
 
 def test_forwards_non_stop_utterance() -> None:
     gk = StopGatekeeper(_gate(False), lambda: None)
-    result = gk.process(_utterance("hello world"), [])
+    result = gk.process(_buffered("hello world"), [], [])
     assert result == GateDispatch("forward_current", "hello world")
-
-
-def test_forwards_buffered_non_stop_utterance() -> None:
-    gk = StopGatekeeper(_gate(False), lambda: None)
-    result = gk.process(_buffered("type this"), [])
-    assert result == GateDispatch("forward_current", "type this")
 
 
 def test_drops_stop_utterance() -> None:
     gk = StopGatekeeper(_gate(True), lambda: None)
-    result = gk.process(_utterance("stop dictation"), [])
+    result = gk.process(_buffered("stop dictation"), [], [])
     assert result == GateDispatch("drop")
 
 
 def test_calls_stop_callback_on_stop() -> None:
     called = []
     gk = StopGatekeeper(_gate(True), lambda: called.append(1))
-    gk.process(_utterance("stop"), [])
+    gk.process(_buffered("stop"), [], [])
     assert called == [1]
 
 
 def test_does_not_call_stop_callback_for_normal_text() -> None:
     called = []
     gk = StopGatekeeper(_gate(False), lambda: called.append(1))
-    gk.process(_utterance("just some text"), [])
+    gk.process(_buffered("just some text"), [], [])
     assert called == []
 
 
@@ -56,24 +50,24 @@ def test_wake_word_stop_phrase_ends_the_mode_without_the_llm_gate() -> None:
                  "Tusk, stop dictation.", "Tusk stop coding"]:
         called = []
         gk = StopGatekeeper(_unused_gate(), lambda: called.append(1), _command_gate())
-        assert gk.process(_utterance(text), []) == GateDispatch("drop") and called == [1], text
+        assert gk.process(_buffered(text), [], []) == GateDispatch("drop") and called == [1], text
 
 
 # Regression: "Tusk, use GPT OSS 120B for the main agent" was turned into code instead of switching the model.
 def test_other_wake_word_utterance_goes_to_the_command_gatekeeper_bypassing_the_mode() -> None:
     gk = StopGatekeeper(_unused_gate(), lambda: None, _command_gate())
-    result = gk.process(_utterance("Tusk, use GPT OSS 120B for the main agent."), [])
+    result = gk.process(_buffered("Tusk, use GPT OSS 120B for the main agent."), [], [])
     assert result == GateDispatch("forward_current", "use GPT OSS 120B for the main agent", kind="mode-bypass:command")
 
 
 def test_dropped_wake_word_utterance_stays_dropped() -> None:
     gk = StopGatekeeper(_unused_gate(), lambda: None, _command_gate(GateDispatch("drop")))
-    assert gk.process(_utterance("Tusk is a nice name"), []) == GateDispatch("drop")
+    assert gk.process(_buffered("Tusk is a nice name"), [], []) == GateDispatch("drop")
 
 
 def test_utterance_without_wake_word_stays_a_mode_instruction() -> None:
     gk = StopGatekeeper(_gate(False), lambda: None, _command_gate())
-    result = gk.process(_utterance("stop the loop after ten iterations"), [])
+    result = gk.process(_buffered("stop the loop after ten iterations"), [], [])
     assert result == GateDispatch("forward_current", "stop the loop after ten iterations")
 
 
@@ -83,7 +77,7 @@ def _unused_gate() -> object:
 
 def _command_gate(result: GateDispatch | None = None) -> object:
     dispatch = result or GateDispatch("forward_current", "use GPT OSS 120B for the main agent", kind="command")
-    return types.SimpleNamespace(process=lambda utterance, recent, candidates=None: dispatch)
+    return types.SimpleNamespace(process=lambda utterance, recent, candidates: dispatch)
 
 
 def _unused_gate() -> object:
@@ -95,13 +89,13 @@ def _unused_gate() -> object:
 def test_bare_stop_phrase_stops_without_llm_gate() -> None:
     called = []
     gk = StopGatekeeper(_unused_gate(), lambda: called.append(1))
-    assert gk.process(_utterance("Stop Pair Coating Mode."), []) == GateDispatch("drop")
+    assert gk.process(_buffered("Stop Pair Coating Mode."), [], []) == GateDispatch("drop")
     assert called == [1]
 
 
 def test_stop_word_inside_dictated_text_still_forwards() -> None:
     gk = StopGatekeeper(_gate(False), lambda: None)
-    result = gk.process(_utterance("stop the loop after ten iterations"), [])
+    result = gk.process(_buffered("stop the loop after ten iterations"), [], [])
     assert result.action == "forward_current"
 
 
@@ -110,4 +104,4 @@ def test_stt_variants_of_the_stop_phrase_stop_without_llm_gate() -> None:
                  "Stop pair programming.", "Okay, stop pair coding mode", "Stop pair coding mode please.", "Stop coding now"]:
         called = []
         gk = StopGatekeeper(_unused_gate(), lambda: called.append(1))
-        assert gk.process(_utterance(text), []) == GateDispatch("drop") and called == [1], text
+        assert gk.process(_buffered(text), [], []) == GateDispatch("drop") and called == [1], text

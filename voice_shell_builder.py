@@ -5,6 +5,7 @@ from shells.voice.interfaces.gatekeeper import Gatekeeper
 from shells.voice.gate.playback_gate import PlaybackGate
 from shells.voice.speech.chunked_speaker import ChunkedSpeaker
 from shells.voice.speech.confirmation_reply import ConfirmationReply
+from shells.voice.gate.llm_client import LLMClient
 from shells.voice.gate.llm_gatekeeper import LLMGatekeeper
 from shells.voice.gate.speech_stop_gate import SpeechStopGate
 from shells.voice.gate.stop_gatekeeper import StopGatekeeper
@@ -77,4 +78,4 @@ class VoiceShellBuilder:
 
     def _guarded(self, inner: Gatekeeper, stop_llm: LLMProvider | None, worker: CommandWorker) -> PlaybackGate:
         # while TUSK's own voice plays, only stop_gate (STOP_GATE_LLM) may interrupt; otherwise delegate to inner
-        return PlaybackGate(inner, lambda: worker.current_speech_text, SpeechStopGate(stop_llm, self._log))
+        return PlaybackGate(inner, lambda: worker.current_speech_text, SpeechStopGate(LLMClient(stop_llm, self._log), self._log))

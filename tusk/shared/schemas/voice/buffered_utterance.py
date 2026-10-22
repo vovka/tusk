@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 
-from tusk.shared.schemas.voice.gate_state import GateState
 from tusk.shared.schemas.voice.utterance import Utterance
 
 __all__ = ["BufferedUtterance"]
@@ -11,7 +10,7 @@ class BufferedUtterance:
     id: str
     utterance: Utterance
     received_at: float
-    gate_state: GateState = GateState.PENDING
+    dropped: bool = False
 
     @property
     def text(self) -> str:

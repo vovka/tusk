@@ -138,7 +138,7 @@ for utterance in detector.stream_utterances():
     # pipeline marks buffer states and calls submit() based on dispatch.action
 ```
 
-`GateDispatch.action` values: `forward_current`, `forward_recovered`, `forward_clarification`, `drop`.
+`GateDispatch.action` values: `forward_current`, `forward_recovered`, `interrupt`, `drop`.
 
 Stages are injected into `VoicePipeline` as plain objects. Any stage can be replaced with
 a test double or an alternative implementation without touching the others.
@@ -149,7 +149,7 @@ a test double or an alternative implementation without touching the others.
 
 | ABC | File | Key methods |
 |---|---|---|
-| `Gatekeeper` | `interfaces/gatekeeper.py` | `evaluate(utterance, recent)`, `process(utterance, recent, candidates) → GateDispatch` |
+| `Gatekeeper` | `interfaces/gatekeeper.py` | `process(utterance: BufferedUtterance, recent, candidates) → GateDispatch` |
 
 ---
 
@@ -176,18 +176,17 @@ shells/voice/
 │   ├── speech_stop_gate.py      # SpeechStopGate — yes/no "stop" classifier
 │   ├── confirmation_answer_gate.py  # ConfirmationAnswerGate — yes/no to a pending confirmation
 │   ├── gatekeeper_slot.py       # GatekeeperSlot — swappable inner gatekeeper
-│   ├── llm_client.py            # LLMClient — runs the gate LLM calls
-│   ├── gatekeeper_parser.py     # JSON parsing for gate and recovery LLM responses
-│   ├── gatekeeper_support.py    # Helpers: schemas, dispatch builders, wake-word check
+│   ├── llm_client.py            # LLMClient — runs a gate LLM call, parses and logs the JSON reply
+│   ├── gatekeeper_support.py    # Helpers: dispatch builders, recovery gating, recent context
+│   ├── wake_words.py            # WAKE_WORDS + wake-word checks
 │   ├── command_gate_prompt.py   # Prompt builder for the primary classification call
-│   ├── recovery_gate_prompt.py  # Prompt builder for the recovery LLM call
-│   └── recent_context_formatter.py  # Formats recent utterances for context
+│   └── recovery_gate_prompt.py  # Prompt builder for the recovery LLM call
 └── speech/                  # output side: text → audio
     ├── chunked_speaker.py       # ChunkedSpeaker — TTS in sentence chunks
     ├── speech_playback.py       # SpeechPlayback — audio output
     └── confirmation_reply.py    # ConfirmationReply — pending yes/no question state
 
-Typed records (BufferedUtterance, GateAction, GateDispatch, GateState, RecoveryDecision,
+Typed records (BufferedUtterance, GateAction, GateDispatch, RecoveryDecision,
 GateResult, GateClassification, Utterance) live in `tusk/shared/schemas/voice/`.
 ```
 

@@ -5,23 +5,23 @@ from shells.voice.gate.gatekeeper_slot import GatekeeperSlot
 
 
 def _gatekeeper(action: str, text: str = "hi") -> object:
-    return types.SimpleNamespace(process=lambda u, r, candidates=None: GateDispatch(action, text))
+    return types.SimpleNamespace(process=lambda u, r, candidates: GateDispatch(action, text))
 
 
 def test_gatekeeper_slot_delegates_process_to_inner() -> None:
     slot = GatekeeperSlot(_gatekeeper("forward_current", "hello"))
-    result = slot.process(None, [])
+    result = slot.process(None, [], [])
     assert result == GateDispatch("forward_current", "hello")
 
 
 def test_gatekeeper_slot_swap_changes_delegate() -> None:
     slot = GatekeeperSlot(_gatekeeper("drop"))
     slot.swap(_gatekeeper("forward_current", "new"))
-    assert slot.process(None, []) == GateDispatch("forward_current", "new")
+    assert slot.process(None, [], []) == GateDispatch("forward_current", "new")
 
 
 def test_gatekeeper_slot_swap_does_not_affect_original() -> None:
     original = _gatekeeper("drop")
     slot = GatekeeperSlot(original)
     slot.swap(_gatekeeper("forward_current", "swapped"))
-    assert original.process(None, []) == GateDispatch("drop", "hi")
+    assert original.process(None, [], []) == GateDispatch("drop", "hi")

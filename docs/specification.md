@@ -236,12 +236,12 @@ morning`, `good evening`, `hello`, `hey`, `hi`.
 ## 7. Command Gatekeeper Specification
 
 **Sources:** `shells/voice/gate/` (`llm_gatekeeper.py`, `llm_client.py`,
-`gatekeeper_parser.py`, `gatekeeper_support.py`, `command_gate_prompt.py`,
-`recovery_gate_prompt.py`, `recent_context_formatter.py`).
+`gatekeeper_support.py`, `wake_words.py`, `command_gate_prompt.py`,
+`recovery_gate_prompt.py`).
 **Interface:** `shells/voice/interfaces/gatekeeper.py` — a single method:
 
 ```python
-def process(self, utterance, recent, candidates=None) -> GateDispatch
+def process(self, utterance: BufferedUtterance, recent, candidates) -> GateDispatch
 ```
 
 `LLMGatekeeper` is the command-mode implementation. Mode gates (§16) and the playback
@@ -296,7 +296,7 @@ enum (unknown values → `AMBIENT`). `GateResult` (frozen dataclass,
 2. `command` → `FORWARD_CURRENT` with `cleaned_text` (or raw text if empty).
 3. Anything else → **recovery evaluation** (§7.4):
    - `recover` → `FORWARD_RECOVERED` with the candidate's text and id
-   - `ambiguous` → `FORWARD_CLARIFICATION` with the current text
+   - `ambiguous` → `FORWARD_CURRENT` with the current text
    - `none` → fallback: `conversation` **with a wake word** (`tusk`/`task` as a
      whole word) → `FORWARD_CURRENT`; everything else → `DROP`.
 
@@ -678,15 +678,14 @@ def _handle_utterance(utterance, submit):
 
 ### 15.3 Dispatch
 
-`GateAction` (StrEnum): `forward_current`, `forward_recovered`,
-`forward_clarification`, `interrupt`, `drop`. `GateState` (StrEnum): `pending`,
-`consumed`, `dropped`, `forwarded`, `recovered`.
+`GateAction` (StrEnum): `forward_current`, `forward_recovered`, `interrupt`, `drop`.
+`BufferedUtterance.dropped` marks recovery candidates.
 
 ```
-INTERRUPT                → mark(current, CONSUMED); on_interrupt()          # before the drop check: interrupt has text=None
-DROP or text is None     → mark(current, DROPPED)
-FORWARD_RECOVERED        → mark(recovered_id, RECOVERED); mark(current, CONSUMED); submit(text)
-anything else forwarded  → mark(current, FORWARDED); submit(text)
+INTERRUPT                → on_interrupt()                                  # before the drop check: interrupt has text=None
+DROP or text is None     → mark_dropped(current)
+FORWARD_RECOVERED        → mark_recovered(recovered_id); submit(text)
+anything else forwarded  → submit(text)
 ```
 
 `on_interrupt` is wired by `ShellLoader` to `kernel.request_interrupt()` +
@@ -697,9 +696,9 @@ before each `submit` and returns to `LISTENING` after each utterance.
 
 Interface `shells/voice/interfaces/transcription_buffer.py`; implementation
 `shells/voice/stages/transcription_buffer.py`: a `deque(maxlen=50)` of
-`BufferedUtterance(id, utterance, received_at, gate_state)` with ids `u1`, `u2`, ….
-`recoverable(count, max_age)` returns the newest `count` entries in state `DROPPED`
-younger than `max_age`; `mark(id, state)` updates and logs the whole buffer state.
+`BufferedUtterance(id, utterance, received_at, dropped)` with ids `u1`, `u2`, ….
+`recoverable(count, max_age)` returns the newest `count` dropped entries younger than
+`max_age`; `mark_dropped(id)` / `mark_recovered(id)` update and log the whole buffer state.
 
 ### 15.5 Text Shells Path
 

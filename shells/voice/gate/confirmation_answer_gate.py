@@ -15,12 +15,7 @@ class ConfirmationAnswerGate(Gatekeeper):
         self._inner = inner
         self._reply = reply
 
-    def process(
-        self,
-        utterance: Utterance | BufferedUtterance,
-        recent: list[Utterance],
-        candidates: list[BufferedUtterance] | None = None,
-    ) -> GateDispatch:
+    def process(self, utterance: BufferedUtterance, recent: list[Utterance], candidates: list[BufferedUtterance]) -> GateDispatch:
         answer = self._reply.answer(utterance.text)
         if answer is None:
             return self._inner.process(utterance, recent, candidates)

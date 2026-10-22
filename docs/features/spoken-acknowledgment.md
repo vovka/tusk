@@ -12,8 +12,8 @@ silent when TTS is off, spoken when it is on, and toggleable independently.
 
 ## Key Files And Structure
 - `shells/voice/stages/gate/command_gate_prompt.py`: instructs the gatekeeper to emit `intent`.
-- `shells/voice/stages/gate/gatekeeper_support.py`: `PRIMARY_SCHEMA` includes `intent`; `fallback_dispatch` carries it for conversation turns.
-- `shells/voice/stages/gate/gatekeeper_parser.py`: parses `intent` into `GateResult`.
+- `shells/voice/gate/gatekeeper_support.py`: `fallback_dispatch` carries `intent` for conversation turns.
+- `shells/voice/gate/llm_client.py`: the primary schema includes `intent`; parses it into `GateResult`.
 - `tusk/shared/schemas/gate_result.py`, `shells/voice/gate_dispatch.py`: `intent` field.
 - `shells/voice/pipeline.py`: forwards `(text, refrain)` to the worker.
 - `shells/voice/command_worker.py`: speaks the refrain before `submit` when `ack_enabled`.
@@ -38,8 +38,8 @@ silent when TTS is off, spoken when it is on, and toggleable independently.
   `intent` (negligible cost).
 
 ## Testing Strategy
-- `tests/test_gatekeeper_parser.py`, `tests/test_command_gate_prompt.py`: `intent` parsing and prompt.
-- `tests/test_gatekeeper_support.py`, `tests/test_gatekeeper_follow_up.py`: command and conversation dispatch carry `intent`; schema requires it.
+- `tests/shells/voice/gate/test_llm_client_parsing.py`, `test_command_gate_prompt.py`: `intent` parsing and prompt.
+- `tests/shells/voice/gate/test_gatekeeper_support.py`, `test_gatekeeper_follow_up.py`, `test_guardrail_gatekeeper.py`: command and conversation dispatch carry `intent`; schema requires it.
 - `tests/test_command_worker_refrain.py`: refrain spoken before submit, skipped when disabled/empty, logged when TTS off.
 - `tests/test_pipeline.py`, `tests/test_config_factory.py`: refrain forwarding and `TUSK_ACK` parsing.
 

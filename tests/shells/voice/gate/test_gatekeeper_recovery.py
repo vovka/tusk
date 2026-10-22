@@ -7,29 +7,29 @@ from tusk.shared.schemas.voice.utterance import Utterance
 
 
 def test_gatekeeper_recovers_selected_dropped_candidate() -> None:
-    dispatch = _gatekeeper([_ambient(), _recover("u2")]).process(_utterance("that was for you"), [], _candidates())
+    dispatch = _gatekeeper([_ambient(), _recover("u2")]).process(_buffered("that was for you"), [], _candidates())
     assert dispatch.action == "forward_recovered"
     assert dispatch.text == "open Firefox"
     assert dispatch.recovered_id == "u2"
 
 
-def test_gatekeeper_forwards_clarification_when_recovery_is_ambiguous() -> None:
-    dispatch = _gatekeeper([_ambient(), _ambiguous()]).process(_utterance("the previous one was for you"), [], _candidates())
-    assert dispatch.action == "forward_clarification"
+def test_gatekeeper_forwards_current_text_when_recovery_is_ambiguous() -> None:
+    dispatch = _gatekeeper([_ambient(), _ambiguous()]).process(_buffered("the previous one was for you"), [], _candidates())
+    assert dispatch.action == "forward_current"
     assert dispatch.text == "the previous one was for you"
 
 
 def test_gatekeeper_keeps_ambient_drop_when_recovery_finds_no_match() -> None:
-    dispatch = _gatekeeper([_ambient(), _none()]).process(_utterance("just chatting"), [], _candidates())
+    dispatch = _gatekeeper([_ambient(), _none()]).process(_buffered("just chatting"), [], _candidates())
     assert dispatch.action == "drop"
     assert dispatch.text is None
 
 
 def test_recovered_forward_refreshes_follow_up_window() -> None:
-    prompts, times = [], iter([100.0, 110.0])
+    prompts, times = [], iter([100.0, 110.0, 110.0])
     gatekeeper = _gatekeeper([_ambient(), _recover("u2"), _command()], prompts, lambda: next(times))
-    gatekeeper.process(_utterance("that was for you"), [], _candidates())
-    gatekeeper.evaluate(_utterance("and close it"), [_utterance("open Firefox")])
+    gatekeeper.process(_buffered("that was for you"), [], _candidates())
+    gatekeeper.process(_buffered("and close it"), [_utterance("open Firefox")], [])
     assert "Recent context:" in prompts[-1]
 
 
@@ -48,12 +48,16 @@ def _utterance(text: str) -> Utterance:
     return Utterance(text, b"", 1.0)
 
 
+def _buffered(text: str) -> BufferedUtterance:
+    return BufferedUtterance("u9", _utterance(text), 9.0)
+
+
 def _candidates() -> list[BufferedUtterance]:
-    return [BufferedUtterance("u1", _utterance("weather report"), 1.0, "dropped"), BufferedUtterance("u2", _utterance("open Firefox"), 2.0, "dropped")]
+    return [BufferedUtterance("u1", _utterance("weather report"), 1.0, dropped=True), BufferedUtterance("u2", _utterance("open Firefox"), 2.0, dropped=True)]
 
 
 def _variant_candidate() -> BufferedUtterance:
-    return BufferedUtterance("u3", _utterance("Hey TASC, how do you do?"), 3.0, "dropped")
+    return BufferedUtterance("u3", _utterance("Hey TASC, how do you do?"), 3.0, dropped=True)
 
 
 def _llm(responses: list[str], prompts: list[str]) -> object:

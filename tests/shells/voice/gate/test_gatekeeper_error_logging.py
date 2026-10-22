@@ -1,7 +1,7 @@
 import types
 
-from tusk.shared.schemas.voice.buffered_utterance import BufferedUtterance
 from shells.voice.gate.llm_gatekeeper import LLMGatekeeper
+from tusk.shared.schemas.voice.buffered_utterance import BufferedUtterance
 from tusk.shared.schemas.voice.utterance import Utterance
 
 
@@ -13,11 +13,11 @@ class _RecordingLog:
         self.tags.append(tag)
 
 
-def test_primary_parse_failure_is_logged_as_error() -> None:
+def test_primary_parse_failure_is_logged_as_error_and_dropped() -> None:
     log = _RecordingLog()
     gatekeeper = LLMGatekeeper(_llm(["no json here at all"]), log)
-    result = gatekeeper.evaluate(_utterance("hello"), [])
-    assert result.is_directed_at_tusk is False
+    dispatch = gatekeeper.process(_buffered("hello"), [], [])
+    assert dispatch.action == "drop"
     assert "ERROR" in log.tags
 
 
@@ -25,24 +25,24 @@ def test_recovery_parse_failure_is_logged_as_error() -> None:
     log = _RecordingLog()
     responses = ['{"classification":"ambient","cleaned_text":"","reason":"x"}', "still not json"]
     gatekeeper = LLMGatekeeper(_llm(responses), log)
-    gatekeeper.process(_utterance("no that one"), [], [_candidate()])
+    assert gatekeeper.process(_buffered("no that one"), [], [_candidate()]).action == "drop"
     assert "ERROR" in log.tags
 
 
-def test_total_llm_failure_is_logged_as_error() -> None:
+def test_total_llm_failure_is_logged_as_error_and_dropped() -> None:
     log = _RecordingLog()
     gatekeeper = LLMGatekeeper(_failing_llm(), log)
-    result = gatekeeper.evaluate(_utterance("hello"), [])
-    assert result.is_directed_at_tusk is False
+    dispatch = gatekeeper.process(_buffered("hello"), [], [])
+    assert dispatch.action == "drop"
     assert "ERROR" in log.tags
 
 
-def _utterance(text: str) -> Utterance:
-    return Utterance(text, b"", 1.0)
+def _buffered(text: str) -> BufferedUtterance:
+    return BufferedUtterance("u2", Utterance(text, b"", 1.0), 2.0)
 
 
 def _candidate() -> BufferedUtterance:
-    return BufferedUtterance("u1", _utterance("open Firefox"), 1.0, "dropped")
+    return BufferedUtterance("u1", Utterance("open Firefox", b"", 1.0), 1.0, dropped=True)
 
 
 def _llm(responses: list[str]) -> object:

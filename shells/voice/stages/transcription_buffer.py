@@ -2,7 +2,6 @@ import time
 from collections import deque
 
 from tusk.shared.schemas.voice.buffered_utterance import BufferedUtterance
-from tusk.shared.schemas.voice.gate_state import GateState
 from tusk.shared.interfaces.log_printer import LogPrinter
 from tusk.shared.schemas.voice.utterance import Utterance
 
@@ -37,11 +36,17 @@ class TranscriptionBuffer:
         items = [item for item in self._utterances if _is_recoverable(item, cutoff)]
         return items[-count:]
 
-    def mark(self, entry_id: str, state: GateState) -> None:
+    def mark_dropped(self, entry_id: str) -> None:
+        self._set_dropped(entry_id, True)
+
+    def mark_recovered(self, entry_id: str) -> None:
+        self._set_dropped(entry_id, False)
+
+    def _set_dropped(self, entry_id: str, dropped: bool) -> None:
         entry = self._entry(entry_id)
         if entry is None:
             return
-        entry.gate_state = state
+        entry.dropped = dropped
         self._log_state()
 
     def _entry(self, entry_id: str) -> BufferedUtterance | None:
@@ -52,7 +57,7 @@ class TranscriptionBuffer:
             self._log.log("BUFFER", self._message(), "buffer")
 
     def _message(self) -> str:
-        lines = [f"{item.id} [{item.gate_state}]: {item.text}" for item in self._utterances]
+        lines = [f"{item.id}{' [dropped]' if item.dropped else ''}: {item.text}" for item in self._utterances]
         return "\n".join([f"size={len(self._utterances)}", *lines])
 
     def _new_id(self) -> str:
@@ -61,4 +66,4 @@ class TranscriptionBuffer:
 
 
 def _is_recoverable(item: BufferedUtterance, cutoff: float) -> bool:
-    return item.gate_state == GateState.DROPPED and item.received_at >= cutoff
+    return item.dropped and item.received_at >= cutoff

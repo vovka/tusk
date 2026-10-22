@@ -2,7 +2,7 @@ import difflib
 import time
 from collections.abc import Callable
 
-from shells.voice.gate.gatekeeper_support import starts_with_wake_word as _starts_with_wake_word
+from shells.voice.gate.wake_words import starts_with_wake_word as _starts_with_wake_word
 from tusk.shared.interfaces.log_printer import LogPrinter
 from tusk.shared.schemas.voice.utterance import Utterance
 

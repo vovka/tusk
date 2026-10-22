@@ -3,7 +3,7 @@ import types
 
 from shells.voice.gate.command_gate_prompt import build_command_gate_prompt
 from shells.voice.gate.llm_gatekeeper import LLMGatekeeper
-from shells.voice.gate.gatekeeper_support import PRIMARY_SCHEMA
+from tusk.shared.schemas.voice.buffered_utterance import BufferedUtterance
 from tusk.shared.schemas.voice.utterance import Utterance
 
 
@@ -24,31 +24,27 @@ def test_prompt_has_no_interrupt_clause_when_idle() -> None:
     assert "interrupt" not in prompt
 
 
-def test_schema_accepts_interrupt_classification() -> None:
-    assert "interrupt" in PRIMARY_SCHEMA["properties"]["classification"]["enum"]
-
-
 def test_interrupt_classification_dispatches_interrupt_when_busy() -> None:
     gatekeeper = _gatekeeper(_llm("interrupt"), busy=True)
-    dispatch = gatekeeper.process(_utterance("forget it, that is wrong"), [])
+    dispatch = gatekeeper.process(_buffered("forget it, that is wrong"), [], [])
     assert dispatch.action == "interrupt"
 
 
 def test_interrupt_classification_ignored_when_idle() -> None:
     gatekeeper = _gatekeeper(_llm("interrupt"), busy=False)
-    dispatch = gatekeeper.process(_utterance("stop"), [])
+    dispatch = gatekeeper.process(_buffered("stop"), [], [])
     assert dispatch.action == "drop"
 
 
 def test_busy_state_reaches_prompt() -> None:
     prompts: list[str] = []
     gatekeeper = _gatekeeper(_llm("ambient", prompts), busy=True, speaking="reading a long reply")
-    gatekeeper.process(_utterance("anything"), [])
+    gatekeeper.process(_buffered("anything"), [], [])
     assert "reading a long reply" in prompts[0]
 
 
-def _utterance(text: str) -> Utterance:
-    return Utterance(text, b"", 1.0)
+def _buffered(text: str) -> BufferedUtterance:
+    return BufferedUtterance("u1", Utterance(text, b"", 1.0), 1.0)
 
 
 def _llm(classification: str, prompts: list[str] | None = None) -> object:

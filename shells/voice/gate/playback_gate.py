@@ -23,19 +23,13 @@ class PlaybackGate(Gatekeeper):
         self._current_speech_text = current_speech_text
         self._stop_gate = stop_gate
 
-    def process(
-        self,
-        utterance: Utterance | BufferedUtterance,
-        recent: list[Utterance],
-        candidates: list[BufferedUtterance] | None = None,
-    ) -> GateDispatch:
+    def process(self, utterance: BufferedUtterance, recent: list[Utterance], candidates: list[BufferedUtterance]) -> GateDispatch:
         speaking = self._current_speech_text()
         if speaking is None:
             return self._inner.process(utterance, recent, candidates)
-        text = utterance.text if isinstance(utterance, Utterance) else utterance.utterance.text
-        if self._stop_gate.should_stop(text, speaking):
+        if self._stop_gate.should_stop(utterance.text, speaking):
             return GateDispatch(GateAction.INTERRUPT)
-        if _is_echo(text, speaking):
+        if _is_echo(utterance.text, speaking):
             return GateDispatch(GateAction.DROP)
         return self._inner.process(utterance, recent, candidates)
 

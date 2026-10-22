@@ -13,10 +13,5 @@ class GatekeeperSlot(Gatekeeper):
     def swap(self, gatekeeper: Gatekeeper) -> None:
         self._inner = gatekeeper
 
-    def process(
-        self,
-        utterance: Utterance | BufferedUtterance,
-        recent: list[Utterance],
-        candidates: list[BufferedUtterance] | None = None,
-    ) -> GateDispatch:
+    def process(self, utterance: BufferedUtterance, recent: list[Utterance], candidates: list[BufferedUtterance]) -> GateDispatch:
         return self._inner.process(utterance, recent, candidates)

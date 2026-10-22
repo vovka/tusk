@@ -1,6 +1,5 @@
-from tusk.shared.interfaces.llm_provider import LLMProvider
+from shells.voice.gate.llm_client import LLMClient
 from tusk.shared.interfaces.log_printer import LogPrinter
-from tusk.shared.llm.llm_json import extract_json_payload
 
 __all__ = ["SpeechStopGate"]
 
@@ -26,34 +25,12 @@ _PROMPT = "\n".join([
 class SpeechStopGate:
     """Semantic yes/no classifier: does an utterance heard during playback ask TUSK to stop?"""
 
-    def __init__(self, llm: LLMProvider, log_printer: LogPrinter | None = None) -> None:
-        self._llm = llm
+    def __init__(self, client: LLMClient, log_printer: LogPrinter) -> None:
+        self._client = client
         self._log = log_printer
 
     def should_stop(self, text: str, speaking: str) -> bool:
-        raw = self._complete(_PROMPT.format(speaking=speaking), text)
-        data = self._parsed(raw)
-        self._log_result(text, data)
-        return bool(data.get("stop"))
-
-    def _complete(self, prompt: str, text: str) -> str:
-        try:
-            return self._llm.complete_structured(prompt, text, "speech_stop_gate", _SCHEMA, 128)
-        except Exception as exc:
-            self._log_error("structured output failed", exc)
-            return ""
-
-    def _parsed(self, raw: str) -> dict[str, object]:
-        try:
-            return extract_json_payload(raw) if raw else {}
-        except ValueError as exc:
-            self._log_error("parse error", exc)
-            return {}
-
-    def _log_error(self, message: str, exc: Exception) -> None:
-        if self._log is not None:
-            self._log.log("ERROR", f"{message}: {exc}", "speech-stop")
-
-    def _log_result(self, text: str, data: dict[str, object]) -> None:
-        if self._log is not None:
-            self._log.log("SPEECHSTOP", f"stop={bool(data.get('stop'))} text={text!r}", "speech-stop")
+        data = self._client.complete(_PROMPT.format(speaking=speaking), text, "speech_stop_gate", _SCHEMA, 128)
+        stop = bool(data.get("stop"))
+        self._log.log("SPEECHSTOP", f"stop={stop} text={text!r}", "speech-stop")
+        return stop

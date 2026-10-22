@@ -392,7 +392,7 @@ the dataclass is the authoritative schema. Index:
 
 Mode/session state that belongs to one component lives next to it, not in shared:
 `ModeState` in `tusk/kernel/modes/`, `BufferModel` in
-`adapters/coding/`, `BufferedUtterance`/`GateDispatch`/`GateAction`/`GateState`/`RecoveryDecision`
+`adapters/coding/`, `BufferedUtterance`/`GateDispatch`/`GateAction`/`RecoveryDecision`
 in `shells/voice/`, `TrayMenuItem` in `shells/tray/`.
 
 ---
@@ -422,13 +422,12 @@ AudioCapture.stream_frames()
     → KernelResponse(handled, reply) → TTS → SpeechPlayback
 
 # Recovery path (gatekeeper returns FORWARD_RECOVERED):
-    → buffer.mark(recovered_id, RECOVERED); buffer.mark(current_id, CONSUMED)
+    → buffer.mark_recovered(recovered_id)
     → KernelAPI.submit(prior_text)
 
 # Interrupt path (gatekeeper returns INTERRUPT while the worker is busy):
     → kernel.request_interrupt()      # sets the shared InterruptToken
     → worker.flush()                  # queued commands dropped
-    → buffer.mark(current_id, CONSUMED)
     # AgentRuntime cancels at the next step boundary → reply "Stopped."
     # SpeechPlayback polls the token every 100 ms → paplay terminated mid-word
 ```
@@ -835,7 +834,7 @@ this same path: it is spoken before the reply and is likewise silent when `TUSK_
 ## Gatekeeper Specification
 
 **Source:** `shells/voice/gate/` — `LLMGatekeeper` orchestrates; `LLMClient` runs
-the LLM calls; `gatekeeper_parser`/`gatekeeper_support` handle schemas and parsing;
+the LLM calls, schemas and parsing; `gatekeeper_support`/`wake_words` hold the dispatch helpers;
 prompts live in `command_gate_prompt.py` / `recovery_gate_prompt.py`.
 
 ### Command Classification

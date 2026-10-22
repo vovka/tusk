@@ -6,7 +6,7 @@ from tusk.shared.schemas.voice.buffered_utterance import BufferedUtterance
 from tusk.shared.schemas.voice.gate_action import GateAction
 from tusk.shared.schemas.voice.gate_dispatch import GateDispatch
 from shells.voice.interfaces.gatekeeper import Gatekeeper
-from shells.voice.gate.gatekeeper_support import WAKE_WORDS
+from shells.voice.gate.wake_words import WAKE_WORDS
 from tusk.shared.schemas.app_mode import MODE_BYPASS_KIND_PREFIX
 from tusk.shared.schemas.voice.utterance import Utterance
 
@@ -29,12 +29,7 @@ class StopGatekeeper(Gatekeeper):
         self._stop = stop_callback
         self._commands = command_gatekeeper
 
-    def process(
-        self,
-        utterance: Utterance | BufferedUtterance,
-        recent: list[Utterance],
-        candidates: list[BufferedUtterance] | None = None,
-    ) -> GateDispatch:
+    def process(self, utterance: BufferedUtterance, recent: list[Utterance], candidates: list[BufferedUtterance]) -> GateDispatch:
         text = utterance.text
         words = re.findall(r"[\w-]+", text.casefold())
         woken = bool(words) and words[0] in WAKE_WORDS
@@ -46,7 +41,7 @@ class StopGatekeeper(Gatekeeper):
             return self._stopped()
         return GateDispatch(GateAction.FORWARD_CURRENT, text)
 
-    def _wake_word_command(self, utterance: object, recent: list, candidates: list | None) -> GateDispatch:
+    def _wake_word_command(self, utterance: BufferedUtterance, recent: list[Utterance], candidates: list[BufferedUtterance]) -> GateDispatch:
         result = self._commands.process(utterance, recent, candidates)
         if result.action == GateAction.DROP or result.action == GateAction.INTERRUPT:
             return result

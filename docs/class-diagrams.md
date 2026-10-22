@@ -644,7 +644,7 @@ classDiagram
     stream_frames() Iterator[bytes]
   }
   class BufferedUtterance {
-    gate_state
+    dropped : bool
     id : str
     received_at : float
     text : str
@@ -673,29 +673,23 @@ classDiagram
     recovered_id : str
     text : str | None
   }
-  class GateState {
-    name
-  }
   class Gatekeeper {
-    process(utterance: Utterance | BufferedUtterance, recent: list[Utterance], candidates: list[BufferedUtterance] | None)* GateDispatch
+    process(utterance: BufferedUtterance, recent: list[Utterance], candidates: list[BufferedUtterance])* GateDispatch
   }
   class GatekeeperSlot {
-    process(utterance: Utterance | BufferedUtterance, recent: list[Utterance], candidates: list[BufferedUtterance] | None) GateDispatch
+    process(utterance: BufferedUtterance, recent: list[Utterance], candidates: list[BufferedUtterance]) GateDispatch
     swap(gatekeeper: Gatekeeper) None
   }
   class LLMClient {
+    complete(prompt: str, text: str, name: str, schema: dict, max_tokens: int) dict[str, object]
     primary(prompt: str, text: str) GateResult
     recovery(prompt: str, text: str, candidates: list[BufferedUtterance]) RecoveryDecision
   }
   class LLMGatekeeper {
-    evaluate(utterance: Utterance, recent: list[Utterance]) GateResult
-    process(utterance: Utterance | BufferedUtterance, recent: list[Utterance], candidates: list[BufferedUtterance] | None) GateDispatch
+    process(utterance: BufferedUtterance, recent: list[Utterance], candidates: list[BufferedUtterance]) GateDispatch
   }
   class PlaybackGate {
-    process(utterance: Utterance | BufferedUtterance, recent: list[Utterance], candidates: list[BufferedUtterance] | None) GateDispatch
-  }
-  class RecentContextFormatter {
-    format(utterances: list[Utterance]) str
+    process(utterance: BufferedUtterance, recent: list[Utterance], candidates: list[BufferedUtterance]) GateDispatch
   }
   class RecoveryDecision {
     action : str
@@ -715,19 +709,21 @@ classDiagram
     resolve(status: AppStatus) str
   }
   class StopGatekeeper {
-    process(utterance: Utterance | BufferedUtterance, recent: list[Utterance], candidates: list[BufferedUtterance] | None) GateDispatch
+    process(utterance: BufferedUtterance, recent: list[Utterance], candidates: list[BufferedUtterance]) GateDispatch
   }
   class Transcriber {
     process(utterance: Utterance) Utterance
   }
   class TranscriptionBufferImpl["TranscriptionBuffer (stages)"] {
-    mark(entry_id: str, state: GateState) None
+    mark_dropped(entry_id: str) None
+    mark_recovered(entry_id: str) None
     process(utterance: Utterance) BufferedUtterance
     recent(count: int) list[Utterance]
     recoverable(count: int, max_age_seconds: float) list[BufferedUtterance]
   }
   class TranscriptionBuffer {
-    mark(entry_id: str, state: GateState)* None
+    mark_dropped(entry_id: str)* None
+    mark_recovered(entry_id: str)* None
     process(utterance: Utterance)* BufferedUtterance | None
     recent(count: int)* list[Utterance]
     recoverable(count: int, max_age_seconds: float)* list[BufferedUtterance]
@@ -781,7 +777,6 @@ classDiagram
   StopGatekeeper --|> Gatekeeper
   TranscriptionBufferImpl --|> TranscriptionBuffer
   GateDispatch --> GateAction : action
-  BufferedUtterance --> GateState : gate_state
 ```
 
 > Hand-edit after regeneration: pyreverse emits both the `TranscriptionBuffer`

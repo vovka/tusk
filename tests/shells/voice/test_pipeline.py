@@ -10,7 +10,7 @@ from tusk.shared.schemas.voice.utterance import Utterance
 def test_pipeline_submits_directed_text() -> None:
     submits, states = [], []
     result = list(_pipeline(GateDispatch("forward_current", "open Firefox"), states).run(_submitter(submits)))
-    assert submits == ["open Firefox"] and states == [("forwarded", "u1")]
+    assert submits == ["open Firefox"] and states == []
     assert result == [KernelResponse(True, "done")]
 
 
@@ -21,8 +21,10 @@ def test_pipeline_drops_sanitized_phantoms() -> None:
 
 
 def test_pipeline_drops_ambient_speech() -> None:
-    pipeline = _pipeline(GateDispatch("drop"), [])
+    states = []
+    pipeline = _pipeline(GateDispatch("drop"), states)
     assert list(pipeline.run(_submitter([]))) == []
+    assert states == [("dropped", "u1")]
 
 
 def test_pipeline_drops_self_echo_before_buffering() -> None:
@@ -41,12 +43,12 @@ def test_pipeline_forwards_intent_refrain() -> None:
     assert forwarded == [("open Firefox", "Opening Firefox")]
 
 
-def test_pipeline_submits_recovered_text_and_consumes_current_entry() -> None:
+def test_pipeline_submits_recovered_text_and_unmarks_the_recovered_entry() -> None:
     submits, states = [], []
     dispatch = GateDispatch("forward_recovered", "open Firefox", "u0")
     list(_pipeline(dispatch, states).run(_submitter(submits)))
     assert submits == ["open Firefox"]
-    assert states == [("recovered", "u0"), ("consumed", "u1")]
+    assert states == [("recovered", "u0")]
 
 
 def _pipeline(dispatch: GateDispatch, states: list[tuple[str, str]]) -> VoicePipeline:
@@ -54,8 +56,11 @@ def _pipeline(dispatch: GateDispatch, states: list[tuple[str, str]]) -> VoicePip
 
 
 def _buffer(states: list[tuple[str, str]]) -> object:
-    candidate = BufferedUtterance("u0", Utterance("open Firefox", b"", 1.0), 0.0, "dropped")
-    return types.SimpleNamespace(process=_process, recent=lambda count: [], recoverable=lambda count, window: [candidate], mark=lambda entry_id, state: states.append((state, entry_id)))
+    candidate = BufferedUtterance("u0", Utterance("open Firefox", b"", 1.0), 0.0, dropped=True)
+    return types.SimpleNamespace(
+        process=_process, recent=lambda count: [], recoverable=lambda count, window: [candidate],
+        mark_dropped=lambda entry_id: states.append(("dropped", entry_id)), mark_recovered=lambda entry_id: states.append(("recovered", entry_id)),
+    )
 
 
 def _process(utterance: Utterance) -> BufferedUtterance:
@@ -72,7 +77,7 @@ def _dropper() -> object:
 
 
 def _gatekeeper(dispatch: GateDispatch) -> object:
-    return types.SimpleNamespace(process=lambda utterance, recent, candidates=None: dispatch)
+    return types.SimpleNamespace(process=lambda utterance, recent, candidates: dispatch)
 
 
 def _sanitizer() -> object:

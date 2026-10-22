@@ -7,6 +7,9 @@ from shells.voice.gate.llm_gatekeeper import LLMGatekeeper
 from tests.command_worker_support import await_condition
 from tusk.shared.interrupt_token import InterruptToken
 from tusk.shared.schemas.kernel_response import KernelResponse
+from tusk.shared.schemas.voice.buffered_utterance import BufferedUtterance
+from tusk.shared.schemas.voice.recovery_decision import RecoveryDecision
+from shells.voice.gate.gatekeeper_support import recovered_dispatch
 from tusk.shared.schemas.voice.utterance import Utterance
 
 
@@ -16,19 +19,23 @@ def _llm(classification: str) -> object:
     return types.SimpleNamespace(complete_structured=complete_structured)
 
 
+def _buffered(text: str) -> BufferedUtterance:
+    return BufferedUtterance("u1", Utterance(text, b"", 1.0), 1.0)
+
+
 def _gatekeeper(classification: str) -> LLMGatekeeper:
     log = types.SimpleNamespace(log=lambda *args: None)
     return LLMGatekeeper(_llm(classification), log)
 
 
 def test_command_classification_dispatches_with_command_kind() -> None:
-    dispatch = _gatekeeper("command").process(Utterance("open gedit", b"", 1.0), [])
+    dispatch = _gatekeeper("command").process(_buffered("open gedit"), [], [])
     assert dispatch.kind == "command"
     assert dispatch.text == "open gedit"
 
 
 def test_conversation_classification_keeps_conversation_kind() -> None:
-    dispatch = _gatekeeper("conversation").process(Utterance("hey tusk how are you", b"", 1.0), [])
+    dispatch = _gatekeeper("conversation").process(_buffered("hey tusk how are you"), [], [])
     assert dispatch.kind == "conversation"
 
 
@@ -51,10 +58,6 @@ def test_worker_forwards_kind_to_kernel_submit() -> None:
 
 
 def test_recovered_dispatch_carries_command_kind() -> None:
-    from tusk.shared.schemas.voice.buffered_utterance import BufferedUtterance
-    from tusk.shared.schemas.voice.recovery_decision import RecoveryDecision
-    from shells.voice.gate.gatekeeper_support import recovered_dispatch
-
     candidate = BufferedUtterance("c1", Utterance("open firefox", b"", 1.0), 0.0)
     dispatch = recovered_dispatch([candidate], RecoveryDecision("recover", candidate_id="c1"))
     assert dispatch.kind == "command"
