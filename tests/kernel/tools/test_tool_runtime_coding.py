@@ -1,19 +1,17 @@
 import types
 
-from tusk.kernel.modes.edit_strategies.full_replace_edit_strategy import FullReplaceEditStrategy
-from tusk.kernel.modes.edit_strategies.line_anchored_edit_strategy import LineAnchoredEditStrategy
-from tusk.kernel.modes.edit_strategies.verified_edit_strategy import VerifiedEditStrategy
+from tusk.kernel.modes.editor.edit_applier import EditApplier
+from tusk.kernel.modes.editor.editor_driver import EditorDriver
 from tusk.kernel.tools.tool_runtime import ToolRuntime
 
 
-def test_coding_router_is_wired_with_verified_line_anchored_strategy() -> None:
-    strategy = _wired_strategy()
-    assert isinstance(strategy, VerifiedEditStrategy)
-    assert isinstance(strategy._primary, LineAnchoredEditStrategy)
-    assert isinstance(strategy._fallback, FullReplaceEditStrategy)
+def test_coding_router_is_wired_with_edit_applier_over_editor_driver() -> None:
+    router = _wired_router()
+    assert isinstance(router._applier, EditApplier)
+    assert isinstance(router._driver, EditorDriver)
 
 
-def _wired_strategy() -> object:
+def _wired_router() -> object:
     captured: dict[str, object] = {}
     controller = types.SimpleNamespace(
         dictation=types.SimpleNamespace(attach_router=lambda router: None),
@@ -21,7 +19,7 @@ def _wired_strategy() -> object:
     )
     runtime = ToolRuntime(_registry(), types.SimpleNamespace(), _manager(), _log())
     runtime.register_tools(controller)
-    return captured["router"]._strategy
+    return captured["router"]
 
 
 def _registry() -> object:

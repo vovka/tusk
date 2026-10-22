@@ -8,7 +8,7 @@ focused editor via select-all + clipboard automation.
 ## Key Files & Structure
 - `tusk/kernel/start_coding_tool.py` — agent-visible `start_coding` tool; reads the editor buffer, opens an adapter session. Idempotent: no-ops (`ToolResult(True, "Already in pair-coding mode.")`) if `ModeSlot.active` is already true, so executor retries can't orphan adapter sessions.
 - `tusk/kernel/coding_mode.py` / `coding_router.py` — while active, `KernelAPI.submit` routes every utterance here. Successful edits reply with an empty string (silent — logged, not spoken); only failures ("I couldn't apply that edit.") are spoken.
-- `tusk/kernel/input_automation_editor_driver.py` — drives the editor via `<desktop>.press_keys` / clipboard tools (`ClipboardGuard` saves/restores clipboard)
+- `tusk/kernel/modes/editor/editor_driver.py` — drives the editor via `<desktop>.press_keys` / clipboard tools (`ClipboardGuard` saves/restores clipboard)
 - `tusk/kernel/full_replace_edit_strategy.py` — select-all + paste `full_buffer` (a `line_anchored_edit_strategy.py` exists but is not wired in `ToolRuntime`)
 - `adapters/coding/` — stdio MCP adapter: `CodingEditPlanner` (LLM, `CODING_AGENT_MODEL`, `openai/gpt-oss-120b` on Groq) plans a full-buffer rewrite per intent; `server.py` holds the session buffer as plain text (`dict[str, str]`), no separate buffer-model class
 - `shells/voice/stages/coding_gatekeeper.py` + `tusk/kernel/coding_gate.py` — voice-shell-only stop detection ("stop coding"); bypassed by other shells
@@ -17,7 +17,7 @@ focused editor via select-all + clipboard automation.
 1. "Start pair-coding mode" (or "let's start pair coding") → conversation agent → planner → executor calls `start_coding`.
 2. `start_coding` reads the focused editor buffer (ctrl+A/C via primary desktop source) and calls `coding.start_coding_session`.
 3. Each subsequent utterance → `coding.process_intent`: the planner receives the buffer with **numbered lines** (`1| code`, for the LLM's own reference only) plus the instruction, and returns `{"buffer": "<complete new buffer>"}`. The server wraps this as a single `replace` operation spanning the whole old buffer (`target_start=1`, `target_end=<old line count>`) and updates the session.
-4. `CodingRouter` applies that one op through `FullReplaceEditStrategy` (paste `full_buffer`).
+4. `CodingRouter` applies that one op through `EditApplier` (line-anchored edit, then re-paste `full_buffer` on drift).
 5. If the instruction names a line number beyond the buffer's end (e.g. "go to line seven" on a 3-line buffer), the planner is instructed to place the change structurally instead of padding with blank lines — verified working in e2e.
 
 ## E2E Test Harness (no X11 needed)

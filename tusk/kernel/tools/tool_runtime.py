@@ -1,10 +1,8 @@
 from tusk.kernel.core.adapter_manager import AdapterManager
 from tusk.kernel.core.kernel_api import KernelAPI
-from tusk.kernel.modes.edit_strategies.full_replace_edit_strategy import FullReplaceEditStrategy
-from tusk.kernel.modes.input_automation_editor_driver import InputAutomationEditorDriver
+from tusk.kernel.modes.editor.edit_applier import EditApplier
+from tusk.kernel.modes.editor.editor_driver import EditorDriver
 from tusk.kernel.modes.mode_slot import ModeSlot
-from tusk.kernel.modes.edit_strategies.line_anchored_edit_strategy import LineAnchoredEditStrategy
-from tusk.kernel.modes.edit_strategies.verified_edit_strategy import VerifiedEditStrategy
 from tusk.kernel.modes.coding_router import CodingRouter
 from tusk.kernel.modes.dictation_router import DictationRouter
 from tusk.kernel.tools.start_coding_tool import StartCodingTool
@@ -33,7 +31,6 @@ class ToolRuntime:
         self._registry.register(StartDictationTool(self._registry, kernel.dictation, self._manager))
 
     def _register_coding(self, slot: ModeSlot) -> None:
-        driver = InputAutomationEditorDriver(self._registry, self._manager.primary_desktop_source())
-        strategy = VerifiedEditStrategy(LineAnchoredEditStrategy(), FullReplaceEditStrategy())
-        slot.attach_router(CodingRouter(self._registry, driver, strategy, self._log))
+        driver = EditorDriver(self._registry, self._manager.primary_desktop_source())
+        slot.attach_router(CodingRouter(self._registry, driver, EditApplier(), self._log))
         self._registry.register(StartCodingTool(self._registry, slot, self._manager, driver))

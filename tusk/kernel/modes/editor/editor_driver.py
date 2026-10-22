@@ -1,12 +1,11 @@
 import time
 from collections.abc import Callable
 
-from tusk.kernel.modes.clipboard_guard import ClipboardGuard
-from tusk.kernel.interfaces.editor_driver import EditorDriver
+from tusk.kernel.modes.editor.clipboard_guard import ClipboardGuard
 from tusk.shared.schemas.buffer_selection import BufferSelection
 from tusk.kernel.tools.tool_registry import ToolRegistry
 
-__all__ = ["InputAutomationEditorDriver"]
+__all__ = ["EditorDriver"]
 
 # xdotool returns before the target app consumes a copy/paste keystroke, so the
 # clipboard must settle before we read or restore it, or we lose the round-trip.
@@ -15,7 +14,7 @@ _CLIPBOARD_SETTLE_SECONDS = 0.2
 _EMPTY_BUFFER_SENTINEL = "\x00tusk-empty-buffer\x00"
 
 
-class InputAutomationEditorDriver(EditorDriver):
+class EditorDriver:
     def __init__(self, tool_registry: ToolRegistry, desktop_source: str, sleep: Callable[[float], None] = time.sleep) -> None:
         self._registry = tool_registry
         self._source = desktop_source

@@ -2,7 +2,7 @@ import types
 
 import pytest
 
-from tusk.kernel.modes.input_automation_editor_driver import InputAutomationEditorDriver
+from tusk.kernel.modes.editor.editor_driver import EditorDriver
 from tusk.shared.schemas.buffer_selection import BufferSelection
 from tusk.shared.schemas.tools.tool_result import ToolResult
 
@@ -21,7 +21,7 @@ def test_paste_writes_clipboard_and_restores_it() -> None:
 
 def test_paste_settles_before_restoring_clipboard() -> None:
     calls: list[tuple] = []
-    driver = InputAutomationEditorDriver(_registry(calls), "gnome", sleep=lambda seconds: calls.append(("sleep", seconds)))
+    driver = EditorDriver(_registry(calls), "gnome", sleep=lambda seconds: calls.append(("sleep", seconds)))
     driver.paste("code")
     paste_idx = calls.index(("press_keys", {"keys": "<ctrl>v"}))
     sleep_idx = next(index for index, call in enumerate(calls) if call[0] == "sleep")
@@ -38,7 +38,7 @@ def test_read_buffer_select_all_copy_then_restores_clipboard() -> None:
 
 def test_read_buffer_settles_after_copy_before_reading_clipboard() -> None:
     calls: list[tuple] = []
-    driver = InputAutomationEditorDriver(_registry(calls), "gnome", sleep=lambda seconds: calls.append(("sleep", seconds)))
+    driver = EditorDriver(_registry(calls), "gnome", sleep=lambda seconds: calls.append(("sleep", seconds)))
     driver.read_buffer()
     copy_idx = calls.index(("press_keys", {"keys": "<ctrl>c"}))
     sleep_idx = next(index for index, call in enumerate(calls) if call[0] == "sleep")
@@ -48,7 +48,7 @@ def test_read_buffer_settles_after_copy_before_reading_clipboard() -> None:
 
 def test_driver_raises_when_a_gnome_tool_fails() -> None:
     registry = types.SimpleNamespace(get=lambda name: types.SimpleNamespace(execute=lambda args: ToolResult(False, "xdotool missing", None)))
-    driver = InputAutomationEditorDriver(registry, "gnome", sleep=lambda seconds: None)
+    driver = EditorDriver(registry, "gnome", sleep=lambda seconds: None)
     with pytest.raises(RuntimeError):
         driver.press_keys("<ctrl>a")
 
@@ -62,7 +62,7 @@ def test_select_range_spans_rows_with_shift() -> None:
 
 def _run(action: object) -> list[tuple]:
     calls: list[tuple] = []
-    driver = InputAutomationEditorDriver(_registry(calls), "gnome")
+    driver = EditorDriver(_registry(calls), "gnome")
     action(driver)
     return calls
 
@@ -94,18 +94,18 @@ def _clipboard_registry(clipboard: dict, copy_writes: str | None, read_ok: bool)
 
 def test_read_buffer_returns_empty_when_clipboard_read_reports_empty() -> None:
     clipboard = {"text": "OLD"}
-    driver = InputAutomationEditorDriver(_clipboard_registry(clipboard, "", True), "gnome", sleep=lambda seconds: None)
+    driver = EditorDriver(_clipboard_registry(clipboard, "", True), "gnome", sleep=lambda seconds: None)
     assert driver.read_buffer() == ""
     assert clipboard["text"] == "OLD"
 
 
 def test_read_buffer_ignores_stale_clipboard_when_copy_is_noop() -> None:
     clipboard = {"text": "OLD"}
-    driver = InputAutomationEditorDriver(_clipboard_registry(clipboard, None, True), "gnome", sleep=lambda seconds: None)
+    driver = EditorDriver(_clipboard_registry(clipboard, None, True), "gnome", sleep=lambda seconds: None)
     assert driver.read_buffer() == ""
     assert clipboard["text"] == "OLD"
 
 
 def test_read_buffer_returns_copied_text() -> None:
-    driver = InputAutomationEditorDriver(_clipboard_registry({"text": "OLD"}, "x = 1", True), "gnome", sleep=lambda s: None)
+    driver = EditorDriver(_clipboard_registry({"text": "OLD"}, "x = 1", True), "gnome", sleep=lambda s: None)
     assert driver.read_buffer() == "x = 1"

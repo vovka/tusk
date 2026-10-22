@@ -57,22 +57,10 @@ classDiagram
     process(state: ModeState, text: str) KernelResponse
     stop(state: ModeState) KernelResponse
   }
-  class EditApplicationStrategy {
-    apply(edit: EditOperation, driver: EditorDriver)* None
-  }
-  class EditorDriver {
-    goto_line(line_number: int)* None
-    paste(text: str)* None
-    press_keys(keys: str)* None
-    read_buffer()* str
-    replace_buffer(text: str)* None
-    select_range(selection: BufferSelection)* None
-    type_text(text: str)* None
-  }
-  class FullReplaceEditStrategy {
+  class EditApplier {
     apply(edit: EditOperation, driver: EditorDriver) None
   }
-  class InputAutomationEditorDriver {
+  class EditorDriver {
     goto_line(line_number: int) None
     paste(text: str) None
     press_keys(keys: str) None
@@ -113,8 +101,6 @@ classDiagram
     clear() None
     get_messages() list[ChatMessage]
   }
-  FullReplaceEditStrategy --|> EditApplicationStrategy
-  InputAutomationEditorDriver --|> EditorDriver
 ```
 
 ## Kernel — agent

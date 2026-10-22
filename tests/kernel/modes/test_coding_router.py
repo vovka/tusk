@@ -7,16 +7,16 @@ from tusk.shared.schemas.edit_operation import EditOperation
 from tusk.shared.schemas.tools.tool_result import ToolResult
 
 
-def test_process_applies_each_operation_via_strategy() -> None:
+def test_process_applies_each_operation_via_applier() -> None:
     applied: list[EditOperation] = []
-    router = CodingRouter(_registry([], True), object(), _strategy(applied), _log())
+    router = CodingRouter(_registry([], True), object(), _applier(applied), _log())
     result = router.process(_state(), "rename the function")
     assert result.handled is True
     assert applied == [EditOperation("replace", 1, 1, "def renamed():", "def renamed():")]
 
 
 def test_process_replies_silently_on_success() -> None:
-    router = CodingRouter(_registry([], True), object(), _strategy([]), _log())
+    router = CodingRouter(_registry([], True), object(), _applier([]), _log())
     result = router.process(_state(), "rename the function")
     assert result.reply == ""
 
@@ -25,15 +25,15 @@ def test_process_reports_failure_when_apply_raises() -> None:
     def boom(edit: object, driver: object) -> None:
         raise RuntimeError("xdotool missing")
 
-    strategy = types.SimpleNamespace(apply=boom)
-    router = CodingRouter(_registry([], True), object(), strategy, _log())
+    applier = types.SimpleNamespace(apply=boom)
+    router = CodingRouter(_registry([], True), object(), applier, _log())
     result = router.process(_state(), "rename the function")
     assert result.handled is False
     assert "couldn't apply" in result.reply.lower()
 
 
 def test_process_reports_failure_when_adapter_errors() -> None:
-    router = CodingRouter(_registry([], False), object(), _strategy([]), _log())
+    router = CodingRouter(_registry([], False), object(), _applier([]), _log())
     result = router.process(_state(), "do thing")
     assert result.handled is False
     assert result.reply == "planning failed"
@@ -42,7 +42,7 @@ def test_process_reports_failure_when_adapter_errors() -> None:
 def test_process_reports_failure_on_malformed_operation() -> None:
     malformed = ToolResult(True, "ok", {"operations": [{"unexpected": 1}]})
     registry = types.SimpleNamespace(get=lambda name: _tool([], name, malformed))
-    router = CodingRouter(registry, object(), _strategy([]), _log())
+    router = CodingRouter(registry, object(), _applier([]), _log())
     result = router.process(_state(), "rename the function")
     assert result.handled is False
     assert "couldn't apply" in result.reply.lower()
@@ -51,7 +51,7 @@ def test_process_reports_failure_on_malformed_operation() -> None:
 def test_process_reports_failure_when_data_is_not_a_dict() -> None:
     malformed = ToolResult(True, "ok", ["operations"])
     registry = types.SimpleNamespace(get=lambda name: _tool([], name, malformed))
-    router = CodingRouter(registry, object(), _strategy([]), _log())
+    router = CodingRouter(registry, object(), _applier([]), _log())
     result = router.process(_state(), "rename the function")
     assert result.handled is False
     assert "couldn't apply" in result.reply.lower()
@@ -59,7 +59,7 @@ def test_process_reports_failure_when_data_is_not_a_dict() -> None:
 
 def test_stop_calls_adapter_stop_tool() -> None:
     calls: list[tuple[str, dict]] = []
-    router = CodingRouter(_registry(calls, True), object(), _strategy([]), _log())
+    router = CodingRouter(_registry(calls, True), object(), _applier([]), _log())
     result = router.stop(_state())
     assert result == KernelResponse(True, "Coding stopped.")
     assert calls == [("coding.stop_coding_session", {"session_id": "s1"})]
@@ -82,7 +82,7 @@ def _ops() -> dict:
     return {"operations": [{"kind": "replace", "target_start": 1, "target_end": 1, "new_text": "def renamed():", "full_buffer": "def renamed():"}]}
 
 
-def _strategy(applied: list) -> object:
+def _applier(applied: list) -> object:
     return types.SimpleNamespace(apply=lambda edit, driver: applied.append(edit))
 
 

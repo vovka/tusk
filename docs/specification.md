@@ -893,7 +893,7 @@ map `isError` → `success=False`.
 ## 19. Coding Specification
 
 Coding mode is the pair-coding sibling of dictation (§17): spoken intent becomes editor
-edits applied through an `EditorDriver` + `EditApplicationStrategy`. TUSK never reads
+edits applied through an `EditApplier` over an `EditorDriver`. TUSK never reads
 or writes files on disk — only the focused editor buffer via input automation.
 
 ### 19.1 StartCodingTool — `tusk/kernel/tools/start_coding_tool.py`
@@ -942,10 +942,9 @@ replaced and a single operation is returned:
  "new_text": <new buffer>, "full_buffer": <new buffer>}
 ```
 
-### 19.4 EditorDriver — `tusk/kernel/interfaces/editor_driver.py`
+### 19.4 EditorDriver — `tusk/kernel/modes/editor/editor_driver.py`
 
-One implementation is wired: **`InputAutomationEditorDriver`**
-(`tusk/kernel/modes/input_automation_editor_driver.py`), editor-agnostic automation
+**`EditorDriver`** is editor-agnostic automation
 over the desktop adapter's tools (DI: `tool_registry`, `desktop_source`):
 
 - `read_buffer()` → inside `ClipboardGuard`: `<ctrl>a`, `<ctrl>c`, settle sleep,
@@ -960,19 +959,19 @@ over the desktop adapter's tools (DI: `tool_registry`, `desktop_source`):
 `_CLIPBOARD_SETTLE_SECONDS = 0.2` — xdotool returns before the target app consumes a
 copy/paste keystroke, so the clipboard must settle before reading or restoring it.
 
-**Clipboard preservation:** `ClipboardGuard` (`tusk/kernel/clipboard_guard.py`) is a
+**Clipboard preservation:** `ClipboardGuard` (`tusk/kernel/modes/editor/clipboard_guard.py`) is a
 context manager that snapshots the user's clipboard on entry and restores it on exit,
 so coding mode never destroys clipboard contents the user was holding.
 
-### 19.5 EditApplicationStrategy — `tusk/kernel/interfaces/edit_application_strategy.py`
+### 19.5 EditApplier — `tusk/kernel/modes/editor/edit_applier.py`
 
-One strategy is implemented and wired: **`FullReplaceEditStrategy`**
-(`tusk/kernel/modes/edit_strategies/full_replace_edit_strategy.py`) —
-`driver.replace_buffer(edit.full_buffer)`, i.e. select-all + paste the authoritative
-buffer. It is drift-proof for a fire-and-forget input-automation driver: the editor
-always ends up exactly matching the adapter's model. (Line-anchored/raw-key/fallback
-strategies and a VS Code driver existed as design contracts in an earlier iteration
-and were removed from the code; see §28.)
+**`EditApplier.apply(edit, driver)`** applies the line-anchored edit (`insert` →
+`goto_line` + `paste`; `replace` → `select_range` + `paste`; `delete` → `select_range`
++ `Delete`), then, when `edit.full_buffer` is set, reads the buffer back and calls
+`driver.replace_buffer(edit.full_buffer)` on mismatch. Line-anchored edits drift under
+fire-and-forget GNOME automation (gedit 46 dropped hunks); the read-back costs one
+clipboard round-trip (~0.4s) per edit. (Raw-key/fallback strategies and a VS Code
+driver existed as design contracts in an earlier iteration and were removed; see §28.)
 
 ### 19.6 Buffer Ownership
 
@@ -1307,7 +1306,7 @@ apps start on the host desktop rather than inside the container.
 | `AdapterManager` | shared-env connect fails | retried once with the managed venv |
 | `AdapterManager` | `watchdog` missing | hot-plug disabled, logged |
 | `CodingRouter` | apply error | `KernelResponse(False, "I couldn't apply that edit.")`; adapter buffer already updated (next edit repaints) |
-| `InputAutomationEditorDriver` | failed desktop tool call | `RuntimeError` (caught by `CodingRouter`) |
+| `EditorDriver` | failed desktop tool call | `RuntimeError` (caught by `CodingRouter`) |
 | `CommandWorker` | exception from `submit`/TTS | logged under `ERROR`; the worker thread keeps processing |
 | `SpeechPlayback` | interrupt / 30 s cap / feeder `OSError` | `terminate()` / `kill()` / swallowed |
 | `FallbackAgentBackend` | primary `status="failed"` | fallback runs; primary failure attached as metadata |
@@ -1376,10 +1375,10 @@ The active runtime no longer contains:
   `GatekeeperSlot` swapping (§16)
 - Separate dictation/coding kernel mode classes — unified into `ModeSlot` +
   `ModeState`
-- `VSCodeEditorDriver`, `LineAnchoredEditStrategy`, `RawKeyEditStrategy`,
-  `FallbackEditStrategy`, and the `TUSK_CODING_EDITOR_DRIVER` /
-  `TUSK_CODING_EDIT_STRATEGY` selection vars — the input-automation driver +
-  full-replace strategy are the implementation (§19.4–19.5)
+- `VSCodeEditorDriver`, `RawKeyEditStrategy`, `FallbackEditStrategy`, the
+  `EditApplicationStrategy` ABC, and the `TUSK_CODING_EDITOR_DRIVER` /
+  `TUSK_CODING_EDIT_STRATEGY` selection vars — `EditApplier` over the
+  input-automation `EditorDriver` is the implementation (§19.4–19.5)
 - The kernel-side `CODING_AGENT_LLM` slot — the coding adapter owns its model via
   `CODING_AGENT_MODEL` in its own process (§19.3)
 - A `PipelineControl` ABC — the tray drives the voice shell's `pause()`/`resume()`

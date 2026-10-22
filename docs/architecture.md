@@ -194,7 +194,7 @@ sequenceDiagram
             alt dictation
                 R->>G: type_text / replace_recent_text
             else coding
-                R->>G: EditApplicationStrategy.apply(op, EditorDriver) → gnome.* keys/clipboard
+                R->>G: EditApplier.apply(op, EditorDriver) → gnome.* keys/clipboard
             end
         else stop intent
             MG-->>SG: true
@@ -216,7 +216,7 @@ a literal segment). Stop detection relies on the model returning a non-null
 Coding specifics: the `coding` adapter owns an authoritative, immutable `BufferModel`
 seeded once from the editor at session start. `CodingEditPlanner` (adapter-side LLM)
 turns each spoken intent + buffer into `EditOperation`s; the kernel-side `CodingRouter`
-applies them through `FullReplaceEditStrategy` over `InputAutomationEditorDriver`, which
+applies them through `EditApplier` over `EditorDriver`, which
 composes `gnome.*` key/clipboard primitives. `EditOperation.full_buffer` re-pastes the
 authoritative buffer, making every edit drift-proof under fire-and-forget GUI automation.
 
@@ -264,7 +264,7 @@ tusk/                        (repo root)
 │   ├── kernel/              # Thin orchestration layer
 │   │   ├── core/            # KernelAPI, CommandMode, MainAgent, AdapterManager,
 │   │   │   │                #   agent profiles, SlidingWindowHistory, startup wiring
-│   │   ├── interfaces/      # Shell, EditorDriver, EditApplicationStrategy
+│   │   ├── interfaces/      # Shell
 │   │   ├── agent/           # Agentic loop: AgentOrchestrator, AgentRuntime, tool catalog/toolset, dispatcher
 │   │   │   ├── backends/    # AgentBackend ABC; tusk / codex_exec / codex_mcp / fallback backends
 │   │   │   │   ├── codex_exec/ # One-shot `codex exec --json` backend (CommandBuilder, ResultParser)
@@ -275,7 +275,7 @@ tusk/                        (repo root)
 │   │   │   ├── toolset/     # Per-profile synthetic tool definitions, static schemas, argument validator
 │   │   │   └── tool_sequence/ # Compiled sequences: PlanValidator, Executor, Recorder
 │   │   ├── modes/           # Dictation/coding machinery: ModeSlot, ModeState, ModeGate, routers,
-│   │   │                    #   gate prompts, InputAutomationEditorDriver, FullReplaceEditStrategy
+│   │   │   └── editor/      # EditApplier, EditorDriver, ClipboardGuard
 │   │   └── tools/           # ToolRegistry, RegisteredTool, ToolRuntime,
 │   │                        #   kernel tools: start_dictation, start_coding, switch_model
 │   ├── shared/              # Contracts + cross-layer plumbing; depends on nothing else
@@ -345,8 +345,6 @@ source files; this table is the index:
 | ABC | Defined in | Implementations | Key consumers |
 |---|---|---|---|
 | `Shell` | `tusk/kernel/interfaces/shell.py` | `VoiceShell`, `CLIShell`, `EmulatorShell`, `TrayShell` (structural) | `ShellLoader` |
-| `EditorDriver` | `tusk/kernel/interfaces/editor_driver.py` | `InputAutomationEditorDriver` | `CodingRouter`, `StartCodingTool`, strategies |
-| `EditApplicationStrategy` | `tusk/kernel/interfaces/edit_application_strategy.py` | `FullReplaceEditStrategy` | `CodingRouter` |
 | `AgentBackend` | `tusk/kernel/agent/backends/agent_backend.py` | `TuskAgentBackend`, `CodexExecAgentBackend`, `CodexMcpAgentBackend`, `FallbackAgentBackend` | `CommandMode` |
 | `LLMProvider` | `tusk/shared/llm/interfaces/llm_provider.py` | `GroqLLM`, `OpenRouterLLM`, `LLMProxy` (wrapper) | agent profiles, gatekeepers, `ModeGate` |
 | `LLMProviderFactory` | `tusk/shared/llm/interfaces/llm_provider_factory.py` | `ConfigurableLLMFactory` | `LLMRegistry` |
@@ -1021,7 +1019,7 @@ GNOME tools.
   authoritative in-memory `BufferModel`; it never writes files. Manual edits made by the
   user during a session are **not detected** and would drift the model; the full-replace
   strategy (re-pasting `EditOperation.full_buffer`) is the resync path. Feedback-capable
-  editor drivers (e.g. a future VS Code extension implementing `EditorDriver`) could
+  editor drivers (e.g. a future VS Code extension with the `EditorDriver` methods) could
   detect drift automatically.
 - The input-automation driver uses the system clipboard for `Ctrl+C`/`Ctrl+V`, so
   `ClipboardGuard` saves and restores the user's clipboard around every operation.

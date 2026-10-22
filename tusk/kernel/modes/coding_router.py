@@ -1,8 +1,8 @@
 from tusk.shared.schemas.edit_operation import EditOperation
 from tusk.shared.schemas.tools.tool_result import ToolResult
 from tusk.shared.schemas.kernel_response import KernelResponse
-from tusk.kernel.interfaces.edit_application_strategy import EditApplicationStrategy
-from tusk.kernel.interfaces.editor_driver import EditorDriver
+from tusk.kernel.modes.editor.edit_applier import EditApplier
+from tusk.kernel.modes.editor.editor_driver import EditorDriver
 from tusk.kernel.modes.mode_state import ModeState
 from tusk.kernel.tools.tool_registry import ToolRegistry
 from tusk.shared.logging.interfaces.log_printer import LogPrinter
@@ -11,10 +11,10 @@ __all__ = ["CodingRouter"]
 
 
 class CodingRouter:
-    def __init__(self, tool_registry: ToolRegistry, driver: EditorDriver, strategy: EditApplicationStrategy, log_printer: LogPrinter) -> None:
+    def __init__(self, tool_registry: ToolRegistry, driver: EditorDriver, applier: EditApplier, log_printer: LogPrinter) -> None:
         self._registry = tool_registry
         self._driver = driver
-        self._strategy = strategy
+        self._applier = applier
         self._log = log_printer
 
     def process(self, state: ModeState, text: str) -> KernelResponse:
@@ -42,7 +42,7 @@ class CodingRouter:
 
     def _apply_all(self, operations: list[dict]) -> None:
         for operation in operations:
-            self._strategy.apply(self._to_operation(operation), self._driver)
+            self._applier.apply(self._to_operation(operation), self._driver)
 
     def _to_operation(self, data: dict) -> EditOperation:
         return EditOperation(data["kind"], data["target_start"], data["target_end"], data.get("new_text", ""), data.get("full_buffer", ""))
