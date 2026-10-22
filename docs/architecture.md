@@ -269,14 +269,13 @@ tusk/                        (repo root)
 │   │   │   ├── backends/    # AgentBackend ABC; tusk / codex_exec / codex_mcp / fallback backends
 │   │   │   │   ├── codex_exec/ # One-shot `codex exec --json` backend (CommandBuilder, ResultParser)
 │   │   │   │   └── codex_mcp/ # Persistent codex mcp-server session backend (Client, CallBuilder, ResultMapper)
-│   │   │   ├── guards/      # Turn guards (delegation, failure budget, clipboard, typing)
+│   │   │   ├── guards/      # Turn guards (delegation, clipboard, typing, repeated calls)
 │   │   │   ├── planner/     # Planner output validation, sequence promotion, runtime tool resolution
 │   │   │   ├── runtime/     # Message history builder, result factory, step recorder, guard composition
-│   │   │   ├── session/     # Store ABC, FileStore event log, event formatter
 │   │   │   └── tool_sequence/ # Compiled sequences: PlanValidator, Executor, Recorder
 │   │   ├── modes/           # Dictation/coding machinery: ModeSlot, AdapterMode, ModeGate, routers,
 │   │   │                    #   states, gate prompts, InputAutomationEditorDriver, FullReplaceEditStrategy
-│   │   └── tools/           # ToolRegistry, RegisteredTool, ToolRuntime, RepeatedToolCallGuard,
+│   │   └── tools/           # ToolRegistry, RegisteredTool, ToolRuntime,
 │   │                        #   kernel tools: start_dictation, start_coding, switch_model
 │   ├── shared/              # Contracts + cross-layer plumbing; depends on nothing else
 │   │   ├── config/          # Config (frozen), ConfigFactory (env), StartupOptions (CLI)
@@ -348,7 +347,6 @@ source files; this table is the index:
 | `EditorDriver` | `tusk/kernel/interfaces/editor_driver.py` | `InputAutomationEditorDriver` | `CodingRouter`, `StartCodingTool`, strategies |
 | `EditApplicationStrategy` | `tusk/kernel/interfaces/edit_application_strategy.py` | `FullReplaceEditStrategy` | `CodingRouter` |
 | `AgentBackend` | `tusk/kernel/agent/backends/agent_backend.py` | `TuskAgentBackend`, `CodexExecAgentBackend`, `CodexMcpAgentBackend`, `FallbackAgentBackend` | `CommandMode` |
-| `Store` (sessions) | `tusk/kernel/agent/session/store.py` | `FileStore` | `AgentRuntime`, `AgentOrchestrator`, recorders |
 | `LLMProvider` | `tusk/shared/llm/interfaces/llm_provider.py` | `GroqLLM`, `OpenRouterLLM`, `LLMProxy` (wrapper) | agent profiles, gatekeepers, `ModeGate` |
 | `LLMProviderFactory` | `tusk/shared/llm/interfaces/llm_provider_factory.py` | `ConfigurableLLMFactory` | `LLMRegistry` |
 | `LogPrinter` | `tusk/shared/logging/interfaces/log_printer.py` | `ColorLogPrinter` | everything |
@@ -558,7 +556,7 @@ tools are for shortcuts only; call `done` immediately after the final successful
 
 Shared across all profiles. Each run:
 
-1. `runtime.Transcript` loads prior messages from the session `Store`.
+1. `runtime.Transcript` loads prior messages from the `SessionStore`.
 2. Appends the user instruction to messages and the session event log (`runtime.Transcript`).
 3. Loops up to `profile.max_steps`:
    - If the `InterruptToken` is set → returns `AgentResult(status="cancelled")` immediately.
@@ -571,9 +569,9 @@ Shared across all profiles. Each run:
 4. Returns `AgentResult` with `session_id`, `status`, `reply_text()`.
 
 **`runtime.TurnGuards` composes** (`tusk/kernel/agent/guards/`):
-- `ConversationRunAgentGuard` — blocks the conversation profile from delegating again
-  after an executor/default child already returned `done` (planner `done` is intermediate).
-- `ConversationFailureBudgetGuard` — blocks delegation after two failed children in one turn.
+- `ConversationDelegationGuard` — blocks the conversation profile from delegating again
+  after an executor/default child already returned `done` (planner `done` is intermediate),
+  or after two failed children in one turn.
 - `ExecutorClipboardGuard` — blocks repeated `write_clipboard` calls without progress
   toward focus/paste in between.
 
@@ -584,7 +582,7 @@ depth, self-delegation, executor without runtime tools) before a run.
 
 `SlidingWindowHistory` (max 20 messages) is maintained by `MainAgent` after each turn.
 It is **not** used as LLM context — `AgentRuntime` reads per-session messages from the
-session `Store`. On overflow the oldest half is compacted locally (no LLM call) into a
+`SessionStore`. On overflow the oldest half is compacted locally (no LLM call) into a
 `"Previous context summary: ..."` message: the last 6 evicted messages truncated to 120
 chars, joined with `" | "`. The gatekeeper's follow-up prompt reads recent user commands
 from this history.
@@ -880,7 +878,7 @@ main()
       → ToolRegistry()
       → SlidingWindowHistory(20)
       → MainAgent(AgentOrchestrator(build_agent_profiles(llm_registry),
-                                    tool_registry, FileStore(session_log_dir), log, token),
+                                    tool_registry, SessionStore(session_log_dir), log, token),
                   history)
       → KernelAPI(CommandMode(AgentBackendFactory(agent, config, log).create(), log, confirmation),
                   llm_registry, log, reporter, token)     # owns dictation/coding ModeSlots

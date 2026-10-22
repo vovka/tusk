@@ -3,7 +3,7 @@ from tusk.shared.schemas.tools.tool_result import ToolResult
 from tusk.kernel.agent.agent_profile import AgentProfile
 from tusk.kernel.agent.agent_result import AgentResult
 from tusk.kernel.agent.agent_run_request import AgentRunRequest
-from tusk.kernel.agent.session.store import Store
+from tusk.kernel.agent.session_store import SessionStore
 
 __all__ = ["Delegation"]
 
@@ -12,7 +12,7 @@ Lineage = tuple[tuple[str, str, str], ...]
 
 
 class Delegation:
-    def __init__(self, session_store: Store) -> None:
+    def __init__(self, session_store: SessionStore) -> None:
         self._store = session_store
 
     def request(self, tool_call: ToolCall, parent_session_id: str) -> AgentRunRequest:

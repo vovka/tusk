@@ -1,11 +1,11 @@
-from tusk.kernel.agent.session.store import Store
+from tusk.kernel.agent.session_store import SessionStore
 from tusk.shared.schemas.tools.tool_result import ToolResult
 
 __all__ = ["Recorder"]
 
 
 class Recorder:
-    def __init__(self, session_store: Store) -> None:
+    def __init__(self, session_store: SessionStore) -> None:
         self._store = session_store
 
     def started(self, session_id: str, goal: str) -> None:

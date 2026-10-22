@@ -1,11 +1,11 @@
 from tusk.kernel.agent.agent_result import AgentResult
-from tusk.kernel.agent.session.store import Store
+from tusk.kernel.agent.session_store import SessionStore
 
 __all__ = ["ResultFactory"]
 
 
 class ResultFactory:
-    def __init__(self, session_store: Store) -> None:
+    def __init__(self, session_store: SessionStore) -> None:
         self._store = session_store
 
     def from_parameters(self, session_id: str, parameters: dict[str, object]) -> AgentResult:

@@ -1,12 +1,12 @@
 import tempfile
 
 from tusk.kernel.agent.agent_run_request import AgentRunRequest
-from tusk.kernel.agent.session.file_store import FileStore
+from tusk.kernel.agent.session_store import SessionStore
 from tusk.kernel.agent.planner.runtime_tool_resolver import RuntimeToolResolver
 
 
 def test_resolver_recovers_sequence_mode_and_plan_from_session_ref() -> None:
-    store = FileStore(tempfile.mkdtemp(prefix="tusk-sequence-"))
+    store = SessionStore(tempfile.mkdtemp(prefix="tusk-sequence-"))
     session_id = store.create_session_id()
     store.start_session(session_id, "planner", "", "", {})
     store.append_event(session_id, "session_finished", _result(session_id))

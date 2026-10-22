@@ -83,7 +83,7 @@ There is **no kernel-side coding LLM slot**: the coding adapter owns its own mod
 | `GATE_RECOVERY_CANDIDATE_LIMIT` | `int` | `6` | Max recovery candidates per gate call |
 | `TUSK_SHELLS` | `list[str]` | `["voice"]` | Comma-separated: `voice`, `cli`, `tray`, `emulator`. The loader always moves `tray` last (it owns the blocking GUI loop) |
 | `TUSK_ADAPTER_ENV_CACHE_DIR` | `str` | `".tusk_runtime/adapters"` | Managed adapter venv cache |
-| `TUSK_AGENT_SESSION_LOG_DIR` | `str` | `".tusk_runtime/agent_sessions"` | `FileStore` session event logs |
+| `TUSK_AGENT_SESSION_LOG_DIR` | `str` | `".tusk_runtime/agent_sessions"` | `SessionStore` session event logs |
 | `TUSK_TRAY_ICON_THEME` | `str` | `"light"` | `light`, `dark` |
 | `TUSK_TRAY_SHOW_LAST_ACTIVITY` | `bool` | `false` | Opt-in: last command/reply line in the tray menu (the transcript may contain sensitive speech) |
 | `AGENT_BACKEND` | `str` | `"tusk"` | `tusk`, `codex_exec`, `codex_mcp` (§8) |
@@ -404,7 +404,7 @@ Use done to finish with the final result.
 
 ### 9.3 History Management
 
-`AgentRuntime` loads prior messages from the session `Store` on each turn (§12).
+`AgentRuntime` loads prior messages from the `SessionStore` on each turn (§12).
 Separately, `MainAgent` appends command + reply to `SlidingWindowHistory(20)` — local
 cross-turn context only, not passed to the LLM runtime. On overflow the history evicts
 the older half and inserts one summary message (`Previous context summary: …`, built
@@ -529,8 +529,7 @@ Shared by all profiles.
 4. The step loop runs until `done`, a guard violation, interrupt, or max steps
 5. `ResultFactory.persist` writes `session_finished` + the assistant reply to the store
 
-The store is the `Store` ABC (`agent/session/store.py`); the wired implementation is
-`FileStore` (`agent/session/file_store.py`), one JSONL event file per session under
+The store is `SessionStore` (`agent/session_store.py`), one JSONL event file per session under
 `TUSK_AGENT_SESSION_LOG_DIR`.
 
 ### 12.2 Step Loop
@@ -568,19 +567,17 @@ Max steps exhausted → `AgentResult(status="failed", "max steps reached")`.
 
 ## 13. Agent Guard Specification
 
-**Sources:** `tusk/kernel/agent/guards/`, `tusk/kernel/agent/runtime/turn_guards.py`,
-`tusk/kernel/tools/repeated_tool_call_guard.py`
+**Sources:** `tusk/kernel/agent/guards/`, `tusk/kernel/agent/runtime/turn_guards.py`
 
 | Guard | Scope | Rule |
 |---|---|---|
 | `AgentRunGuard` | orchestrator, pre-run | Unknown profile → `failed`; delegation depth ≥ 4 → `failed`; a profile already present in the lineage → `failed` ("recursive delegation detected") |
 | `ExecutorToolGuard` | orchestrator, pre-run | Executor with no runtime tools → `need_tools` |
-| `ConversationRunAgentGuard` | per step | After an `executor`/`default` child returns `status=done`, another `run_agent` from `conversation` is a violation |
-| `ConversationFailureBudgetGuard` | per step | After 2 `executor`/`default` child results with status `failed`/`need_tools`, further delegation is a violation |
+| `ConversationDelegationGuard` | per step | After an `executor`/`default` child returns `status=done`, or after 2 such children end `failed`/`need_tools`, another `run_agent` from `conversation` is a violation |
 | `ExecutorClipboardGuard` | per step | After a successful clipboard write/copy: writing different text, or copying again before a paste, is a violation; a paste (`<ctrl>v` variants, `shift+insert`) resets the state |
 | `RepeatedToolCallGuard` | per step | 3 consecutive identical calls → run fails |
 
-`TurnGuards` composes the three per-step guards; violations end the run with
+`TurnGuards` composes the two per-step guards; violations end the run with
 `AgentResult(status="failed", <message>)`.
 
 ---

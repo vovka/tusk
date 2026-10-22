@@ -1,6 +1,6 @@
 from tusk.kernel import CommandMode, KernelAPI, MainAgent, SlidingWindowHistory, ToolRegistry
 from tusk.kernel.core.adapter_manager import AdapterManager
-from tusk.kernel.agent import AgentOrchestrator, FileStore
+from tusk.kernel.agent import AgentOrchestrator, SessionStore
 from tusk.kernel.agent.confirmation import ConfirmationGate
 from tusk.kernel.agent.backends import AgentBackendFactory
 from tusk.kernel.core.agent_profiles import build_agent_profiles
@@ -32,7 +32,7 @@ def build_api(agent: MainAgent, config: Config, log: ColorLogPrinter, llm_regist
 
 
 def build_agent(config: Config, log: ColorLogPrinter, llm_registry: LLMRegistry, tool_registry: ToolRegistry, history: SlidingWindowHistory, token: InterruptToken | None = None, tracer: Tracer | None = None, *, confirmation: ConfirmationGate) -> MainAgent:
-    store = FileStore(config.agent_session_log_dir)
+    store = SessionStore(config.agent_session_log_dir)
     profiles = build_agent_profiles(llm_registry)
     return MainAgent(AgentOrchestrator(profiles, tool_registry, store, log, token, tracer, confirmation=confirmation), history, store)
 

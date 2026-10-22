@@ -2,7 +2,7 @@ import tempfile
 
 from tests.kernel_api_support import make_registry_tool
 from tusk.kernel.agent.confirmation.confirmation_gate import ConfirmationGate
-from tusk.kernel.agent.session.file_store import FileStore
+from tusk.kernel.agent.session_store import SessionStore
 from tusk.kernel.agent.tool_sequence.executor import Executor
 from tusk.kernel.tools.tool_registry import ToolRegistry
 from tusk.shared.schemas.tools.tool_result import ToolResult
@@ -28,7 +28,7 @@ def test_sequence_executor_aborts_on_failed_step() -> None:
 
 
 def _executor(registry: ToolRegistry) -> Executor:
-    store = FileStore(tempfile.mkdtemp(prefix="tusk-sequence-exec-"))
+    store = SessionStore(tempfile.mkdtemp(prefix="tusk-sequence-exec-"))
     return Executor(registry, store, confirmation=ConfirmationGate(registry))
 
 
@@ -64,7 +64,7 @@ def test_sequence_executor_cancels_between_steps() -> None:
 
 
 def _cancellable_executor(registry: ToolRegistry, token: object) -> Executor:
-    store = FileStore(tempfile.mkdtemp(prefix="tusk-sequence-exec-"))
+    store = SessionStore(tempfile.mkdtemp(prefix="tusk-sequence-exec-"))
     return Executor(registry, store, token, confirmation=ConfirmationGate(registry))
 
 
@@ -92,7 +92,7 @@ def _settle_registry() -> ToolRegistry:
 
 
 def _settling_executor(registry: ToolRegistry, sleeps: list[float]) -> Executor:
-    store = FileStore(tempfile.mkdtemp(prefix="tusk-sequence-exec-"))
+    store = SessionStore(tempfile.mkdtemp(prefix="tusk-sequence-exec-"))
     return Executor(registry, store, sleep=sleeps.append, confirmation=ConfirmationGate(registry))
 
 

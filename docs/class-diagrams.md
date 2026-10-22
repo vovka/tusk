@@ -186,17 +186,9 @@ classDiagram
     result(profile_id: str, agent_result: AgentResult) ToolResult
     started(parent_session_id: str, child: AgentRunRequest) None
   }
-  class ConversationFailureBudgetGuard {
+  class ConversationDelegationGuard {
     observe(tool_call: ToolCall, tool_result: ToolResult) None
     violation(profile_id: str, tool_call: ToolCall) str | None
-  }
-  class ConversationRunAgentGuard {
-    observe(tool_call: ToolCall, tool_result: ToolResult) None
-    violation(profile_id: str, tool_call: ToolCall) str | None
-  }
-  class EventFormatter {
-    digest(events: list[dict[str, object]]) str
-    result(events: list[dict[str, object]]) AgentResult | None
   }
   class Executor {
     execute(session_id: str, parameters: dict[str, object], allowed: set[str]) ToolResult
@@ -206,7 +198,7 @@ classDiagram
     observe(tool_call: ToolCall, tool_result: ToolResult) None
     violation(profile_id: str, tool_call: ToolCall) str | None
   }
-  class FileStore {
+  class SessionStore {
     append_event(session_id: str, event_type: str, data: dict[str, object]) None
     conversation_messages(session_id: str) list[dict[str, str]]
     create_session_id() str
@@ -251,20 +243,10 @@ classDiagram
     requested(session_id: str, step: int, tool_call: ToolCall) None
     result(session_id: str, step: int, tool_call: ToolCall, tool_result: ToolResult) None
   }
-  class Store {
-    append_event(session_id: str, event_type: str, data: dict[str, object])* None
-    conversation_messages(session_id: str)* list[dict[str, str]]
-    create_session_id()* str
-    final_result(session_id: str)* AgentResult | None
-    has_session(session_id: str)* bool
-    session_digest(session_id: str)* str
-    start_session(session_id: str, profile_id: str, parent_session_id: str, parent_call_id: str, metadata: dict[str, object])* None
-  }
   class TurnGuards {
     observe(tool_call: ToolCall, tool_result: ToolResult) None
     violation(profile_id: str, tool_call: ToolCall) str | None
   }
-  FileStore --|> Store
 ```
 
 ## Kernel — agent backends

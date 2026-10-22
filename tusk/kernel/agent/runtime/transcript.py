@@ -1,7 +1,7 @@
 import json
 
 from tusk.kernel.agent.agent_run_request import AgentRunRequest
-from tusk.kernel.agent.session.store import Store
+from tusk.kernel.agent.session_store import SessionStore
 from tusk.kernel.tools.tool_registry import ToolRegistry
 from tusk.shared.schemas.tools.tool_call import ToolCall
 from tusk.shared.schemas.tools.tool_result import ToolResult
@@ -10,7 +10,7 @@ __all__ = ["Transcript"]
 
 
 class Transcript:
-    def __init__(self, session_store: Store, tool_registry: ToolRegistry) -> None:
+    def __init__(self, session_store: SessionStore, tool_registry: ToolRegistry) -> None:
         self._store = session_store
         self._registry = tool_registry
 

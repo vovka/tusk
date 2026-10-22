@@ -1,14 +1,14 @@
 from dataclasses import replace
 
 from tusk.kernel.agent.agent_run_request import AgentRunRequest
-from tusk.kernel.agent.session.store import Store
+from tusk.kernel.agent.session_store import SessionStore
 from tusk.shared.schemas.tools.tool_sequence_plan import ToolSequencePlan
 
 __all__ = ["RuntimeToolResolver"]
 
 
 class RuntimeToolResolver:
-    def __init__(self, session_store: Store) -> None:
+    def __init__(self, session_store: SessionStore) -> None:
         self._store = session_store
 
     def resolve(self, request: AgentRunRequest, real_names: set[str]) -> AgentRunRequest:
