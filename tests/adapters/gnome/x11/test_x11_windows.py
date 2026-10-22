@@ -1,7 +1,7 @@
 import subprocess
 
-import adapters.gnome.x11.windows as x11_windows_module
-from adapters.gnome.x11.windows import X11Windows
+import adapters.gnome.x11.x11_windows as x11_windows_module
+from adapters.gnome.x11.x11_windows import X11Windows
 
 _OUTPUTS = {
     "wmctrl": "0x0420000a  0 gedit.Gedit  box Untitled Document 1 - gedit\n0x01e00004  0 N/A  box Desktop\n",

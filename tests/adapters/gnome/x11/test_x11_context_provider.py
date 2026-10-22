@@ -1,6 +1,6 @@
 import subprocess
 
-from adapters.gnome.x11.context_provider import X11ContextProvider
+from adapters.gnome.x11.x11_context_provider import X11ContextProvider
 
 WMCTRL_LINE = "0x02e00004 -1 10 20 800 600 VovkaLaptop Системний монітор"
 

@@ -1,4 +1,4 @@
-from adapters.gnome.x11.input_simulator import X11InputSimulator
+from adapters.gnome.x11.x11_input_simulator import X11InputSimulator
 from adapters.gnome.tools.launched_window_guard import LaunchedWindowGuard
 
 __all__ = ["InputTools"]

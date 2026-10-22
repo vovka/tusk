@@ -9,10 +9,10 @@ from adapters.gnome.wayland.shell_bus import ShellBus
 from adapters.gnome.wayland.wayland_context_provider import WaylandContextProvider
 from adapters.gnome.wayland.wayland_input_simulator import WaylandInputSimulator
 from adapters.gnome.wayland.wayland_window_tools import WaylandWindowTools
-from adapters.gnome.x11.context_provider import X11ContextProvider
-from adapters.gnome.x11.input_simulator import X11InputSimulator
+from adapters.gnome.x11.x11_context_provider import X11ContextProvider
+from adapters.gnome.x11.x11_input_simulator import X11InputSimulator
 from adapters.gnome.x11.window_tools import WindowTools
-from adapters.gnome.x11.windows import X11Windows
+from adapters.gnome.x11.x11_windows import X11Windows
 from tusk.shared.mcp.mcp_stdio_server import MCPStdioServer
 
 __all__ = ["build_router", "build_server"]

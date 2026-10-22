@@ -1,19 +1,19 @@
 import types
 from unittest.mock import patch
 
-from adapters.gnome.x11.input_simulator import X11InputSimulator
+from adapters.gnome.x11.x11_input_simulator import X11InputSimulator
 
 
 def test_press_keys_normalizes_angle_bracket_shortcuts() -> None:
     command: list[str] = []
-    with patch("adapters.gnome.x11.input_simulator.subprocess.run", side_effect=_capture(command)):
+    with patch("adapters.gnome.x11.x11_input_simulator.subprocess.run", side_effect=_capture(command)):
         X11InputSimulator().press_keys("<Ctrl>c")
     assert command[-1] == "ctrl+c"
 
 
 def test_type_text_raises_on_failure() -> None:
     result = types.SimpleNamespace(returncode=1, stderr="XGetInputFocus returned the focused window of 1")
-    with patch("adapters.gnome.x11.input_simulator.subprocess.run", return_value=result):
+    with patch("adapters.gnome.x11.x11_input_simulator.subprocess.run", return_value=result):
         try:
             X11InputSimulator().type_text("hello")
         except RuntimeError as exc:
@@ -28,7 +28,7 @@ def test_type_text_presses_return_for_newlines() -> None:
     """GTK4 apps drop synthetic Return events embedded in a fast `xdotool type`
     stream (the poem arrived as one line); newlines must be explicit key presses."""
     commands: list[list[str]] = []
-    with patch("adapters.gnome.x11.input_simulator.subprocess.run", side_effect=_capture_all(commands)):
+    with patch("adapters.gnome.x11.x11_input_simulator.subprocess.run", side_effect=_capture_all(commands)):
         X11InputSimulator().type_text("one\n\ntwo\n")
     assert [command[-1] for command in commands] == ["one", "Return", "Return", "two", "Return"]
     assert commands[0][:2] == ["xdotool", "type"]
@@ -37,7 +37,7 @@ def test_type_text_presses_return_for_newlines() -> None:
 
 def test_replace_text_sends_backspaces_then_types_text() -> None:
     commands: list[list[str]] = []
-    with patch("adapters.gnome.x11.input_simulator.subprocess.run", side_effect=_capture_all(commands)):
+    with patch("adapters.gnome.x11.x11_input_simulator.subprocess.run", side_effect=_capture_all(commands)):
         X11InputSimulator().replace_text(3, "hi")
     assert commands == [
         ["xdotool", "key", "--delay", "0", "--repeat", "3", "BackSpace"],
@@ -47,14 +47,14 @@ def test_replace_text_sends_backspaces_then_types_text() -> None:
 
 def test_replace_text_skips_backspace_for_zero_chars() -> None:
     commands: list[list[str]] = []
-    with patch("adapters.gnome.x11.input_simulator.subprocess.run", side_effect=_capture_all(commands)):
+    with patch("adapters.gnome.x11.x11_input_simulator.subprocess.run", side_effect=_capture_all(commands)):
         X11InputSimulator().replace_text(0, "hi")
     assert commands == [["xdotool", "type", "--delay", "0", "--", "hi"]]
 
 
 def test_replace_text_presses_return_for_newlines() -> None:
     commands: list[list[str]] = []
-    with patch("adapters.gnome.x11.input_simulator.subprocess.run", side_effect=_capture_all(commands)):
+    with patch("adapters.gnome.x11.x11_input_simulator.subprocess.run", side_effect=_capture_all(commands)):
         X11InputSimulator().replace_text(0, "x\ny")
     assert [command[1] for command in commands] == ["type", "key", "type"]
     assert [command[-1] for command in commands] == ["x", "Return", "y"]
@@ -62,7 +62,7 @@ def test_replace_text_presses_return_for_newlines() -> None:
 
 def test_replace_text_raises_when_backspace_fails() -> None:
     result = types.SimpleNamespace(returncode=1, stderr="boom")
-    with patch("adapters.gnome.x11.input_simulator.subprocess.run", return_value=result):
+    with patch("adapters.gnome.x11.x11_input_simulator.subprocess.run", return_value=result):
         try:
             X11InputSimulator().replace_text(2, "hi")
         except RuntimeError as exc:
@@ -89,7 +89,7 @@ def test_mouse_scroll_raises_on_failure() -> None:
 
 def _assert_mouse_raises(action: object, name: str) -> None:
     result = types.SimpleNamespace(returncode=1, stderr="no display")
-    with patch("adapters.gnome.x11.input_simulator.subprocess.run", return_value=result):
+    with patch("adapters.gnome.x11.x11_input_simulator.subprocess.run", return_value=result):
         try:
             action(X11InputSimulator())
         except RuntimeError as exc:

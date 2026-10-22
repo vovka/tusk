@@ -68,7 +68,7 @@ def test_build_router_selects_wayland_backend(monkeypatch: object) -> None:
 
 def test_build_router_keeps_x11_backend(monkeypatch: object) -> None:
     from adapters.gnome.server import build_router
-    from adapters.gnome.x11.windows import X11Windows
+    from adapters.gnome.x11.x11_windows import X11Windows
     monkeypatch.setenv("XDG_SESSION_TYPE", "x11")
     monkeypatch.delenv("WAYLAND_DISPLAY", raising=False)
     router = build_router()
