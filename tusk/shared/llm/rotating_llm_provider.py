@@ -1,14 +1,19 @@
+from collections.abc import Callable
+from typing import TypeVar
+
 from tusk.shared.interfaces.llm_provider import LLMProvider
 from tusk.shared.llm.llm_payload_logger import LLMPayloadLogger
 from tusk.shared.schemas.tools.tool_call import ToolCall
 
 __all__ = ["RotatingLLMProvider"]
 
+T = TypeVar("T")
+
 
 class RotatingLLMProvider(LLMProvider):
     """Spreads requests round-robin over models that each have their own rate limit; a 429 moves to the next one."""
 
-    def __init__(self, providers: list[LLMProvider], on_failover: object | None = None) -> None:
+    def __init__(self, providers: list[LLMProvider], on_failover: Callable[[Exception, str], None] | None = None) -> None:
         self._providers = providers
         self._next = 0
         self._on_failover = on_failover
@@ -33,7 +38,7 @@ class RotatingLLMProvider(LLMProvider):
         for provider in self._providers:
             provider.set_payload_logger(logger)
 
-    def _rotate(self, operation: object) -> object:
+    def _rotate(self, operation: Callable[[LLMProvider], T]) -> T:
         # all models rate-limited: the last 429 propagates so the proxy's retry runner sleeps once
         for _ in range(len(self._providers) - 1):
             try:

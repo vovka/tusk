@@ -1082,6 +1082,9 @@ Interrupt:   a set InterruptToken abandons pending retries immediately
 
 ### 21.3 GroqLLM — `tusk/providers/llm/groq_llm.py`
 
+Subclass of `ChatCompletionsLLM` (`tusk/providers/llm/chat_completions_llm.py`), which owns the
+shared chat.completions body; Groq adds the client, `verify()` and the response-format hook.
+
 - **Client:** `groq.Groq(api_key, timeout=30.0)`; `max_tokens` 1024 for
   messages/tool calls, 256 default for `complete`
 - **complete_tool_call:** `tool_choice="required"`; on error, first
@@ -1095,6 +1098,8 @@ Interrupt:   a set InterruptToken abandons pending retries immediately
 - **label:** `groq/<model>`
 
 ### 21.4 OpenRouterLLM — `tusk/providers/llm/open_router_llm.py`
+
+Subclass of `ChatCompletionsLLM` adding only the client (no response-format hook).
 
 - **Client:** `openai.OpenAI(base_url="https://openrouter.ai/api/v1", timeout=15.0)`
   with headers `HTTP-Referer: https://github.com/vovka/tusk`, `X-Title: TUSK`

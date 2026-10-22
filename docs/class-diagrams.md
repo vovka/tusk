@@ -397,7 +397,7 @@ classDiagram
     swap(slot_name: str, provider_name: str, model: str) str
   }
   class LLMRetryRunner {
-    run(operation: object, on_retry: object | None) str
+    run(operation: Callable[[], T], on_retry: RetryListener | None) T
   }
   class LogPrinter {
     clear_wait()* None
@@ -586,10 +586,7 @@ classDiagram
 
 ```mermaid
 classDiagram
-  class ConfigurableLLMFactory {
-    create(provider_name: str, model: str) LLMProvider
-  }
-  class GroqLLM {
+  class ChatCompletionsLLM {
     label : str
     complete(system_prompt: str, user_message: str, max_tokens: int) str
     complete_messages(system_prompt: str, messages: list[dict]) str
@@ -597,6 +594,13 @@ classDiagram
     complete_tool_call(system_prompt: str, messages: list[dict], tools: list[dict[str, object]]) ToolCall
     set_payload_logger(logger: LLMPayloadLogger) None
   }
+  class ConfigurableLLMFactory {
+    create(provider_name: str, model: str) LLMProvider
+  }
+  class GroqLLM {
+    verify() None
+  }
+  ChatCompletionsLLM <|-- GroqLLM
   class GroqSTT {
     transcribe(audio_frames: bytes, sample_rate: int) Utterance
   }
@@ -604,13 +608,8 @@ classDiagram
     synthesize(text: str) bytes
   }
   class OpenRouterLLM {
-    label : str
-    complete(system_prompt: str, user_message: str, max_tokens: int) str
-    complete_messages(system_prompt: str, messages: list[dict]) str
-    complete_structured(system_prompt: str, user_message: str, schema_name: str, schema: dict, max_tokens: int) str
-    complete_tool_call(system_prompt: str, messages: list[dict], tools: list[dict[str, object]]) ToolCall
-    set_payload_logger(logger: LLMPayloadLogger) None
   }
+  ChatCompletionsLLM <|-- OpenRouterLLM
   class STTEngineFactory {
     create(name: str) STTEngine
   }

@@ -49,7 +49,7 @@ class AdapterManager:
             self._log.log("PIPELINE", "watchdog not installed; adapter hot-plug disabled")
             return
         self._observer = Observer()
-        self._observer.schedule(AdapterWatcher(self), str(self.adapters_dir), recursive=False)
+        self._observer.schedule(AdapterWatcher(self.start_adapter), str(self.adapters_dir), recursive=False)
         self._observer.daemon = True
         self._observer.start()
 

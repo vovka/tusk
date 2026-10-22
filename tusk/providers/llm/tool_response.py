@@ -4,6 +4,8 @@ from tusk.shared.schemas.tools.tool_call import ToolCall
 
 __all__ = ["message_content", "needs_tool_fallback", "tool_or_done"]
 
+# responses stay `object`: groq and openai each ship their own ChatCompletion class and both SDKs are optional installs
+
 
 def message_content(response: object) -> str:
     choice = response.choices[0]

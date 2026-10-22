@@ -1,4 +1,8 @@
 import time
+from collections.abc import Callable
+from typing import TypeVar
+
+from tusk.shared.interrupt_token import InterruptToken
 
 __all__ = ["LLMRetryRunner"]
 
@@ -20,15 +24,17 @@ _RETRY_TERMS = (
 )
 _BLOCKED_TERMS = ("invalid_request_error", "tool_use_failed")
 _BLOCKED_STATUS_CODES = frozenset({400, 401, 403, 404, 422})
+T = TypeVar("T")
+RetryListener = Callable[[Exception, int, float], None]
 
 
 class LLMRetryRunner:
-    def __init__(self, attempts: int = 3, sleeper: object | None = None, interrupt_token: object | None = None) -> None:
+    def __init__(self, attempts: int = 3, sleeper: Callable[[float], None] | None = None, interrupt_token: InterruptToken | None = None) -> None:
         self._attempts = attempts
         self._sleep = sleeper or time.sleep
         self._token = interrupt_token
 
-    def run(self, operation: object, on_retry: object | None = None) -> str:
+    def run(self, operation: Callable[[], T], on_retry: RetryListener | None = None) -> T:
         last_error = None
         for attempt in range(1, self._attempts + 1):
             try:
@@ -65,14 +71,14 @@ class LLMRetryRunner:
             code = getattr(getattr(exc, "response", None), "status_code", None)
         return code if isinstance(code, int) else None
 
-    def _handle_retry(self, exc: Exception, attempt: int, on_retry: object | None) -> None:
+    def _handle_retry(self, exc: Exception, attempt: int, on_retry: RetryListener | None) -> None:
         if not self._retry(exc, attempt):
             raise exc
         delay = self._delay(exc, attempt)
         self._notify(on_retry, exc, attempt, delay)
         self._sleep(delay)
 
-    def _notify(self, on_retry: object | None, exc: Exception, attempt: int, delay: float) -> None:
+    def _notify(self, on_retry: RetryListener | None, exc: Exception, attempt: int, delay: float) -> None:
         if on_retry:
             on_retry(exc, attempt, delay)
 

@@ -292,7 +292,7 @@ tusk/                        (repo root)
 │   │   ├── fuzzy_name_matcher.py  # FuzzyNameMatcher
 │   │   └── interrupt_token.py     # InterruptToken
 │   └── providers/           # Swappable implementations behind shared ABCs
-│       ├── llm/             # GroqLLM, OpenRouterLLM, ConfigurableLLMFactory
+│       ├── llm/             # ChatCompletionsLLM base, GroqLLM, OpenRouterLLM, ConfigurableLLMFactory
 │       ├── stt/             # GroqSTT, WhisperSTT, STTEngineFactory
 │       └── tts/             # GroqTTS + text chunking / WAV concatenation
 ├── shells/
@@ -786,6 +786,8 @@ while an interrupt is pending.
 
 ### Providers — `tusk/providers/llm/`
 
+- **`ChatCompletionsLLM`** — shared chat.completions body (payloads, tool-call fallback chain, payload
+  logging); `GroqLLM` and `OpenRouterLLM` subclass it with their client and response-format hook.
 - **`GroqLLM`** — `groq.Groq` client, 30 s timeout. Structured output via
   `response_format json_schema` for strict-schema models (`openai/gpt-oss-20b/120b`),
   `json_object` otherwise. Tool calling: `tool_choice="required"` first, retrying with

@@ -2,6 +2,7 @@ import queue
 import subprocess
 import threading
 from collections import deque
+from collections.abc import Callable
 
 __all__ = ["MCPStdioTransport"]
 
@@ -44,7 +45,7 @@ class MCPStdioTransport:
         self._process.terminate()
         self._wait_or_kill()
 
-    def _spawn(self, target: object) -> threading.Thread:
+    def _spawn(self, target: Callable[[], None]) -> threading.Thread:
         thread = threading.Thread(target=target, daemon=True)
         thread.start()
         return thread

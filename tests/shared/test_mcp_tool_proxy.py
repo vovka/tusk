@@ -1,6 +1,7 @@
 import types
 
 from tusk.shared.mcp import MCPToolProxy
+from tusk.shared.schemas.tools.mcp_tool_schema import MCPToolSchema
 
 
 def test_mcp_tool_proxy_converts_adapter_exception_to_failure() -> None:
@@ -22,12 +23,8 @@ def test_flags_come_from_constructor() -> None:
     assert proxy.sequence_callable is True
 
 
-def _schema(name: str = "close_window") -> object:
-    return types.SimpleNamespace(
-        name=name,
-        description="close",
-        input_schema={"type": "object", "properties": {"window_title": {"type": "string"}}},
-    )
+def _schema(name: str = "close_window") -> MCPToolSchema:
+    return MCPToolSchema(name, "close", {"type": "object", "properties": {"window_title": {"type": "string"}}})
 
 
 def _client() -> object:
