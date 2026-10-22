@@ -230,7 +230,8 @@ classDiagram
     dispatch(tool_call: ToolCall, run_agent: Callable[[ToolCall], ToolResult], session_id: str, allowed_tool_names: set[str] | None, sequence_plan: ToolSequencePlan | None) ToolResult
   }
   class PlanValidator {
-    validate(plan_data: object, allowed: set[str]) str | None
+    validate_sequence(plan: ToolSequencePlan, allowed_tool_names: set[str]) str | None
+    validate_steps(plan: ToolSequencePlan) str | None
   }
   class Recorder {
     finished(session_id: str, status: str, summary: str) None
@@ -245,20 +246,13 @@ classDiagram
     persist(session_id: str, result: AgentResult, reply: str) AgentResult
   }
   class ResultValidator {
-    validate(profile_id: str, result: AgentResult, allowed: object) AgentResult
+    validate(profile_id: str, result: AgentResult, registry: ToolRegistry) AgentResult
   }
   class RuntimeToolResolver {
     resolve(request: AgentRunRequest, real_names: set[str]) AgentRunRequest
   }
-  class SequencePromoter {
-    materialize(result: AgentResult) AgentResult
-    promote(result: AgentResult) AgentResult
-  }
   class SimpleSchemaValidator {
     validate(schema: dict[str, object], value: object) str | None
-  }
-  class StepPlanValidator {
-    validate(plan_data: object) str | None
   }
   class StepRecorder {
     append_message(session_id: str, role: str, content: str) None

@@ -5,7 +5,7 @@ from tusk.shared.schemas.tools.tool_sequence_plan import ToolSequencePlan
 __all__ = ["PlanValidator"]
 
 _FORBIDDEN_TOOLS = {"done", "execute_tool_sequence", "list_available_tools", "run_agent"}
-_MAX_SEQUENCE_STEPS = 8
+_MAX_STEPS = 8
 
 
 class PlanValidator:
@@ -13,40 +13,41 @@ class PlanValidator:
         self._registry = registry
         self._schemas = SimpleSchemaValidator()
 
-    def validate(self, plan_data: object, allowed: set[str]) -> str | None:
-        plan = ToolSequencePlan.from_dict(plan_data)
-        if plan is None:
-            return "invalid sequence_plan"
-        return self._steps(plan) or self._tools(plan, allowed) or self._args(plan)
+    def validate_steps(self, plan: ToolSequencePlan) -> str | None:
+        return self._steps(plan) or self._tools(plan) or self._args(plan)
+
+    def validate_sequence(self, plan: ToolSequencePlan, allowed_tool_names: set[str]) -> str | None:
+        return self.validate_steps(plan) or self._sequence_tools(plan, allowed_tool_names)
 
     def _steps(self, plan: ToolSequencePlan) -> str | None:
         ids = [step.step_id for step in plan.steps]
         if not ids:
-            return "sequence_plan requires at least one step"
-        if len(plan.steps) > _MAX_SEQUENCE_STEPS:
-            return f"sequence_plan exceeds max steps ({_MAX_SEQUENCE_STEPS})"
+            return "planned_steps requires at least one step"
+        if len(plan.steps) > _MAX_STEPS:
+            return f"planned_steps exceeds max steps ({_MAX_STEPS})"
         if any(not step.tool_name or not step.step_id for step in plan.steps):
-            return "sequence_plan step ids and tool_name values must be non-empty"
-        return None if len(ids) == len(set(ids)) else "sequence_plan contains duplicate step ids"
+            return "planned_steps step ids and tool_name values must be non-empty"
+        return None if len(ids) == len(set(ids)) else "planned_steps contains duplicate step ids"
 
-    def _tools(self, plan: ToolSequencePlan, allowed: set[str]) -> str | None:
+    def _tools(self, plan: ToolSequencePlan) -> str | None:
         for step in plan.steps:
-            message = self._tool(step.tool_name)
-            if message is not None:
-                return f"{step.step_id}: {message}"
-        return None if plan.tool_names() == allowed else "sequence_plan tool set must match selected_tool_names"
-
-    def _tool(self, name: str) -> str | None:
-        if name in _FORBIDDEN_TOOLS:
-            return "synthetic tools are not allowed in sequence_plan"
-        if name not in self._registry.tool_names():
-            return f"unknown tool: {name}"
-        tool = self._registry.get(name)
-        return None if tool.sequence_callable else f"tool is not sequence_callable: {name}"
+            if step.tool_name in _FORBIDDEN_TOOLS:
+                return f"{step.step_id}: synthetic tools are not allowed in planned_steps"
+            if step.tool_name not in self._registry.tool_names():
+                return f"{step.step_id}: unknown tool: {step.tool_name}"
+        return None
 
     def _args(self, plan: ToolSequencePlan) -> str | None:
         for step in plan.steps:
             message = self._schemas.validate(self._registry.get(step.tool_name).input_schema, step.args)
             if message is not None:
                 return f"{step.step_id}: {message}"
+        return None
+
+    def _sequence_tools(self, plan: ToolSequencePlan, allowed_tool_names: set[str]) -> str | None:
+        for step in plan.steps:
+            if not self._registry.get(step.tool_name).sequence_callable:
+                return f"{step.step_id}: tool is not sequence_callable: {step.tool_name}"
+        if plan.tool_names() != allowed_tool_names:
+            return "sequence_plan tool set must match selected_tool_names"
         return None

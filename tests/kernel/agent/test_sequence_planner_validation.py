@@ -82,3 +82,32 @@ def _step(step_id: str) -> dict[str, object]:
 
 def _logger(logs: list[tuple[str, str]]) -> object:
     return types.SimpleNamespace(log=lambda tag, message, group=None: logs.append((tag, message)))
+
+
+def test_planner_rejects_unparseable_planned_steps() -> None:
+    registry = ToolRegistry()
+    registry.register(make_registry_tool("gnome.type_text", "type", sequence_callable=True))
+    result = _validated(_payload(["gnome.type_text"], "normal", {"steps": "nope"}), registry)
+    assert result.status == "failed"
+    assert result.summary == "invalid planned_steps"
+
+
+def test_planner_keeps_normal_mode_when_tool_is_not_sequence_callable() -> None:
+    registry = ToolRegistry()
+    registry.register(make_registry_tool("gnome.type_text", "type"))
+    logs: list[tuple[str, str]] = []
+    result = _validated(_payload(["gnome.type_text"], "normal", _plan([_step("s1")])), registry, log=_logger(logs))
+    assert result.status == "done"
+    assert result.payload["execution_mode"] == "normal"
+    assert "sequence_plan" not in result.payload
+    assert logs == []
+
+
+def test_planner_materializes_sequence_plan_in_sequence_mode() -> None:
+    registry = ToolRegistry()
+    registry.register(make_registry_tool("gnome.type_text", "type", sequence_callable=True))
+    logs: list[tuple[str, str]] = []
+    result = _validated(_payload(["gnome.type_text"], "sequence", _plan([_step("s1")])), registry, log=_logger(logs))
+    assert result.status == "done"
+    assert result.payload["sequence_plan"] == _plan([_step("s1")])
+    assert logs == []

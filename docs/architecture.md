@@ -613,12 +613,12 @@ The executor can run a compiled deterministic plan through a single synthetic to
 short desktop workflows.
 
 Validation pipeline:
-1. `planner.StepPlanValidator` — validates `planned_steps` structure at planner output:
-   step schema, args against tool input schemas, no forbidden synthetic tools.
-2. `planner.SequencePromoter` — promotes `execution_mode=normal` to `sequence` when all
-   steps are linear and every tool is `sequence_callable` (logged under `SEQPROMOTE`).
-3. `planner.ResultValidator` — orchestrates both and derives `sequence_plan`.
-4. `tool_sequence.PlanValidator` — re-checks immediately before execution:
+1. `tool_sequence.PlanValidator.validate_steps` — validates `planned_steps` structure at
+   planner output: step schema, args against tool input schemas, no forbidden synthetic tools.
+2. `planner.ResultValidator` — parses the plan once, runs `validate_steps`, then promotes
+   `execution_mode=normal` to `sequence` when `validate_sequence` passes (logged under
+   `SEQPROMOTE`) and derives `sequence_plan`.
+3. `tool_sequence.PlanValidator.validate_sequence` — re-checks immediately before execution:
    `sequence_callable`, forbidden tools, max 8 steps.
 
 Forbidden in sequence plans: `done`, `run_agent`, `list_available_tools`,

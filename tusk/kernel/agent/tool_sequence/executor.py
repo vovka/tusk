@@ -29,7 +29,7 @@ class Executor:
     def execute_plan(self, session_id: str, plan: ToolSequencePlan | None, allowed: set[str]) -> ToolResult:
         if plan is None:
             return self._invalid(session_id, "execute_tool_sequence requires a resolved sequence_plan")
-        message = self._validator.validate(plan.to_dict(), allowed)
+        message = self._validator.validate_sequence(plan, allowed)
         return self._invalid(session_id, message) if message is not None else self._run(session_id, plan)
 
     def _invalid(self, session_id: str, message: str) -> ToolResult:
