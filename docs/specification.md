@@ -1187,7 +1187,7 @@ the `switch_model` tool after a swap.
 
 `AppMode`: `DEFAULT`, `DICTATION`. There is no coding mode value; a coding session does
 not change the reported mode. Icons resolve to
-`shells/tray/icons/{theme}/{name}.png` (`StatusIconResolver`, theme from
+`shells/tray/icons/{theme}/{name}.png` (`TrayStatusSink.icon_path`, theme from
 `TUSK_TRAY_ICON_THEME`). Tooltip: `TUSK — {status}`, or `TUSK — error: {detail}`.
 `idle` is deliberately not a distinct status — always-listening collapses idle into
 `LISTENING` to avoid icon flicker between utterances.
@@ -1208,7 +1208,7 @@ not change the reported mode. Icons resolve to
 
 ### 23.4 Menu
 
-Built by `TrayMenuBuilder` from a `StatusSnapshot` + injected `TrayMenuActions`:
+Built by `TrayStatusSink` from a `StatusSnapshot` + injected action callables:
 
 | Item | Enabled | Action |
 |---|---|---|

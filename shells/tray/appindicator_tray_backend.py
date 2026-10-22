@@ -1,3 +1,5 @@
+from collections.abc import Callable
+
 from shells.tray.interfaces.tray_backend import TrayBackend
 from shells.tray.tray_menu_item import TrayMenuItem
 
@@ -39,13 +41,13 @@ class AppIndicatorTrayBackend(TrayBackend):
         if self._running:
             self._icon.update_menu()
 
-    def _convert(self, item: TrayMenuItem) -> object:
+    def _convert(self, item: TrayMenuItem) -> "pystray.MenuItem":
         if item.children:
             submenu = pystray.Menu(*[self._convert(child) for child in item.children])
             return pystray.MenuItem(item.label, submenu)
         return pystray.MenuItem(item.label, self._callback(item.action), enabled=item.enabled)
 
-    def _callback(self, action: object) -> object:
+    def _callback(self, action: Callable[[], None] | None) -> Callable[[object, object], None] | None:
         if action is None:
             return None
         return lambda icon, menu_item: action()

@@ -306,7 +306,7 @@ tusk/                        (repo root)
 │   │   └── speech/          # ChunkedSpeaker, SpeechPlayback, ConfirmationReply
 │   ├── cli/                 # CLIShell — stdin REPL
 │   ├── emulator/            # EmulatorShell — replays a scripted transcript as kernel input
-│   └── tray/                # TrayShell, TrayBackend ABC, AppIndicator backend, status sink, menu builder, icons
+│   └── tray/                # TrayShell, TrayBackend ABC, AppIndicator backend, status sink, icons
 ├── adapters/                # Out-of-process MCP servers, discovered from adapter.json manifests
 │   ├── gnome/               # Desktop control: windows, input, mouse, clipboard, context (tools/ subpackage)
 │   ├── dictation/           # Dictation sessions + segment processing
@@ -739,8 +739,8 @@ selected by name from `TUSK_SHELLS` (default `voice`). There are no shell manife
 - **`EmulatorShell`** — replays a scripted transcript into the kernel, standing in for
   voice input (used by demos).
 - **`TrayShell`** — optional status-and-control indicator. Registers a `TrayStatusSink`
-  into the `StatusReporter`, renders the icon from `AppStatus` (`StatusIconResolver`),
-  and builds the menu (`TrayMenuBuilder`) wired to injected actions — pause/resume call the
+  into the `StatusReporter`; the sink renders the icon from `AppStatus` and builds the
+  menu wired to injected action callables — pause/resume call the
   `VoiceShell` reference injected by the loader; open logs; restart; exit via a shutdown
   event. It holds no business logic and the kernel never imports it. The `TrayBackend`
   ABC isolates the tray library (v1: `pystray`/AppIndicator) so other platforms are new
@@ -936,7 +936,7 @@ LLM slot proxies for agents carry the `InterruptToken`; gatekeeper/utility do no
    exceptions so a broken UI can never propagate into audio or kernel threads.
 
 8. **`AppStatus` is the single source of truth for the tray icon** — the icon is a pure
-   function of it (`StatusIconResolver`); modes surface via `AppMode.set_mode` without
+   function of it (`TrayStatusSink.icon_path`); modes surface via `AppMode.set_mode` without
    tray changes.
 
 ---

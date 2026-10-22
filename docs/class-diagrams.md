@@ -705,9 +705,6 @@ classDiagram
   class SpeechStopGate {
     should_stop(text: str, speaking: str) bool
   }
-  class StatusIconResolver {
-    resolve(status: AppStatus) str
-  }
   class StopGatekeeper {
     process(utterance: BufferedUtterance, recent: list[Utterance], candidates: list[BufferedUtterance]) GateDispatch
   }
@@ -735,16 +732,6 @@ classDiagram
     set_tooltip(text: str)* None
     stop()* None
   }
-  class TrayMenuActions {
-    exit : Callable[[], None]
-    open_logs : Callable[[], None]
-    pause : Callable[[], None]
-    restart : Callable[[], None]
-    resume : Callable[[], None]
-  }
-  class TrayMenuBuilder {
-    build(snapshot: StatusSnapshot, actions: TrayMenuActions, show_last_activity: bool) tuple[TrayMenuItem, ...]
-  }
   class TrayMenuItem {
     action : Callable[[], None] | None
     children : tuple['TrayMenuItem', ...]
@@ -752,10 +739,11 @@ classDiagram
     label : str
   }
   class TrayShell {
-    start(submit: object) None
+    start(submit: Callable[[str], KernelResponse]) None
     stop() None
   }
   class TrayStatusSink {
+    icon_path(status: AppStatus) str
     publish(snapshot: StatusSnapshot) None
   }
   class UtteranceDetector {

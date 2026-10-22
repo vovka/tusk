@@ -1,12 +1,16 @@
 import os
 import subprocess
 import sys
+import threading
+from collections.abc import Callable
 
 from shells.tray.appindicator_tray_backend import AppIndicatorTrayBackend
-from shells.tray.status_icon_resolver import StatusIconResolver
-from shells.tray.tray_menu_actions import TrayMenuActions
-from shells.tray.tray_menu_builder import TrayMenuBuilder
+from shells.tray.interfaces.tray_backend import TrayBackend
 from shells.tray.tray_status_sink import TrayStatusSink
+from shells.voice.voice_shell import VoiceShell
+from tusk.shared.config.config import Config
+from tusk.shared.observability.status_reporter import StatusReporter
+from tusk.shared.schemas.kernel_response import KernelResponse
 
 __all__ = ["TrayShell"]
 
@@ -14,11 +18,11 @@ __all__ = ["TrayShell"]
 class TrayShell:
     def __init__(
         self,
-        reporter: object,
-        pipeline_control: object,
-        shutdown_event: object,
-        config: object,
-        backend: object | None = None,
+        reporter: StatusReporter,
+        pipeline_control: VoiceShell,
+        shutdown_event: threading.Event,
+        config: Config,
+        backend: TrayBackend | None = None,
     ) -> None:
         self._reporter = reporter
         self._control = pipeline_control
@@ -26,11 +30,12 @@ class TrayShell:
         self._config = config
         self._backend = backend
 
-    def start(self, submit: object) -> None:
+    def start(self, submit: Callable[[str], KernelResponse]) -> None:
         backend = self._resolve_backend()
         if backend is not None:
-            self._attach(backend)
-            self._prime_icon(backend)
+            sink = self._sink(backend)
+            self._reporter.attach_sink(sink)
+            self._prime_icon(backend, sink)
             self._run_backend(backend)
         self._shutdown_event.wait()
 
@@ -39,33 +44,31 @@ class TrayShell:
         if self._backend is not None:
             self._backend.stop()
 
-    def _resolve_backend(self) -> object | None:
+    def _resolve_backend(self) -> TrayBackend | None:
         if self._backend is None:
             self._backend = self._build_backend()
         return self._backend
 
-    def _build_backend(self) -> object | None:
+    def _build_backend(self) -> TrayBackend | None:
         try:
             return AppIndicatorTrayBackend()
         except (ImportError, RuntimeError):
             return None
 
-    def _attach(self, backend: object) -> None:
-        sink = TrayStatusSink(
-            backend, self._resolver(), TrayMenuBuilder(), self._actions(),
-            self._config.tray_show_last_activity, self._marshal,
+    def _sink(self, backend: TrayBackend) -> TrayStatusSink:
+        return TrayStatusSink(
+            backend, self._control.pause, self._control.resume, self._open_logs, self._restart, self.stop,
+            theme=self._config.tray_icon_theme,
+            show_last_activity=self._config.tray_show_last_activity,
+            marshal=self._marshal,
         )
-        self._reporter.attach_sink(sink)
 
-    def _resolver(self) -> StatusIconResolver:
-        return StatusIconResolver(self._config.tray_icon_theme)
-
-    def _prime_icon(self, backend: object) -> None:
-        icon = self._resolver().resolve(self._reporter.status)
+    def _prime_icon(self, backend: TrayBackend, sink: TrayStatusSink) -> None:
+        icon = sink.icon_path(self._reporter.status)
         if icon:
             backend.set_icon(icon)
 
-    def _marshal(self, render: object) -> None:
+    def _marshal(self, render: Callable[[], None]) -> None:
         try:
             from gi.repository import GLib
         except (ImportError, ValueError):
@@ -73,7 +76,7 @@ class TrayShell:
             return
         GLib.idle_add(lambda: self._safe_render(render))
 
-    def _safe_render(self, render: object) -> bool:
+    def _safe_render(self, render: Callable[[], None]) -> bool:
         try:
             render()
         except Exception as exc:
@@ -84,14 +87,11 @@ class TrayShell:
         if hasattr(self._config, "log"):
             self._config.log("TRAY", f"tray render failed: {exc}", "tray")
 
-    def _run_backend(self, backend: object) -> None:
+    def _run_backend(self, backend: TrayBackend) -> None:
         try:
             backend.run()
         except Exception:  # a GUI-loop crash must degrade to headless, not kill daemons
             backend.stop()
-
-    def _actions(self) -> TrayMenuActions:
-        return TrayMenuActions(self._control.pause, self._control.resume, self._open_logs, self._restart, self.stop)
 
     def _open_logs(self) -> None:
         if sys.platform == "win32":
