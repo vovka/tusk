@@ -35,8 +35,6 @@ classDiagram
     start_adapter(adapter_dir: str) None
     start_all() None
     start_watcher() None
-    stop_adapter(name: str) None
-    stop_all() None
   }
   class AdapterMode {
     state : object
@@ -59,11 +57,6 @@ classDiagram
   }
   class CommandMode {
     process_command(command: str) KernelResponse
-  }
-  class ConversationHistory {
-    append(message: ChatMessage)* None
-    clear()* None
-    get_messages()* list[ChatMessage]
   }
   class DictationRouter {
     process(state: object, text: str) KernelResponse
@@ -135,7 +128,6 @@ classDiagram
   }
   FullReplaceEditStrategy --|> EditApplicationStrategy
   InputAutomationEditorDriver --|> EditorDriver
-  SlidingWindowHistory --|> ConversationHistory
 ```
 
 ## Kernel — agent
@@ -337,7 +329,6 @@ classDiagram
   }
   class CodexExecAgentBackend {
     name : str
-    supports_streaming : bool
     run(request: AgentRequest) AgentResult
   }
   class CodexExecCommandBuilder {
@@ -345,7 +336,6 @@ classDiagram
   }
   class CodexMcpAgentBackend {
     name : str
-    supports_streaming : bool
     run(request: AgentRequest) AgentResult
   }
   class CodexPromptBuilder {
@@ -356,7 +346,6 @@ classDiagram
   }
   class FallbackAgentBackend {
     name : str
-    supports_streaming : bool
     run(request: AgentRequest) AgentResult
   }
   class ResponseReader {
@@ -368,7 +357,6 @@ classDiagram
   }
   class TuskAgentBackend {
     name : str
-    supports_streaming : bool
     run(request: AgentRequest) AgentResult
   }
   CodexExecAgentBackend --|> AgentBackend
@@ -481,7 +469,6 @@ classDiagram
   }
   class MCPClient {
     call_tool(name: str, arguments: dict) MCPToolResult
-    connect_http(url: str)* None
     connect_stdio(command: list[str], cwd: str, env: dict | None) None
     is_running() bool
     list_tools() list[MCPToolSchema]
@@ -520,13 +507,6 @@ classDiagram
   }
   class StatusReporter {
     status : AppStatus
-    set_mic_device(device: str)* None
-    set_mode(mode: AppMode)* None
-    set_models(models: tuple[tuple[str, str], ...])* None
-    set_status(status: AppStatus, detail: str)* None
-  }
-  class StatusReporterHub {
-    status : AppStatus
     attach_sink(sink: StatusSink) None
     set_mic_device(device: str) None
     set_mode(mode: AppMode) None
@@ -545,7 +525,6 @@ classDiagram
   LLMProxy --|> LLMProvider
   ColorLogPrinter --|> LogPrinter
   NullStatusSink --|> StatusSink
-  StatusReporterHub --|> StatusReporter
 ```
 
 ## Shared — schemas
@@ -570,7 +549,6 @@ classDiagram
   }
   class ChatMessage {
     content : str
-    is_summary : bool
     role : str
     to_dict() dict[str, str]
   }
@@ -883,7 +861,6 @@ classDiagram
 classDiagram
   class AppCatalog {
     list_apps() list[AppEntry]
-    list_dicts() list[dict]
     search(query: str, limit: int) list[AppEntry]
   }
   class ApplicationTools {
@@ -909,13 +886,6 @@ classDiagram
     get_desktop_context(arguments: dict) dict
     list_windows(arguments: dict) dict
   }
-  class DictationEdit {
-    operation : str
-    replace_chars : int
-    text : str
-  }
-  class DictationRefiner {
-    refine(text: str) str
   }
   class DictationServer {
     serve() None
@@ -935,7 +905,6 @@ classDiagram
   }
   class GnomeContextProvider {
     get_context() DesktopContext
-    get_context_dict() dict
   }
   class GnomeInputSimulator {
     mouse_click(x: int, y: int, button: int, clicks: int) None

@@ -612,12 +612,11 @@ class RegisteredTool:
 
 | Method | Description |
 |---|---|
-| `register(tool)` / `unregister_source(source)` | Add one tool / drop all tools of a source (adapter unload) |
+| `register(tool)` | Add one tool (reads `source`/`planner_visible`/`sequence_callable`/`settle_ms` off the object) |
 | `get(name)` | Raises `KeyError` if missing |
-| `all_tools()` | Insertion order |
-| `real_tools()` / `real_tool_names()` | Alphabetically sorted / name set |
-| `planner_tools()` / `planner_tool_names()` | `planner_visible=True` subset |
-| `sequence_tools()` / `sequence_tool_names()` | `sequence_callable=True` subset |
+| `planner_tools()` | `planner_visible=True` subset |
+| `resolve_name(name)` | Full name, or the unique `*.name` suffix match (models drop the adapter prefix) |
+| `all_tools()` / `tool_names()` | Alphabetically sorted / name set |
 | `definitions_for(names)` | Native tool defs for a named subset, sorted; unknown names skipped |
 
 Native definition format (consumed by `LLMProvider.complete_tool_call`):
@@ -633,7 +632,6 @@ Native definition format (consumed by `LLMProvider.complete_tool_call`):
 | Tool name | Handling |
 |---|---|
 | `run_agent` | Delegation via `AgentChildRunner` → recursive orchestrator run; the child result comes back as `ToolResult(data={"child_result": {...}})`, success iff child `status=="done"` |
-| `list_available_tools` | `AgentToolCatalog.list_tools()` (kept dispatchable; in no profile's toolset) |
 | `execute_tool_sequence` | `tool_sequence.Executor.execute_plan(session_id, request.sequence_plan, allowed)` |
 | anything else | Registry lookup (unknown → `ToolResult(False, "unknown tool: …")`), argument validation via `SimpleSchemaValidator` (invalid → failure), then `tool.execute(parameters)` |
 
@@ -729,8 +727,8 @@ dictation slot active → dictation.process_text(text)
 otherwise            → command_mode.process_command(text)
 ```
 
-`SubmitStatusReporter` wraps the route call: `REACTING` (with the text as detail) on
-entry, prior status restored when the last concurrent submit finishes.
+`KernelAPI._reported_route` wraps the route call in `try/finally`: `REACTING` (with the
+text as detail) on entry, prior status restored on exit.
 
 ### 16.2 ModeSlot and AdapterMode
 
@@ -795,7 +793,7 @@ everything to interrupt-or-drop while TUSK's own speech is playing (§30.4).
 1. `ToolRegistry.get("dictation.start_dictation").execute({})`; `KeyError` →
    `ToolResult(False, "dictation adapter is not available")`
 2. Build `DictationState("dictation", data["session_id"], adapter_manager.primary_desktop_source())`
-3. `controller.start_dictation(state)` (→ `ModeSlot.start`, reply "Dictation started.")
+3. `ModeSlot.start(state)` (reply "Dictation started.")
 
 ### 17.2 DictationRouter — `tusk/kernel/modes/dictation_router.py`
 
@@ -807,7 +805,7 @@ everything to interrupt-or-drop while TUSK's own speech is playing (§30.4).
    `"replace"` → `replace_recent_text` with `{"text", "replace_chars": str(n)}`;
    anything else → no-op
 
-**stop(state):** `{adapter}.stop_dictation`, then `controller.stop_dictation()`
+**stop(state):** `{adapter}.stop_dictation`, then `ModeSlot.stop()`
 (clears the slot, restores the command gatekeeper) → "Dictation stopped.".
 
 ### 17.3 DictationServer — `adapters/dictation/server.py`
@@ -824,10 +822,6 @@ MCP stdio server (`MCPStdioServer`); sessions in `DictationSessionStore` with
 **Segment logic:** segments are inserted verbatim (STT output only). A space is
 prepended unless it's the session's first segment, the text is empty, or it starts
 with one of `,.!?:;)]}`. Unknown `session_id` → error ("not found or expired").
-
-> `DictationRefiner` (`adapters/dictation/dictation_refiner.py`) exists but is not
-> wired: small LLMs interpreted instruction-like phrases ("tell me a joke") as commands
-> rather than literal text. LLM proofreading will return once a reliable approach exists.
 
 Stop detection happens at the voice-pipeline level via `ModeGate` + `StopGatekeeper`
 (§16.3–16.4) — a stop segment never reaches `KernelAPI`.
@@ -866,7 +860,6 @@ Shipped adapters: `gnome` (provides context; all window/keyboard/mouse/clipboard
   retry with a **managed venv**: if the adapter has `requirements.txt`, create/reuse
   `<cache_dir>/<name>/<version>` (`python -m venv` + `pip install -r` once), prepend
   its `bin` to `PATH`, set `VIRTUAL_ENV`
-- `stop_adapter(name)`: client shutdown + `unregister_source(name)`
 - `start_watcher()`: a `watchdog` observer on `adapters/` — a newly created directory
   hot-plugs via `start_adapter`. Without `watchdog` installed, hot-plug is disabled
   (logged)
@@ -915,7 +908,7 @@ or writes files on disk — only the focused editor buffer via input automation.
 3. `coding.start_coding_session` with `{"initial_buffer": buffer}`; `KeyError` →
    `ToolResult(False, "coding adapter is not available")`
 4. `CodingState("coding", session_id, primary_desktop_source)` →
-   `controller.start_coding(state)` (reply "Coding started.")
+   `ModeSlot.start(state)` (reply "Coding started.")
 
 ### 19.2 CodingRouter — `tusk/kernel/modes/coding_router.py`
 
@@ -925,7 +918,7 @@ each entry of `data.operations` is converted to a typed
 `strategy.apply(op, driver)`. Apply-time errors (`RuntimeError`, `KeyError`,
 `TypeError`, `AttributeError`) → `KernelResponse(False, "I couldn't apply that edit.")`.
 
-**stop(state):** `coding.stop_coding_session`, then `controller.stop_coding()` →
+**stop(state):** `coding.stop_coding_session`, then `ModeSlot.stop()` →
 "Coding stopped.".
 
 ### 19.3 CodingServer — `adapters/coding/server.py`
@@ -1161,22 +1154,22 @@ swallowed.
 
 ### 23.1 Status Propagation
 
-Producers depend only on the `StatusReporter` ABC and never know a tray exists:
+Producers depend only on `StatusReporter` and never know a tray exists:
 
 ```
 producer → StatusReporter.set_status/set_mode/set_models/set_mic_device
-         → StatusReporterHub  (dedupes unchanged values, builds StatusSnapshot)
+           (dedupes unchanged values, builds StatusSnapshot)
          → StatusSink.publish(snapshot)
               → NullStatusSink  (no-op; wired when no tray is loaded)
               → TrayStatusSink  (marshals onto the GUI thread, updates icon/tooltip/menu)
 ```
 
-`StatusReporterHub._emit` catches every sink exception (a broken sink never reaches a
+`StatusReporter._emit` catches every sink exception (a broken sink never reaches a
 producer). `attach_sink` (called when the tray starts) immediately re-emits the current
 snapshot.
 
 Emit points: the voice pipeline (`LISTENING` idle / `REACTING` around forwards),
-`SubmitStatusReporter` around every `KernelAPI.submit`, `ModeSlot`
+`KernelAPI._reported_route` around every `submit`, `ModeSlot`
 `start`/`stop` (`set_mode`), `main.py` `set_models` at startup, and
 the `switch_model` tool after a swap.
 
@@ -1323,7 +1316,7 @@ apps start on the host desktop rather than inside the container.
 | `FallbackAgentBackend` | primary `status="failed"` | fallback runs; primary failure attached as metadata |
 | `CodexExecAgentBackend` | missing binary / timeout / non-zero exit / bad JSON | `failed` / `timeout` / `failed` (stderr excerpt) / `failed` |
 | `LLMRetryRunner` | retryable / non-retryable | up to 3 attempts with linear backoff / re-raised immediately |
-| `StatusReporterHub` | sink raises | caught and logged; never reaches the producer |
+| `StatusReporter` | sink raises | caught and logged; never reaches the producer |
 | `TrayShell` | backend import fails / GUI loop crashes | headless no-op; daemon shells keep running; process exits on the shutdown callback |
 
 ---
@@ -1375,7 +1368,7 @@ The active runtime no longer contains:
 - `find_tools` / `describe_tool` / `run_tool` broker tools, described-tool tracking,
   learned top-tool injection, and persistent tool-usage ranking
 - Automatic desktop-context injection into agent prompts
-- `list_available_tools` in any profile's toolset (still dispatchable; replaced by the
+- `list_available_tools` tool (replaced by the
   catalog text injected into the planner instruction)
 - `tusk/kernel/tool_call_parser.py` — deleted; tool calls are native
   (`complete_tool_call`) with `ToolUseFailedRecovery` as the salvage path

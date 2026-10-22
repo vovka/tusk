@@ -6,7 +6,7 @@ LLM planner, which returns the complete rewritten buffer; the kernel pastes it i
 focused editor via select-all + clipboard automation.
 
 ## Key Files & Structure
-- `tusk/kernel/start_coding_tool.py` — agent-visible `start_coding` tool; reads the editor buffer, opens an adapter session. Idempotent: no-ops (`ToolResult(True, "Already in pair-coding mode.")`) if `KernelAPI.coding_active` is already true, so executor retries can't orphan adapter sessions.
+- `tusk/kernel/start_coding_tool.py` — agent-visible `start_coding` tool; reads the editor buffer, opens an adapter session. Idempotent: no-ops (`ToolResult(True, "Already in pair-coding mode.")`) if `ModeSlot.active` is already true, so executor retries can't orphan adapter sessions.
 - `tusk/kernel/coding_mode.py` / `coding_router.py` — while active, `KernelAPI.submit` routes every utterance here. Successful edits reply with an empty string (silent — logged, not spoken); only failures ("I couldn't apply that edit.") are spoken.
 - `tusk/kernel/input_automation_editor_driver.py` — drives the editor via `<desktop>.press_keys` / clipboard tools (`ClipboardGuard` saves/restores clipboard)
 - `tusk/kernel/full_replace_edit_strategy.py` — select-all + paste `full_buffer` (a `line_anchored_edit_strategy.py` exists but is not wired in `ToolRuntime`)
@@ -43,7 +43,7 @@ focused editor via select-all + clipboard automation.
    `additionalProperties: false` on every schema object; the planner's schema lacked it
    (latent while the default model used loose `json_object` mode). Fixed by adding the
    key, matching the existing convention in `tusk/kernel/coding_gate.py`.
-4. **Orphaned adapter sessions from executor retries.** Fixed via `KernelAPI.coding_active`
+4. **Orphaned adapter sessions from executor retries.** Fixed via `ModeSlot.active`
    + an idempotent `StartCodingTool`.
 5. **TTS chatter on every edit.** Fixed — successful edits are now silent.
 
