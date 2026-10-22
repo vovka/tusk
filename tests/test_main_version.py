@@ -55,7 +55,7 @@ def _reporter() -> object:
 
 def _kernel() -> object:
     registry = type("Registry", (), {"model_labels": lambda self: ()})()
-    return type("Kernel", (), {"get_llm_registry": lambda self: registry})()
+    return type("Kernel", (), {"llm_registry": registry})()
 
 
 def _loader(started: list[bool]) -> object:

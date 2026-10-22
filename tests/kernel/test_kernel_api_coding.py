@@ -24,28 +24,28 @@ def test_request_coding_stop_calls_mode_stop() -> None:
     actions: list[str] = []
     api = KernelAPI(_command_mode(), types.SimpleNamespace())
     api._coding._mode = _coding_mode(actions)
-    assert api.request_coding_stop() == KernelResponse(True, "stopped")
+    assert api.coding.request_stop() == KernelResponse(True, "stopped")
     assert "stop" in actions
 
 
 def test_request_coding_stop_is_noop_when_not_coding() -> None:
     api = KernelAPI(_command_mode(), types.SimpleNamespace())
-    assert api.request_coding_stop() == KernelResponse(False, "")
+    assert api.coding.request_stop() == KernelResponse(False, "")
 
 
 def test_coding_active_reflects_mode_state() -> None:
     api = KernelAPI(_command_mode(), types.SimpleNamespace())
-    assert api.coding_active is False
+    assert api.coding.active is False
     api._coding._mode = _coding_mode([])
-    assert api.coding_active is True
+    assert api.coding.active is True
 
 
 def test_start_and_stop_coding_fire_callbacks() -> None:
     called: list[str] = []
     api = KernelAPI(_command_mode(), types.SimpleNamespace())
-    api.set_coding_callbacks(on_start=lambda: called.append("start"), on_stop=lambda: called.append("stop"))
-    api.start_coding(types.SimpleNamespace())
-    api.stop_coding()
+    api.coding.set_callbacks(on_start=lambda: called.append("start"), on_stop=lambda: called.append("stop"))
+    api.coding.start(types.SimpleNamespace())
+    api.coding.stop()
     assert called == ["start", "stop"]
 
 

@@ -19,11 +19,13 @@ def _mode_kernel(requested: list[tuple]) -> types.SimpleNamespace:
         get_with_fallback=lambda name, fallback: requested.append(("fallback", name, fallback)) or object(),
     )
     return types.SimpleNamespace(
-        get_llm_registry=lambda: registry, interrupt_token=InterruptToken(), submit=lambda text: None,
-        dictation_gate=lambda: object(), coding_gate=lambda: object(),
-        set_dictation_callbacks=lambda on_start, on_stop: None, set_coding_callbacks=lambda on_start, on_stop: None,
-        request_dictation_stop=lambda: None, request_coding_stop=lambda: None,
+        llm_registry=registry, interrupt_token=InterruptToken(), submit=lambda text: None,
+        dictation=_mode_slot(), coding=_mode_slot(),
     )
+
+
+def _mode_slot() -> types.SimpleNamespace:
+    return types.SimpleNamespace(set_callbacks=lambda on_start, on_stop: None, request_stop=lambda: None)
 
 
 def _builder(config: types.SimpleNamespace, kernel: object | None = None) -> VoiceShellBuilder:
@@ -84,5 +86,5 @@ def test_gatekeeper_wiring_resolves_stop_gate_slot_with_fallback() -> None:
 
 def test_gatekeeper_tolerates_missing_registry() -> None:
     kernel = _mode_kernel([])
-    kernel.get_llm_registry = lambda: None
+    kernel.llm_registry = None
     _builder(_config(), kernel).gatekeeper(types.SimpleNamespace(is_busy=False, current_speech_text=None))

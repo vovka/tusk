@@ -75,7 +75,7 @@ def main() -> None:
     reporter = StatusReporterHub(NullStatusSink(), log)
     latency_meter = LatencyMeter(log, reporter)
     kernel = _build_kernel(config, log, options, reporter, InterruptToken(), tracer, latency_meter)
-    reporter.set_models(kernel.get_llm_registry().model_labels())
+    reporter.set_models(kernel.llm_registry.model_labels())
     ShellLoader(config, kernel, log, reporter, latency_meter.mark_speech_end).start()
 
 

@@ -1,8 +1,6 @@
 import threading
 import uuid
-from collections.abc import Callable
 
-from tusk.kernel.modes.mode_gate import ModeGate
 from tusk.kernel.modes.mode_slot import ModeSlot
 from tusk.shared.schemas.app_mode import MODE_BYPASS_KIND_PREFIX, AppMode
 from tusk.shared.schemas.app_status import AppStatus
@@ -33,16 +31,28 @@ class KernelAPI:
         self._reporter = reporter
         self._interrupt_token = interrupt_token
         self._submit_lock = threading.Lock()
-        self._dictation = dictation_slot or ModeSlot("DICTATION", "Dictation started.")
-        self._coding = coding_slot or ModeSlot("CODING", "Coding started.")
+        self._dictation = dictation_slot or ModeSlot(AppMode.DICTATION, "Dictation started.", log, reporter)
+        self._coding = coding_slot or ModeSlot(AppMode.CODING, "Coding started.", log, reporter)
 
     def request_interrupt(self) -> None:
         if self._interrupt_token is not None:
             self._interrupt_token.interrupt()
 
     @property
-    def interrupt_token(self) -> object | None:
+    def interrupt_token(self) -> InterruptToken | None:
         return self._interrupt_token
+
+    @property
+    def llm_registry(self) -> LLMRegistry | None:
+        return self._llm_registry
+
+    @property
+    def dictation(self) -> ModeSlot:
+        return self._dictation
+
+    @property
+    def coding(self) -> ModeSlot:
+        return self._coding
 
     def submit(self, text: str, kind: str = "conversation") -> KernelResponse:
         # ponytail: one global lock — commands are serial by design (single user voice stream)
@@ -75,53 +85,3 @@ class KernelAPI:
         if self._dictation.active and not kind.startswith(MODE_BYPASS_KIND_PREFIX):
             return self._dictation.process_text(text)
         return self._command_mode.process_command(text, kind.removeprefix(MODE_BYPASS_KIND_PREFIX))
-
-    def _report_mode(self, mode: AppMode) -> None:
-        if self._reporter is not None:
-            self._reporter.set_mode(mode)
-
-    def set_dictation_callbacks(self, on_start: Callable[[], None], on_stop: Callable[[], None]) -> None:
-        self._dictation.set_callbacks(on_start, on_stop)
-
-    def request_dictation_stop(self) -> KernelResponse:
-        return self._dictation.request_stop()
-
-    def attach_dictation_router(self, router: object) -> None:
-        self._dictation.attach_router(router)
-
-    def start_dictation(self, state: object) -> KernelResponse:
-        response = self._dictation.start(state, self._log)
-        self._report_mode(AppMode.DICTATION)
-        return response
-
-    def stop_dictation(self) -> None:
-        self._dictation.stop()
-        self._report_mode(AppMode.DEFAULT)
-
-    def set_coding_callbacks(self, on_start: Callable[[], None], on_stop: Callable[[], None]) -> None:
-        self._coding.set_callbacks(on_start, on_stop)
-
-    def request_coding_stop(self) -> KernelResponse:
-        return self._coding.request_stop()
-
-    def attach_coding_router(self, router: object) -> None:
-        self._coding.attach_router(router)
-
-    @property
-    def coding_active(self) -> bool:
-        return self._coding.active
-
-    def start_coding(self, state: object) -> KernelResponse:
-        return self._coding.start(state, self._log)
-
-    def stop_coding(self) -> None:
-        self._coding.stop()
-
-    def get_llm_registry(self) -> LLMRegistry | None:
-        return self._llm_registry
-
-    def dictation_gate(self) -> ModeGate:
-        return ModeGate.for_mode(self._llm_registry, "dictation", self._log)
-
-    def coding_gate(self) -> ModeGate:
-        return ModeGate.for_mode(self._llm_registry, "coding", self._log)

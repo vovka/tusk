@@ -99,20 +99,11 @@ classDiagram
     type_text(text: str) None
   }
   class KernelAPI {
-    coding_active : bool
-    interrupt_token : object | None
-    attach_coding_router(router: object) None
-    attach_dictation_router(router: object) None
-    get_llm_registry() LLMRegistry | None
-    request_coding_stop() KernelResponse
-    request_dictation_stop() KernelResponse
+    coding : ModeSlot
+    dictation : ModeSlot
+    interrupt_token : InterruptToken | None
+    llm_registry : LLMRegistry | None
     request_interrupt() None
-    set_coding_callbacks(on_start: Callable[[], None], on_stop: Callable[[], None]) None
-    set_dictation_callbacks(on_start: Callable[[], None], on_stop: Callable[[], None]) None
-    start_coding(state: object) KernelResponse
-    start_dictation(state: object) KernelResponse
-    stop_coding() None
-    stop_dictation() None
     submit(text: str) KernelResponse
   }
   class MainAgent {

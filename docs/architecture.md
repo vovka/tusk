@@ -177,8 +177,7 @@ sequenceDiagram
     EX->>ST: tool call start_dictation / start_coding
     ST->>A: start_* session (coding: driver.read_buffer() seeds the buffer)
     A-->>ST: session_id
-    ST->>K: start_dictation(state) / start_coding(state)
-    K->>MS: start(state) — builds AdapterMode
+    ST->>MS: kernel.dictation.start(state) / kernel.coding.start(state) — builds AdapterMode
     MS->>GS: on_start callback → swap(PlaybackGate(StopGatekeeper))
 
     loop each utterance while the mode is active
@@ -199,12 +198,10 @@ sequenceDiagram
             end
         else stop intent
             MG-->>SG: true
-            SG->>K: request_dictation_stop() / request_coding_stop()
-            K->>MS: request_stop → AdapterMode.stop()
+            SG->>MS: kernel.dictation.request_stop() / kernel.coding.request_stop() → AdapterMode.stop()
             MS->>R: router.stop(state)
             R->>A: stop_* session(session_id)
-            R->>K: stop_dictation() / stop_coding()
-            K->>MS: stop() → on_stop callback
+            R->>MS: slot.stop() → on_stop callback, reports AppMode.DEFAULT
             MS->>GS: swap back to LLMGatekeeper
             SG-->>GS: GateDispatch(DROP) — the stop phrase is never typed
         end

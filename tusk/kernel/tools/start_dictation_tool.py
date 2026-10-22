@@ -1,4 +1,5 @@
 from tusk.kernel.modes.dictation_state import DictationState
+from tusk.kernel.modes.mode_slot import ModeSlot
 from tusk.shared.schemas.tools.tool_result import ToolResult
 
 __all__ = ["StartDictationTool"]
@@ -10,9 +11,9 @@ class StartDictationTool:
     description = "Start adapter-driven dictation mode"
     input_schema = {"type": "object", "properties": {}}
 
-    def __init__(self, tool_registry: object, controller: object, adapter_manager: object) -> None:
+    def __init__(self, tool_registry: object, slot: ModeSlot, adapter_manager: object) -> None:
         self._registry = tool_registry
-        self._controller = controller
+        self._slot = slot
         self._manager = adapter_manager
 
     def execute(self, parameters: dict) -> ToolResult:
@@ -23,5 +24,5 @@ class StartDictationTool:
         if not result.success or result.data is None:
             return ToolResult(False, result.message)
         state = DictationState("dictation", result.data["session_id"], self._manager.primary_desktop_source())
-        response = self._controller.start_dictation(state)
+        response = self._slot.start(state)
         return ToolResult(response.handled, response.reply, result.data)

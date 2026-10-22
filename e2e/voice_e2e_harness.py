@@ -76,7 +76,7 @@ class VoiceE2EHarness:
         )
 
     def _gatekeeper(self) -> LLMGatekeeper:
-        gk_llm = self._kernel.get_llm_registry().get("gatekeeper")
+        gk_llm = self._kernel.llm_registry.get("gatekeeper")
         return LLMGatekeeper(
             gk_llm, self._log,
             is_busy=lambda: self.worker.is_busy,

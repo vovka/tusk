@@ -28,7 +28,7 @@ def test_main_publishes_initial_model_labels(monkeypatch) -> None:
 def _stub_main(monkeypatch, captured: dict) -> None:
     config = types.SimpleNamespace(shells=["cli"])
     registry = types.SimpleNamespace(model_labels=lambda: (("gatekeeper", "groq/llama"),))
-    kernel = types.SimpleNamespace(get_llm_registry=lambda: registry)
+    kernel = types.SimpleNamespace(llm_registry=registry)
     monkeypatch.setattr(main.StartupOptions, "from_sources", lambda argv=None: types.SimpleNamespace())
     monkeypatch.setattr(main.Config, "from_env", lambda: config)
     monkeypatch.setattr(main, "_build_log", lambda options: types.SimpleNamespace(log=lambda *a: None))

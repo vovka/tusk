@@ -16,8 +16,8 @@ def test_coding_router_is_wired_with_verified_line_anchored_strategy() -> None:
 def _wired_strategy() -> object:
     captured: dict[str, object] = {}
     controller = types.SimpleNamespace(
-        attach_dictation_router=lambda router: None,
-        attach_coding_router=lambda router: captured.__setitem__("router", router),
+        dictation=types.SimpleNamespace(attach_router=lambda router: None),
+        coding=types.SimpleNamespace(attach_router=lambda router: captured.__setitem__("router", router)),
     )
     runtime = ToolRuntime(_registry(), types.SimpleNamespace(), _manager(), _log())
     runtime.register_tools(controller)

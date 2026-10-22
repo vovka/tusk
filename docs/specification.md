@@ -745,9 +745,9 @@ entry, prior status restored when the last concurrent submit finishes.
 - `process_text(text)` → `router.process(state, text)`; `request_stop()` →
   `mode.stop()` → `router.stop(state)`; `stop()` — clears the mode, fires `on_stop`
 
-`KernelAPI.start_dictation`/`stop_dictation` additionally report
-`AppMode.DICTATION`/`AppMode.DEFAULT`. Coding does not set an `AppMode` (the enum has
-only `default` and `dictation`).
+`ModeSlot.start`/`stop` also report the slot's `AppMode` (`DICTATION`/`CODING`) and
+`AppMode.DEFAULT` to the injected `StatusReporter`; `KernelAPI` exposes the slots as
+`kernel.dictation`/`kernel.coding`.
 
 ### 16.3 ModeGate
 
@@ -1176,8 +1176,8 @@ producer). `attach_sink` (called when the tray starts) immediately re-emits the 
 snapshot.
 
 Emit points: the voice pipeline (`LISTENING` idle / `REACTING` around forwards),
-`SubmitStatusReporter` around every `KernelAPI.submit`, `KernelAPI`
-`start_dictation`/`stop_dictation` (`set_mode`), `main.py` `set_models` at startup, and
+`SubmitStatusReporter` around every `KernelAPI.submit`, `ModeSlot`
+`start`/`stop` (`set_mode`), `main.py` `set_models` at startup, and
 the `switch_model` tool after a swap.
 
 ### 23.2 Status and Mode States

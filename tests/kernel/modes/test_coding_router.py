@@ -55,13 +55,13 @@ def test_process_reports_failure_when_data_is_not_a_dict() -> None:
     assert "couldn't apply" in result.reply.lower()
 
 
-def test_stop_calls_adapter_and_controller() -> None:
+def test_stop_calls_adapter_and_slot() -> None:
     calls: list[tuple[str, dict]] = []
-    controller = types.SimpleNamespace(stop_coding=lambda: calls.append(("controller.stop_coding", {})))
-    router = CodingRouter(_registry(calls, True), controller, object(), _strategy([]), _log())
+    slot = types.SimpleNamespace(stop=lambda: calls.append(("slot.stop", {})))
+    router = CodingRouter(_registry(calls, True), slot, object(), _strategy([]), _log())
     result = router.stop(_state())
     assert result.handled is True
-    assert calls == [("coding.stop_coding_session", {"session_id": "s1"}), ("controller.stop_coding", {})]
+    assert calls == [("coding.stop_coding_session", {"session_id": "s1"}), ("slot.stop", {})]
 
 
 def _registry(calls: list, success: bool) -> object:

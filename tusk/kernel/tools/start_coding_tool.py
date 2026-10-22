@@ -1,4 +1,5 @@
 from tusk.kernel.modes.coding_state import CodingState
+from tusk.kernel.modes.mode_slot import ModeSlot
 from tusk.shared.schemas.tools.tool_result import ToolResult
 from tusk.kernel.core.adapter_manager import AdapterManager
 from tusk.kernel.interfaces.editor_driver import EditorDriver
@@ -13,14 +14,14 @@ class StartCodingTool:
     description = "Start pair-coding mode (coding session, pair programming): spoken code edits go to the focused editor."
     input_schema = {"type": "object", "properties": {}}
 
-    def __init__(self, tool_registry: ToolRegistry, controller: object, adapter_manager: AdapterManager, driver: EditorDriver) -> None:
+    def __init__(self, tool_registry: ToolRegistry, slot: ModeSlot, adapter_manager: AdapterManager, driver: EditorDriver) -> None:
         self._registry = tool_registry
-        self._controller = controller
+        self._slot = slot
         self._manager = adapter_manager
         self._driver = driver
 
     def execute(self, parameters: dict) -> ToolResult:
-        if self._controller.coding_active:
+        if self._slot.active:
             return ToolResult(True, "Already in pair-coding mode.")
         try:
             result = self._start_session()
@@ -36,5 +37,5 @@ class StartCodingTool:
 
     def _begin(self, result: ToolResult) -> ToolResult:
         state = CodingState("coding", result.data["session_id"], self._manager.primary_desktop_source())
-        response = self._controller.start_coding(state)
+        response = self._slot.start(state)
         return ToolResult(response.handled, response.reply, result.data)

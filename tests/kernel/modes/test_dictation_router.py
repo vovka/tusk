@@ -25,12 +25,12 @@ def test_dictation_router_reports_desktop_apply_failure() -> None:
 
 def test_dictation_router_stops_via_adapter_stop_tool() -> None:
     calls: list[tuple[str, dict]] = []
-    pipeline = types.SimpleNamespace(stop_dictation=lambda: calls.append(("pipeline.stop_dictation", {})))
-    router = DictationRouter(_registry(calls, True), pipeline, _log([]))
+    slot = types.SimpleNamespace(stop=lambda: calls.append(("slot.stop", {})))
+    router = DictationRouter(_registry(calls, True), slot, _log([]))
     result = router.stop(_state())
     assert result.handled is True
     assert result.reply == "Dictation stopped."
-    assert calls[-2:] == [("dictation.stop_dictation", {"session_id": "session-1"}), ("pipeline.stop_dictation", {})]
+    assert calls[-2:] == [("dictation.stop_dictation", {"session_id": "session-1"}), ("slot.stop", {})]
 
 
 def _registry(calls: list[tuple[str, dict]], success: bool) -> object:

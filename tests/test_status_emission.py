@@ -1,6 +1,8 @@
 import threading
 import types
 
+import pytest
+
 from shells.voice.buffered_utterance import BufferedUtterance
 from shells.voice.gate_dispatch import GateDispatch
 from shells.voice.pipeline import VoicePipeline
@@ -27,13 +29,14 @@ def test_kernel_submit_emits_reacting_then_restores_prior_status() -> None:
     assert [s.status for s in published] == [AppStatus.LISTENING, AppStatus.REACTING, AppStatus.LISTENING]
 
 
-def test_start_and_stop_dictation_toggle_mode() -> None:
+@pytest.mark.parametrize("name,mode", [("dictation", AppMode.DICTATION), ("coding", AppMode.CODING)])
+def test_start_and_stop_mode_slot_toggle_app_mode(name: str, mode: AppMode) -> None:
     hub, _ = _hub()
-    api = KernelAPI(types.SimpleNamespace(process_command=lambda t, kind="conversation": None), types.SimpleNamespace(), None, hub)
-    api.start_dictation(types.SimpleNamespace())
-    assert hub.status == AppStatus.STARTING and _mode(hub) == AppMode.DICTATION
-    api.stop_dictation()
-    assert _mode(hub) == AppMode.DEFAULT
+    slot = getattr(KernelAPI(types.SimpleNamespace(process_command=lambda t, kind="conversation": None), types.SimpleNamespace(), None, hub), name)
+    slot.start(types.SimpleNamespace())
+    assert hub.status == AppStatus.STARTING and hub._snapshot().mode == mode
+    slot.stop()
+    assert hub._snapshot().mode == AppMode.DEFAULT
 
 
 def test_pipeline_emits_listening_then_reacting_around_submit() -> None:
@@ -95,10 +98,6 @@ def _config() -> object:
 
 def _log() -> object:
     return types.SimpleNamespace(log=lambda *args: None)
-
-
-def _mode(hub: StatusReporterHub) -> AppMode:
-    return hub._snapshot().mode
 
 
 def _swap_params() -> dict:
