@@ -262,7 +262,7 @@ tusk/                        (repo root)
 ├── launcher/                # Host-side launcher daemon (Unix socket) — runs GUI apps as the host user
 ├── tusk/
 │   ├── kernel/              # Thin orchestration layer
-│   │   ├── core/            # KernelAPI, CommandMode, MainAgent, AdapterManager,
+│   │   ├── core/            # KernelAPI, CommandMode, MainAgent,
 │   │   │   │                #   agent profiles, SlidingWindowHistory, startup wiring
 │   │   ├── interfaces/      # Shell
 │   │   ├── agent/           # Agentic loop: AgentOrchestrator, AgentRuntime, tool catalog/toolset, dispatcher
@@ -276,7 +276,7 @@ tusk/                        (repo root)
 │   │   │   └── tool_sequence/ # Compiled sequences: PlanValidator, Executor, Recorder
 │   │   ├── modes/           # Dictation/coding machinery: ModeSlot, ModeState, ModeGate, modes,
 │   │   │   └── editor/      # EditApplier, EditorDriver, ClipboardGuard
-│   │   └── tools/           # ToolRegistry, RegisteredTool, KernelToolInstaller,
+│   │   └── tools/           # ToolRegistry, RegisteredTool, KernelToolInstaller, AdapterManager,
 │   │                        #   kernel tools: start_dictation, start_coding, switch_model
 │   ├── shared/              # Contracts + cross-layer plumbing; depends on nothing else
 │   │   ├── config/          # Config (frozen), ConfigFactory (env), StartupOptions (CLI)
@@ -677,7 +677,7 @@ plan. The
 dictation/coding manifests hide their session tools from the planner
 (`planner_visible=false`) — they are driven by kernel tools and routers instead.
 
-### Startup Sequence (`AdapterManager` — `tusk/kernel/adapter_manager.py`)
+### Startup Sequence (`AdapterManager` — `tusk/kernel/tools/adapter_manager.py`)
 
 1. `start_all()` iterates `adapters/*/` directories with a valid `adapter.json`.
 2. For each: spawn the server via `MCPClient.connect_stdio()` (retrying once with a

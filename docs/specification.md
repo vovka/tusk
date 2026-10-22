@@ -845,7 +845,7 @@ Shipped adapters: `gnome` (provides context; all window/keyboard/mouse/clipboard
 `sequence_callable: true`), `dictation`, `coding` (lifecycle tools
 `planner_visible: false`).
 
-### 18.2 AdapterManager — `tusk/kernel/adapter_manager.py`
+### 18.2 AdapterManager — `tusk/kernel/tools/adapter_manager.py`
 
 - `start_all()`: every directory under `adapters/`, sorted, → `start_adapter`
 - `start_adapter(dir)`: parse manifest (absent → skip; non-stdio → skip), connect,

@@ -2,7 +2,7 @@ from tusk.kernel import CommandMode, KernelAPI, MainAgent, SlidingWindowHistory,
 from tusk.kernel.agent import AgentOrchestrator, SessionStore
 from tusk.kernel.agent.backends import AgentBackendFactory
 from tusk.kernel.agent.confirmation import ConfirmationGate
-from tusk.kernel.core.adapter_manager import AdapterManager
+from tusk.kernel.tools.adapter_manager import AdapterManager
 from tusk.kernel.core.agent_profiles import build_agent_profiles
 from tusk.kernel.tools.kernel_tool_installer import KernelToolInstaller
 from tusk.shared.config import Config

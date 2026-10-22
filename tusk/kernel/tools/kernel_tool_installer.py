@@ -1,4 +1,4 @@
-from tusk.kernel.core.adapter_manager import AdapterManager
+from tusk.kernel.tools.adapter_manager import AdapterManager
 from tusk.kernel.core.kernel_api import KernelAPI
 from tusk.kernel.modes.coding_mode import CodingMode
 from tusk.kernel.modes.dictation_mode import DictationMode
