@@ -28,6 +28,7 @@ def _first_json_object(text: str) -> dict:
 
 def _unwrapped(data: dict | list) -> dict[str, object]:
     item = data[0] if isinstance(data, list) and data else data
-    if not isinstance(item, dict):
+    payload = item.get("arguments", item) if isinstance(item, dict) else item
+    if not isinstance(payload, dict):
         raise ValueError("LLM response is not a JSON object")
-    return item["arguments"] if "arguments" in item else item
+    return payload

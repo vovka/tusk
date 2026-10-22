@@ -172,7 +172,7 @@ shells/voice/
 ├── gate/                    # every Gatekeeper implementation + its helpers
 │   ├── llm_gatekeeper.py        # LLMGatekeeper — primary classify + recovery
 │   ├── stop_gatekeeper.py       # StopGatekeeper — mode stop phrases
-│   ├── playback_gate.py         # PlaybackGate — stop-request interrupt while TUSK speaks
+│   ├── playback_gate.py         # PlaybackGate — stop interrupt / echo drop while TUSK speaks
 │   ├── speech_stop_gate.py      # SpeechStopGate — yes/no "stop" classifier
 │   ├── confirmation_answer_gate.py  # ConfirmationAnswerGate — yes/no to a pending confirmation
 │   ├── gatekeeper_slot.py       # GatekeeperSlot — swappable inner gatekeeper

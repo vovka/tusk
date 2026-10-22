@@ -20,8 +20,8 @@ flowchart LR
 ```
 
 While TUSK speaks in forward-all modes (dictation/coding), `PlaybackGate` wraps the mode
-gate: `SpeechStopGate` (yes/no LLM) decides interrupt-or-delegate; `EchoFilter` has already
-dropped TUSK's own voice before the buffer, so it is never typed into the editor.
+gate: `SpeechStopGate` (yes/no LLM) decides interrupt; an echo of the text TUSK is speaking
+is dropped; anything else is delegated, so TUSK's own voice is never typed into the editor.
 
 ## Interrupt lifecycle
 

@@ -157,8 +157,7 @@ the differences live entirely in the injected prompt, mode, and adapter:
 `KernelAPI` owns two `ModeSlot`s and routes every `submit(text)` to the active one
 (coding is checked first) before falling back to `CommandMode`. Entering a mode swaps the
 voice shell's `GatekeeperSlot` from `LLMGatekeeper` to a `StopGatekeeper` wrapped in
-`PlaybackGate` (so a stop request interrupts TUSK's own speech; `EchoFilter` keeps that speech
-from being typed). Callbacks are wired in `GatekeeperBuilder._wire_modes`.
+`PlaybackGate` (so TUSK's own speech can only be interrupted or dropped as an echo, never typed). Callbacks are wired in `GatekeeperBuilder._wire_modes`.
 
 ```mermaid
 sequenceDiagram
@@ -244,7 +243,7 @@ Interrupt is honored only while the worker is busy (an idle "stop" is a normal c
 Cancellation is step-boundary: in-flight LLM/tool calls finish and their results are
 discarded; the runtime replies "Stopped." Playback stop is near-instant. While TUSK
 speaks in forward-all modes (dictation/coding), `PlaybackGate` lets a stop request interrupt
-before the mode gate sees it; `EchoFilter` keeps TUSK's own voice out of the editor.
+and drops echoes of the current speech before the mode gate sees them.
 
 ---
 
@@ -413,7 +412,7 @@ AudioCapture.stream_frames()
     → GatekeeperSlot.process(buffered, recent, candidates)   # delegates to active gatekeeper
         # command mode:    LLMGatekeeper — LLM classify (busy/speaking-aware) → DROP / INTERRUPT
         # dictation/coding: StopGatekeeper — forward all; ModeGate LLM stop detection → DROP (stop phrase)
-        # while TUSK speaks: mode gates wrapped in PlaybackGate → INTERRUPT on a stop request
+        # while TUSK speaks: mode gates wrapped in PlaybackGate → INTERRUPT on a stop request, DROP an echo
     → GateDispatch(action, text, recovered_id) — GateAction enum
     → CommandWorker.enqueue(text)              # worker thread — listening never blocks
       → KernelAPI.submit(text)                 # serialized by one submit lock

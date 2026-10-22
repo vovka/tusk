@@ -1466,8 +1466,8 @@ utterance heard during playback goes to `SpeechStopGate`
 (`{"stop": bool, "reason": str}`, 128 max tokens, gatekeeper slot) with the spoken
 sentence as context and an explicit echo rule ("utterances that repeat fragments of
 TUSK's own sentence are its own voice: not a stop request"). `stop=true` →
-`GateDispatch(INTERRUPT)`; anything else is delegated to the wrapped gate. Echoes of
-TUSK's own voice never reach it: `EchoFilter` (`shells/voice/stages/echo_filter.py`) drops them before the buffer.
+`GateDispatch(INTERRUPT)`; an utterance whose words are a substring of the spoken text →
+`GateDispatch(DROP)` (an echo of TUSK's own voice); anything else is delegated to the wrapped gate.
 
 ### 30.5 Out of Scope
 

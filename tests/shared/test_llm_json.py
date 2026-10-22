@@ -31,3 +31,8 @@ def test_rejects_response_without_json_object() -> None:
 def test_rejects_non_object_json() -> None:
     with pytest.raises(ValueError):
         extract_json_payload("[1, 2]")
+
+
+def test_rejects_non_object_arguments() -> None:
+    with pytest.raises(ValueError):
+        extract_json_payload('{"name": "gate", "arguments": "{\\"stop\\": true}"}')

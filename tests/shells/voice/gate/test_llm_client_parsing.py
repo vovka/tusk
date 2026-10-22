@@ -57,6 +57,16 @@ def test_complete_returns_empty_payload_on_parse_error() -> None:
     assert tags == ["ERROR"]
 
 
+def test_string_arguments_payload_is_not_directed() -> None:
+    result = _client('{"name": "command_gatekeeper", "arguments": "{}"}').primary("prompt", "text")
+    assert not result.is_directed_at_tusk
+
+
+def test_string_arguments_payload_recovers_nothing() -> None:
+    decision = _client('{"name": "command_gate_recovery", "arguments": "{}"}').recovery("prompt", "text", [])
+    assert decision.action == "none"
+
+
 def _client(raw: str) -> LLMClient:
     llm = types.SimpleNamespace(complete_structured=lambda *a: raw)
     return LLMClient(llm, types.SimpleNamespace(log=lambda *a: None))
