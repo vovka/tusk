@@ -1,33 +1,33 @@
 import types
 
-from tusk.kernel.modes.dictation_router import DictationRouter
+from tusk.kernel.modes.dictation_mode import DictationMode
 from tusk.kernel.modes.mode_state import ModeState
 from tusk.shared.schemas.tools.tool_result import ToolResult
 
 
-def test_dictation_router_logs_segment_and_apply() -> None:
+def test_dictation_mode_logs_segment_and_apply() -> None:
     calls: list[tuple[str, dict]] = []
     logs: list[tuple[str, str]] = []
-    router = DictationRouter(_registry(calls, True), _log(logs))
-    result = router.process(_state(), "hello world")
+    mode = DictationMode(_registry(calls, True), _log(logs))
+    result = mode.process(_state(), "hello world")
     assert result.handled is True
     assert calls[-1] == ("gnome.type_text", {"text": "hello world"})
     assert logs == _expected_logs()
 
 
-def test_dictation_router_reports_desktop_apply_failure() -> None:
+def test_dictation_mode_reports_desktop_apply_failure() -> None:
     logs: list[tuple[str, str]] = []
-    router = DictationRouter(_registry([], False), _log(logs))
-    result = router.process(_state(), "hello world")
+    mode = DictationMode(_registry([], False), _log(logs))
+    result = mode.process(_state(), "hello world")
     assert result.handled is False
     assert result.reply == "typing failed"
     assert logs[-1] == ("DICTATION", "apply failed via gnome: typing failed")
 
 
-def test_dictation_router_stops_via_adapter_stop_tool() -> None:
+def test_dictation_mode_stops_via_adapter_stop_tool() -> None:
     calls: list[tuple[str, dict]] = []
-    router = DictationRouter(_registry(calls, True), _log([]))
-    result = router.stop(_state())
+    mode = DictationMode(_registry(calls, True), _log([]))
+    result = mode.stop(_state())
     assert result.handled is True
     assert result.reply == "Dictation stopped."
     assert calls[-1] == ("dictation.stop_dictation", {"session_id": "session-1"})

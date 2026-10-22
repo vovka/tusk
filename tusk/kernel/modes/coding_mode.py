@@ -7,10 +7,10 @@ from tusk.kernel.modes.mode_state import ModeState
 from tusk.kernel.tools.tool_registry import ToolRegistry
 from tusk.shared.logging.interfaces.log_printer import LogPrinter
 
-__all__ = ["CodingRouter"]
+__all__ = ["CodingMode"]
 
 
-class CodingRouter:
+class CodingMode:
     def __init__(self, tool_registry: ToolRegistry, driver: EditorDriver, applier: EditApplier, log_printer: LogPrinter) -> None:
         self._registry = tool_registry
         self._driver = driver

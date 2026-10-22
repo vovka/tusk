@@ -1,5 +1,4 @@
-from tusk.kernel.modes.coding_gate_prompt import CODING_GATE_PROMPT
-from tusk.kernel.modes.dictation_gate_prompt import DICTATION_GATE_PROMPT
+from tusk.kernel.modes.mode_gate_prompts import CODING_GATE_PROMPT, DICTATION_GATE_PROMPT
 
 
 def test_coding_gate_prompt_requires_unambiguous_stop_intent() -> None:
@@ -23,3 +22,12 @@ def test_dictation_gate_prompt_requires_unambiguous_stop_intent() -> None:
 
 def test_dictation_gate_prompt_treats_mentions_of_stopping_as_text() -> None:
     assert "merely mention stopping" in DICTATION_GATE_PROMPT
+
+
+def test_dictation_gate_prompt_limits_commands_to_stop() -> None:
+    assert "only command you may detect is a request to stop dictation" in DICTATION_GATE_PROMPT
+    assert "Everything else must be treated as literal dictation text" in DICTATION_GATE_PROMPT
+
+
+def test_dictation_gate_prompt_uses_dictation_schema() -> None:
+    assert "metadata_stop" in DICTATION_GATE_PROMPT

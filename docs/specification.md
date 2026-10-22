@@ -732,12 +732,12 @@ text as detail) on entry, prior status restored on exit.
 `KernelAPI` holds two `ModeSlot`s (`DICTATION`/"Dictation started.",
 `CODING`/"Coding started."). A slot owns the switchable mode lifecycle:
 
-- `attach_router(router)` — wired once at startup by `ToolRuntime`
+- `attach_mode(mode)` — wired once at startup by `KernelToolInstaller`
 - `set_callbacks(on_start, on_stop)` — wired by `ShellLoader` to swap the voice
   gatekeeper (§16.4)
 - `start(state)` — stores the `ModeState`, fires `on_start`,
   returns the start reply
-- `process_text(text)` → `router.process(state, text)`; `request_stop()` →
+- `process_text(text)` → `mode.process(state, text)`; `request_stop()` →
   `router.stop(state)` then `stop()`; `stop()` — clears the state, fires `on_stop`
 
 `ModeSlot.start`/`stop` also report the slot's `AppMode` (`DICTATION`/`CODING`) and
@@ -748,7 +748,7 @@ text as detail) on entry, prior status restored on exit.
 
 **Source:** `tusk/kernel/modes/mode_gate.py` — one stop-classifier class for both
 modes; the prompt is injected (`DICTATION_GATE_PROMPT` / `CODING_GATE_PROMPT`,
-`tusk/kernel/modes/*_gate_prompt.py`). Both prompts state: the only detectable command
+`tusk/kernel/modes/mode_gate_prompts.py`). Both prompts state: the only detectable command
 is a request to stop the mode; everything else is literal text/instruction.
 
 ```python
@@ -792,7 +792,7 @@ everything to interrupt-or-drop while TUSK's own speech is playing (§30.4).
 2. Build `ModeState("dictation", data["session_id"], adapter_manager.primary_desktop_source())`
 3. `ModeSlot.start(state)` (reply "Dictation started.")
 
-### 17.2 DictationRouter — `tusk/kernel/modes/dictation_router.py`
+### 17.2 DictationMode — `tusk/kernel/modes/dictation_mode.py`
 
 **process(state, text):**
 1. `{adapter}.process_segment` with `{"session_id", "text"}`; failure or no data →
@@ -907,7 +907,7 @@ or writes files on disk — only the focused editor buffer via input automation.
 4. `ModeState("coding", session_id, primary_desktop_source)` →
    `ModeSlot.start(state)` (reply "Coding started.")
 
-### 19.2 CodingRouter — `tusk/kernel/modes/coding_router.py`
+### 19.2 CodingMode — `tusk/kernel/modes/coding_mode.py`
 
 **process(state, text):** `coding.process_intent` with `{"session_id", "intent"}`;
 each entry of `data.operations` is converted to a typed
@@ -983,8 +983,8 @@ driver existed as design contracts in an earlier iteration and were removed; see
 - **Limitation:** manual edits mid-session are invisible (no feedback channel) and are
   overwritten by the next TUSK edit's full-buffer repaint.
 
-Wiring: `ToolRuntime.register_tools` (`tusk/kernel/tools/tool_runtime.py`) builds the
-driver + strategy, attaches `DictationRouter`/`CodingRouter` to the kernel's mode
+Wiring: `KernelToolInstaller.install` (`tusk/kernel/tools/kernel_tool_installer.py`) builds the
+driver + applier, attaches `DictationMode`/`CodingMode` to the kernel's mode
 slots, and registers `SwitchModelTool`, `StartDictationTool`, `StartCodingTool`.
 
 ---
@@ -1277,7 +1277,7 @@ apps start on the host desktop rather than inside the container.
    repaint of that buffer. TUSK never touches files on disk.
 
 8. **`EditOperation` crosses the adapter→router boundary as a typed object.**
-   `CodingRouter` converts the JSON payload into `EditOperation` instances before any
+   `CodingMode` converts the JSON payload into `EditOperation` instances before any
    strategy runs.
 
 9. **Commands are serial.** `KernelAPI.submit` holds a single lock; the voice shell
@@ -1305,8 +1305,8 @@ apps start on the host desktop rather than inside the container.
 | `MCPToolProxy` | transport error / adapter `isError` | `ToolResult(False, message)` |
 | `AdapterManager` | shared-env connect fails | retried once with the managed venv |
 | `AdapterManager` | `watchdog` missing | hot-plug disabled, logged |
-| `CodingRouter` | apply error | `KernelResponse(False, "I couldn't apply that edit.")`; adapter buffer already updated (next edit repaints) |
-| `EditorDriver` | failed desktop tool call | `RuntimeError` (caught by `CodingRouter`) |
+| `CodingMode` | apply error | `KernelResponse(False, "I couldn't apply that edit.")`; adapter buffer already updated (next edit repaints) |
+| `EditorDriver` | failed desktop tool call | `RuntimeError` (caught by `CodingMode`) |
 | `CommandWorker` | exception from `submit`/TTS | logged under `ERROR`; the worker thread keeps processing |
 | `SpeechPlayback` | interrupt / 30 s cap / feeder `OSError` | `terminate()` / `kill()` / swallowed |
 | `FallbackAgentBackend` | primary `status="failed"` | fallback runs; primary failure attached as metadata |

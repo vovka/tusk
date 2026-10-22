@@ -4,7 +4,7 @@ from tusk.kernel.agent import AgentOrchestrator, SessionStore
 from tusk.kernel.agent.confirmation import ConfirmationGate
 from tusk.kernel.agent.backends import AgentBackendFactory
 from tusk.kernel.core.agent_profiles import build_agent_profiles
-from tusk.kernel.tools.tool_runtime import ToolRuntime
+from tusk.kernel.tools.kernel_tool_installer import KernelToolInstaller
 from tusk.shared.config import Config
 from tusk.shared.interrupt import InterruptToken
 from tusk.shared.llm import LLMRegistry
@@ -21,7 +21,7 @@ def build_kernel(config: Config, log: ColorLogPrinter, llm_registry: LLMRegistry
     kernel = build_api(agent, config, log, llm_registry, reporter, token, tracer, confirmation=confirmation)
     if with_adapters:
         adapter_manager = build_adapter_manager(config, log, tool_registry)
-        ToolRuntime(tool_registry, llm_registry, adapter_manager, log, reporter).register_tools(kernel)
+        KernelToolInstaller(tool_registry, llm_registry, adapter_manager, log, reporter).install(kernel)
     return kernel
 
 

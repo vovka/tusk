@@ -5,19 +5,19 @@ from tusk.kernel.core import startup
 from tusk.shared.schemas.kernel_response import KernelResponse
 
 
-class RuntimeStub:
+class InstallerStub:
     registrations: list[object] = []
 
     def __init__(self, *args: object) -> None:
         self._args = args
 
-    def register_tools(self, kernel: object) -> None:
+    def install(self, kernel: object) -> None:
         self.registrations.append(kernel)
 
 
 def test_kernel_startup_submits_text_through_selected_backend(monkeypatch: object) -> None:
     FactoryStub.instances.clear()
-    RuntimeStub.registrations.clear()
+    InstallerStub.registrations.clear()
     agent = types.SimpleNamespace(name="main-agent")
     config = types.SimpleNamespace(agent_backend="codex_exec")
     _patch_startup(monkeypatch, agent)
@@ -28,7 +28,7 @@ def test_kernel_startup_submits_text_through_selected_backend(monkeypatch: objec
 
 def _patch_startup(monkeypatch: object, agent: object) -> None:
     monkeypatch.setattr(startup, "AgentBackendFactory", FactoryStub)
-    monkeypatch.setattr(startup, "ToolRuntime", RuntimeStub)
+    monkeypatch.setattr(startup, "KernelToolInstaller", InstallerStub)
     monkeypatch.setattr(startup, "build_adapter_manager", lambda *args: object())
     monkeypatch.setattr(startup, "build_agent", lambda *args, **kwargs: agent)
 
@@ -47,13 +47,13 @@ def _assert_factory_received(agent: object, config: object, user_text: str) -> N
     assert FactoryStub.instances[0].backend.requests[0].user_text == user_text
 
 
-def test_kernel_startup_without_adapters_skips_adapter_manager_and_tool_runtime(monkeypatch: object) -> None:
-    RuntimeStub.registrations.clear()
+def test_kernel_startup_without_adapters_skips_adapter_manager_and_tool_installer(monkeypatch: object) -> None:
+    InstallerStub.registrations.clear()
     _patch_startup(monkeypatch, types.SimpleNamespace(name="main-agent"))
     monkeypatch.setattr(startup, "build_adapter_manager", _unexpected_adapter_manager)
     config = types.SimpleNamespace(agent_backend="codex_exec")
     startup.build_kernel(config, _log(), _llm_registry(), None, with_adapters=False)
-    assert RuntimeStub.registrations == []
+    assert InstallerStub.registrations == []
 
 
 def _unexpected_adapter_manager(*args: object) -> object:

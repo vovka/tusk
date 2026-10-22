@@ -1,7 +1,7 @@
 from collections.abc import Callable
 
-from tusk.kernel.modes.coding_router import CodingRouter
-from tusk.kernel.modes.dictation_router import DictationRouter
+from tusk.kernel.modes.coding_mode import CodingMode
+from tusk.kernel.modes.dictation_mode import DictationMode
 from tusk.kernel.modes.mode_state import ModeState
 from tusk.shared.logging.interfaces.log_printer import LogPrinter
 from tusk.shared.schemas.app_mode import AppMode
@@ -23,7 +23,7 @@ class ModeSlot:
         self._log = log
         self._reporter = reporter
         self._state: ModeState | None = None
-        self._router: CodingRouter | DictationRouter | None = None
+        self._mode: CodingMode | DictationMode | None = None
         self._on_started: Callable[[], None] | None = None
         self._on_stopped: Callable[[], None] | None = None
 
@@ -35,20 +35,20 @@ class ModeSlot:
         self._on_started = on_start
         self._on_stopped = on_stop
 
-    def attach_router(self, router: CodingRouter | DictationRouter) -> None:
-        self._router = router
+    def attach_mode(self, mode: CodingMode | DictationMode) -> None:
+        self._mode = mode
 
     def process_text(self, text: str) -> KernelResponse:
         if self._state is None:
             raise RuntimeError(f"{self._app_mode.name}: process_text called with no active mode")
-        result = self._router.process(self._state, text)
+        result = self._mode.process(self._state, text)
         self._log_line(self._app_mode.name, result.reply or "updated")
         return result
 
     def request_stop(self) -> KernelResponse:
         if self._state is None:
             return KernelResponse(False, "")
-        result = self._router.stop(self._state)
+        result = self._mode.stop(self._state)
         self._log_line(self._app_mode.name, result.reply or "stopped")
         self._log_line("MODE", f"{self._app_mode.name.lower()} mode ended")
         self.stop()

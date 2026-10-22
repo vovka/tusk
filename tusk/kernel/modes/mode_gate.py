@@ -1,5 +1,4 @@
-from tusk.kernel.modes.coding_gate_prompt import CODING_GATE_PROMPT
-from tusk.kernel.modes.dictation_gate_prompt import DICTATION_GATE_PROMPT
+from tusk.kernel.modes.mode_gate_prompts import CODING_GATE_PROMPT, DICTATION_GATE_PROMPT
 from tusk.shared.llm.interfaces.llm_provider import LLMProvider
 from tusk.shared.llm.llm_json import extract_json_payload
 from tusk.shared.llm.llm_registry import LLMRegistry

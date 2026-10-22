@@ -143,15 +143,15 @@ sequenceDiagram
 ## Adapter Mode Flow (dictation & coding)
 
 Dictation and coding are the two "forward-all" modes. They share one set of classes —
-the differences live entirely in the injected prompt, router, and adapter:
+the differences live entirely in the injected prompt, mode, and adapter:
 
 | Piece | Class | Per-mode difference |
 |---|---|---|
 | Kernel mode holder | `ModeSlot` (`tusk/kernel/modes/mode_slot.py`) | log tag + start reply |
-| Active mode state | `ModeState` | none — `ModeSlot` routes text to the injected router |
+| Active mode state | `ModeState` | none — `ModeSlot` routes text to the attached mode |
 | Stop classifier | `ModeGate` (utility for the gatekeeper LLM) | prompt: `DICTATION_GATE_PROMPT` / `CODING_GATE_PROMPT` |
 | Voice-side gatekeeper | `StopGatekeeper` (`shells/voice/stages/gate/`) | none — wraps the mode's `ModeGate` |
-| Router | `DictationRouter` / `CodingRouter` | dictation types text; coding applies `EditOperation`s via `EditorDriver` |
+| Mode behaviour | `DictationMode` / `CodingMode` | dictation types text; coding applies `EditOperation`s via `EditorDriver` |
 | Adapter | `dictation` / `coding` MCP server | segment refinement vs. LLM edit planning over `BufferModel` |
 
 `KernelAPI` owns two `ModeSlot`s and routes every `submit(text)` to the active one
@@ -169,7 +169,7 @@ sequenceDiagram
     participant GS as GatekeeperSlot
     participant SG as StopGatekeeper
     participant MG as ModeGate (LLM)
-    participant R as DictationRouter /<br/>CodingRouter
+    participant R as DictationMode /<br/>CodingMode
     participant A as dictation / coding<br/>adapter (MCP)
     participant G as gnome adapter (MCP)
 
@@ -215,7 +215,7 @@ a literal segment). Stop detection relies on the model returning a non-null
 
 Coding specifics: the `coding` adapter owns an authoritative, immutable `BufferModel`
 seeded once from the editor at session start. `CodingEditPlanner` (adapter-side LLM)
-turns each spoken intent + buffer into `EditOperation`s; the kernel-side `CodingRouter`
+turns each spoken intent + buffer into `EditOperation`s; the kernel-side `CodingMode`
 applies them through `EditApplier` over `EditorDriver`, which
 composes `gnome.*` key/clipboard primitives. `EditOperation.full_buffer` re-pastes the
 authoritative buffer, making every edit drift-proof under fire-and-forget GUI automation.
@@ -274,9 +274,9 @@ tusk/                        (repo root)
 │   │   │   ├── runtime/     # Message history builder, result factory, step recorder, guard composition
 │   │   │   ├── toolset/     # Per-profile synthetic tool definitions, static schemas, argument validator
 │   │   │   └── tool_sequence/ # Compiled sequences: PlanValidator, Executor, Recorder
-│   │   ├── modes/           # Dictation/coding machinery: ModeSlot, ModeState, ModeGate, routers,
+│   │   ├── modes/           # Dictation/coding machinery: ModeSlot, ModeState, ModeGate, modes,
 │   │   │   └── editor/      # EditApplier, EditorDriver, ClipboardGuard
-│   │   └── tools/           # ToolRegistry, RegisteredTool, ToolRuntime,
+│   │   └── tools/           # ToolRegistry, RegisteredTool, KernelToolInstaller,
 │   │                        #   kernel tools: start_dictation, start_coding, switch_model
 │   ├── shared/              # Contracts + cross-layer plumbing; depends on nothing else
 │   │   ├── config/          # Config (frozen), ConfigFactory (env), StartupOptions (CLI)
@@ -643,7 +643,7 @@ lookups by name and filtered views (`all_tools`, `planner_tools`,
 The planner receives the full catalog as text in its request context via
 `ToolCatalog` (name, description, parameters, `sequence_callable` flag per tool).
 
-Kernel-internal tools (registered by `ToolRuntime`): `start_dictation`, `start_coding`,
+Kernel-internal tools (registered by `KernelToolInstaller`): `start_dictation`, `start_coding`,
 `switch_model`. Synthetic tools (`done`, `run_agent`, `execute_tool_sequence`) are built
 per profile by `ToolsetBuilder` and never stored in the registry.
 
@@ -882,8 +882,8 @@ main()
       → KernelAPI(CommandMode(AgentBackendFactory(agent, config, log).create(), log, confirmation),
                   llm_registry, log, reporter, token)     # owns dictation/coding ModeSlots
       → AdapterManager("adapters", ...).start_all() + start_watcher()   # skipped when with_adapters=False (voice e2e)
-      → ToolRuntime(...).register_tools(kernel)  # start_dictation/start_coding/switch_model,
-                                                 # routers + editor driver + strategy attached
+      → KernelToolInstaller(...).install(kernel)  # start_dictation/start_coding/switch_model,
+                                                 # modes + editor driver + applier attached
   → reporter.set_models(registry.model_labels())
   → ShellLoader(config, kernel, log, reporter).start()
       → per TUSK_SHELLS: build each shell ("tray" forced last)

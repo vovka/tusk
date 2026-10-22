@@ -4,10 +4,10 @@ from tusk.kernel.modes.mode_state import ModeState
 from tusk.kernel.tools.tool_registry import ToolRegistry
 from tusk.shared.logging.interfaces.log_printer import LogPrinter
 
-__all__ = ["DictationRouter"]
+__all__ = ["DictationMode"]
 
 
-class DictationRouter:
+class DictationMode:
     def __init__(self, tool_registry: ToolRegistry, log_printer: LogPrinter) -> None:
         self._registry = tool_registry
         self._log = log_printer

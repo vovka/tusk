@@ -17,7 +17,7 @@ def _state() -> ModeState:
     return ModeState("dictation", "s1", "gnome")
 
 
-def _router(seen: list) -> object:
+def _mode(seen: list) -> object:
     return types.SimpleNamespace(
         process=lambda state, text: seen.append((state, text)) or KernelResponse(True, "updated"),
         stop=lambda state: seen.append(("stop", state)) or KernelResponse(True, "Dictation stopped."),
@@ -58,10 +58,10 @@ def test_process_text_without_active_mode_raises_runtime_error() -> None:
         _slot().process_text("hello")
 
 
-def test_process_text_routes_state_and_text_through_attached_router() -> None:
+def test_process_text_routes_state_and_text_through_attached_mode() -> None:
     seen: list[tuple] = []
     slot = _slot()
-    slot.attach_router(_router(seen))
+    slot.attach_mode(_mode(seen))
     slot.start(_state())
     assert slot.process_text("hello") == KernelResponse(True, "updated")
     assert seen == [(_state(), "hello")]
@@ -70,16 +70,16 @@ def test_process_text_routes_state_and_text_through_attached_router() -> None:
 def test_process_text_logs_reply_under_mode_tag() -> None:
     logs: list[tuple] = []
     slot = _slot(logs=logs)
-    slot.attach_router(_router([]))
+    slot.attach_mode(_mode([]))
     slot.start(_state())
     slot.process_text("x")
     assert logs == [("DICTATION", "updated")]
 
 
-def test_request_stop_stops_router_then_slot() -> None:
+def test_request_stop_stops_mode_then_slot() -> None:
     seen: list[tuple] = []
     slot = _slot()
-    slot.attach_router(_router(seen))
+    slot.attach_mode(_mode(seen))
     slot.start(_state())
     assert slot.request_stop() == KernelResponse(True, "Dictation stopped.")
     assert seen == [("stop", _state())]
@@ -91,7 +91,7 @@ def test_request_stop_logs_always_visible_mode_ended_line() -> None:
     from tusk.shared.logging.log_tag_palette import is_always_visible
     logs: list[tuple] = []
     slot = _slot(logs=logs)
-    slot.attach_router(_router([]))
+    slot.attach_mode(_mode([]))
     slot.start(_state())
     slot.request_stop()
     assert ("DICTATION", "Dictation stopped.") in logs

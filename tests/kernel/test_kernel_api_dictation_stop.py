@@ -62,7 +62,7 @@ def _command_mode() -> object:
 
 
 def _start_dictation(api: KernelAPI, actions: list[str]) -> None:
-    api.dictation.attach_router(types.SimpleNamespace(
+    api.dictation.attach_mode(types.SimpleNamespace(
         stop=lambda state: actions.append(f"stop:{state.session_id}") or KernelResponse(True, "stopped"),
         process=lambda state, text: actions.append(f"process:{text}") or KernelResponse(True, "updated"),
     ))

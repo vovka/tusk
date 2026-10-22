@@ -41,7 +41,7 @@ classDiagram
   }
   class ClipboardGuard {
   }
-  class CodingRouter {
+  class CodingMode {
     process(state: ModeState, text: str) KernelResponse
     stop(state: ModeState) KernelResponse
   }
@@ -53,7 +53,7 @@ classDiagram
   class CommandMode {
     process_command(command: str) KernelResponse
   }
-  class DictationRouter {
+  class DictationMode {
     process(state: ModeState, text: str) KernelResponse
     stop(state: ModeState) KernelResponse
   }
@@ -85,7 +85,7 @@ classDiagram
   }
   class ModeSlot {
     active : bool
-    attach_router(router: CodingRouter | DictationRouter) None
+    attach_mode(mode: CodingMode | DictationMode) None
     process_text(text: str) KernelResponse
     request_stop() KernelResponse
     set_callbacks(on_start: Callable[[], None], on_stop: Callable[[], None]) None

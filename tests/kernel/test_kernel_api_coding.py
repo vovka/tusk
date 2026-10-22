@@ -56,7 +56,7 @@ def _command_mode() -> object:
 
 
 def _start_coding(api: KernelAPI, actions: list[str]) -> None:
-    api.coding.attach_router(types.SimpleNamespace(
+    api.coding.attach_mode(types.SimpleNamespace(
         stop=lambda state: actions.append(f"stop:{state.session_id}") or KernelResponse(True, "stopped"),
         process=lambda state, text: actions.append(f"process:{text}") or KernelResponse(True, "updated"),
     ))
