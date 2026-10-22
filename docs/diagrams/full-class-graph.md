@@ -27,7 +27,7 @@ examples so you don't have to hold the rule in your head.
   adapters), and each of those is further split into nested sub-clusters by
   immediate subpackage — e.g. `shells` contains `voice`/`cli`/`tray`/`emulator`
   boxes, `adapters` contains `gnome`/`dictation`/`coding`, `shared.contracts`
-  contains `llm`/`stt`/`tts`/`mcp`/`config`/`status`/`logging`/`interrupt`.
+  contains `interfaces`/`observability`/`mcp`/`llm`/`config`.
   `fdp` supports true nested clusters, so each sub-cluster lays out as its own
   tight group first, then those groups get placed within the parent cluster.
 - Within and between clusters (and sub-clusters), position is decided by

@@ -4,7 +4,8 @@
 Usage: generate_full_class_graph.py <pyreverse_classes.dot> <output.dot>
 
 Render the output with fdp, not dot — dot strings disconnected clusters into a
-single line. The embedded legend lives in full-class-graph-legend.gv next to
+single line; splines=line because curved routing trips a GTS assertion in fdp
+2.43 on this graph. The embedded legend lives in full-class-graph-legend.gv next to
 this script (kept as data so this file stays within the code-size guardrails).
 """
 import re
@@ -20,14 +21,14 @@ RULES = [
     (r"^tusk\.kernel\.", "kernel.core", "#fbe5c8", ["core", "interfaces", "modes", "tools"]),
     (r"^tusk\.shared\.schemas\.", "shared.schemas", "#e3f2e1", ["tools", "desktop"]),
     (r"^tusk\.shared\.", "shared.contracts", "#d7f0d3",
-     ["status", "logging", "mcp", "llm", "config", "interrupt", "stt", "tts"]),
+     ["interfaces", "observability", "mcp", "llm", "config"]),
     (r"^tusk\.providers\.", "providers", "#e0e8fb", ["llm", "stt", "tts"]),
     (r"^shells\.", "shells", "#f3e3fa", ["voice", "cli", "tray", "emulator"]),
     (r"^adapters\.", "adapters", "#fdf0c8", ["dictation", "gnome", "editor_emulator", "coding"]),
 ]
 
 GRAPH_ATTRS = [
-    'overlap="prism"', "splines=true", "pack=true", 'packmode="clust"',
+    'overlap="prism"', "splines=line", "pack=true", 'packmode="clust"',
     'sep="+15"', 'esep="+8"', 'fontname="Helvetica"',
 ]
 

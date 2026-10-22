@@ -108,17 +108,17 @@ digraph tusk_interfaces {
     ConfigurableLLMFactory -> I_LLMProviderFactory [arrowhead=empty];
   }
   subgraph cluster_log {
-    label="tusk/shared/observability/interfaces"; fontsize=13; style=filled; fillcolor="#d7f0d3"; margin=12;
+    label="tusk/shared/interfaces"; fontsize=13; style=filled; fillcolor="#d7f0d3"; margin=12;
     I_LogPrinter [label="«interface»\nLogPrinter", penwidth=2];
     ColorLogPrinter -> I_LogPrinter [arrowhead=empty];
   }
   subgraph cluster_reporter {
-    label="tusk/shared/observability/interfaces"; fontsize=13; style=filled; fillcolor="#d7f0d3"; margin=12;
+    label="tusk/shared/observability"; fontsize=13; style=filled; fillcolor="#d7f0d3"; margin=12;
     I_StatusReporter [label="«interface»\nStatusReporter", penwidth=2];
     StatusReporterHub -> I_StatusReporter [arrowhead=empty];
   }
   subgraph cluster_sink {
-    label="tusk/shared/observability/interfaces"; fontsize=13; style=filled; fillcolor="#d7f0d3"; margin=12;
+    label="tusk/shared/interfaces"; fontsize=13; style=filled; fillcolor="#d7f0d3"; margin=12;
     I_StatusSink [label="«interface»\nStatusSink", penwidth=2];
     NullStatusSink;
     TrayStatusSink [label="TrayStatusSink\n(shells.tray)"];
