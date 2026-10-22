@@ -30,6 +30,12 @@ def test_tool_use_failed_recovery_best_effort_recovers_done() -> None:
     assert result.parameters["text"].startswith("Ozymandias")
 
 
+def test_tool_use_failed_recovery_best_effort_accepts_done_alias() -> None:
+    exc = RuntimeError(_broken_done_text().replace('"name": "done"', '"name": "functions.done"'))
+    result = ToolUseFailedRecovery().recover(exc)
+    assert result is not None and result.tool_name == "done"
+
+
 def _response(text: str) -> object:
     message = type("Message", (), {"tool_calls": [], "content": text})()
     choice = type("Choice", (), {"message": message})()

@@ -44,7 +44,7 @@ The voice shell uses the gatekeeper to classify utterances, then routes actionab
 - `RepeatedToolCallGuard` only stops the third identical tool call. There is no executor-specific guard that forces `done` immediately after a successful `execute_tool_sequence`.
 - `RuntimeStepRecorder` feeds raw tool result messages back into the transcript as user messages. For sequence success this becomes `<goal> completed`, which is what the executor then sees on the next turn.
 - Conversation is only forced to stop after executor/default returns `done`. After executor failure, it may still improvise or re-delegate until the failure budget trips.
-- Some models emit static finish/delegation tools as `functions.done`, `functions.run_agent`, or `name=functions.done`. `ToolCall` now normalizes those aliases before runtime dispatch.
+- Some models emit static finish/delegation tools as `functions.done`, `functions.run_agent`, or `name=functions.done`. `ToolNameNormalizer` resolves those aliases in `CallTool.unwrap`, the one point every model tool call passes before the guards and the dispatcher.
 - `ToolUseFailedRecovery` now falls back to extracting `failed_generation` directly from the provider error string when the outer wrapper cannot be parsed with `ast.literal_eval`, then best-effort recovers malformed `done(...)` calls by status and summary.
 
 ## Command Queueing (CommandWorker)

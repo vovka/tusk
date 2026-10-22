@@ -11,6 +11,7 @@ def test_shared_llm_exports_present() -> None:
 
 def test_shared_llm_retry_exports_present() -> None:
     assert "LLMRetryRunner" in llm.__all__
+    assert "ToolNameNormalizer" in llm.__all__
     assert "LLMRetryPolicy" not in llm.__all__
     assert "ToolUseFailedRecovery" not in llm.__all__
 

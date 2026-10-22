@@ -1,5 +1,7 @@
 import types
 
+import pytest
+
 from tests.kernel_api_support import make_agent, make_registry_tool
 from tusk.kernel.agent.runtime.call_tool import CallTool
 from tusk.kernel.tools.tool_registry import ToolRegistry
@@ -20,7 +22,32 @@ def test_unwrap_turns_call_tool_into_the_named_tool_call() -> None:
 
 def test_unwrap_leaves_other_calls_alone() -> None:
     call = ToolCall("done", {"status": "done"})
-    assert CallTool.unwrap(call) is call
+    assert CallTool.unwrap(call) == call
+
+
+@pytest.mark.parametrize(
+    ("alias", "canonical"),
+    [
+        ("functions.done", "done"),
+        ("functions.run_agent", "run_agent"),
+        ("functions.execute_tool_sequence", "execute_tool_sequence"),
+        ("finish_agent_run", "done"),
+        ("tool:done", "done"),
+        ("press_keys", "gnome.press_keys"),
+        ("type_text", "gnome.type_text"),
+        ("write_clipboard", "gnome.write_clipboard"),
+        ("name=functions.done]", "done"),
+        ("=functions.done", "done"),
+        ("[`done`]", "done"),
+    ],
+)
+def test_unwrap_resolves_model_alias_to_canonical_tool_name(alias: str, canonical: str) -> None:
+    assert CallTool.unwrap(ToolCall(alias, {"status": "done"}, "c1")) == ToolCall(canonical, {"status": "done"}, "c1")
+
+
+def test_unwrap_resolves_alias_inside_call_tool() -> None:
+    wrapped = ToolCall("call_tool", {"name": "press_keys", "arguments": {"keys": "<ctrl>v"}}, "c1")
+    assert CallTool.unwrap(wrapped) == ToolCall("gnome.press_keys", {"keys": "<ctrl>v"}, "c1")
 
 
 def test_catalogue_line_shows_short_name_args_and_enum_without_restated_description() -> None:

@@ -1,4 +1,5 @@
 from tusk.kernel.tools.registered_tool import RegisteredTool
+from tusk.shared.llm.tool_name_normalizer import ToolNameNormalizer
 from tusk.shared.schemas.tools.tool_call import ToolCall
 
 __all__ = ["CallTool"]
@@ -26,12 +27,14 @@ class CallTool:
 
     @staticmethod
     def unwrap(tool_call: ToolCall) -> ToolCall:
-        # guards, confirmation and the transcript must see the real tool, never the wrapper
+        # guards, confirmation and the transcript must see the real tool, never the wrapper or a model's alias
+        tool_call = ToolNameNormalizer.tool_call(tool_call)
         if tool_call.tool_name != _NAME:
             return tool_call
         arguments = tool_call.parameters.get("arguments")
         parameters = arguments if isinstance(arguments, dict) else {}
-        return ToolCall(str(tool_call.parameters.get("name", "")), parameters, tool_call.call_id)
+        name = ToolNameNormalizer.name(tool_call.parameters.get("name", ""))
+        return ToolCall(name, parameters, tool_call.call_id)
 
     @staticmethod
     def _shown_name(tool: RegisteredTool, tools: list[RegisteredTool]) -> str:

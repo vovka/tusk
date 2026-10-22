@@ -2,7 +2,8 @@ import ast
 import json
 import re
 
-from tusk.shared.schemas.tools.tool_call import ToolCall, normalize_tool_name
+from tusk.shared.llm.tool_name_normalizer import ToolNameNormalizer
+from tusk.shared.schemas.tools.tool_call import ToolCall
 
 __all__ = ["ToolUseFailedRecovery"]
 
@@ -38,14 +39,14 @@ class ToolUseFailedRecovery:
         return error.get("failed_generation", "") if isinstance(error, dict) else ""
 
     def _built(self, data: dict[str, object]) -> ToolCall | None:
-        name = normalize_tool_name(data.get("name", ""))
+        name = ToolNameNormalizer.name(data.get("name", ""))
         arguments = data.get("arguments", {})
         if not name or not isinstance(arguments, dict):
             return None
         return ToolCall(name, arguments, "")
 
     def _best_effort_done(self, generation: str) -> ToolCall | None:
-        name = normalize_tool_name(self._match(_NAME, generation))
+        name = ToolNameNormalizer.name(self._match(_NAME, generation))
         status = self._match(_STATUS, generation)
         summary = self._decoded(_SUMMARY, generation)
         text = self._decoded(_TEXT, generation)
