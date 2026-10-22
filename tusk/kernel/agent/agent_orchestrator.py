@@ -76,8 +76,9 @@ class AgentOrchestrator:
         return replace(request, instruction=f"{request.instruction}\n{self._catalog.prompt_text()}")
 
     def _execute(self, call: ToolCall, request: AgentRunRequest, lineage: tuple[tuple[str, str, str], ...], sid: str) -> ToolResult:
-        agent_runner = lambda tc: self._run_agent(tc, request, lineage, sid)
-        return self._dispatcher.dispatch(call, agent_runner, sid, set(request.runtime_tool_names), request.sequence_plan)
+        if call.tool_name == "run_agent":
+            return self._run_agent(call, request, lineage, sid)
+        return self._dispatcher.dispatch(call, sid, set(request.runtime_tool_names), request.sequence_plan)
 
     def _run_agent(self, tool_call: ToolCall, request: AgentRunRequest, lineage: tuple[tuple[str, str, str], ...], session_id: str) -> ToolResult:
         child = self._delegation.request(tool_call, session_id)

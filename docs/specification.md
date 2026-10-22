@@ -627,11 +627,12 @@ Native definition format (consumed by `LLMProvider.complete_tool_call`):
 
 ### 14.3 Dispatch
 
-`OrchestratorToolDispatcher.dispatch(tool_call, run_agent, session_id, allowed, plan)`:
+`AgentOrchestrator._execute` handles `run_agent` itself; everything else goes to
+`OrchestratorToolDispatcher.dispatch(tool_call, session_id, allowed, plan)`:
 
 | Tool name | Handling |
 |---|---|
-| `run_agent` | Delegation via `AgentChildRunner` → recursive orchestrator run; the child result comes back as `ToolResult(data={"child_result": {...}})`, success iff child `status=="done"` |
+| `run_agent` | Delegation via `AgentOrchestrator._run_agent` → recursive orchestrator run; the child result comes back as `ToolResult(data={"child_result": {...}})`, success iff child `status=="done"` |
 | `execute_tool_sequence` | `tool_sequence.Executor.execute_plan(session_id, request.sequence_plan, allowed)` |
 | anything else | Registry lookup (unknown → `ToolResult(False, "unknown tool: …")`), argument validation via `SimpleSchemaValidator` (invalid → failure), then `tool.execute(parameters)` |
 

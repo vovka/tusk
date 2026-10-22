@@ -222,7 +222,7 @@ classDiagram
     build(session_id: str, request: AgentRunRequest) list[dict[str, str]]
   }
   class OrchestratorToolDispatcher {
-    dispatch(tool_call: ToolCall, run_agent: Callable[[ToolCall], ToolResult], session_id: str, allowed_tool_names: set[str] | None, sequence_plan: ToolSequencePlan | None) ToolResult
+    dispatch(tool_call: ToolCall, session_id: str, allowed_tool_names: set[str] | None, sequence_plan: ToolSequencePlan | None) ToolResult
   }
   class PlanValidator {
     validate_sequence(plan: ToolSequencePlan, allowed_tool_names: set[str]) str | None

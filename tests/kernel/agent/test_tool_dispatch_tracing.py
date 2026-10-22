@@ -26,7 +26,7 @@ def _dispatcher(registry: ToolRegistry, tracer: RecordingTracer) -> Orchestrator
 def test_dispatcher_wraps_real_tool_execution_in_span() -> None:
     tracer = RecordingTracer()
     dispatcher = _dispatcher(_registry(), tracer)
-    dispatcher.dispatch(ToolCall("gnome.press_keys", {}, "c1"), run_agent=lambda call: None)
+    dispatcher.dispatch(ToolCall("gnome.press_keys", {}, "c1"))
     assert tracer.spans[0]["name"] == "tool.gnome.press_keys"
     assert tracer.spans[0]["attributes"]["success"] == "True"
 

@@ -1,7 +1,6 @@
 import time
 from collections.abc import Callable
 
-from tusk.kernel.agent.confirmation.active_window_probe import ActiveWindowProbe
 from tusk.kernel.agent.confirmation.destructive_action_policy import DestructiveActionPolicy
 from tusk.kernel.agent.confirmation.pending_action import PendingAction
 from tusk.kernel.tools.tool_registry import ToolRegistry
@@ -17,11 +16,10 @@ _DECLINE_WORDS = {"no", "cancel", "stop", "no thanks"}
 
 class ConfirmationGate:
     def __init__(self, registry: ToolRegistry, policy: DestructiveActionPolicy | None = None,
-                 probe: ActiveWindowProbe | None = None, clock: Callable[[], float] = time.monotonic,
+                 clock: Callable[[], float] = time.monotonic,
                  ttl_seconds: float = 30.0, latency_meter: LatencyMeter | None = None) -> None:
         self._registry = registry
         self._policy = policy or DestructiveActionPolicy()
-        self._probe = probe or ActiveWindowProbe(registry)
         self._clock = clock
         self._ttl_seconds = ttl_seconds
         self._pending: PendingAction | None = None
@@ -52,7 +50,7 @@ class ConfirmationGate:
 
     def _hold(self, tool_name: str, arguments: dict[str, object], action: str) -> ToolResult:
         explicit_target = str(arguments.get("window_title", ""))
-        target = explicit_target or self._probe.title()
+        target = explicit_target or self._active_window_title()
         if not target:
             return ToolResult(False, f"refused: {action} needs an explicit target window")
         self._pending = PendingAction(tool_name, dict(arguments), target, not explicit_target, self._clock())
@@ -61,7 +59,15 @@ class ConfirmationGate:
         return ToolResult(False, f"needs_confirmation: {self._question} Do not retry; call done.")
 
     def _confirm(self, pending: PendingAction) -> KernelResponse:
-        if pending.follows_active_window and self._probe.title() != pending.target_window:
+        if pending.follows_active_window and self._active_window_title() != pending.target_window:
             return KernelResponse(True, f"Not done: the active window is no longer '{pending.target_window}'.")
         result = self._registry.get(pending.tool_name).execute(pending.arguments)
         return KernelResponse(True, "Done." if result.success else result.message)
+
+    def _active_window_title(self) -> str:
+        names = [tool.name for tool in self._registry.all_tools() if tool.name.endswith("get_active_window")]
+        if not names:
+            return ""
+        message = self._registry.get(names[0]).execute({}).message
+        # adapter reply format: "active window: <title> -> <application> [...]"
+        return message.removeprefix("active window:").split(" -> ")[0].strip()

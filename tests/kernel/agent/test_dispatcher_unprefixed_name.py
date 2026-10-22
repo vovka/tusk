@@ -18,12 +18,12 @@ def _dispatcher(names: tuple[str, ...], seen: list[str]) -> OrchestratorToolDisp
 def test_unprefixed_name_runs_the_unique_matching_tool() -> None:
     seen: list[str] = []
     call = ToolCall("switch_workspace", {"text": "2"})
-    assert _dispatcher(("gnome.switch_workspace",), seen).dispatch(call, lambda tool_call: None).success is True
+    assert _dispatcher(("gnome.switch_workspace",), seen).dispatch(call).success is True
     assert seen == ["gnome.switch_workspace"]
 
 
 def test_ambiguous_unprefixed_name_stays_unknown() -> None:
     seen: list[str] = []
     call = ToolCall("stop", {"text": "x"})
-    result = _dispatcher(("coding.stop", "dictation.stop"), seen).dispatch(call, lambda tool_call: None)
+    result = _dispatcher(("coding.stop", "dictation.stop"), seen).dispatch(call)
     assert result.message == "unknown tool: stop" and seen == []
