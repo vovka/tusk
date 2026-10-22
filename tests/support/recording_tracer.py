@@ -1,7 +1,7 @@
 from contextlib import contextmanager
 from collections.abc import Iterator
 
-from tests.recording_span_handle import RecordingSpanHandle
+from tests.support.recording_span_handle import RecordingSpanHandle
 from tusk.shared.interfaces.span_handle import SpanHandle
 from tusk.shared.interfaces.tracer import Tracer
 

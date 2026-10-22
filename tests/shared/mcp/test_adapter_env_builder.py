@@ -3,7 +3,7 @@ from pathlib import Path
 
 from tusk.shared.mcp import AdapterEnvironmentBuilder
 
-_REPO_ROOT = str(Path(__file__).resolve().parents[2])
+_REPO_ROOT = str(Path(__file__).resolve().parents[3])
 
 
 def test_base_env_prepends_repo_root_to_pythonpath(monkeypatch) -> None:

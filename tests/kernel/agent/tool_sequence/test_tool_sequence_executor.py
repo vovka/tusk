@@ -1,6 +1,6 @@
 import tempfile
 
-from tests.kernel_api_support import make_registry_tool
+from tests.support.kernel_api import make_registry_tool
 from tusk.kernel.agent.confirmation.confirmation_gate import ConfirmationGate
 from tusk.kernel.agent.session_store import SessionStore
 from tusk.kernel.agent.tool_sequence.executor import Executor

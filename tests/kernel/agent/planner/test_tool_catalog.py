@@ -1,4 +1,4 @@
-from tests.kernel_api_support import make_registry_tool
+from tests.support.kernel_api import make_registry_tool
 from tusk.kernel.agent.planner.tool_catalog import ToolCatalog
 from tusk.kernel.tools.tool_registry import ToolRegistry
 

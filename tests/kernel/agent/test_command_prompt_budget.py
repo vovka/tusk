@@ -5,7 +5,7 @@ from pathlib import Path
 from adapters.coding.server import TOOL_SCHEMAS as CODING_SCHEMAS
 from adapters.dictation.server import TOOL_SCHEMAS as DICTATION_SCHEMAS
 from adapters.gnome.tools.tool_schema_catalog import ToolSchemaCatalog
-from tests.kernel_api_support import make_agent, make_registry_tool
+from tests.support.kernel_api import make_agent, make_registry_tool
 from tusk.kernel.tools.switch_model_tool import SwitchModelTool
 from tusk.kernel.tools.tool_registry import ToolRegistry
 from tusk.shared.schemas.tools.tool_call import ToolCall

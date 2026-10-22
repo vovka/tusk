@@ -1,6 +1,6 @@
 import types
 
-from tests.recording_tracer import RecordingTracer
+from tests.support.recording_tracer import RecordingTracer
 from tusk.kernel.core.kernel_api import KernelAPI
 from tusk.shared.schemas.kernel_response import KernelResponse
 

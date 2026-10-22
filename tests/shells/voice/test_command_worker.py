@@ -1,7 +1,7 @@
 import threading
 import types
 
-from tests.command_worker_support import (
+from tests.support.command_worker import (
     await_condition,
     blocking_submit,
     broken_tts,

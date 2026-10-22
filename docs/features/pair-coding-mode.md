@@ -51,7 +51,7 @@ focused editor via select-all + clipboard automation.
 - **Crossed replies on the shared MCP stdio pipe.** The stop path runs on the voice thread while the worker thread can still
   be inside `coding.process_intent`; `MCPClient` had no lock and `MCPStdioTransport.write_line` discards unread output, so
   one call could get the other's reply or time out after 30 s (a "hung" stop or a lost edit). `MCPClient._request` is now
-  serialised (`tests/shared/test_mcp_client_concurrency.py`). A stop spoken mid-edit waits for that edit to finish.
+  serialised (`tests/shared/mcp/test_mcp_client_concurrency.py`). A stop spoken mid-edit waits for that edit to finish.
 - **STT variants of the stop phrase** ("pair-coding", "paired/pear coding", "pair programming", "okay ... please/now") no
   longer fall through to the LLM stop gate (`shells/voice/stages/gate/stop_gatekeeper.py`).
 

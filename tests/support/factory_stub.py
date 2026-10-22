@@ -1,4 +1,4 @@
-from tests.recording_backend import RecordingBackend
+from tests.support.recording_backend import RecordingBackend
 
 
 class FactoryStub:

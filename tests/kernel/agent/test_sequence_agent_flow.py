@@ -1,7 +1,7 @@
 import json
 import types
 
-from tests.kernel_api_support import make_agent, make_registry_tool
+from tests.support.kernel_api import make_agent, make_registry_tool
 from tusk.kernel.tools.tool_registry import ToolRegistry
 from tusk.shared.schemas.tools.tool_call import ToolCall
 from tusk.shared.schemas.tools.tool_result import ToolResult

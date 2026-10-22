@@ -1,6 +1,6 @@
 import threading
 
-from tests.command_worker_support import await_condition, blocking_submit, make_worker
+from tests.support.command_worker import await_condition, blocking_submit, make_worker
 
 
 def _start_blocked_worker(first: str):

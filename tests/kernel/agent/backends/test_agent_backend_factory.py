@@ -1,10 +1,10 @@
+from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
 
-from tests.backend_config import BackendConfig
-from tests.recording_agent import RecordingAgent
-from tests.recording_log_printer import RecordingLogPrinter
+from tests.support.recording_agent import RecordingAgent
+from tests.support.recording_log_printer import RecordingLogPrinter
 from tusk.kernel.agent.backends.agent_backend_factory import AgentBackendFactory
 from tusk.kernel.agent.backends.backend_request import BackendRequest
 from tusk.kernel.agent.backends.backend_result import BackendResult
@@ -16,7 +16,7 @@ from tusk.kernel.agent.backends.tusk_agent_backend import TuskAgentBackend
 
 def factory(agent_backend: str, fallback: str = "") -> tuple[AgentBackendFactory, RecordingLogPrinter]:
     log_printer = RecordingLogPrinter()
-    config = BackendConfig(agent_backend, fallback)
+    config = SimpleNamespace(agent_backend=agent_backend, agent_backend_fallback=fallback)
     return AgentBackendFactory(RecordingAgent(), config, log_printer), log_printer
 
 

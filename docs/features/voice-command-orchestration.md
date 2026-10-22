@@ -56,8 +56,8 @@ The voice shell uses the gatekeeper to classify utterances, then routes actionab
 - `tests/test_sequence_agent_flow.py`: happy-path sequence execution.
 - `tests/test_sequence_planner_validation.py`: planner validation and sequence promotion.
 - `tests/test_agent_runtime.py`: planner rejection, child bubbling, executor-done conversation guard.
-- `tests/test_executor_clipboard_guard.py`: clipboard sequencing constraints.
-- `tests/test_guardrail_gatekeeper.py`: structured-output fallback in the gatekeeper.
+- `tests/kernel/agent/guards/test_executor_clipboard_guard.py`: clipboard sequencing constraints.
+- `tests/shells/voice/gate/test_llm_gatekeeper.py`: structured-output fallback in the gatekeeper.
 
 ## Known Issues Or Future Improvements
 - Add post-LLM validation so tool calls must be in the currently exposed tool set.

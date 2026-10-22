@@ -4,7 +4,7 @@ import types
 from shells.voice.command_worker import CommandWorker
 from shells.voice.speech.chunked_speaker import ChunkedSpeaker
 from shells.voice.gate.llm_gatekeeper import LLMGatekeeper
-from tests.command_worker_support import await_condition
+from tests.support.command_worker import await_condition
 from tusk.shared.interrupt_token import InterruptToken
 from tusk.shared.schemas.kernel_response import KernelResponse
 from tusk.shared.schemas.voice.buffered_utterance import BufferedUtterance

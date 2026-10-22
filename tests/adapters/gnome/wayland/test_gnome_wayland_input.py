@@ -1,5 +1,5 @@
 from adapters.gnome.wayland.wayland_input_simulator import WaylandInputSimulator
-from tests.adapters.wayland_fake_bus import FakeBus
+from tests.support.wayland_fake_bus import FakeBus
 
 
 def test_press_keys_sends_normalized_combo() -> None:

@@ -1,4 +1,4 @@
-from tests.kernel_api_support import make_registry_tool
+from tests.support.kernel_api import make_registry_tool
 from tusk.kernel.agent.tool_sequence.plan_validator import PlanValidator
 from tusk.kernel.tools.tool_registry import ToolRegistry
 from tusk.shared.schemas.tools.tool_sequence_plan import ToolSequencePlan

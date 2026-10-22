@@ -2,7 +2,7 @@ import types
 
 from adapters.gnome.wayland.wayland_context_provider import WaylandContextProvider
 from adapters.gnome.wayland.wayland_window_tools import WaylandWindowTools
-from tests.adapters.wayland_fake_bus import FakeBus
+from tests.support.wayland_fake_bus import FakeBus
 
 
 def test_context_lists_windows_and_active_title() -> None:

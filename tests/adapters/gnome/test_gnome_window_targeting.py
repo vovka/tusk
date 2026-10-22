@@ -3,7 +3,7 @@ import types
 import adapters.gnome.x11.window_tools as window_tools_module
 from adapters.gnome.x11.window_tools import WindowTools
 from adapters.gnome.wayland.wayland_window_tools import WaylandWindowTools
-from tests.adapters.wayland_fake_bus import FakeBus
+from tests.support.wayland_fake_bus import FakeBus
 
 _SIMILAR = "0x01 0 host gedit\n0x02 0 host gedit - notes\n"
 _AMBIGUOUS = "0x01 0 host a.txt - gedit\n0x02 0 host b.txt - gedit\n"

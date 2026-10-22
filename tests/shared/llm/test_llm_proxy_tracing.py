@@ -1,6 +1,6 @@
 import types
 
-from tests.recording_tracer import RecordingTracer
+from tests.support.recording_tracer import RecordingTracer
 from tusk.shared.llm.llm_proxy import LLMProxy
 
 

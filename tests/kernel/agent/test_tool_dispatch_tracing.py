@@ -1,7 +1,7 @@
 import types
 
-from tests.kernel_api_support import make_registry_tool
-from tests.recording_tracer import RecordingTracer
+from tests.support.kernel_api import make_registry_tool
+from tests.support.recording_tracer import RecordingTracer
 from tusk.kernel.agent.confirmation.confirmation_gate import ConfirmationGate
 from tusk.kernel.agent.orchestrator_tool_dispatcher import OrchestratorToolDispatcher
 from tusk.kernel.agent.tool_sequence.executor import Executor

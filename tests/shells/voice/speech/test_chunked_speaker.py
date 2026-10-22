@@ -2,7 +2,7 @@ import threading
 import types
 
 from shells.voice.speech.chunked_speaker import ChunkedSpeaker
-from tests.command_worker_support import await_condition
+from tests.support.command_worker import await_condition
 
 
 def _speaker(engine: object | None, played: list[bytes], on_play: object | None = None) -> ChunkedSpeaker:

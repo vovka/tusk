@@ -1,6 +1,6 @@
 import types
 
-from tests.kernel_api_support import make_registry_tool
+from tests.support.kernel_api import make_registry_tool
 from tusk.kernel.agent.agent_profile import AgentProfile
 from tusk.kernel.agent.agent_run_request import AgentRunRequest
 from tusk.kernel.agent.toolset.toolset_builder import ToolsetBuilder

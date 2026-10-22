@@ -327,7 +327,7 @@ tusk/                        (repo root)
 | A data shape crossing layers | `tusk/shared/schemas/` |
 | Cross-layer plumbing (config, MCP, observability) | `tusk/shared/<area>/` |
 | An engine implementation behind a shared ABC (LLM/STT/TTS) | `tusk/providers/<kind>/` |
-| Tests | `tests/<mirror of source package>`; cross-tree tests and shared helpers at `tests/` root |
+| Tests | `tests/<mirror of source package>`; cross-tree tests at `tests/` root; shared fakes in `tests/support/` |
 | Composition/wiring | `main.py` / `composition/` — the only places allowed to import everything |
 | Dev-only tooling | `tools/` |
 
