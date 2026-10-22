@@ -39,6 +39,49 @@ def test_recovery_prompt_normalizes_wake_word_variants() -> None:
     assert "u3: Hey TASC, how do you do? | normalized: hey tusk how do you do" in prompt
 
 
+def test_recovery_is_skipped_for_non_referential_ambient_chatter() -> None:
+    calls = _counting_gatekeeper([_ambient()]).process(_cue_buffered("the weather is lovely today"), [], _one_candidate())
+    assert calls.action == "drop"
+    assert _CALL_COUNT["n"] == 1  # only the primary classification, no recovery call
+
+
+def test_recovery_runs_when_utterance_has_a_reference_cue() -> None:
+    _counting_gatekeeper([_ambient(), _none()]).process(_cue_buffered("no the last one"), [], _one_candidate())
+    assert _CALL_COUNT["n"] == 2
+
+
+def test_recovery_runs_for_directed_conversation_without_a_cue() -> None:
+    _counting_gatekeeper([_conversation(), _none()]).process(_cue_buffered("good morning friend"), [], _one_candidate())
+    assert _CALL_COUNT["n"] == 2
+
+
+def test_recovery_runs_when_wake_word_present() -> None:
+    _counting_gatekeeper([_ambient(), _none()]).process(_cue_buffered("hello there tusk"), [], _one_candidate())
+    assert _CALL_COUNT["n"] == 2
+
+
+_CALL_COUNT = {"n": 0}
+
+
+def _counting_gatekeeper(responses: list[str]) -> LLMGatekeeper:
+    _CALL_COUNT["n"] = 0
+
+    def complete_structured(prompt: str, *_args) -> str:
+        _CALL_COUNT["n"] += 1
+        return responses.pop(0)
+
+    llm = types.SimpleNamespace(label="gate", complete_structured=complete_structured)
+    return LLMGatekeeper(llm, types.SimpleNamespace(log=lambda *a: None), time_source=lambda: 0.0)
+
+
+def _cue_buffered(text: str) -> BufferedUtterance:
+    return BufferedUtterance("u2", _utterance(text), 2.0)
+
+
+def _one_candidate() -> list[BufferedUtterance]:
+    return [BufferedUtterance("u1", _utterance("open Firefox"), 1.0, dropped=True)]
+
+
 def _gatekeeper(responses: list[str], prompts: list[str] | None = None, time_source: object | None = None) -> LLMGatekeeper:
     llm = _llm(responses, [] if prompts is None else prompts)
     return LLMGatekeeper(llm, _log(), time_source=time_source or (lambda: 0.0))
@@ -90,3 +133,7 @@ def _none() -> str:
 
 def _command() -> str:
     return '{"classification":"command","cleaned_text":"close it","reason":"follow up"}'
+
+
+def _conversation() -> str:
+    return '{"classification":"conversation","cleaned_text":"good morning friend","reason":"chat"}'

@@ -66,7 +66,7 @@ sequenceDiagram
 ## Testing
 
 - Unit: `docker compose exec tusk pytest tests/` (`test_interrupt_token`, `test_command_worker`,
-  `test_speech_playback`, `test_gatekeeper_interrupt`, `test_playback_gate`, `test_pipeline_interrupt`,
+  `test_speech_playback`, `test_llm_gatekeeper_context`, `test_playback_gate`, `test_pipeline_interrupt`,
   `test_agent_runtime_cancellation`, `test_llm_retry_interrupt`, …)
 - E2E (real Groq calls, scripted audio edges, no MCP adapters):
   `docker compose exec tusk python -m e2e.run_e2e voice` — 5 scenarios: interrupt mid-run,

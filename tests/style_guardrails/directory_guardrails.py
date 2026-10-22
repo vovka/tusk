@@ -4,7 +4,7 @@ __all__ = ["DirectoryGuardrails"]
 
 _MAX_FILES_PER_DIRECTORY = 12
 _MAX_PACKAGE_DEPTH = 5
-_SOURCE_ROOTS = ("tusk", "shells", "adapters", "composition", "e2e", "demos", "launcher")
+_SOURCE_ROOTS = ("tusk", "shells", "adapters", "composition", "e2e", "demos", "launcher", "tests")
 
 
 class DirectoryGuardrails:

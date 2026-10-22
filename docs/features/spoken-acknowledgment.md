@@ -38,8 +38,8 @@ silent when TTS is off, spoken when it is on, and toggleable independently.
   `intent` (negligible cost).
 
 ## Testing Strategy
-- `tests/shells/voice/gate/test_llm_client_parsing.py`, `test_command_gate_prompt.py`: `intent` parsing and prompt.
-- `tests/shells/voice/gate/test_gatekeeper_support.py`, `test_gatekeeper_follow_up.py`, `test_llm_gatekeeper.py`: command and conversation dispatch carry `intent`; schema requires it.
+- `tests/shells/voice/gate/test_llm_client.py`, `test_command_gate_prompt.py`: `intent` parsing and prompt.
+- `tests/shells/voice/gate/test_gatekeeper_support.py`, `test_llm_gatekeeper_context.py`, `test_llm_gatekeeper.py`: command and conversation dispatch carry `intent`; schema requires it.
 - `tests/shells/voice/test_command_worker_refrain.py`: refrain spoken over submit, skipped when disabled/empty, logged when TTS off.
 - `tests/shells/voice/test_pipeline.py`, `tests/shared/config/test_config_factory.py`: refrain forwarding and `TUSK_ACK` parsing.
 

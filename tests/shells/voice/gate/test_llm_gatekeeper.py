@@ -1,8 +1,11 @@
 import types
 
 from shells.voice.gate.llm_gatekeeper import LLMGatekeeper
+from tusk.shared.schemas.voice.gate_action import GateAction
 from tusk.shared.schemas.voice.buffered_utterance import BufferedUtterance
 from tusk.shared.schemas.voice.utterance import Utterance
+
+_AMBIENT = '{"classification":"ambient","cleaned_text":"","reason":"misspelled wake word"}'
 
 
 def test_gatekeeper_uses_structured_output() -> None:
@@ -59,6 +62,29 @@ def test_gatekeeper_logs_result_summary() -> None:
         "classification=command directed=True text='open Firefox' reason='wake word'",
         "gatekeeper",
     )
+
+
+def test_leading_wake_word_forwards_even_when_llm_says_ambient() -> None:
+    # E2E: 'TOSK maximize it.' hit a structured 400, fallback said ambient, command was dropped
+    dispatch = _fallback_gatekeeper(lambda *a: _AMBIENT).process(_buffered("TOSK maximize it."), [], [])
+    assert dispatch.action == GateAction.FORWARD_CURRENT
+    assert dispatch.kind == "command"
+    assert dispatch.text == "TOSK maximize it."
+
+
+def test_leading_wake_word_forwards_when_gatekeeper_llm_fails_entirely() -> None:
+    dispatch = _fallback_gatekeeper(_structured_failure).process(_buffered("Tusk, maximize it."), [], [])
+    assert dispatch.action == GateAction.FORWARD_CURRENT
+
+
+def test_mid_sentence_wake_word_still_respects_ambient() -> None:
+    dispatch = _fallback_gatekeeper(lambda *a: _AMBIENT).process(_buffered("I told tusk about it."), [], [])
+    assert dispatch.action == GateAction.DROP
+
+
+def _fallback_gatekeeper(complete) -> LLMGatekeeper:
+    llm = types.SimpleNamespace(label="gate", complete_structured=_structured_failure, complete=complete)
+    return LLMGatekeeper(llm, types.SimpleNamespace(log=lambda *a: None), time_source=lambda: 0.0)
 
 
 def _gatekeeper(calls: list[tuple]) -> LLMGatekeeper:

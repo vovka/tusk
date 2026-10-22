@@ -1,3 +1,4 @@
+import json
 import types
 
 from shells.voice.gate.llm_gatekeeper import LLMGatekeeper
@@ -41,6 +42,36 @@ def test_conversation_dispatch_carries_intent_refrain() -> None:
     assert gatekeeper.process(_buffered("Tusk tell me a joke"), [], []).intent == "Telling a joke"
 
 
+def test_interrupt_classification_dispatches_interrupt_when_busy() -> None:
+    gatekeeper = _busy_gatekeeper(_classifying_llm("interrupt"), busy=True)
+    dispatch = gatekeeper.process(_buffered("forget it, that is wrong"), [], [])
+    assert dispatch.action == "interrupt"
+
+
+def test_interrupt_classification_ignored_when_idle() -> None:
+    gatekeeper = _busy_gatekeeper(_classifying_llm("interrupt"), busy=False)
+    dispatch = gatekeeper.process(_buffered("stop"), [], [])
+    assert dispatch.action == "drop"
+
+
+def test_busy_state_reaches_prompt() -> None:
+    prompts: list[str] = []
+    gatekeeper = _busy_gatekeeper(_classifying_llm("ambient", prompts), busy=True, speaking="reading a long reply")
+    gatekeeper.process(_buffered("anything"), [], [])
+    assert "reading a long reply" in prompts[0]
+
+
+def test_command_classification_dispatches_with_command_kind() -> None:
+    dispatch = _kind_gatekeeper("command").process(_buffered("open gedit"), [], [])
+    assert dispatch.kind == "command"
+    assert dispatch.text == "open gedit"
+
+
+def test_conversation_classification_keeps_conversation_kind() -> None:
+    dispatch = _kind_gatekeeper("conversation").process(_buffered("hey tusk how are you"), [], [])
+    assert dispatch.kind == "conversation"
+
+
 def _llm(prompts: list[str]) -> object:
     def complete_structured(prompt: str, *_args) -> str:
         prompts.append(prompt)
@@ -59,3 +90,29 @@ def _buffered(text: str) -> BufferedUtterance:
 
 def _log() -> object:
     return types.SimpleNamespace(log=lambda *args: None)
+
+
+def _classifying_llm(classification: str, prompts: list[str] | None = None) -> object:
+    def complete_structured(prompt, text, name, schema, max_tokens):
+        if prompts is not None:
+            prompts.append(prompt)
+        return json.dumps({"classification": classification, "cleaned_text": text, "reason": "test"})
+    return types.SimpleNamespace(complete_structured=complete_structured)
+
+
+def _busy_gatekeeper(llm: object, busy: bool, speaking: str | None = None) -> LLMGatekeeper:
+    log = types.SimpleNamespace(log=lambda *args: None)
+    return LLMGatekeeper(
+        llm, log, is_busy=lambda: busy, current_speech_text=lambda: speaking,
+    )
+
+
+def _intent_llm(classification: str) -> object:
+    def complete_structured(prompt, text, name, schema, max_tokens):
+        return json.dumps({"classification": classification, "cleaned_text": text, "intent": "Doing it", "reason": "test"})
+    return types.SimpleNamespace(complete_structured=complete_structured)
+
+
+def _kind_gatekeeper(classification: str) -> LLMGatekeeper:
+    log = types.SimpleNamespace(log=lambda *args: None)
+    return LLMGatekeeper(_intent_llm(classification), log)
