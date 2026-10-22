@@ -27,6 +27,12 @@ def test_sequence_executor_aborts_on_failed_step() -> None:
     assert result.data["failed_step_id"] == "s1"
 
 
+def test_sequence_executor_reports_invalid_plan_as_sequence_plan() -> None:
+    plan = ToolSequencePlan.from_dict({"goal": "Type text", "steps": _plan("hello")["steps"] * 2})
+    result = _executor(_settle_registry()).execute_plan("s1", plan, {"gnome.type_text"})
+    assert (result.success, result.message) == (False, "sequence_plan contains duplicate step ids")
+
+
 def _executor(registry: ToolRegistry) -> Executor:
     store = SessionStore(tempfile.mkdtemp(prefix="tusk-sequence-exec-"))
     return Executor(registry, store, confirmation=ConfirmationGate(registry))

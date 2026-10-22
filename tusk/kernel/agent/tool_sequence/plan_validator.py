@@ -14,25 +14,26 @@ class PlanValidator:
         self._schemas = SimpleSchemaValidator()
 
     def validate_steps(self, plan: ToolSequencePlan) -> str | None:
-        return self._steps(plan) or self._tools(plan) or self._args(plan)
+        return self._steps(plan, "planned_steps") or self._tools(plan, "planned_steps") or self._args(plan)
 
     def validate_sequence(self, plan: ToolSequencePlan, allowed_tool_names: set[str]) -> str | None:
-        return self.validate_steps(plan) or self._sequence_tools(plan, allowed_tool_names)
+        return (self._steps(plan, "sequence_plan") or self._tools(plan, "sequence_plan")
+                or self._sequence_tools(plan, allowed_tool_names) or self._args(plan))
 
-    def _steps(self, plan: ToolSequencePlan) -> str | None:
+    def _steps(self, plan: ToolSequencePlan, field_name: str) -> str | None:
         ids = [step.step_id for step in plan.steps]
         if not ids:
-            return "planned_steps requires at least one step"
+            return f"{field_name} requires at least one step"
         if len(plan.steps) > _MAX_STEPS:
-            return f"planned_steps exceeds max steps ({_MAX_STEPS})"
+            return f"{field_name} exceeds max steps ({_MAX_STEPS})"
         if any(not step.tool_name or not step.step_id for step in plan.steps):
-            return "planned_steps step ids and tool_name values must be non-empty"
-        return None if len(ids) == len(set(ids)) else "planned_steps contains duplicate step ids"
+            return f"{field_name} step ids and tool_name values must be non-empty"
+        return None if len(ids) == len(set(ids)) else f"{field_name} contains duplicate step ids"
 
-    def _tools(self, plan: ToolSequencePlan) -> str | None:
+    def _tools(self, plan: ToolSequencePlan, field_name: str) -> str | None:
         for step in plan.steps:
             if step.tool_name in _FORBIDDEN_TOOLS:
-                return f"{step.step_id}: synthetic tools are not allowed in planned_steps"
+                return f"{step.step_id}: synthetic tools are not allowed in {field_name}"
             if step.tool_name not in self._registry.tool_names():
                 return f"{step.step_id}: unknown tool: {step.tool_name}"
         return None

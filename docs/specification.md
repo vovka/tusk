@@ -447,19 +447,19 @@ planner-visible tool's `name`, `description`, `input_schema`, `source`, and
 After a planner child finishes with `status=done`,
 `ResultValidator` (`planner/result_validator.py`) runs:
 
-1. `StepPlanValidator` on `payload.planned_steps`: parseable plan, 1–8 steps, unique
-   non-empty step ids and tool names, no synthetic tools (`done`,
+1. `PlanValidator.validate_steps` on `payload.planned_steps`: parseable plan, 1–8 steps,
+   unique non-empty step ids and tool names, no synthetic tools (`done`,
    `execute_tool_sequence`, `list_available_tools`, `run_agent`), every tool known to
    the registry, args valid against each tool's schema (`SimpleSchemaValidator`).
    Any violation → the child result is replaced by `status="failed"`.
 2. `selected_tool_names` is **normalized from the plan's step order** (the planner's
    own list is overwritten).
-3. `execution_mode == "normal"` → `SequencePromoter.promote`: the plan is re-validated
-   as a sequence (`PlanValidator`: same step rules **plus** every tool
-   `sequence_callable` and the plan's tool set equal to `selected_tool_names`); if it
-   passes, `execution_mode` is flipped to `sequence` and `payload.sequence_plan` is
-   materialized; if not, the plan stays `normal`.
-4. `execution_mode == "sequence"` → `PlanValidator` must pass, else `failed`.
+3. `PlanValidator.validate_sequence` re-checks the plan as a sequence (same step rules
+   **plus** every tool `sequence_callable` and the plan's tool set equal to
+   `selected_tool_names`). `execution_mode == "normal"` → if it passes, `execution_mode`
+   is flipped to `sequence` and `payload.sequence_plan` is materialized; if not, the
+   plan stays `normal`.
+4. `execution_mode == "sequence"` → `validate_sequence` must pass, else `failed`.
 
 ---
 
@@ -508,7 +508,7 @@ order if a plan exists, else the request's own names, else the payload's
   the compiled plan travels on the `AgentRunRequest` and is retrieved by the
   dispatcher, never through LLM-provided arguments.
 
-`ExecutorToolGuard`: an executor run with zero runtime tools terminates immediately
+`Delegation.refusal`: an executor run with zero runtime tools terminates immediately
 with `AgentResult(status="need_tools")`.
 
 ---
@@ -571,8 +571,7 @@ Max steps exhausted → `AgentResult(status="failed", "max steps reached")`.
 
 | Guard | Scope | Rule |
 |---|---|---|
-| `AgentRunGuard` | orchestrator, pre-run | Unknown profile → `failed`; delegation depth ≥ 4 → `failed`; a profile already present in the lineage → `failed` ("recursive delegation detected") |
-| `ExecutorToolGuard` | orchestrator, pre-run | Executor with no runtime tools → `need_tools` |
+| `Delegation.refusal` | orchestrator, pre-run | Unknown profile → `failed`; delegation depth ≥ 4 → `failed`; a profile already present in the lineage → `failed` ("recursive delegation detected"); executor with no runtime tools → `need_tools` |
 | `ConversationDelegationGuard` | per step | After an `executor`/`default` child returns `status=done`, or after 2 such children end `failed`/`need_tools`, another `run_agent` from `conversation` is a violation |
 | `ExecutorClipboardGuard` | per step | After a successful clipboard write/copy: writing different text, or copying again before a paste, is a violation; a paste (`<ctrl>v` variants, `shift+insert`) resets the state |
 | `RepeatedToolCallGuard` | per step | 3 consecutive identical calls → run fails |
@@ -1301,7 +1300,7 @@ apps start on the host desktop rather than inside the container.
 | `AgentRuntime` | max steps (8/16) / guard violation / 3× repeated call | `AgentResult(status="failed")` |
 | `AgentRuntime` | `InterruptToken` set | `AgentResult(status="cancelled")` at the next step boundary |
 | `ResultFactory.model_failure_text` | rate limit / json_validate_failed / tool_use_failed / empty completion / other | canned user-facing reply per class |
-| `ResultValidator` / `StepPlanValidator` / `PlanValidator` | invalid planner output | child result replaced by `status="failed"` with the violation message |
+| `ResultValidator` / `PlanValidator` | invalid planner output | child result replaced by `status="failed"` with the violation message |
 | `tool_sequence.Executor` | step failure / interrupt | aborts remaining steps; partial payload with `completed_step_ids`, `failed_step_id` |
 | `OrchestratorToolDispatcher` | unknown tool / invalid args | `ToolResult(False, ...)` back to the LLM |
 | `MCPToolProxy` | transport error / adapter `isError` | `ToolResult(False, message)` |

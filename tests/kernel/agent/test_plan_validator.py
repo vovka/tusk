@@ -53,7 +53,22 @@ def test_validate_sequence_rejects_tool_set_mismatch() -> None:
 
 def test_validate_sequence_runs_step_checks_first() -> None:
     plan = _plan([_step("s1"), _step("s1")])
-    assert _validator().validate_sequence(plan, {"gnome.type_text"}) == "planned_steps contains duplicate step ids"
+    assert _validator().validate_sequence(plan, {"gnome.type_text"}) == "sequence_plan contains duplicate step ids"
+
+
+def test_validate_sequence_labels_step_errors_as_sequence_plan() -> None:
+    assert _validator().validate_sequence(_plan([]), set()) == "sequence_plan requires at least one step"
+
+
+def test_validate_sequence_labels_synthetic_tool_errors_as_sequence_plan() -> None:
+    message = _validator().validate_sequence(_plan([_step("s1", "done")]), {"done"})
+    assert message == "s1: synthetic tools are not allowed in sequence_plan"
+
+
+def test_validate_sequence_checks_sequence_callable_before_args() -> None:
+    plan = _plan([_step("s1", args={"text": 5})])
+    message = _validator(sequence_callable=False).validate_sequence(plan, {"gnome.type_text"})
+    assert message == "s1: tool is not sequence_callable: gnome.type_text"
 
 
 def test_validate_sequence_accepts_valid_plan() -> None:
