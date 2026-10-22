@@ -1,13 +1,17 @@
 from tusk.shared.schemas.tools.tool_call import ToolCall
 from tusk.shared.schemas.tools.tool_result import ToolResult
+from tusk.kernel.agent.agent_profile import AgentProfile
 from tusk.kernel.agent.agent_result import AgentResult
 from tusk.kernel.agent.agent_run_request import AgentRunRequest
 from tusk.kernel.agent.session.store import Store
 
-__all__ = ["AgentChildRunner"]
+__all__ = ["Delegation"]
+
+_MAX_DEPTH = 4
+Lineage = tuple[tuple[str, str, str], ...]
 
 
-class AgentChildRunner:
+class Delegation:
     def __init__(self, session_store: Store) -> None:
         self._store = session_store
 
@@ -24,6 +28,22 @@ class AgentChildRunner:
 
     def invalid_request(self) -> ToolResult:
         return ToolResult(False, "run_agent requires an instruction")
+
+    def refusal(
+        self, request: AgentRunRequest, profile: AgentProfile | None, lineage: Lineage, runtime_names: set[str]
+    ) -> AgentResult | None:
+        if profile is None:
+            return AgentResult("failed", "", f"unknown profile: {request.profile_id}")
+        if len(lineage) >= _MAX_DEPTH:
+            return AgentResult("failed", "", "delegation depth exceeded")
+        if any(entry[0] == request.profile_id for entry in lineage):
+            return AgentResult("failed", "", "recursive delegation detected")
+        if profile.profile_id == "executor" and not runtime_names:
+            return AgentResult("need_tools", "", "executor requires runtime tools")
+        return None
+
+    def child_lineage(self, request: AgentRunRequest, session_id: str, lineage: Lineage) -> Lineage:
+        return (*lineage, (request.profile_id, session_id, request.instruction[:80]))
 
     def started(self, parent_session_id: str, child: AgentRunRequest) -> None:
         data = {"child_profile": child.profile_id, "child_instruction": child.instruction[:120]}

@@ -3,17 +3,15 @@ from dataclasses import replace
 from tusk.shared.schemas.tools.tool_call import ToolCall
 from tusk.shared.schemas.tools.tool_result import ToolResult
 from tusk.kernel.tools.tool_registry import ToolRegistry
-from tusk.kernel.agent.agent_child_runner import AgentChildRunner
 from tusk.kernel.agent.agent_profile import AgentProfile
 from tusk.kernel.agent.agent_result import AgentResult
-from tusk.kernel.agent.guards.agent_run_guard import AgentRunGuard
 from tusk.kernel.agent.agent_run_request import AgentRunRequest
 from tusk.kernel.agent.agent_runtime import AgentRuntime
 from tusk.kernel.agent.runtime.step_recorder import StepRecorder
 from tusk.kernel.agent.session.store import Store
 from tusk.kernel.agent.agent_tool_catalog import AgentToolCatalog
 from tusk.kernel.agent.agent_toolset_builder import AgentToolsetBuilder
-from tusk.kernel.agent.guards.executor_tool_guard import ExecutorToolGuard
+from tusk.kernel.agent.delegation import Delegation
 from tusk.kernel.agent.orchestrator_tool_dispatcher import OrchestratorToolDispatcher
 from tusk.kernel.agent.planner.result_validator import ResultValidator
 from tusk.kernel.agent.planner.runtime_tool_resolver import RuntimeToolResolver
@@ -45,9 +43,7 @@ class AgentOrchestrator:
     def _init_components(self, store: Store, log: LogPrinter, registry: ToolRegistry, token: object | None, tracer: Tracer | None,
                          confirmation: ConfirmationGate) -> None:
         self._runtime = AgentRuntime(store, log, StepRecorder(store, registry), token)
-        self._guard = AgentRunGuard()
-        self._children = AgentChildRunner(store)
-        self._executor_tools = ExecutorToolGuard()
+        self._delegation = Delegation(store)
         self._catalog = AgentToolCatalog(registry)
         self._planner_results = ResultValidator(log)
         self._resolved_tools = RuntimeToolResolver(store)
@@ -61,21 +57,14 @@ class AgentOrchestrator:
     def _run(self, request: AgentRunRequest, lineage: tuple[tuple[str, str, str], ...]) -> AgentResult:
         request = self._prepared(request)
         profile = self._profiles.get(request.profile_id)
-        failure = self._validate(request, profile, lineage)
+        runtime_names = self._tools.runtime_names(profile, request) if profile else set()
+        failure = self._delegation.refusal(request, profile, lineage, runtime_names)
         if failure:
             return failure
         assert profile is not None
         tools = self._tools.build(profile, request)
         run = lambda call, sid: self._execute(call, request, lineage, sid)
         return self._runtime.run(request, profile, tools, run)
-
-    def _validate(self, request: AgentRunRequest, profile: AgentProfile | None, lineage: tuple[tuple[str, str, str], ...]) -> AgentResult | None:
-        failure = self._guard.validate(request, profile, lineage)
-        if failure:
-            return failure
-        if profile is not None:
-            return self._check_executor(profile, request)
-        return None
 
     def _prepared(self, request: AgentRunRequest) -> AgentRunRequest:
         request = self._enrich_planner(request)
@@ -86,24 +75,20 @@ class AgentOrchestrator:
             return request
         return replace(request, instruction=f"{request.instruction}\n{self._catalog.prompt_text()}")
 
-    def _check_executor(self, profile: AgentProfile, request: AgentRunRequest) -> AgentResult | None:
-        names = self._tools.runtime_names(profile, request)
-        return self._executor_tools.validate(profile.profile_id, request, names)
-
     def _execute(self, call: ToolCall, request: AgentRunRequest, lineage: tuple[tuple[str, str, str], ...], sid: str) -> ToolResult:
         agent_runner = lambda tc: self._run_agent(tc, request, lineage, sid)
         return self._dispatcher.dispatch(call, agent_runner, sid, set(request.runtime_tool_names), request.sequence_plan)
 
     def _run_agent(self, tool_call: ToolCall, request: AgentRunRequest, lineage: tuple[tuple[str, str, str], ...], session_id: str) -> ToolResult:
-        child = self._children.request(tool_call, session_id)
+        child = self._delegation.request(tool_call, session_id)
         if not child.instruction:
-            return self._children.invalid_request()
+            return self._delegation.invalid_request()
         return self._delegate(child, request, lineage, session_id)
 
     def _delegate(self, child: AgentRunRequest, request: AgentRunRequest, lineage: tuple[tuple[str, str, str], ...], session_id: str) -> ToolResult:
-        self._children.started(session_id, child)
-        child_lineage = self._guard.child_lineage(request, session_id, lineage)
+        self._delegation.started(session_id, child)
+        child_lineage = self._delegation.child_lineage(request, session_id, lineage)
         result = self._run(child, child_lineage)
         result = self._planner_results.validate(child.profile_id, result, self._registry)
-        self._children.finished(session_id, child.profile_id, result)
-        return self._children.result(child.profile_id, result)
+        self._delegation.finished(session_id, child.profile_id, result)
+        return self._delegation.result(child.profile_id, result)

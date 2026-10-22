@@ -268,7 +268,7 @@ tusk/                        (repo root)
 │   │   ├── agent/           # Agentic loop: AgentOrchestrator, AgentRuntime, tool catalog/toolset, dispatcher
 │   │   │   ├── backends/    # AgentBackend ABC; tusk / codex_exec / codex_mcp / fallback backends
 │   │   │   │   └── codex_mcp/ # Persistent codex mcp-server session (Client, CallBuilder, ResponseReader, ResultMapper)
-│   │   │   ├── guards/      # AgentRunGuard + turn guards (delegation, failure budget, clipboard, executor tools)
+│   │   │   ├── guards/      # Turn guards (delegation, failure budget, clipboard, typing)
 │   │   │   ├── planner/     # Planner output validation, sequence promotion, runtime tool resolution
 │   │   │   ├── runtime/     # Message history builder, result factory, step recorder, guard composition
 │   │   │   ├── session/     # Store ABC, FileStore event log, event formatter
@@ -576,9 +576,8 @@ Shared across all profiles. Each run:
 - `ExecutorClipboardGuard` — blocks repeated `write_clipboard` calls without progress
   toward focus/paste in between.
 
-`AgentOrchestrator` additionally applies `guards.AgentRunGuard` (recursion depth,
-self-delegation, lineage) before a run and `guards.ExecutorToolGuard` (validates the
-resolved runtime tool names) for executor requests.
+`AgentOrchestrator` additionally applies `Delegation.refusal` (unknown profile, recursion
+depth, self-delegation, executor without runtime tools) before a run.
 
 ### History
 
@@ -602,7 +601,7 @@ When the executor profile receives `session_refs=[planner_session_id]`,
 
 Delegation is controlled solely by `AgentProfile.static_tool_names`: a profile with
 `"run_agent"` can delegate to any child profile (`planner`, `executor`, `default`);
-`guards.AgentRunGuard` blocks self-recursion and excessive depth but does not enforce
+`Delegation` blocks self-recursion and excessive depth but does not enforce
 parent-specific child allowlists. `conversation` and `default` can delegate; `planner`
 and `executor` cannot.
 

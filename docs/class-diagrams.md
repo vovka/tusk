@@ -136,13 +136,6 @@ classDiagram
 
 ```mermaid
 classDiagram
-  class AgentChildRunner {
-    finished(parent_session_id: str, profile_id: str, result: AgentResult) None
-    invalid_request() ToolResult
-    request(tool_call: ToolCall, parent_session_id: str) AgentRunRequest
-    result(profile_id: str, agent_result: AgentResult) ToolResult
-    started(parent_session_id: str, child: AgentRunRequest) None
-  }
   class AgentOrchestrator {
     run(request: AgentRunRequest) AgentResult
   }
@@ -163,10 +156,6 @@ classDiagram
     text : str
     reply_text() str
     to_dict() dict[str, object]
-  }
-  class AgentRunGuard {
-    child_lineage(request: AgentRunRequest, session_id: str, lineage: tuple[tuple[str, str, str], ...]) tuple[tuple[str, str, str], ...]
-    validate(request: AgentRunRequest, profile: AgentProfile | None, lineage: tuple[tuple[str, str, str], ...]) AgentResult | None
   }
   class AgentRunRequest {
     execution_mode : str
@@ -191,6 +180,15 @@ classDiagram
     build(profile: AgentProfile, request: AgentRunRequest) list[dict[str, object]]
     runtime_names(profile: AgentProfile, request: AgentRunRequest) set[str]
   }
+  class Delegation {
+    child_lineage(request: AgentRunRequest, session_id: str, lineage: Lineage) Lineage
+    finished(parent_session_id: str, profile_id: str, result: AgentResult) None
+    invalid_request() ToolResult
+    refusal(request: AgentRunRequest, profile: AgentProfile | None, lineage: Lineage, runtime_names: set[str]) AgentResult | None
+    request(tool_call: ToolCall, parent_session_id: str) AgentRunRequest
+    result(profile_id: str, agent_result: AgentResult) ToolResult
+    started(parent_session_id: str, child: AgentRunRequest) None
+  }
   class ConversationFailureBudgetGuard {
     observe(tool_call: ToolCall, tool_result: ToolResult) None
     violation(profile_id: str, tool_call: ToolCall) str | None
@@ -210,9 +208,6 @@ classDiagram
   class ExecutorClipboardGuard {
     observe(tool_call: ToolCall, tool_result: ToolResult) None
     violation(profile_id: str, tool_call: ToolCall) str | None
-  }
-  class ExecutorToolGuard {
-    validate(profile_id: str, request: AgentRunRequest, runtime_names: set[str]) AgentResult | None
   }
   class FileStore {
     append_event(session_id: str, event_type: str, data: dict[str, object]) None
