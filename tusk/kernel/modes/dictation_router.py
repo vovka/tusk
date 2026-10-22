@@ -1,6 +1,6 @@
 from tusk.shared.schemas.tools.tool_result import ToolResult
 from tusk.shared.schemas.kernel_response import KernelResponse
-from tusk.kernel.modes.mode_slot import ModeSlot
+from tusk.kernel.modes.mode_state import ModeState
 from tusk.kernel.tools.tool_registry import ToolRegistry
 from tusk.shared.logging.interfaces.log_printer import LogPrinter
 
@@ -8,12 +8,11 @@ __all__ = ["DictationRouter"]
 
 
 class DictationRouter:
-    def __init__(self, tool_registry: ToolRegistry, slot: ModeSlot, log_printer: LogPrinter) -> None:
+    def __init__(self, tool_registry: ToolRegistry, log_printer: LogPrinter) -> None:
         self._registry = tool_registry
-        self._slot = slot
         self._log = log_printer
 
-    def process(self, state: object, text: str) -> KernelResponse:
+    def process(self, state: ModeState, text: str) -> KernelResponse:
         result = self._segment_result(state, text)
         self._log.log("DICTATION", f"segment={text!r}")
         if not result.success or result.data is None:
@@ -25,12 +24,11 @@ class DictationRouter:
             return KernelResponse(False, apply_result.message)
         return KernelResponse(True, result.message)
 
-    def stop(self, state: object) -> KernelResponse:
+    def stop(self, state: ModeState) -> KernelResponse:
         self._registry.get(f"{state.adapter_name}.stop_dictation").execute({"session_id": state.session_id})
-        self._slot.stop()
         return KernelResponse(True, "Dictation stopped.")
 
-    def _segment_result(self, state: object, text: str) -> object:
+    def _segment_result(self, state: ModeState, text: str) -> ToolResult:
         name = f"{state.adapter_name}.process_segment"
         return self._registry.get(name).execute({"session_id": state.session_id, "text": text})
 

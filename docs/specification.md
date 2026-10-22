@@ -727,7 +727,7 @@ otherwise            → command_mode.process_command(text)
 `KernelAPI._reported_route` wraps the route call in `try/finally`: `REACTING` (with the
 text as detail) on entry, prior status restored on exit.
 
-### 16.2 ModeSlot and AdapterMode
+### 16.2 ModeSlot and ModeState
 
 `KernelAPI` holds two `ModeSlot`s (`DICTATION`/"Dictation started.",
 `CODING`/"Coding started."). A slot owns the switchable mode lifecycle:
@@ -735,10 +735,10 @@ text as detail) on entry, prior status restored on exit.
 - `attach_router(router)` — wired once at startup by `ToolRuntime`
 - `set_callbacks(on_start, on_stop)` — wired by `ShellLoader` to swap the voice
   gatekeeper (§16.4)
-- `start(state)` — builds an `AdapterMode(state, router, log, tag)`, fires `on_start`,
+- `start(state)` — stores the `ModeState`, fires `on_start`,
   returns the start reply
 - `process_text(text)` → `router.process(state, text)`; `request_stop()` →
-  `mode.stop()` → `router.stop(state)`; `stop()` — clears the mode, fires `on_stop`
+  `router.stop(state)` then `stop()`; `stop()` — clears the state, fires `on_stop`
 
 `ModeSlot.start`/`stop` also report the slot's `AppMode` (`DICTATION`/`CODING`) and
 `AppMode.DEFAULT` to the injected `StatusReporter`; `KernelAPI` exposes the slots as
@@ -789,7 +789,7 @@ everything to interrupt-or-drop while TUSK's own speech is playing (§30.4).
 
 1. `ToolRegistry.get("dictation.start_dictation").execute({})`; `KeyError` →
    `ToolResult(False, "dictation adapter is not available")`
-2. Build `DictationState("dictation", data["session_id"], adapter_manager.primary_desktop_source())`
+2. Build `ModeState("dictation", data["session_id"], adapter_manager.primary_desktop_source())`
 3. `ModeSlot.start(state)` (reply "Dictation started.")
 
 ### 17.2 DictationRouter — `tusk/kernel/modes/dictation_router.py`
@@ -904,7 +904,7 @@ or writes files on disk — only the focused editor buffer via input automation.
 2. `driver.read_buffer()` — one select-all/copy/clipboard-read round-trip (§19.4)
 3. `coding.start_coding_session` with `{"initial_buffer": buffer}`; `KeyError` →
    `ToolResult(False, "coding adapter is not available")`
-4. `CodingState("coding", session_id, primary_desktop_source)` →
+4. `ModeState("coding", session_id, primary_desktop_source)` →
    `ModeSlot.start(state)` (reply "Coding started.")
 
 ### 19.2 CodingRouter — `tusk/kernel/modes/coding_router.py`
@@ -1375,7 +1375,7 @@ The active runtime no longer contains:
   per-mode voice gatekeepers — unified into `ModeGate` + `StopGatekeeper` +
   `GatekeeperSlot` swapping (§16)
 - Separate dictation/coding kernel mode classes — unified into `ModeSlot` +
-  `AdapterMode`
+  `ModeState`
 - `VSCodeEditorDriver`, `LineAnchoredEditStrategy`, `RawKeyEditStrategy`,
   `FallbackEditStrategy`, and the `TUSK_CODING_EDITOR_DRIVER` /
   `TUSK_CODING_EDIT_STRATEGY` selection vars — the input-automation driver +

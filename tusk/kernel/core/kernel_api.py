@@ -1,6 +1,7 @@
 import threading
 import uuid
 
+from tusk.kernel.core.command_mode import CommandMode
 from tusk.kernel.modes.mode_slot import ModeSlot
 from tusk.shared.schemas.app_mode import MODE_BYPASS_KIND_PREFIX, AppMode
 from tusk.shared.schemas.app_status import AppStatus
@@ -19,7 +20,7 @@ _TEXT_PREVIEW_CHARS = 240
 
 class KernelAPI:
     def __init__(
-        self, command_mode: object, llm_registry: LLMRegistry | None, log: LogPrinter | None = None,
+        self, command_mode: CommandMode, llm_registry: LLMRegistry | None, log: LogPrinter | None = None,
         reporter: StatusReporter | None = None, interrupt_token: InterruptToken | None = None,
         dictation_slot: ModeSlot | None = None, coding_slot: ModeSlot | None = None,
         tracer: Tracer | None = None,

@@ -3,21 +3,30 @@ import types
 import pytest
 
 from tusk.kernel.modes.mode_slot import ModeSlot
+from tusk.kernel.modes.mode_state import ModeState
 from tusk.shared.schemas.app_mode import AppMode
 from tusk.shared.schemas.kernel_response import KernelResponse
 
 
-def _slot(reporter: object | None = None) -> ModeSlot:
-    return ModeSlot(AppMode.DICTATION, "Dictation started.", _log(), reporter)
+def _slot(reporter: object | None = None, logs: list[tuple] | None = None) -> ModeSlot:
+    log = types.SimpleNamespace(log=lambda *args: logs.append(args) if logs is not None else None)
+    return ModeSlot(AppMode.DICTATION, "Dictation started.", log, reporter)
 
 
-def _log() -> object:
-    return types.SimpleNamespace(log=lambda *args: None)
+def _state() -> ModeState:
+    return ModeState("dictation", "s1", "gnome")
+
+
+def _router(seen: list) -> object:
+    return types.SimpleNamespace(
+        process=lambda state, text: seen.append((state, text)) or KernelResponse(True, "updated"),
+        stop=lambda state: seen.append(("stop", state)) or KernelResponse(True, "Dictation stopped."),
+    )
 
 
 def test_start_activates_and_replies_with_mode_reply() -> None:
     slot = _slot()
-    response = slot.start(types.SimpleNamespace())
+    response = slot.start(_state())
     assert response == KernelResponse(True, "Dictation started.")
     assert slot.active is True
 
@@ -26,7 +35,7 @@ def test_callbacks_fire_on_start_and_stop() -> None:
     called: list[str] = []
     slot = _slot()
     slot.set_callbacks(lambda: called.append("start"), lambda: called.append("stop"))
-    slot.start(types.SimpleNamespace())
+    slot.start(_state())
     slot.stop()
     assert called == ["start", "stop"]
     assert slot.active is False
@@ -35,7 +44,7 @@ def test_callbacks_fire_on_start_and_stop() -> None:
 def test_start_and_stop_report_app_mode() -> None:
     modes: list[AppMode] = []
     slot = _slot(types.SimpleNamespace(set_mode=modes.append))
-    slot.start(types.SimpleNamespace())
+    slot.start(_state())
     slot.stop()
     assert modes == [AppMode.DICTATION, AppMode.DEFAULT]
 
@@ -49,24 +58,42 @@ def test_process_text_without_active_mode_raises_runtime_error() -> None:
         _slot().process_text("hello")
 
 
-def test_started_mode_routes_through_attached_router() -> None:
-    seen: list[str] = []
-    router = types.SimpleNamespace(process=lambda state, text: seen.append(text) or KernelResponse(True, "updated"))
+def test_process_text_routes_state_and_text_through_attached_router() -> None:
+    seen: list[tuple] = []
     slot = _slot()
-    slot.attach_router(router)
-    slot.start(types.SimpleNamespace())
+    slot.attach_router(_router(seen))
+    slot.start(_state())
     assert slot.process_text("hello") == KernelResponse(True, "updated")
-    assert seen == ["hello"]
+    assert seen == [(_state(), "hello")]
 
 
-def test_slot_uses_injected_mode_factory() -> None:
-    created: list[tuple] = []
+def test_process_text_logs_reply_under_mode_tag() -> None:
+    logs: list[tuple] = []
+    slot = _slot(logs=logs)
+    slot.attach_router(_router([]))
+    slot.start(_state())
+    slot.process_text("x")
+    assert logs == [("DICTATION", "updated")]
 
-    def factory(state: object, router: object, log: object, tag: str) -> object:
-        created.append((state, router, tag))
-        return types.SimpleNamespace(process_text=lambda text: KernelResponse(True, "custom"))
 
-    slot = ModeSlot(AppMode.DICTATION, "Dictation started.", _log(), mode_factory=factory)
-    slot.start(types.SimpleNamespace())
-    assert created and created[0][2] == "DICTATION"
-    assert slot.process_text("hi") == KernelResponse(True, "custom")
+def test_request_stop_stops_router_then_slot() -> None:
+    seen: list[tuple] = []
+    slot = _slot()
+    slot.attach_router(_router(seen))
+    slot.start(_state())
+    assert slot.request_stop() == KernelResponse(True, "Dictation stopped.")
+    assert seen == [("stop", _state())]
+    assert slot.active is False
+
+
+def test_request_stop_logs_always_visible_mode_ended_line() -> None:
+    # E2E: a bare "stop pair coding mode" left the mode with nothing in the default log
+    from tusk.shared.logging.log_tag_palette import is_always_visible
+    logs: list[tuple] = []
+    slot = _slot(logs=logs)
+    slot.attach_router(_router([]))
+    slot.start(_state())
+    slot.request_stop()
+    assert ("DICTATION", "Dictation stopped.") in logs
+    assert ("MODE", "dictation mode ended") in logs
+    assert is_always_visible("MODE")

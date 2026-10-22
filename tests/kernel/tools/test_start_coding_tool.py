@@ -1,17 +1,17 @@
 import types
 
-from tusk.kernel.modes.coding_state import CodingState
+from tusk.kernel.modes.mode_state import ModeState
 from tusk.kernel.tools.start_coding_tool import StartCodingTool
 from tusk.shared.schemas.kernel_response import KernelResponse
 from tusk.shared.schemas.tools.tool_result import ToolResult
 
 
 def test_execute_reads_buffer_and_starts_session() -> None:
-    states: list[CodingState] = []
+    states: list[ModeState] = []
     tool = StartCodingTool(_registry(True), _slot(states), _manager(), _driver())
     result = tool.execute({})
     assert result.success is True
-    assert states == [CodingState("coding", "sid", "gnome")]
+    assert states == [ModeState("coding", "sid", "gnome")]
 
 
 def test_execute_seeds_session_with_buffer_contents() -> None:

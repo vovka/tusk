@@ -1,4 +1,4 @@
-from tusk.kernel.modes.coding_state import CodingState
+from tusk.kernel.modes.mode_state import ModeState
 from tusk.kernel.modes.mode_slot import ModeSlot
 from tusk.shared.schemas.tools.tool_result import ToolResult
 from tusk.kernel.core.adapter_manager import AdapterManager
@@ -36,6 +36,6 @@ class StartCodingTool:
         return self._registry.get("coding.start_coding_session").execute({"initial_buffer": initial_buffer})
 
     def _begin(self, result: ToolResult) -> ToolResult:
-        state = CodingState("coding", result.data["session_id"], self._manager.primary_desktop_source())
+        state = ModeState("coding", result.data["session_id"], self._manager.primary_desktop_source())
         response = self._slot.start(state)
         return ToolResult(response.handled, response.reply, result.data)

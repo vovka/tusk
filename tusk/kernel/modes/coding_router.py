@@ -1,8 +1,9 @@
 from tusk.shared.schemas.edit_operation import EditOperation
+from tusk.shared.schemas.tools.tool_result import ToolResult
 from tusk.shared.schemas.kernel_response import KernelResponse
 from tusk.kernel.interfaces.edit_application_strategy import EditApplicationStrategy
 from tusk.kernel.interfaces.editor_driver import EditorDriver
-from tusk.kernel.modes.mode_slot import ModeSlot
+from tusk.kernel.modes.mode_state import ModeState
 from tusk.kernel.tools.tool_registry import ToolRegistry
 from tusk.shared.logging.interfaces.log_printer import LogPrinter
 
@@ -10,21 +11,20 @@ __all__ = ["CodingRouter"]
 
 
 class CodingRouter:
-    def __init__(self, tool_registry: ToolRegistry, slot: ModeSlot, driver: EditorDriver, strategy: EditApplicationStrategy, log_printer: LogPrinter) -> None:
+    def __init__(self, tool_registry: ToolRegistry, driver: EditorDriver, strategy: EditApplicationStrategy, log_printer: LogPrinter) -> None:
         self._registry = tool_registry
-        self._slot = slot
         self._driver = driver
         self._strategy = strategy
         self._log = log_printer
 
-    def process(self, state: object, text: str) -> KernelResponse:
+    def process(self, state: ModeState, text: str) -> KernelResponse:
         result = self._intent_result(state, text)
         self._log.log("CODING", f"intent={text!r}")
         if not result.success or result.data is None:
             return KernelResponse(False, result.message)
         return self._apply(result)
 
-    def _apply(self, result: object) -> KernelResponse:
+    def _apply(self, result: ToolResult) -> KernelResponse:
         try:
             self._apply_all(result.data.get("operations", []))
         except (RuntimeError, KeyError, TypeError, AttributeError) as exc:
@@ -32,12 +32,11 @@ class CodingRouter:
             return KernelResponse(False, "I couldn't apply that edit.")
         return KernelResponse(True, "")
 
-    def stop(self, state: object) -> KernelResponse:
+    def stop(self, state: ModeState) -> KernelResponse:
         self._registry.get(f"{state.adapter_name}.stop_coding_session").execute({"session_id": state.session_id})
-        self._slot.stop()
         return KernelResponse(True, "Coding stopped.")
 
-    def _intent_result(self, state: object, text: str) -> object:
+    def _intent_result(self, state: ModeState, text: str) -> ToolResult:
         name = f"{state.adapter_name}.process_intent"
         return self._registry.get(name).execute({"session_id": state.session_id, "intent": text})
 

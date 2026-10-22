@@ -27,7 +27,7 @@ class ToolRuntime:
         self._reporter = reporter
 
     def register_tools(self, kernel: KernelAPI) -> None:
-        kernel.dictation.attach_router(DictationRouter(self._registry, kernel.dictation, self._log))
+        kernel.dictation.attach_router(DictationRouter(self._registry, self._log))
         self._register_coding(kernel.coding)
         self._registry.register(SwitchModelTool(self._llms, self._reporter))
         self._registry.register(StartDictationTool(self._registry, kernel.dictation, self._manager))
@@ -35,5 +35,5 @@ class ToolRuntime:
     def _register_coding(self, slot: ModeSlot) -> None:
         driver = InputAutomationEditorDriver(self._registry, self._manager.primary_desktop_source())
         strategy = VerifiedEditStrategy(LineAnchoredEditStrategy(), FullReplaceEditStrategy())
-        slot.attach_router(CodingRouter(self._registry, slot, driver, strategy, self._log))
+        slot.attach_router(CodingRouter(self._registry, driver, strategy, self._log))
         self._registry.register(StartCodingTool(self._registry, slot, self._manager, driver))

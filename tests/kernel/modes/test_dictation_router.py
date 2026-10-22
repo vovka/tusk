@@ -1,13 +1,14 @@
 import types
 
 from tusk.kernel.modes.dictation_router import DictationRouter
+from tusk.kernel.modes.mode_state import ModeState
 from tusk.shared.schemas.tools.tool_result import ToolResult
 
 
 def test_dictation_router_logs_segment_and_apply() -> None:
     calls: list[tuple[str, dict]] = []
     logs: list[tuple[str, str]] = []
-    router = DictationRouter(_registry(calls, True), types.SimpleNamespace(), _log(logs))
+    router = DictationRouter(_registry(calls, True), _log(logs))
     result = router.process(_state(), "hello world")
     assert result.handled is True
     assert calls[-1] == ("gnome.type_text", {"text": "hello world"})
@@ -16,7 +17,7 @@ def test_dictation_router_logs_segment_and_apply() -> None:
 
 def test_dictation_router_reports_desktop_apply_failure() -> None:
     logs: list[tuple[str, str]] = []
-    router = DictationRouter(_registry([], False), types.SimpleNamespace(), _log(logs))
+    router = DictationRouter(_registry([], False), _log(logs))
     result = router.process(_state(), "hello world")
     assert result.handled is False
     assert result.reply == "typing failed"
@@ -25,12 +26,11 @@ def test_dictation_router_reports_desktop_apply_failure() -> None:
 
 def test_dictation_router_stops_via_adapter_stop_tool() -> None:
     calls: list[tuple[str, dict]] = []
-    slot = types.SimpleNamespace(stop=lambda: calls.append(("slot.stop", {})))
-    router = DictationRouter(_registry(calls, True), slot, _log([]))
+    router = DictationRouter(_registry(calls, True), _log([]))
     result = router.stop(_state())
     assert result.handled is True
     assert result.reply == "Dictation stopped."
-    assert calls[-2:] == [("dictation.stop_dictation", {"session_id": "session-1"}), ("slot.stop", {})]
+    assert calls[-1] == ("dictation.stop_dictation", {"session_id": "session-1"})
 
 
 def _registry(calls: list[tuple[str, dict]], success: bool) -> object:
@@ -59,8 +59,8 @@ def _segment() -> dict:
     return {"operation": "insert", "text": "hello world", "should_stop": False}
 
 
-def _state() -> object:
-    return types.SimpleNamespace(adapter_name="dictation", desktop_source="gnome", session_id="session-1")
+def _state() -> ModeState:
+    return ModeState("dictation", "session-1", "gnome")
 
 
 def _log(logs: list[tuple[str, str]]) -> object:

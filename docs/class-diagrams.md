@@ -36,21 +36,16 @@ classDiagram
     start_all() None
     start_watcher() None
   }
-  class AdapterMode {
-    state : object
-    process_text(text: str) KernelResponse
-    stop() KernelResponse
-  }
   class Agent {
     process_command(command: str)* str
   }
   class ClipboardGuard {
   }
   class CodingRouter {
-    process(state: object, text: str) KernelResponse
-    stop(state: object) KernelResponse
+    process(state: ModeState, text: str) KernelResponse
+    stop(state: ModeState) KernelResponse
   }
-  class CodingState {
+  class ModeState {
     adapter_name : str
     desktop_source : str
     session_id : str
@@ -59,13 +54,8 @@ classDiagram
     process_command(command: str) KernelResponse
   }
   class DictationRouter {
-    process(state: object, text: str) KernelResponse
-    stop(state: object) KernelResponse
-  }
-  class DictationState {
-    adapter_name : str
-    desktop_source : str
-    session_id : str
+    process(state: ModeState, text: str) KernelResponse
+    stop(state: ModeState) KernelResponse
   }
   class EditApplicationStrategy {
     apply(edit: EditOperation, driver: EditorDriver)* None
@@ -107,11 +97,11 @@ classDiagram
   }
   class ModeSlot {
     active : bool
-    attach_router(router: object) None
+    attach_router(router: CodingRouter | DictationRouter) None
     process_text(text: str) KernelResponse
     request_stop() KernelResponse
     set_callbacks(on_start: Callable[[], None], on_stop: Callable[[], None]) None
-    start(state: object, log: object) KernelResponse
+    start(state: ModeState) KernelResponse
     stop() None
   }
   class Shell {

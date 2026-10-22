@@ -148,7 +148,7 @@ the differences live entirely in the injected prompt, router, and adapter:
 | Piece | Class | Per-mode difference |
 |---|---|---|
 | Kernel mode holder | `ModeSlot` (`tusk/kernel/modes/mode_slot.py`) | log tag + start reply |
-| Active mode | `AdapterMode` | none — routes text to the injected router |
+| Active mode state | `ModeState` | none — `ModeSlot` routes text to the injected router |
 | Stop classifier | `ModeGate` (utility for the gatekeeper LLM) | prompt: `DICTATION_GATE_PROMPT` / `CODING_GATE_PROMPT` |
 | Voice-side gatekeeper | `StopGatekeeper` (`shells/voice/stages/gate/`) | none — wraps the mode's `ModeGate` |
 | Router | `DictationRouter` / `CodingRouter` | dictation types text; coding applies `EditOperation`s via `EditorDriver` |
@@ -177,7 +177,7 @@ sequenceDiagram
     EX->>ST: tool call start_dictation / start_coding
     ST->>A: start_* session (coding: driver.read_buffer() seeds the buffer)
     A-->>ST: session_id
-    ST->>MS: kernel.dictation.start(state) / kernel.coding.start(state) — builds AdapterMode
+    ST->>MS: kernel.dictation.start(state) / kernel.coding.start(state) — stores ModeState
     MS->>GS: on_start callback → swap(PlaybackGate(StopGatekeeper))
 
     loop each utterance while the mode is active
@@ -188,7 +188,7 @@ sequenceDiagram
             SG-->>GS: GateDispatch(FORWARD_CURRENT, text)
             Note over GS,K: CommandWorker → kernel.submit(text)
             K->>MS: active → process_text(text)
-            MS->>R: AdapterMode → router.process(state, text)
+            MS->>R: router.process(state, text)
             R->>A: process_segment / process_intent (JSON-RPC)
             A-->>R: edit data
             alt dictation
@@ -198,7 +198,7 @@ sequenceDiagram
             end
         else stop intent
             MG-->>SG: true
-            SG->>MS: kernel.dictation.request_stop() / kernel.coding.request_stop() → AdapterMode.stop()
+            SG->>MS: kernel.dictation.request_stop() / kernel.coding.request_stop()
             MS->>R: router.stop(state)
             R->>A: stop_* session(session_id)
             R->>MS: slot.stop() → on_stop callback, reports AppMode.DEFAULT
@@ -274,8 +274,8 @@ tusk/                        (repo root)
 │   │   │   ├── runtime/     # Message history builder, result factory, step recorder, guard composition
 │   │   │   ├── toolset/     # Per-profile synthetic tool definitions, static schemas, argument validator
 │   │   │   └── tool_sequence/ # Compiled sequences: PlanValidator, Executor, Recorder
-│   │   ├── modes/           # Dictation/coding machinery: ModeSlot, AdapterMode, ModeGate, routers,
-│   │   │                    #   states, gate prompts, InputAutomationEditorDriver, FullReplaceEditStrategy
+│   │   ├── modes/           # Dictation/coding machinery: ModeSlot, ModeState, ModeGate, routers,
+│   │   │                    #   gate prompts, InputAutomationEditorDriver, FullReplaceEditStrategy
 │   │   └── tools/           # ToolRegistry, RegisteredTool, ToolRuntime,
 │   │                        #   kernel tools: start_dictation, start_coding, switch_model
 │   ├── shared/              # Contracts + cross-layer plumbing; depends on nothing else
@@ -391,7 +391,7 @@ the dataclass is the authoritative schema. Index:
 | `DesktopContext` / `WindowInfo` / `AppEntry` | `desktop/` | desktop snapshot / window geometry / installed app |
 
 Mode/session state that belongs to one component lives next to it, not in shared:
-`DictationState` and `CodingState` in `tusk/kernel/modes/`, `BufferModel` in
+`ModeState` in `tusk/kernel/modes/`, `BufferModel` in
 `adapters/coding/`, `BufferedUtterance`/`GateDispatch`/`GateAction`/`GateState`/`RecoveryDecision`
 in `shells/voice/`, `TrayMenuItem` in `shells/tray/`.
 

@@ -1,20 +1,22 @@
 import types
 
 from tusk.kernel.modes.coding_router import CodingRouter
+from tusk.kernel.modes.mode_state import ModeState
+from tusk.shared.schemas.kernel_response import KernelResponse
 from tusk.shared.schemas.edit_operation import EditOperation
 from tusk.shared.schemas.tools.tool_result import ToolResult
 
 
 def test_process_applies_each_operation_via_strategy() -> None:
     applied: list[EditOperation] = []
-    router = CodingRouter(_registry([], True), types.SimpleNamespace(), object(), _strategy(applied), _log())
+    router = CodingRouter(_registry([], True), object(), _strategy(applied), _log())
     result = router.process(_state(), "rename the function")
     assert result.handled is True
     assert applied == [EditOperation("replace", 1, 1, "def renamed():", "def renamed():")]
 
 
 def test_process_replies_silently_on_success() -> None:
-    router = CodingRouter(_registry([], True), types.SimpleNamespace(), object(), _strategy([]), _log())
+    router = CodingRouter(_registry([], True), object(), _strategy([]), _log())
     result = router.process(_state(), "rename the function")
     assert result.reply == ""
 
@@ -24,14 +26,14 @@ def test_process_reports_failure_when_apply_raises() -> None:
         raise RuntimeError("xdotool missing")
 
     strategy = types.SimpleNamespace(apply=boom)
-    router = CodingRouter(_registry([], True), types.SimpleNamespace(), object(), strategy, _log())
+    router = CodingRouter(_registry([], True), object(), strategy, _log())
     result = router.process(_state(), "rename the function")
     assert result.handled is False
     assert "couldn't apply" in result.reply.lower()
 
 
 def test_process_reports_failure_when_adapter_errors() -> None:
-    router = CodingRouter(_registry([], False), types.SimpleNamespace(), object(), _strategy([]), _log())
+    router = CodingRouter(_registry([], False), object(), _strategy([]), _log())
     result = router.process(_state(), "do thing")
     assert result.handled is False
     assert result.reply == "planning failed"
@@ -40,7 +42,7 @@ def test_process_reports_failure_when_adapter_errors() -> None:
 def test_process_reports_failure_on_malformed_operation() -> None:
     malformed = ToolResult(True, "ok", {"operations": [{"unexpected": 1}]})
     registry = types.SimpleNamespace(get=lambda name: _tool([], name, malformed))
-    router = CodingRouter(registry, types.SimpleNamespace(), object(), _strategy([]), _log())
+    router = CodingRouter(registry, object(), _strategy([]), _log())
     result = router.process(_state(), "rename the function")
     assert result.handled is False
     assert "couldn't apply" in result.reply.lower()
@@ -49,19 +51,18 @@ def test_process_reports_failure_on_malformed_operation() -> None:
 def test_process_reports_failure_when_data_is_not_a_dict() -> None:
     malformed = ToolResult(True, "ok", ["operations"])
     registry = types.SimpleNamespace(get=lambda name: _tool([], name, malformed))
-    router = CodingRouter(registry, types.SimpleNamespace(), object(), _strategy([]), _log())
+    router = CodingRouter(registry, object(), _strategy([]), _log())
     result = router.process(_state(), "rename the function")
     assert result.handled is False
     assert "couldn't apply" in result.reply.lower()
 
 
-def test_stop_calls_adapter_and_slot() -> None:
+def test_stop_calls_adapter_stop_tool() -> None:
     calls: list[tuple[str, dict]] = []
-    slot = types.SimpleNamespace(stop=lambda: calls.append(("slot.stop", {})))
-    router = CodingRouter(_registry(calls, True), slot, object(), _strategy([]), _log())
+    router = CodingRouter(_registry(calls, True), object(), _strategy([]), _log())
     result = router.stop(_state())
-    assert result.handled is True
-    assert calls == [("coding.stop_coding_session", {"session_id": "s1"}), ("slot.stop", {})]
+    assert result == KernelResponse(True, "Coding stopped.")
+    assert calls == [("coding.stop_coding_session", {"session_id": "s1"})]
 
 
 def _registry(calls: list, success: bool) -> object:
@@ -85,8 +86,8 @@ def _strategy(applied: list) -> object:
     return types.SimpleNamespace(apply=lambda edit, driver: applied.append(edit))
 
 
-def _state() -> object:
-    return types.SimpleNamespace(adapter_name="coding", session_id="s1")
+def _state() -> ModeState:
+    return ModeState("coding", "s1", "gnome")
 
 
 def _log() -> object:
