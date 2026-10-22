@@ -1,6 +1,6 @@
 import json
 
-from adapters.gnome.tools.window_tools import WindowTools
+from adapters.gnome.x11.window_tools import WindowTools
 from adapters.gnome.wayland.shell_bus import ShellBus
 
 __all__ = ["WaylandWindowTools"]

@@ -1,28 +1,36 @@
-from adapters.gnome.gnome_input_simulator import GnomeInputSimulator
+from adapters.gnome.app_catalog import AppCatalog
+from adapters.gnome.gnome_clipboard_provider import GnomeClipboardProvider
 from adapters.gnome.tools.application_tools import ApplicationTools
 from adapters.gnome.tools.clipboard_tools import ClipboardTools
 from adapters.gnome.tools.context_tools import ContextTools
 from adapters.gnome.tools.input_tools import InputTools
 from adapters.gnome.tools.launched_window_guard import LaunchedWindowGuard
 from adapters.gnome.tools.tool_schema_catalog import ToolSchemaCatalog
-from adapters.gnome.tools.window_tools import WindowTools
-from adapters.gnome.tools.x11_windows import X11Windows
+from adapters.gnome.wayland.wayland_context_provider import WaylandContextProvider
+from adapters.gnome.wayland.wayland_window_tools import WaylandWindowTools
+from adapters.gnome.x11.context_provider import X11ContextProvider
+from adapters.gnome.x11.input_simulator import X11InputSimulator
+from adapters.gnome.x11.window_tools import WindowTools
+from adapters.gnome.x11.windows import X11Windows
 
 __all__ = ["GnomeToolRouter"]
+
+ContextProvider = X11ContextProvider | WaylandContextProvider
+WindowLister = X11Windows | WaylandWindowTools
 
 
 class GnomeToolRouter:
     def __init__(
         self,
-        apps: object,
-        clipboard: object,
-        context: object,
-        input_simulator: GnomeInputSimulator,
-        window_tools: WindowTools | None = None,
+        apps: AppCatalog,
+        clipboard: GnomeClipboardProvider,
+        context: ContextProvider,
+        input_simulator: X11InputSimulator,
+        window_tools: WindowTools,
+        windows: WindowLister,
     ) -> None:
-        # Wayland window tools also list and focus windows by id; X11 uses wmctrl/xdotool for that.
-        self._window_tools = window_tools or WindowTools()
-        self._windows = window_tools if window_tools is not None else X11Windows()
+        self._window_tools = window_tools
+        self._windows = windows
         self._schemas = ToolSchemaCatalog().build()
         self._handlers = self._build_handlers(apps, clipboard, context, input_simulator)
 
@@ -33,18 +41,15 @@ class GnomeToolRouter:
         data = self._handlers[name](arguments)
         return {"content": [{"type": "text", "text": data["message"]}], "isError": not data["success"], "data": data.get("data")}
 
-    def _build_handlers(self, apps: object, clipboard: object, context: object, input_simulator: GnomeInputSimulator) -> dict[str, object]:
-        application, clipboard_tools, context_tools, input_tools, window_tools = self._tool_groups(
-            apps,
-            clipboard,
-            context,
-            input_simulator,
-        )
-        return self._merged_handlers(application, clipboard_tools, context_tools, input_tools, window_tools)
-
-    def _tool_groups(self, apps: object, clipboard: object, context: object, input_simulator: GnomeInputSimulator) -> tuple[object, ...]:
+    def _build_handlers(
+        self,
+        apps: AppCatalog,
+        clipboard: GnomeClipboardProvider,
+        context: ContextProvider,
+        input_simulator: X11InputSimulator,
+    ) -> dict[str, object]:
         launched = LaunchedWindowGuard(self._windows)
-        return (
+        return self._merged_handlers(
             ApplicationTools(apps, window_lister=self._windows.list_windows, launched=launched),
             ClipboardTools(clipboard),
             ContextTools(context),

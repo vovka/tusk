@@ -1,7 +1,7 @@
 import types
 
-import adapters.gnome.tools.window_tools as window_tools_module
-from adapters.gnome.tools.window_tools import WindowTools
+import adapters.gnome.x11.window_tools as window_tools_module
+from adapters.gnome.x11.window_tools import WindowTools
 from adapters.gnome.wayland.wayland_window_tools import WaylandWindowTools
 from tests.adapters.wayland_fake_bus import FakeBus
 

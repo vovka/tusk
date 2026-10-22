@@ -987,8 +987,8 @@ LLM slot proxies for agents carry the `InterruptToken`; gatekeeper/utility do no
 | Clipboard | `read_clipboard`, `write_clipboard` |
 | Inspection | `get_desktop_context`, `get_active_window`, `list_windows` |
 
-Implementation: `wmctrl`/`xdotool`/`xclip` via the handler classes in
-`adapters/gnome/tools/`; `launch_application` delegates to the host launcher.
+Implementation: `wmctrl`/`xdotool`/`xclip` via the handler classes in `adapters/gnome/tools/`
+and the X11 backend in `adapters/gnome/x11/`; `launch_application` delegates to the host launcher.
 
 ### Dictation Adapter Tools (prefix: `dictation.`)
 

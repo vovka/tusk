@@ -1,9 +1,9 @@
 import subprocess
 
-__all__ = ["GnomeInputSimulator"]
+__all__ = ["X11InputSimulator"]
 
 
-class GnomeInputSimulator:
+class X11InputSimulator:
     def press_keys(self, keys: str) -> None:
         normalized = self._normalize_keys(keys)
         self._run_key(["--clearmodifiers", "--delay", "0", normalized], normalized)

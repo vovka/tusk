@@ -4,10 +4,10 @@ from adapters.gnome.app_catalog import AppCatalog
 from tusk.shared.schemas.desktop.desktop_context import DesktopContext
 from tusk.shared.schemas.desktop.window_info import WindowInfo
 
-__all__ = ["GnomeContextProvider"]
+__all__ = ["X11ContextProvider"]
 
 
-class GnomeContextProvider:
+class X11ContextProvider:
     def __init__(self, app_catalog: AppCatalog) -> None:
         self._catalog = app_catalog
 

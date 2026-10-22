@@ -52,8 +52,8 @@ exceed 2^31. `ActiveWindow` from the first draft was dropped: the focused flag i
 - `adapters/gnome/wayland/` — `ShellBus` (`gdbus call` wrapper; arguments are JSON, which is valid
   GVariant text), `WaylandInputSimulator` and `WaylandWindowTools` (subclass the X11 classes to
   reuse key normalisation and geometry parsing), `WaylandTextPaster`, `WaylandContextProvider`.
-- `GnomeToolRouter` takes optional `window_tools`; when it has `list_windows()`, `ApplicationTools`
-  uses it (`window_lister`) to detect the launched app's window instead of `wmctrl`.
+- `server.py` alone picks the backend: it passes `GnomeToolRouter` the window tools and the window
+  lister (X11: `WindowTools` + `X11Windows` from `adapters/gnome/x11/`; Wayland: one `WaylandWindowTools` for both).
 - `docker-compose.yml` passes `XDG_SESSION_TYPE`, `WAYLAND_DISPLAY`, `XDG_RUNTIME_DIR` and mounts
   the Wayland socket (`/dev/null` stands in on X11 hosts). `apparmor=unconfined` lives in the opt-in
   `docker-compose.wayland.yml`: the host dbus-daemon rejects clients confined by Docker's default

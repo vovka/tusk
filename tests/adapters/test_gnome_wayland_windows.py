@@ -63,13 +63,17 @@ def test_build_router_selects_wayland_backend(monkeypatch: object) -> None:
     monkeypatch.setenv("XDG_SESSION_TYPE", "wayland")
     router = build_router()
     assert isinstance(router._window_tools, WaylandWindowTools)
+    assert router._windows is router._window_tools
 
 
 def test_build_router_keeps_x11_backend(monkeypatch: object) -> None:
     from adapters.gnome.server import build_router
+    from adapters.gnome.x11.windows import X11Windows
     monkeypatch.setenv("XDG_SESSION_TYPE", "x11")
     monkeypatch.delenv("WAYLAND_DISPLAY", raising=False)
-    assert not isinstance(build_router()._window_tools, WaylandWindowTools)
+    router = build_router()
+    assert type(router._window_tools).__name__ == "WindowTools"
+    assert isinstance(router._windows, X11Windows)
 
 
 def test_window_tools_tile_right_calls_extension() -> None:

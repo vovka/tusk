@@ -1,8 +1,8 @@
 import subprocess
 import types
 
-import adapters.gnome.tools.window_tools as window_tools_module
-from adapters.gnome.tools.window_tools import WindowTools
+import adapters.gnome.x11.window_tools as window_tools_module
+from adapters.gnome.x11.window_tools import WindowTools
 
 _WINDOW_LIST = "0x01 0 host *Unsaved Document 1 - gedit\n0x02 1 host Tilix: vovka\n"
 

@@ -1,10 +1,10 @@
-from adapters.gnome.gnome_input_simulator import GnomeInputSimulator
+from adapters.gnome.x11.input_simulator import X11InputSimulator
 from adapters.gnome.wayland.shell_bus import ShellBus
 
 __all__ = ["WaylandInputSimulator"]
 
 
-class WaylandInputSimulator(GnomeInputSimulator):
+class WaylandInputSimulator(X11InputSimulator):
     """Sends keyboard and pointer input through the tusk-shell extension's virtual devices."""
 
     def __init__(self, bus: ShellBus) -> None:

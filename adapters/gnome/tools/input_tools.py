@@ -1,4 +1,4 @@
-from adapters.gnome.gnome_input_simulator import GnomeInputSimulator
+from adapters.gnome.x11.input_simulator import X11InputSimulator
 from adapters.gnome.tools.launched_window_guard import LaunchedWindowGuard
 
 __all__ = ["InputTools"]
@@ -7,7 +7,7 @@ _MAX_CHARS = 300
 
 
 class InputTools:
-    def __init__(self, input_simulator: GnomeInputSimulator, launched: LaunchedWindowGuard | None = None) -> None:
+    def __init__(self, input_simulator: X11InputSimulator, launched: LaunchedWindowGuard | None = None) -> None:
         self._input = input_simulator
         self._launched = launched
 
