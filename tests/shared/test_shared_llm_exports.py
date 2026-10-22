@@ -10,9 +10,9 @@ def test_shared_llm_exports_present() -> None:
 
 
 def test_shared_llm_retry_exports_present() -> None:
-    assert "LLMRetryPolicy" in llm.__all__
     assert "LLMRetryRunner" in llm.__all__
-    assert "ToolUseFailedRecovery" in llm.__all__
+    assert "LLMRetryPolicy" not in llm.__all__
+    assert "ToolUseFailedRecovery" not in llm.__all__
 
 
 def test_llm_provider_exports_present() -> None:

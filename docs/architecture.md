@@ -760,7 +760,7 @@ tray crash degrades to headless instead of killing the daemon voice shell.
 
 Wraps any `LLMProvider`. Adds:
 
-- **Wait indicator:** `log.show_wait(label)` before each request, `log.clear_wait()` after.
+- **Wait indicator:** the provider calls `LLMPayloadLogger.before_request` (`log.show_wait(label)`) per request, `log.clear_wait()` after.
 - **Retry:** all calls go through `LLMRetryRunner` (3 attempts, delay `0.5 * attempt` s).
   Retries network/rate-limit/5xx errors; never retries `invalid_request_error` or
   `tool_use_failed`. When the injected `InterruptToken` is set, pending retries are

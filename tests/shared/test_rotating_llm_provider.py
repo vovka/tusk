@@ -15,7 +15,7 @@ def _provider(name: str, served: list[str], fail: bool = False) -> object:
         served.append(name)
         return name
 
-    return types.SimpleNamespace(label=name, complete_messages=complete_messages)
+    return types.SimpleNamespace(label=name, complete_messages=complete_messages, set_payload_logger=lambda logger: served.append(f"logger->{name}"))
 
 
 def test_rotation_round_robins_per_request() -> None:
@@ -40,6 +40,12 @@ def test_rotation_raises_when_every_model_is_rate_limited() -> None:
         assert "429" in str(exc)
     else:
         raise AssertionError("expected the last 429 to propagate")
+
+
+def test_rotation_hands_the_payload_logger_to_every_model() -> None:
+    served: list[str] = []
+    RotatingLLMProvider([_provider(name, served) for name in ("a", "b")]).set_payload_logger(object())
+    assert served == ["logger->a", "logger->b"]
 
 
 def test_slot_config_single_value_is_unchanged() -> None:

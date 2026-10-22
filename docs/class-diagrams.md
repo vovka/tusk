@@ -376,6 +376,7 @@ classDiagram
     complete_messages(system_prompt: str, messages: list[dict])* str
     complete_structured(system_prompt: str, user_message: str, schema_name: str, schema: dict, max_tokens: int)* str
     complete_tool_call(system_prompt: str, messages: list[dict], tools: list[dict[str, object]])* ToolCall
+    set_payload_logger(logger: LLMPayloadLogger) None
   }
   class LLMProviderFactory {
     create(provider_name: str, model: str)* LLMProvider
@@ -394,9 +395,6 @@ classDiagram
     model_labels() tuple[tuple[str, str], ...]
     register_slot(name: str, proxy: LLMProxy) None
     swap(slot_name: str, provider_name: str, model: str) str
-  }
-  class LLMRetryPolicy {
-    should_retry(exc: Exception) bool
   }
   class LLMRetryRunner {
     run(operation: object, on_retry: object | None) str
@@ -457,9 +455,6 @@ classDiagram
   }
   class TTSEngine {
     synthesize(text: str)* bytes
-  }
-  class ToolUseFailedRecovery {
-    recover(exc: Exception) ToolCall | None
   }
   LLMProxy --|> LLMProvider
   ColorLogPrinter --|> LogPrinter
@@ -600,7 +595,7 @@ classDiagram
     complete_messages(system_prompt: str, messages: list[dict]) str
     complete_structured(system_prompt: str, user_message: str, schema_name: str, schema: dict, max_tokens: int) str
     complete_tool_call(system_prompt: str, messages: list[dict], tools: list[dict[str, object]]) ToolCall
-    set_payload_logger(logger: object) None
+    set_payload_logger(logger: LLMPayloadLogger) None
   }
   class GroqSTT {
     transcribe(audio_frames: bytes, sample_rate: int) Utterance
@@ -614,7 +609,7 @@ classDiagram
     complete_messages(system_prompt: str, messages: list[dict]) str
     complete_structured(system_prompt: str, user_message: str, schema_name: str, schema: dict, max_tokens: int) str
     complete_tool_call(system_prompt: str, messages: list[dict], tools: list[dict[str, object]]) ToolCall
-    set_payload_logger(logger: object) None
+    set_payload_logger(logger: LLMPayloadLogger) None
   }
   class STTEngineFactory {
     create(name: str) STTEngine
@@ -624,6 +619,9 @@ classDiagram
   }
   class WavConcatenator {
     concatenate(clips: list[bytes]) bytes
+  }
+  class ToolUseFailedRecovery {
+    recover(exc: Exception) ToolCall | None
   }
   class WhisperSTT {
     transcribe(audio_frames: bytes, sample_rate: int) Utterance

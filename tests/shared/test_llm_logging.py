@@ -33,6 +33,20 @@ def test_llm_proxy_logs_request_payload_wait_and_response_in_order() -> None:
     assert '{ "role": "system", "content": "' in logged[1][2]
 
 
+def test_llm_proxy_shows_wait_once_per_request_and_rebinds_on_swap() -> None:
+    logged = []
+    proxy = LLMProxy(LoggedProvider("first"), _proxy_log(logged), "agent", enabled_log_groups=_groups("llm-wait"))
+    proxy.complete("sys", "hello")
+    proxy.swap(LoggedProvider("second"))
+    proxy.complete("sys", "hello again")
+    assert [item for item in logged if item[0] == "wait"] == [("wait", "groq/model", "llm-wait"), ("wait", "groq/model", "llm-wait")]
+
+
+def test_llm_proxy_without_log_printer_still_binds_a_silent_logger() -> None:
+    provider = LoggedProvider("assistant reply")
+    assert LLMProxy(provider, None, "agent").complete("sys", "hello") == "assistant reply"
+
+
 def test_llm_proxy_logs_tools_separately_and_full_modes_replace_compact() -> None:
     logged = []
     tools = [{"type": "function", "function": {"name": "done", "description": "Finish and return a result.", "parameters": {"type": "object"}}}]

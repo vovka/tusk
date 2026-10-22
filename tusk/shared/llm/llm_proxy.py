@@ -18,8 +18,8 @@ class LLMProxy(LLMProvider):
         self._slot = slot_name or initial_provider.label
         self._retry = retry_runner or LLMRetryRunner(interrupt_token=interrupt_token)
         self._payload_logger = LLMPayloadLogger(log_printer, self._slot, enabled_log_groups, preview_chars)
-        self._provider_logs_wait = self._bind(initial_provider)
         self._tracer = tracer or NullTracer()
+        initial_provider.set_payload_logger(self._payload_logger)
 
     @property
     def label(self) -> str:
@@ -43,7 +43,7 @@ class LLMProxy(LLMProvider):
 
     def swap(self, provider: LLMProvider) -> None:
         self._inner = provider
-        self._provider_logs_wait = self._bind(provider)
+        provider.set_payload_logger(self._payload_logger)
 
     def _logged(self, kind: str, operation: object) -> object:
         attributes = {"slot": self._slot, "provider": self.label, "kind": kind}
@@ -54,23 +54,11 @@ class LLMProxy(LLMProvider):
         return result
 
     def _completed(self, operation: object) -> object:
-        self._show_wait()
         try:
             return self._retry.run(operation, self._log_retry)
         finally:
             if self._log:
                 self._log.clear_wait()
-
-    def _bind(self, provider: object) -> bool:
-        setter = getattr(provider, "set_payload_logger", None)
-        if not callable(setter):
-            return False
-        setter(self._payload_logger)
-        return True
-
-    def _show_wait(self) -> None:
-        if self._log and not self._provider_logs_wait:
-            self._log.show_wait(self.label, "llm-wait")
 
     def _log_request(self, kind: str) -> None:
         if self._log:

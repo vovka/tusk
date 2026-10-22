@@ -1,5 +1,5 @@
 from tusk.providers.llm.tool_response import tool_or_done
-from tusk.shared.llm.tool_use_failed_recovery import ToolUseFailedRecovery
+from tusk.providers.llm.tool_use_failed_recovery import ToolUseFailedRecovery
 
 
 def test_tool_fallback_converts_text_to_done() -> None:

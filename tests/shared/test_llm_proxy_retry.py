@@ -43,7 +43,7 @@ def _messages_provider(calls: dict[str, int]) -> object:
             raise RuntimeError("connection reset by peer")
         return '{"tool":"done","reply":"ok"}'
 
-    return types.SimpleNamespace(label="agent", complete_messages=complete_messages)
+    return types.SimpleNamespace(label="agent", complete_messages=complete_messages, set_payload_logger=lambda logger: None)
 
 
 def _invalid_provider(calls: dict[str, int]) -> object:
@@ -51,7 +51,7 @@ def _invalid_provider(calls: dict[str, int]) -> object:
         calls["count"] += 1
         raise RuntimeError("tool_use_failed invalid_request_error")
 
-    return types.SimpleNamespace(label="agent", complete_messages=complete_messages)
+    return types.SimpleNamespace(label="agent", complete_messages=complete_messages, set_payload_logger=lambda logger: None)
 
 
 def _structured_provider(calls: dict[str, int]) -> object:
@@ -61,7 +61,7 @@ def _structured_provider(calls: dict[str, int]) -> object:
             raise RuntimeError("503 service unavailable")
         return '{"classification":"command","cleaned_text":"hi","reason":"ok"}'
 
-    return types.SimpleNamespace(label="gate", complete_structured=complete_structured)
+    return types.SimpleNamespace(label="gate", complete_structured=complete_structured, set_payload_logger=lambda logger: None)
 
 
 def _tool_provider(calls: dict[str, int]) -> object:
@@ -71,4 +71,4 @@ def _tool_provider(calls: dict[str, int]) -> object:
             raise RuntimeError("timed out")
         return ToolCall("done", {"reply": "ok"}, "call-1")
 
-    return types.SimpleNamespace(label="agent", complete_tool_call=complete_tool_call)
+    return types.SimpleNamespace(label="agent", complete_tool_call=complete_tool_call, set_payload_logger=lambda logger: None)

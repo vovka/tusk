@@ -47,7 +47,7 @@ def test_proxy_logs_the_retry_wait() -> None:
     from tusk.shared.llm.llm_proxy import LLMProxy
     lines: list[str] = []
     printer = SimpleNamespace(log=lambda tag, message, group: lines.append(message), show_wait=lambda *_: None, clear_wait=lambda: None)
-    inner = SimpleNamespace(label="groq/x", complete=lambda *_: (_ for _ in ()).throw(_RateLimited("3.5")))
+    inner = SimpleNamespace(label="groq/x", complete=lambda *_: (_ for _ in ()).throw(_RateLimited("3.5")), set_payload_logger=lambda logger: None)
     proxy = LLMProxy(inner, printer, "command_agent", LLMRetryRunner(2, lambda seconds: None))
     with pytest.raises(_RateLimited):
         proxy.complete("system", "user")

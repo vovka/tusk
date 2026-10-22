@@ -1059,12 +1059,12 @@ editor automation — runs for real. Example transcripts live in `demos/`.
 ### 21.1 LLMProxy — `tusk/shared/llm/llm_proxy.py`
 
 Every registered slot is an `LLMProxy`. Per call: an `LLMREQUEST` log line (slot,
-provider, kind), a wait indicator (`show_wait`/`clear_wait`) unless the provider logs
-its own payloads, `LLMRetryRunner` around the operation, and response payload logging
+provider, kind), a wait indicator (`show_wait` from `LLMPayloadLogger.before_request`,
+`clear_wait` from the proxy), `LLMRetryRunner` around the operation, and response payload logging
 (`LLMPayloadLogger`, preview length from `LLM_LOG_PREVIEW_CHARS`). `swap(provider)`
 replaces the inner provider atomically — consumers hold the proxy, never the provider.
 
-### 21.2 Retry — `llm_retry_runner.py`, `llm_retry_policy.py`
+### 21.2 Retry — `llm_retry_runner.py`
 
 ```
 attempts = 3, delay = 0.5 * attempt seconds (linear backoff)

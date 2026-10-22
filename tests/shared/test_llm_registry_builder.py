@@ -10,7 +10,7 @@ _SLOT_NAMES = ("gatekeeper", "stop_gate", "conversation_agent", "command_agent",
 
 class _Factory:
     def create(self, provider_name: str, model: str) -> types.SimpleNamespace:
-        return types.SimpleNamespace(label=f"{provider_name}/{model}")
+        return types.SimpleNamespace(label=f"{provider_name}/{model}", set_payload_logger=lambda logger: None)
 
 
 def _config(command_agent: str = "groq/m1") -> types.SimpleNamespace:

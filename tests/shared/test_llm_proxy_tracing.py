@@ -8,6 +8,7 @@ def _provider() -> object:
     return types.SimpleNamespace(
         label="groq/test-model",
         complete=lambda system_prompt, user_message, max_tokens=256: "fine, thanks",
+        set_payload_logger=lambda logger: None,
     )
 
 

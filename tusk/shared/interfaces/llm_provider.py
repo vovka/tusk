@@ -1,5 +1,10 @@
 from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
+
 from tusk.shared.schemas.tools.tool_call import ToolCall
+
+if TYPE_CHECKING:
+    from tusk.shared.llm.llm_payload_logger import LLMPayloadLogger
 
 __all__ = ["LLMProvider"]
 
@@ -37,3 +42,6 @@ class LLMProvider(ABC):
         max_tokens: int = 256,
     ) -> str:
         ...
+
+    def set_payload_logger(self, logger: "LLMPayloadLogger") -> None:
+        pass

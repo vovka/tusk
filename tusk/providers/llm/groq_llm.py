@@ -4,8 +4,9 @@ except ImportError:  # pragma: no cover
     Groq = None
 
 from tusk.providers.llm.tool_response import message_content, needs_tool_fallback, tool_or_done
+from tusk.providers.llm.tool_use_failed_recovery import ToolUseFailedRecovery
 from tusk.shared.interfaces.llm_provider import LLMProvider
-from tusk.shared.llm.tool_use_failed_recovery import ToolUseFailedRecovery
+from tusk.shared.llm.llm_payload_logger import LLMPayloadLogger
 from tusk.shared.schemas.tools.tool_call import ToolCall
 
 __all__ = ["GroqLLM"]
@@ -27,7 +28,7 @@ class GroqLLM(LLMProvider):
     def label(self) -> str:
         return f"groq/{self._model}"
 
-    def set_payload_logger(self, logger: object) -> None:
+    def set_payload_logger(self, logger: LLMPayloadLogger) -> None:
         self._logger = logger
 
     def verify(self) -> None:
