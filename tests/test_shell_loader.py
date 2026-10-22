@@ -2,9 +2,9 @@ import types
 
 import pytest
 
-import voice_gatekeeper_builder
 from shell_loader import ShellLoader
 from tusk.shared.interrupt import InterruptToken
+from voice_shell_builder import VoiceShellBuilder
 
 
 def _loader(shells: list[str], log: object | None = None, tts_enabled: bool = False, stt_engine: str = "groq") -> ShellLoader:
@@ -37,7 +37,7 @@ def test_start_logs_ready_and_runs_last_shell_on_main_thread() -> None:
 def test_tray_receives_voice_shell_as_pipeline_control(monkeypatch) -> None:
     _patch_stt(monkeypatch, object())
     loader = _loader(["voice", "tray"])
-    loader._gatekeeper = lambda worker: None
+    _skip_gatekeeper(monkeypatch)
     loader._load_class = lambda name: _voice_class() if name == "voice" else _tray_class()
     shells = [loader._build(name) for name in loader._ordered_names()]
     assert shells[1].control is shells[0]
@@ -46,41 +46,11 @@ def test_tray_receives_voice_shell_as_pipeline_control(monkeypatch) -> None:
 def test_command_worker_receives_tts_engine_when_enabled(monkeypatch) -> None:
     _patch_stt(monkeypatch, object())
     sentinel = object()
-    monkeypatch.setattr("tts_engine_builder.GroqTTS", lambda key: sentinel)
+    monkeypatch.setattr("voice_shell_builder.GroqTTS", lambda key: sentinel)
     loader = _loader(["voice"], tts_enabled=True)
-    loader._gatekeeper = lambda worker: None
+    _skip_gatekeeper(monkeypatch)
     loader._load_class = lambda name: _voice_class()
     assert loader._build("voice").worker._speaker._tts is sentinel
-
-
-def _mode_kernel(requested: list[tuple]) -> types.SimpleNamespace:
-    registry = types.SimpleNamespace(
-        get=lambda name: requested.append(("get", name)) or object(),
-        get_with_fallback=lambda name, fallback: requested.append(("fallback", name, fallback)) or object(),
-    )
-    return types.SimpleNamespace(
-        get_llm_registry=lambda: registry, interrupt_token=InterruptToken(), submit=lambda text: None,
-        dictation_gate=lambda: object(), coding_gate=lambda: object(),
-        set_dictation_callbacks=lambda on_start, on_stop: None, set_coding_callbacks=lambda on_start, on_stop: None,
-        request_dictation_stop=lambda: None, request_coding_stop=lambda: None,
-    )
-
-
-def test_gatekeeper_wiring_resolves_stop_gate_slot_with_fallback() -> None:
-    requested: list[tuple] = []
-    loader = _loader(["voice"])
-    loader._kernel = _mode_kernel(requested)
-    worker = types.SimpleNamespace(is_busy=False, current_speech_text=None)
-    slot = loader._gatekeeper(worker)
-    assert ("get", "gatekeeper") in requested and ("fallback", "stop_gate", "gatekeeper") in requested
-    assert isinstance(slot._inner, voice_gatekeeper_builder.PlaybackGate)
-
-
-def test_gatekeeper_tolerates_missing_registry() -> None:
-    loader = _loader(["voice"])
-    loader._kernel = _mode_kernel([])
-    loader._kernel.get_llm_registry = lambda: None
-    loader._gatekeeper(types.SimpleNamespace(is_busy=False, current_speech_text=None))
 
 
 def test_registry_resolves_every_shell_without_manifests() -> None:
@@ -97,7 +67,7 @@ def test_voice_shell_receives_configured_stt_engine(monkeypatch) -> None:
     sentinel = object()
     _patch_stt(monkeypatch, sentinel)
     loader = _loader(["voice"], stt_engine="whisper")
-    loader._gatekeeper = lambda worker: None
+    _skip_gatekeeper(monkeypatch)
     loader._load_class = lambda name: _voice_class()
     assert loader._build("voice").stt is sentinel
 
@@ -115,13 +85,17 @@ def _built_voice_shell(monkeypatch, requested: list[bool]) -> object:
     _patch_stt(monkeypatch, object())
     loader = _loader(["voice"])
     loader._kernel.request_interrupt = lambda: requested.append(True)
-    loader._gatekeeper = lambda worker: None
+    _skip_gatekeeper(monkeypatch)
     loader._load_class = lambda name: _voice_class()
     return loader._build("voice")
 
 
+def _skip_gatekeeper(monkeypatch) -> None:
+    monkeypatch.setattr(VoiceShellBuilder, "gatekeeper", lambda self, worker: None)
+
+
 def _patch_stt(monkeypatch, engine: object) -> None:
-    monkeypatch.setattr("stt_engine_builder.STTEngineFactory", lambda key, size, vocabulary: types.SimpleNamespace(create=lambda name: engine))
+    monkeypatch.setattr("voice_shell_builder.STTEngineFactory", lambda key, size, vocabulary: types.SimpleNamespace(create=lambda name: engine))
 
 
 def _voice_class() -> object:

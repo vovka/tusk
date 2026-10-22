@@ -260,7 +260,8 @@ Two levels of packages — file-level detail lives in
 ```
 tusk/                        (repo root)
 ├── main.py                  # Entry point: config, log, LLM registry, kernel, ShellLoader
-├── shell_loader.py          # ShellLoader — builds shells from TUSK_SHELLS, wires voice modes, orders tray last
+├── shell_loader.py          # ShellLoader — builds shells from TUSK_SHELLS, orders tray last
+├── voice_shell_builder.py   # VoiceShellBuilder — STT/TTS engines, command worker, gatekeeper slot (voice modes)
 ├── launcher/                # Host-side launcher daemon (Unix socket) — runs GUI apps as the host user
 ├── tusk/
 │   ├── kernel/              # Thin orchestration layer
