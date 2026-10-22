@@ -333,7 +333,7 @@ to the agent directly. `AgentBackendFactory` selects the implementation from
 |---|---|---|
 | `tusk` (default) | `TuskAgentBackend` | Wraps the built-in `MainAgent` (§9–§12); always `handled=True` |
 | `codex_exec` | `CodexExecAgentBackend` | Runs `codex exec --json --output-schema <path> [--model M] [--sandbox S] <extra> <prompt>` as a subprocess |
-| `codex_mcp` | `CodexMcpAgentBackend` | Talks to a Codex MCP server (`codex_mcp/` client, call builder, response reader, result mapper) |
+| `codex_mcp` | `CodexMcpAgentBackend` | Talks to a Codex MCP server (`codex_mcp/` `Client`, `CallBuilder`, `ResultMapper`) |
 | anything else | — | `ValueError` at startup |
 
 With `AGENT_BACKEND_FALLBACK=tusk`, a codex backend is wrapped in
@@ -362,8 +362,8 @@ codex exec"; otherwise `status`/`reply` are read from the parsed JSON.
 
 ## 9. Conversation Agent Specification
 
-**Sources:** `tusk/kernel/command_mode.py`, `tusk/kernel/main_agent.py`,
-`tusk/kernel/agent_profiles.py`
+**Sources:** `tusk/kernel/core/command_mode.py`, `tusk/kernel/core/main_agent.py`,
+`tusk/kernel/core/agent_profiles.py`
 
 `CommandMode.process_command(text)` builds `BackendRequest(text, "command", session_id)`,
 runs the backend, stores the returned `session_id` for the next turn, and returns
@@ -414,7 +414,7 @@ from the last 6 evicted messages, 120 chars each).
 
 ## 10. Planner Agent Specification
 
-**Sources:** `tusk/kernel/agent_profiles.py` (`planner` profile),
+**Sources:** `tusk/kernel/core/agent_profiles.py` (`planner` profile),
 `tusk/kernel/agent/planner/`
 
 ### 10.1 System Prompt
@@ -465,7 +465,7 @@ After a planner child finishes with `status=done`,
 
 ## 11. Executor Agent Specification
 
-**Sources:** `tusk/kernel/agent_profiles.py` (`executor` profile),
+**Sources:** `tusk/kernel/core/agent_profiles.py` (`executor` profile),
 `tusk/kernel/agent/planner/runtime_tool_resolver.py`,
 `tusk/kernel/agent/toolset/toolset_builder.py`
 
@@ -694,8 +694,7 @@ before each `submit` and returns to `LISTENING` after each utterance.
 
 ### 15.4 TranscriptionBuffer
 
-Interface `shells/voice/interfaces/transcription_buffer.py`; implementation
-`shells/voice/stages/transcription_buffer.py`: a `deque(maxlen=50)` of
+Implementation `shells/voice/stages/transcription_buffer.py` (no ABC): a `deque(maxlen=50)` of
 `BufferedUtterance(id, utterance, received_at, dropped)` with ids `u1`, `u2`, ….
 `recoverable(count, max_age)` returns the newest `count` dropped entries younger than
 `max_age`; `mark_dropped(id)` / `mark_recovered(id)` update and log the whole buffer state.
@@ -709,7 +708,7 @@ buffer, or gatekeeper (§16.1, §20).
 
 ## 16. Kernel Routing and Mode Specification
 
-**Sources:** `tusk/kernel/api.py`, `tusk/kernel/modes/`, `composition/shell_loader.py`,
+**Sources:** `tusk/kernel/core/kernel_api.py`, `tusk/kernel/modes/`, `composition/shell_loader.py`,
 `shells/voice/gate/gatekeeper_slot.py`, `shells/voice/gate/stop_gatekeeper.py`
 
 ### 16.1 KernelAPI.submit
@@ -1117,14 +1116,14 @@ which also refreshes the tray's model list). `model_labels()` feeds the tray men
 
 ## 22. TTS and Speech Playback Specification
 
-**Interface:** `tusk/shared/interfaces/tts_engine.py` — `synthesize(text) -> bytes`
-(WAV).
+**Interface:** `tusk/shared/interfaces/tts_engine.py` — `synthesize_chunks(text) -> Iterator[bytes]`
+(one WAV clip per chunk).
 
 ### 22.1 GroqTTS — `tusk/providers/tts/groq_tts.py`
 
 - **Model:** `canopylabs/orpheus-v1-english`, voice `daniel`, `response_format="wav"`
 - Orpheus caps input at **200 chars**: `TextChunker` splits the reply, each chunk is
-  synthesized separately, and `WavConcatenator` merges the clips into one WAV
+  synthesized separately, and `ChunkedSpeaker` plays each WAV clip in turn
 - Enabled by `TUSK_TTS` (on by default); when off, replies are logged but not spoken
 
 ### 22.2 CommandWorker — `shells/voice/command_worker.py`
@@ -1261,7 +1260,7 @@ apps start on the host desktop rather than inside the container.
 
 3. **Dependencies point at `tusk/shared`.** The kernel depends on
    `tusk.shared` interfaces and schemas; concrete providers (`tusk/providers/`) and
-   shells are injected from `main.py` / `composition/` / `tusk/kernel/startup.py`.
+   shells are injected from `main.py` / `composition/` / `tusk/kernel/core/startup.py`.
    The kernel never imports a shell; shells reach the kernel only through
    `KernelAPI.submit` and the wiring callbacks.
 

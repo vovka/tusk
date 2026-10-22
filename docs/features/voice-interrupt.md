@@ -48,12 +48,12 @@ sequenceDiagram
 |---|---|
 | `tusk/shared/interrupt_token.py` | one shared token (Event wrapper), created in `main.py` |
 | `shells/voice/command_worker.py` | runs submit + TTS + playback off the listening thread; survives submit exceptions; clears token / forces "Stopped." |
-| `shells/voice/stages/command_gate_prompt.py` | busy clause (stop intent → interrupt) + speaking clause (echoes → ambient) |
-| `shells/voice/stages/gatekeeper.py` | busy-aware classification; `interrupt` honored only while busy |
-| `shells/voice/playback_gate.py` + `stages/speech_stop_gate.py` | interrupt-or-drop while speaking in dictation/coding |
-| `shells/voice/stages/speech_playback.py` | token poll → terminate; stdin closed via `with` (no fd leak) |
-| `tusk/kernel/agent/agent_runtime.py`, `tool_sequence_executor.py`, `tusk/shared/llm/llm_retry_runner.py` | token checks: per step, between sequence steps, before retries |
-| `tusk/kernel/main_agent.py` | `cancelled` → "Stopped." |
+| `shells/voice/gate/command_gate_prompt.py` | busy clause (stop intent → interrupt) + speaking clause (echoes → ambient) |
+| `shells/voice/gate/llm_gatekeeper.py` | busy-aware classification; `interrupt` honored only while busy |
+| `shells/voice/gate/playback_gate.py` + `shells/voice/gate/speech_stop_gate.py` | interrupt-or-drop while speaking in dictation/coding |
+| `shells/voice/speech/speech_playback.py` | token poll → terminate; stdin closed via `with` (no fd leak) |
+| `tusk/kernel/agent/agent_runtime.py`, `tusk/kernel/agent/tool_sequence/executor.py`, `tusk/shared/llm/llm_retry_runner.py` | token checks: per step, between sequence steps, before retries |
+| `tusk/kernel/core/main_agent.py` | `cancelled` → "Stopped." |
 
 ## Rules worth knowing
 

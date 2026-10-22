@@ -1,6 +1,6 @@
 # Voice Shell
 
-The voice shell is a composable six-stage pipeline that converts raw microphone audio into
+The voice shell is a composable pipeline that converts raw microphone audio into
 a text command delivered to the kernel via `kernel.submit(text)`. Each stage has a single
 responsibility and passes its result forward or drops it. A developer can omit any stage by
 simply not wiring it into `VoicePipeline`.
@@ -36,13 +36,18 @@ Microphone
 └─────┬─────┘
       │ Utterance (clean)
       ▼
+┌────────────┐
+│ EchoFilter │  ← DROP: echo of a finished TUSK speech clip
+└─────┬──────┘
+      │ Utterance (clean)
+      ▼
 ┌────────┐
 │ Buffer │  rolling window + gate-state tracking
 └───┬────┘  (pending → forwarded | dropped | recovered | consumed)
     │ BufferedUtterance + recent[] + recoverable candidates[]
     ▼
 ┌─────────────┐
-│ Gatekeeper  │  primary LLM classify
+│ Gate chain  │  see "Gate Chain" below
 └──────┬──────┘
        │
        ├─ command ──────────────────────────────────── kernel.submit(text)
@@ -54,6 +59,8 @@ Microphone
        │       ├─ ambiguous ─────────── kernel.submit(current text)
        │       └─ none ───────────────────────────────── DROP
        │
+       ├─ interrupt (worker busy) ─────────────────── kernel.request_interrupt()
+       │
        └─ ambient ────────────────────────────────────── DROP
 ```
 
@@ -63,6 +70,8 @@ Microphone
 |---|---|
 | Detector | Silence / below VAD threshold |
 | Sanitizer | Hallucinated or ghost phrase |
+| EchoFilter | Echo of a finished TUSK speech clip |
+| PlaybackGate | Echo of the clip that TUSK speaks now |
 | Gatekeeper (primary) | Ambient speech — no wake word, no command intent |
 | Gatekeeper (recovery) | Ambiguous but no recoverable candidate identified |
 
@@ -94,6 +103,11 @@ Provider-agnostic hallucination and ghost-phrase filter. Drops utterances whose 
 known phantom outputs from STT engines (e.g., "Thank you for watching", blank transcriptions).
 Extracted from individual STT implementations so every provider benefits.
 
+### EchoFilter (`stages/echo_filter.py`)
+
+Drops utterances that match text that TUSK spoke in the last seconds. This is TUSK's own
+TTS output that the microphone heard again. It uses fuzzy text match only, with no LLM call.
+
 ### Buffer (`stages/transcription_buffer.py`)
 
 Rolling window of all surviving utterances. Every clean utterance is appended. The Gatekeeper
@@ -103,21 +117,51 @@ The buffer also tracks gate state for each utterance (`pending`, `forwarded`, `d
 retrospective recovery within a bounded window, so a later correction like "that previous
 one was for TUSK" can recover the earlier dropped text.
 
-### Gatekeeper (`gate/llm_gatekeeper.py`)
+### Gate Chain (`gate/`)
 
-Cheap LLM call that classifies each utterance as `command`, `conversation`, or `ambient`.
-Only `command` and `conversation` are forwarded to the kernel; `ambient` is silently dropped.
-Implements `Gatekeeper` ABC (`interfaces/gatekeeper.py`).
+Every gate implements the `Gatekeeper` ABC (`interfaces/gatekeeper.py`). `VoiceShellBuilder`
+and `GatekeeperBuilder` (`composition/`) wrap them in this order:
 
-**Follow-up window** — the gatekeeper tracks `_last_forwarded_at` internally. When it
+```
+ConfirmationAnswerGate → GatekeeperSlot → PlaybackGate → LLMGatekeeper | StopGatekeeper
+```
+
+- `ConfirmationAnswerGate` forwards a yes/no answer to a pending confirmation question.
+  For all other speech, it calls the next gate.
+- `GatekeeperSlot` holds the active gate. A mode start or stop swaps its content.
+- `PlaybackGate` acts only while TUSK speaks. It interrupts on a stop request
+  (`SpeechStopGate`), drops an echo of the current speech, and passes other speech on.
+- `LLMGatekeeper` is the command-mode gate. It is a cheap LLM call that classifies each
+  utterance as `command`, `conversation`, `ambient`, or `interrupt`. Only `command` and
+  `conversation` go to the kernel. `ambient` is dropped.
+- `StopGatekeeper` is the dictation/coding gate. It forwards all speech. A mode-specific
+  LLM check finds the stop phrase and drops it.
+
+**Follow-up window** — `LLMGatekeeper` tracks `_last_forwarded_at` internally. When it
 forwarded something recently (within `follow_up_window_seconds`, default 30 s), it includes
 recent context in the classification prompt so conversational follow-ups work without a
 wake word. No external clock or side channel is involved; the pipeline is fully linear.
 
-**Retrospective recovery** — when the current utterance is not a clear command, the
-gatekeeper can make one extra structured LLM call over recent dropped candidates from the
+**Retrospective recovery** — when the current utterance is not a clear command,
+`LLMGatekeeper` can make one extra structured LLM call over recent dropped candidates from the
 buffer. If it can identify exactly one earlier dropped utterance, it forwards that prior
 text to the kernel instead of the current correction phrase.
+
+---
+
+## Output Path
+
+`CommandWorker` runs on its own thread. It calls `kernel.submit(text)` and gives the reply
+text to the speech side:
+
+```
+CommandWorker → ChunkedSpeaker → SpeechPlayback
+```
+
+- `ChunkedSpeaker` gets WAV chunks from the injected `TTSEngine` and plays each chunk while
+  the next one synthesizes. It keeps the spoken text for `EchoFilter` and `PlaybackGate`.
+- `SpeechPlayback` plays each WAV clip through `paplay`. It polls the `InterruptToken` and
+  stops the clip when the user interrupts.
 
 ---
 
@@ -150,6 +194,10 @@ a test double or an alternative implementation without touching the others.
 | ABC | File | Key methods |
 |---|---|---|
 | `Gatekeeper` | `interfaces/gatekeeper.py` | `process(utterance: BufferedUtterance, recent, candidates) → GateDispatch` |
+
+Implementations: `ConfirmationAnswerGate`, `GatekeeperSlot`, `PlaybackGate`, `LLMGatekeeper`,
+`StopGatekeeper` (all in `gate/`). The shell also uses the shared ABCs `Shell` (`VoiceShell`),
+`STTEngine` (`Transcriber`), and `TTSEngine` (`ChunkedSpeaker`).
 
 ---
 
@@ -196,9 +244,10 @@ GateResult, GateClassification, Utterance) live in `tusk/shared/schemas/voice/`.
 
 The voice shell depends only on the **shared** layer:
 
-- `tusk.shared.schemas` — `Utterance`, `GateResult`
-- `tusk.shared.interfaces` — `LLMProvider` ABC (used by `LLMGatekeeper`), `LogPrinter` ABC,
-  `STTEngine` ABC (injected into `Transcriber`)
+- `tusk.shared.schemas` — `Utterance`, `GateResult`, `GateDispatch`, `KernelResponse`
+- `tusk.shared.interfaces` — `Shell`, `LLMProvider` (used by `LLMClient`), `LogPrinter`,
+  `STTEngine` (injected into `Transcriber`), `TTSEngine` (injected into `ChunkedSpeaker`)
+- `tusk.shared.interrupt_token` — `InterruptToken`
 
 It does **not** import from `tusk.kernel`. The kernel is reached only through the
 `submit(text)` callable passed to `VoiceShell.start()`.
