@@ -123,8 +123,8 @@ text to the kernel instead of the current correction phrase.
 
 ## Assembly
 
-`VoiceShell` builds the pipeline in `_build_pipeline` and passes `kernel.submit` as the
-callback. `VoicePipeline.run()` drives the loop:
+`VoiceShellBuilder` (repo root) builds the pipeline and hands it to `VoiceShell`, which
+passes `CommandWorker.enqueue` as the callback. `VoicePipeline.run()` drives the loop:
 
 ```python
 for utterance in detector.stream_utterances():
@@ -158,7 +158,7 @@ a test double or an alternative implementation without touching the others.
 ```
 shells/voice/
 ├── pipeline.py              # VoicePipeline — assembles stages, dispatches GateDispatch
-├── voice_shell.py           # VoiceShell — entry point, builds pipeline, calls submit()
+├── voice_shell.py           # VoiceShell — entry point, drives the pipeline, owns the pause gate
 ├── command_worker.py        # CommandWorker — runs kernel submits + speech off the pipeline thread
 ├── interfaces/
 │   └── gatekeeper.py        # Gatekeeper ABC
@@ -172,7 +172,7 @@ shells/voice/
 ├── gate/                    # every Gatekeeper implementation + its helpers
 │   ├── llm_gatekeeper.py        # LLMGatekeeper — primary classify + recovery
 │   ├── stop_gatekeeper.py       # StopGatekeeper — mode stop phrases
-│   ├── playback_gate.py         # PlaybackGate — interrupt/echo handling while TUSK speaks
+│   ├── playback_gate.py         # PlaybackGate — stop-request interrupt while TUSK speaks
 │   ├── speech_stop_gate.py      # SpeechStopGate — yes/no "stop" classifier
 │   ├── confirmation_answer_gate.py  # ConfirmationAnswerGate — yes/no to a pending confirmation
 │   ├── gatekeeper_slot.py       # GatekeeperSlot — swappable inner gatekeeper

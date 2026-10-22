@@ -49,11 +49,13 @@ def test_pipeline_emits_listening_then_reacting_around_submit() -> None:
 def test_voice_shell_pause_and_resume_gate_capture_and_report() -> None:
     statuses: list = []
     reporter = types.SimpleNamespace(set_status=lambda status: statuses.append(status))
-    shell = VoiceShell(_config(), _log(), pipeline=types.SimpleNamespace(run=lambda submit: []), reporter=reporter)
+    pause_gate = threading.Event()
+    pause_gate.set()
+    shell = VoiceShell(types.SimpleNamespace(run=lambda target: []), None, reporter, pause_gate)
     shell.pause()
-    assert not shell._pause_gate.is_set() and statuses == [AppStatus.PAUSED]
+    assert not pause_gate.is_set() and statuses == [AppStatus.PAUSED]
     shell.resume()
-    assert shell._pause_gate.is_set() and statuses == [AppStatus.PAUSED, AppStatus.LISTENING]
+    assert pause_gate.is_set() and statuses == [AppStatus.PAUSED, AppStatus.LISTENING]
 
 
 def test_switch_model_reports_updated_labels_on_success() -> None:
@@ -90,14 +92,6 @@ def _buffer() -> object:
 
 def _gatekeeper() -> object:
     return types.SimpleNamespace(process=lambda utterance, recent, candidates=None: GateDispatch("forward_current", "open Firefox"))
-
-
-def _config() -> object:
-    return types.SimpleNamespace(audio_sample_rate=16000, audio_frame_duration_ms=30, vad_aggressiveness=2, vad_silence_ms=400)
-
-
-def _log() -> object:
-    return types.SimpleNamespace(log=lambda *args: None)
 
 
 def _swap_params() -> dict:

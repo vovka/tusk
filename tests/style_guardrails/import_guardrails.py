@@ -3,7 +3,7 @@ from pathlib import Path
 
 __all__ = ["ImportGuardrails"]
 
-_FIRST_PARTY_ROOTS = ("adapters", "demos", "e2e", "launcher", "main", "shell_loader", "shells", "tests", "tools", "tusk", "voice_shell_builder")
+_FIRST_PARTY_ROOTS = ("adapters", "demos", "e2e", "gatekeeper_builder", "launcher", "main", "shell_loader", "shells", "tests", "tools", "tusk", "voice_shell_builder")
 _ALLOWED_IMPORTS = {
     # adapter servers are standalone process entrypoints, so they compose their own providers
     "adapters": ("adapters", "tusk.shared", "tusk.providers"),

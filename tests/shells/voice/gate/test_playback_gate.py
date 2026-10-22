@@ -22,14 +22,6 @@ def test_stop_intent_during_playback_interrupts() -> None:
     assert inner_calls == []
 
 
-def test_non_stop_speech_during_playback_is_dropped() -> None:
-    inner_calls: list[str] = []
-    gate = _gate(inner_calls, speaking="reading a long reply", stop=False)
-    dispatch = gate.process(_buffered("reading a long reply"), [], [])
-    assert dispatch.action == "drop"
-    assert inner_calls == []
-
-
 def test_non_stop_command_during_playback_goes_to_inner_gatekeeper() -> None:
     # E2E: "TUSK Open the text editor." spoken over a reply got stop=False and was dropped
     inner_calls: list[str] = []

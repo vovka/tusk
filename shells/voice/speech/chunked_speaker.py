@@ -7,6 +7,7 @@ from collections.abc import Generator, Iterator
 from shells.voice.speech.speech_playback import SpeechPlayback
 from tusk.shared.interfaces.log_printer import LogPrinter
 from tusk.shared.interfaces.tts_engine import TTSEngine
+from tusk.shared.interrupt_token import InterruptToken
 
 __all__ = ["ChunkedSpeaker"]
 
@@ -20,7 +21,7 @@ class ChunkedSpeaker:
     # latency: first audio starts after one TTS round trip instead of one per chunk
 
     def __init__(self, tts_engine: TTSEngine | None, playback: SpeechPlayback,
-                 log_printer: LogPrinter, interrupt_token: object | None = None) -> None:
+                 log_printer: LogPrinter, interrupt_token: InterruptToken | None = None) -> None:
         self._tts = tts_engine
         self._playback = playback
         self._log = log_printer

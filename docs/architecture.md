@@ -157,8 +157,8 @@ the differences live entirely in the injected prompt, mode, and adapter:
 `KernelAPI` owns two `ModeSlot`s and routes every `submit(text)` to the active one
 (coding is checked first) before falling back to `CommandMode`. Entering a mode swaps the
 voice shell's `GatekeeperSlot` from `LLMGatekeeper` to a `StopGatekeeper` wrapped in
-`PlaybackGate` (so TUSK's own speech can only be interrupted or dropped, never typed).
-Callbacks are wired in `ShellLoader._wire_modes`.
+`PlaybackGate` (so a stop request interrupts TUSK's own speech; `EchoFilter` keeps that speech
+from being typed). Callbacks are wired in `GatekeeperBuilder._wire_modes`.
 
 ```mermaid
 sequenceDiagram
@@ -243,8 +243,8 @@ flowchart LR
 Interrupt is honored only while the worker is busy (an idle "stop" is a normal command).
 Cancellation is step-boundary: in-flight LLM/tool calls finish and their results are
 discarded; the runtime replies "Stopped." Playback stop is near-instant. While TUSK
-speaks in forward-all modes (dictation/coding), `PlaybackGate` restricts the mode gate to
-interrupt-or-drop so TUSK's own voice is never typed into the editor.
+speaks in forward-all modes (dictation/coding), `PlaybackGate` lets a stop request interrupt
+before the mode gate sees it; `EchoFilter` keeps TUSK's own voice out of the editor.
 
 ---
 
@@ -258,7 +258,8 @@ Two levels of packages — file-level detail lives in
 tusk/                        (repo root)
 ├── main.py                  # Entry point: config, log, LLM registry, kernel, ShellLoader
 ├── shell_loader.py          # ShellLoader — builds shells from TUSK_SHELLS, orders tray last
-├── voice_shell_builder.py   # VoiceShellBuilder — STT/TTS engines, command worker, gatekeeper slot (voice modes)
+├── voice_shell_builder.py   # VoiceShellBuilder — builds the whole voice stack and returns a ready VoiceShell
+├── gatekeeper_builder.py    # GatekeeperBuilder — gatekeeper slot + mode gate wiring (voice modes)
 ├── launcher/                # Host-side launcher daemon (Unix socket) — runs GUI apps as the host user
 ├── tusk/
 │   ├── kernel/              # Thin orchestration layer
@@ -413,7 +414,7 @@ AudioCapture.stream_frames()
     → GatekeeperSlot.process(buffered, recent, candidates)   # delegates to active gatekeeper
         # command mode:    LLMGatekeeper — LLM classify (busy/speaking-aware) → DROP / INTERRUPT
         # dictation/coding: StopGatekeeper — forward all; ModeGate LLM stop detection → DROP (stop phrase)
-        # while TUSK speaks: mode gates wrapped in PlaybackGate → INTERRUPT or DROP only
+        # while TUSK speaks: mode gates wrapped in PlaybackGate → INTERRUPT on a stop request
     → GateDispatch(action, text, recovered_id) — GateAction enum
     → CommandWorker.enqueue(text)              # worker thread — listening never blocks
       → KernelAPI.submit(text)                 # serialized by one submit lock
@@ -726,7 +727,7 @@ selected by name from `TUSK_SHELLS` (default `voice`). There are no shell manife
 `ShellLoader` maps names to classes directly (`_SHELL_CLASSES`: `voice`, `cli`,
 `emulator`, `tray`).
 
-- **`VoiceShell`** — builds the `VoicePipeline` from the stage classes and drives it in a
+- **`VoiceShell`** — drives the `VoicePipeline` built by `VoiceShellBuilder` in a
   loop. The forward target is `CommandWorker.enqueue`: the worker thread runs
   `kernel.submit`, logs the reply, and — when TTS is enabled (`TUSK_TTS=on`, default) —
   speaks it via `SpeechPlayback`. When `TUSK_ACK=on` (default) it first speaks a brief
@@ -890,12 +891,13 @@ main()
   → reporter.set_models(registry.model_labels())
   → ShellLoader(config, kernel, log, reporter).start()
       → per TUSK_SHELLS: build each shell ("tray" forced last)
-      → voice: STTEngineFactory → CommandWorker(kernel.submit, GroqTTS?, SpeechPlayback(token), token)
+      → voice: VoiceShellBuilder.build(): STTEngineFactory → CommandWorker(kernel.submit, GroqTTS?, SpeechPlayback(token), token)
                → LLMGatekeeper(gatekeeper slot, busy/speaking probes from the worker)
                → GatekeeperSlot(llm_gk); mode callbacks wired:
                    on_start → slot.swap(PlaybackGate(StopGatekeeper(ModeGate(prompt), request_stop)))
                    on_stop  → slot.swap(llm_gk)
-               → VoiceShell(..., on_interrupt = kernel.request_interrupt + worker.flush)
+               → VoicePipeline(..., on_interrupt = kernel.request_interrupt + worker.flush)
+               → VoiceShell(pipeline, worker, reporter, pause_gate)
       → tray: TrayShell(reporter, voice_shell_ref, shutdown_event, config)
       → run: all but last in daemon threads; last blocks the main thread
 ```

@@ -29,7 +29,7 @@ class VoiceE2EHarness:
         self.replies, self.enqueued, self.interrupts = [], [], 0
         self.worker = self._build_worker()
         self._wrap_enqueue()
-        self._shell = VoiceShell(None, log, pipeline=self._build_pipeline(), worker=self.worker)
+        self._shell = VoiceShell(self._build_pipeline(), self.worker, None, _open_gate())
 
     def start(self) -> None:
         threading.Thread(target=self._shell.start, args=(self._kernel.submit,), daemon=True).start()
@@ -89,3 +89,9 @@ class VoiceE2EHarness:
         self.interrupts += 1
         self._kernel.request_interrupt()
         self.worker.flush()
+
+
+def _open_gate() -> threading.Event:
+    gate = threading.Event()
+    gate.set()
+    return gate

@@ -768,7 +768,7 @@ Schema:
 ### 16.4 Voice-Side Mode Gating
 
 `GatekeeperSlot` is the pipeline's gatekeeper — a swappable holder implementing the
-`Gatekeeper` ABC. `ShellLoader` wires each mode's callbacks:
+`Gatekeeper` ABC. `GatekeeperBuilder` wires each mode's callbacks:
 
 - **on_start:** `slot.swap(PlaybackGate(StopGatekeeper(ModeGate(...), request_stop), current_speech_text, SpeechStopGate(...)))`
 - **on_stop:** `slot.swap(llm_gatekeeper)` — back to command-mode classification
@@ -776,7 +776,7 @@ Schema:
 `StopGatekeeper` is the forward-all gate: `should_stop` → invoke the kernel's
 `request_stop` callback and `DROP` the utterance (the stop segment never reaches the
 adapter); otherwise `FORWARD_CURRENT` with the raw text. `PlaybackGate` restricts
-everything to interrupt-or-drop while TUSK's own speech is playing (§30.4).
+stop requests to an interrupt while TUSK's own speech is playing (§30.4).
 
 ---
 
@@ -998,7 +998,7 @@ slots, and registers `SwitchModelTool`, `StartDictationTool`, `StartCodingTool`.
 Shells are a static registry — no dynamic discovery:
 
 ```python
-_SHELL_CLASSES = {"cli": CLIShell, "emulator": EmulatorShell, "tray": TrayShell, "voice": VoiceShell}
+_SHELL_CLASSES = {"cli": CLIShell, "emulator": EmulatorShell, "tray": TrayShell}  # "voice" → VoiceShellBuilder.build()
 ```
 
 An unknown name in `TUSK_SHELLS` raises `ValueError`. `tray` is always reordered to
@@ -1006,25 +1006,26 @@ the **end** of the list (GTK main loop must own the main thread). Every shell bu
 last runs in a daemon thread; the last blocks the main thread. Each shell's `start`
 receives `kernel.submit`.
 
-`ShellLoader` also builds the voice stack: STT engine via `STTEngineFactory`,
+`VoiceShellBuilder` (repo root) builds the voice stack: STT engine via `STTEngineFactory`,
 `CommandWorker` (with `GroqTTS` when `TUSK_TTS` is on, `SpeechPlayback`, the interrupt
 token, and the `TUSK_ACK` flag), the busy/speaking-aware `LLMGatekeeper` inside a
-`GatekeeperSlot`, and the mode gate wiring of §16.4.
+`GatekeeperSlot` (via `GatekeeperBuilder`), the mode gate wiring of §16.4, the stage pipeline
+and the pause gate — and returns a ready `VoiceShell`.
 
 ### 20.2 VoiceShell — `shells/voice/voice_shell.py`
 
 ```python
+def __init__(self, pipeline, worker, reporter, pause_gate): ...
+
 def start(self, submit):
-    if self._worker is not None:
-        self._worker.start()
-    target = self._worker.enqueue if self._worker is not None else submit
-    for result in self._pipeline.run(target):
-        ...log reply...
+    self._worker.start()
+    for _ in self._pipeline.run(self._worker.enqueue):
+        if not self._running: return
 ```
 
-With a `CommandWorker` injected (normal wiring), the forward target is
-`worker.enqueue`, so the listening loop never blocks on execution or playback. The
-shell owns the pause gate: `pause()` clears it (capture stops, `PAUSED` reported),
+The forward target is always `worker.enqueue`, so the listening loop never blocks on
+execution or playback; the worker logs and speaks the reply. The shell holds the pause
+gate built alongside `AudioCapture`: `pause()` clears it (capture stops, `PAUSED` reported),
 `resume()` sets it (`LISTENING`). The tray drives these methods directly — the voice
 shell *is* the pipeline control object (duck-typed; there is no separate control ABC).
 
@@ -1465,9 +1466,8 @@ utterance heard during playback goes to `SpeechStopGate`
 (`{"stop": bool, "reason": str}`, 128 max tokens, gatekeeper slot) with the spoken
 sentence as context and an explicit echo rule ("utterances that repeat fragments of
 TUSK's own sentence are its own voice: not a stop request"). `stop=true` →
-`GateDispatch(INTERRUPT)`; anything else → `DROP`. Nothing is ever forwarded, so TUSK's
-own voice is never typed into the editor. Command mode needs no wrapper — the
-busy/speaking-aware prompt covers it in the same single gatekeeper call.
+`GateDispatch(INTERRUPT)`; anything else is delegated to the wrapped gate. Echoes of
+TUSK's own voice never reach it: `EchoFilter` (`shells/voice/stages/echo_filter.py`) drops them before the buffer.
 
 ### 30.5 Out of Scope
 

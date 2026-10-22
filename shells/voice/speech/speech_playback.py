@@ -1,11 +1,13 @@
 import subprocess
 import threading
 
+from tusk.shared.interrupt_token import InterruptToken
+
 __all__ = ["SpeechPlayback"]
 
 
 class SpeechPlayback:
-    def __init__(self, interrupt_token: object | None = None, poll_seconds: float = 0.1) -> None:
+    def __init__(self, interrupt_token: InterruptToken | None = None, poll_seconds: float = 0.1) -> None:
         self._token = interrupt_token
         self._poll = poll_seconds
 

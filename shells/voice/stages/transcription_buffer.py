@@ -1,5 +1,6 @@
 import time
 from collections import deque
+from collections.abc import Callable
 
 from tusk.shared.schemas.voice.buffered_utterance import BufferedUtterance
 from tusk.shared.interfaces.log_printer import LogPrinter
@@ -13,7 +14,7 @@ class TranscriptionBuffer:
         self,
         log_printer: LogPrinter | None = None,
         max_utterances: int = 50,
-        time_source: object = time.monotonic,
+        time_source: Callable[[], float] = time.monotonic,
     ) -> None:
         self._utterances: deque[BufferedUtterance] = deque(maxlen=max_utterances)
         self._log = log_printer
