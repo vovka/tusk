@@ -2,12 +2,10 @@ import threading
 import uuid
 from collections.abc import Callable
 
-from tusk.kernel.modes.coding_gate_prompt import CODING_GATE_PROMPT
-from tusk.kernel.modes.dictation_gate_prompt import DICTATION_GATE_PROMPT
 from tusk.kernel.modes.mode_gate import ModeGate
 from tusk.kernel.modes.mode_slot import ModeSlot
-from tusk.kernel.core.submit_status_reporter import SubmitStatusReporter
 from tusk.shared.schemas.app_mode import MODE_BYPASS_KIND_PREFIX, AppMode
+from tusk.shared.schemas.app_status import AppStatus
 from tusk.shared.schemas.kernel_response import KernelResponse
 from tusk.shared.interrupt.interrupt_token import InterruptToken
 from tusk.shared.llm.llm_registry import LLMRegistry
@@ -34,7 +32,6 @@ class KernelAPI:
         self._log = log
         self._reporter = reporter
         self._interrupt_token = interrupt_token
-        self._submit_reporter = SubmitStatusReporter(reporter) if reporter is not None else None
         self._submit_lock = threading.Lock()
         self._dictation = dictation_slot or ModeSlot("DICTATION", "Dictation started.")
         self._coding = coding_slot or ModeSlot("CODING", "Coding started.")
@@ -58,9 +55,14 @@ class KernelAPI:
                 return response
 
     def _reported_route(self, text: str, kind: str) -> KernelResponse:
-        if self._submit_reporter is None:
+        if self._reporter is None:
             return self._route(text, kind)
-        return self._submit_reporter.run(text, lambda routed_text: self._route(routed_text, kind))
+        previous = self._reporter.status
+        self._reporter.set_status(AppStatus.REACTING, text)
+        try:
+            return self._route(text, kind)
+        finally:
+            self._reporter.set_status(previous)
 
     def _log_input(self, text: str) -> None:
         if self._log is not None:
@@ -119,11 +121,7 @@ class KernelAPI:
         return self._llm_registry
 
     def dictation_gate(self) -> ModeGate:
-        return self._mode_gate("dictation", DICTATION_GATE_PROMPT)
+        return ModeGate.for_mode(self._llm_registry, "dictation", self._log)
 
     def coding_gate(self) -> ModeGate:
-        return self._mode_gate("coding", CODING_GATE_PROMPT)
-
-    def _mode_gate(self, mode_name: str, prompt: str) -> ModeGate:
-        stop_gate_llm = self._llm_registry.get_with_fallback("stop_gate", "gatekeeper") if self._llm_registry else None
-        return ModeGate(stop_gate_llm, mode_name, prompt, self._log)
+        return ModeGate.for_mode(self._llm_registry, "coding", self._log)

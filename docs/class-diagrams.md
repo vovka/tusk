@@ -143,9 +143,6 @@ classDiagram
     clear() None
     get_messages() list[ChatMessage]
   }
-  class SubmitStatusReporter {
-    run(text: str, route: Callable[[str], object]) object
-  }
   FullReplaceEditStrategy --|> EditApplicationStrategy
   InputAutomationEditorDriver --|> EditorDriver
   SlidingWindowHistory --|> ConversationHistory

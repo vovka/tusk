@@ -892,7 +892,7 @@ main()
       → MainAgent(AgentOrchestrator(build_agent_profiles(llm_registry),
                                     tool_registry, FileStore(session_log_dir), log, token),
                   history)
-      → KernelAPI(CommandMode(AgentBackendFactory(agent, config, log).create(), log),
+      → KernelAPI(CommandMode(AgentBackendFactory(agent, config, log).create(), log, confirmation),
                   llm_registry, log, reporter, token)     # owns dictation/coding ModeSlots
       → ToolRuntime(...).register_tools(kernel)  # start_dictation/start_coding/switch_model,
                                                  # routers + editor driver + strategy attached

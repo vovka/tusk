@@ -1,7 +1,7 @@
 from tusk.kernel import CommandMode, KernelAPI, MainAgent, SlidingWindowHistory, ToolRegistry
 from tusk.kernel.core.adapter_manager import AdapterManager
 from tusk.kernel.agent import AgentOrchestrator, FileStore
-from tusk.kernel.agent.confirmation import ConfirmationGate, ConfirmingCommandMode
+from tusk.kernel.agent.confirmation import ConfirmationGate
 from tusk.kernel.interfaces.action_confirmation import ActionConfirmation
 from tusk.kernel.agent.backends import AgentBackendFactory
 from tusk.kernel.core.agent_profiles import build_agent_profiles
@@ -28,7 +28,7 @@ def build_kernel(config: Config, log: ColorLogPrinter, llm_registry: LLMRegistry
 
 def build_api(agent: MainAgent, config: Config, log: ColorLogPrinter, llm_registry: LLMRegistry, reporter: StatusReporterHub, token: InterruptToken | None = None, tracer: Tracer | None = None, *, confirmation: ActionConfirmation) -> KernelAPI:
     backend = AgentBackendFactory(agent, config, log).create()
-    command_mode = ConfirmingCommandMode(CommandMode(backend, log), confirmation)
+    command_mode = CommandMode(backend, log, confirmation)
     return KernelAPI(command_mode, llm_registry, log, reporter, token, tracer=tracer)
 
 

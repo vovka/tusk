@@ -26,5 +26,6 @@ def _kernel(config: Config, log: ColorLogPrinter, registry: LLMRegistry, token: 
     history = SlidingWindowHistory(20)
     store = FileStore(config.agent_session_log_dir)
     tools = ToolRegistry()
-    orchestrator = AgentOrchestrator(build_agent_profiles(registry), tools, store, log, token, confirmation=ConfirmationGate(tools))
-    return KernelAPI(CommandMode(MainAgent(orchestrator, history), log), registry, log, None, token)
+    confirmation = ConfirmationGate(tools)
+    orchestrator = AgentOrchestrator(build_agent_profiles(registry), tools, store, log, token, confirmation=confirmation)
+    return KernelAPI(CommandMode(MainAgent(orchestrator, history), log, confirmation), registry, log, None, token)

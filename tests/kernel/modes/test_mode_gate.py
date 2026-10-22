@@ -70,3 +70,26 @@ def test_gate_failures_log_as_always_visible_error() -> None:
     llm = types.SimpleNamespace(label="gate", complete_structured=_structured_failure, complete=_structured_failure)
     ModeGate(llm, "coding", CODING_GATE_PROMPT, types.SimpleNamespace(log=lambda *a: logs.append(a))).should_stop("x")
     assert logs and logs[0][0] == "ERROR"
+
+
+def test_for_mode_builds_gate_from_stop_gate_slot_and_mode_prompt() -> None:
+    requested: list[tuple[str, str]] = []
+    prompts: list[str] = []
+    llm = _recording_llm(prompts)
+    registry = types.SimpleNamespace(get_with_fallback=lambda name, fallback: requested.append((name, fallback)) or llm)
+    gate = ModeGate.for_mode(registry, "dictation", None)
+    assert gate.should_stop("x") is False
+    assert requested == [("stop_gate", "gatekeeper")]
+    assert prompts == [DICTATION_GATE_PROMPT]
+
+
+def test_for_mode_without_registry_has_no_llm() -> None:
+    assert isinstance(ModeGate.for_mode(None, "coding", None), ModeGate)
+
+
+def _recording_llm(prompts: list[str]) -> object:
+    def structured(prompt: str, text: str, name: str, schema: dict, max_tokens: int) -> str:
+        prompts.append(prompt)
+        return '{"directed": false, "cleaned_command": "", "metadata_stop": null}'
+
+    return types.SimpleNamespace(complete_structured=structured)
