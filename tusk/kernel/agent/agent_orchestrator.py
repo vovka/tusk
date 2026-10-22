@@ -7,7 +7,7 @@ from tusk.kernel.agent.agent_profile import AgentProfile
 from tusk.kernel.agent.agent_result import AgentResult
 from tusk.kernel.agent.agent_run_request import AgentRunRequest
 from tusk.kernel.agent.agent_runtime import AgentRuntime
-from tusk.kernel.agent.runtime.step_recorder import StepRecorder
+from tusk.kernel.agent.runtime.transcript import Transcript
 from tusk.kernel.agent.session.store import Store
 from tusk.kernel.agent.agent_tool_catalog import AgentToolCatalog
 from tusk.kernel.agent.agent_toolset_builder import AgentToolsetBuilder
@@ -42,7 +42,7 @@ class AgentOrchestrator:
 
     def _init_components(self, store: Store, log: LogPrinter, registry: ToolRegistry, token: object | None, tracer: Tracer | None,
                          confirmation: ConfirmationGate) -> None:
-        self._runtime = AgentRuntime(store, log, StepRecorder(store, registry), token)
+        self._runtime = AgentRuntime(store, log, Transcript(store, registry), token)
         self._delegation = Delegation(store)
         self._catalog = AgentToolCatalog(registry)
         self._planner_results = ResultValidator(log)

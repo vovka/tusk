@@ -516,14 +516,14 @@ with `AgentResult(status="need_tools")`.
 ## 12. AgentRuntime Specification
 
 **Source:** `tusk/kernel/agent/agent_runtime.py` with `runtime/` helpers
-(`MessageHistoryBuilder`, `ResultFactory`, `StepRecorder`, `TurnGuards`).
+(`Transcript`, `ResultFactory`, `TurnGuards`).
 Shared by all profiles.
 
 ### 12.1 Session Lifecycle
 
 1. `session_id = request.session_id or store.create_session_id()`; unknown sessions get
    `store.start_session(session_id, profile_id, parent_session_id, parent_call_id, metadata)`
-2. `MessageHistoryBuilder` loads prior conversation messages from the store and appends
+2. `Transcript` loads prior conversation messages from the store and appends
    one `[session-ref] <digest>` user message per `session_refs` entry
 3. The user instruction is appended to the store and to the message list
 4. The step loop runs until `done`, a guard violation, interrupt, or max steps
@@ -539,13 +539,13 @@ Per step (1 … `profile.max_steps`):
 
 1. `InterruptToken` set → `AgentResult(status="cancelled", summary="cancelled by user")`
 2. `profile.llm_provider.complete_tool_call(system_prompt, messages, tools)`; any
-   exception → `ModelFailureReplyBuilder` text → a synthetic
+   exception → `ResultFactory.model_failure_text` → a synthetic
    `done(status="failed", summary=text, text=text)` call
 3. `done` → finish (§12.3)
 4. `TurnGuards.violation` (§13) → `failed`
 5. `RepeatedToolCallGuard`: the **3rd consecutive** identical
    `(tool_name, parameters)` call → `failed` ("repeated identical tool call")
-6. Otherwise the call is dispatched (§14), recorded (`StepRecorder`), appended to the
+6. Otherwise the call is dispatched (§14), recorded (`Transcript`), appended to the
    message history, and observed by the guards
 
 Max steps exhausted → `AgentResult(status="failed", "max steps reached")`.
@@ -1300,10 +1300,10 @@ apps start on the host desktop rather than inside the container.
 | `LLMClient` (gatekeeper) | structured call fails | falls back to plain `complete` |
 | `LLMClient` (gatekeeper) | both calls fail / parse error | `GateResult(False, "", 0.0)` → utterance takes the recovery/drop path |
 | `ModeGate` | both calls fail / parse error | `should_stop() == False` → treated as literal mode text |
-| `AgentRuntime` | LLM exception | `ModelFailureReplyBuilder` message → synthetic `done(status="failed")` |
+| `AgentRuntime` | LLM exception | `ResultFactory.model_failure_text` → synthetic `done(status="failed")` |
 | `AgentRuntime` | max steps (8/16) / guard violation / 3× repeated call | `AgentResult(status="failed")` |
 | `AgentRuntime` | `InterruptToken` set | `AgentResult(status="cancelled")` at the next step boundary |
-| `ModelFailureReplyBuilder` | rate limit / json_validate_failed / tool_use_failed / empty completion / other | canned user-facing reply per class |
+| `ResultFactory.model_failure_text` | rate limit / json_validate_failed / tool_use_failed / empty completion / other | canned user-facing reply per class |
 | `ResultValidator` / `StepPlanValidator` / `PlanValidator` | invalid planner output | child result replaced by `status="failed"` with the violation message |
 | `tool_sequence.Executor` | step failure / interrupt | aborts remaining steps; partial payload with `completed_step_ids`, `failed_step_id` |
 | `OrchestratorToolDispatcher` | unknown tool / invalid args | `ToolResult(False, ...)` back to the LLM |

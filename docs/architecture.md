@@ -557,12 +557,12 @@ tools are for shortcuts only; call `done` immediately after the final successful
 
 Shared across all profiles. Each run:
 
-1. `runtime.MessageHistoryBuilder` loads prior messages from the session `Store`.
-2. Appends the user instruction to messages and the session event log (`runtime.StepRecorder`).
+1. `runtime.Transcript` loads prior messages from the session `Store`.
+2. Appends the user instruction to messages and the session event log (`runtime.Transcript`).
 3. Loops up to `profile.max_steps`:
    - If the `InterruptToken` is set → returns `AgentResult(status="cancelled")` immediately.
    - Calls `profile.llm_provider.complete_tool_call(system_prompt, messages, tools)`;
-     an LLM failure becomes a synthetic `done(status="failed")` via `ModelFailureReplyBuilder`.
+     an LLM failure becomes a synthetic `done(status="failed")` via `ResultFactory.model_failure_text`.
    - `done` → finish and persist the result (`runtime.ResultFactory`).
    - `runtime.TurnGuards` checks profile-specific violations; `RepeatedToolCallGuard`
      aborts on a duplicate identical call — both fail the run.
@@ -947,7 +947,7 @@ LLM slot proxies for agents carry the `InterruptToken`; gatekeeper/utility do no
 | `Sanitizer` | — | Returns `None` — utterance discarded silently |
 | `LLMGatekeeper` | JSON parse error / both LLM calls fail | Returns `GateResult(False, "", 0.0)` |
 | `ModeGate` | Both LLM calls fail | Text forwarded as a literal mode segment |
-| `AgentRuntime` | LLM failure | `ModelFailureReplyBuilder` → synthetic `done(status="failed")` |
+| `AgentRuntime` | LLM failure | `ResultFactory.model_failure_text` → synthetic `done(status="failed")` |
 | `AgentRuntime` | Max steps / repeated tool call / guard violation | Returns `AgentResult(status="failed")` |
 | `AgentRuntime` | `InterruptToken` set | `AgentResult(status="cancelled")` at the next step boundary → "Stopped." |
 | `planner.ResultValidator` | Invalid planner output | Validates steps, promotes to sequence when eligible; fails if no valid steps remain |

@@ -114,9 +114,6 @@ classDiagram
     start(state: object, log: object) KernelResponse
     stop() None
   }
-  class ModelFailureReplyBuilder {
-    build(exc: Exception) str
-  }
   class Shell {
     start(api: object)* None
     stop()* None
@@ -218,9 +215,6 @@ classDiagram
     session_digest(session_id: str) str
     start_session(session_id: str, profile_id: str, parent_session_id: str, parent_call_id: str, metadata: dict[str, object]) None
   }
-  class MessageHistoryBuilder {
-    build(session_id: str, request: AgentRunRequest) list[dict[str, str]]
-  }
   class OrchestratorToolDispatcher {
     dispatch(tool_call: ToolCall, session_id: str, allowed_tool_names: set[str] | None, sequence_plan: ToolSequencePlan | None) ToolResult
   }
@@ -238,6 +232,7 @@ classDiagram
     cancelled(session_id: str) AgentResult
     failed(session_id: str, reason: str) AgentResult
     from_parameters(session_id: str, parameters: dict[str, object]) AgentResult
+    model_failure_text(exc: Exception) str
     persist(session_id: str, result: AgentResult, reply: str) AgentResult
   }
   class ResultValidator {
@@ -249,9 +244,10 @@ classDiagram
   class SimpleSchemaValidator {
     validate(schema: dict[str, object], value: object) str | None
   }
-  class StepRecorder {
+  class Transcript {
     append_message(session_id: str, role: str, content: str) None
     appended(messages: list[dict[str, str]], tool_call: ToolCall, tool_result: ToolResult) None
+    build(session_id: str, request: AgentRunRequest) list[dict[str, str]]
     requested(session_id: str, step: int, tool_call: ToolCall) None
     result(session_id: str, step: int, tool_call: ToolCall, tool_result: ToolResult) None
   }

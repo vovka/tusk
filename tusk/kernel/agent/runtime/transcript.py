@@ -1,16 +1,26 @@
-from tusk.shared.schemas.tools.tool_call import ToolCall
-from tusk.shared.schemas.tools.tool_result import ToolResult
 import json
+
+from tusk.kernel.agent.agent_run_request import AgentRunRequest
 from tusk.kernel.agent.session.store import Store
 from tusk.kernel.tools.tool_registry import ToolRegistry
+from tusk.shared.schemas.tools.tool_call import ToolCall
+from tusk.shared.schemas.tools.tool_result import ToolResult
 
-__all__ = ["StepRecorder"]
+__all__ = ["Transcript"]
 
 
-class StepRecorder:
+class Transcript:
     def __init__(self, session_store: Store, tool_registry: ToolRegistry) -> None:
         self._store = session_store
         self._registry = tool_registry
+
+    def build(self, session_id: str, request: AgentRunRequest) -> list[dict[str, str]]:
+        messages = list(self._store.conversation_messages(session_id))
+        for ref in request.session_refs:
+            digest = self._store.session_digest(ref)
+            if digest:
+                messages.append({"role": "user", "content": f"[session-ref] {digest}"})
+        return messages
 
     def append_message(self, session_id: str, role: str, content: str) -> None:
         self._store.append_event(session_id, "message_appended", {"role": role, "content": content})

@@ -1,8 +1,6 @@
 from collections.abc import Callable
 
-from tusk.kernel.agent.runtime import (
-    CallTool, MessageHistoryBuilder, ModelFailureReplyBuilder, ResultFactory, StepRecorder, TurnGuards,
-)
+from tusk.kernel.agent.runtime import CallTool, ResultFactory, Transcript, TurnGuards
 from tusk.kernel.tools.repeated_tool_call_guard import RepeatedToolCallGuard
 from tusk.shared.schemas.tools.tool_call import ToolCall
 from tusk.shared.schemas.tools.tool_result import ToolResult
@@ -16,23 +14,21 @@ from tusk.shared.logging.interfaces.log_printer import LogPrinter
 class AgentRuntime:
     def __init__(
         self, session_store: Store, log_printer: LogPrinter,
-        step_recorder: StepRecorder, interrupt_token: object | None = None,
+        transcript: Transcript, interrupt_token: object | None = None,
     ) -> None:
         self._store = session_store
         self._log = log_printer
         self._token = interrupt_token
-        self._failure = ModelFailureReplyBuilder()
-        self._history = MessageHistoryBuilder(session_store)
         self._results = ResultFactory(session_store)
-        self._record = step_recorder
+        self._transcript = transcript
 
     def run(
         self, request: AgentRunRequest, profile: AgentProfile,
         tools: list[dict[str, object]], executor: Callable[[ToolCall, str], ToolResult],
     ) -> AgentResult:
         session_id = self._session_id(request, profile)
-        messages = self._history.build(session_id, request)
-        self._record.append_message(session_id, "user", request.instruction)
+        messages = self._transcript.build(session_id, request)
+        self._transcript.append_message(session_id, "user", request.instruction)
         messages.append({"role": "user", "content": request.instruction})
         return self._loop(session_id, profile, tools, messages, executor)
 
@@ -72,13 +68,13 @@ class AgentRuntime:
         repeat: RepeatedToolCallGuard, guards: TurnGuards, step: int,
     ) -> AgentResult | None:
         tool_call = self._tool_call(profile, messages, tools, guards)
-        self._record.requested(session_id, step, tool_call)
+        self._transcript.requested(session_id, step, tool_call)
         finished = self._guard_result(session_id, profile.profile_id, tool_call, repeat, guards)
         if finished is not None:
             return finished
         result = guards.refusal(profile.profile_id, tool_call) or executor(tool_call, session_id)
-        self._record.result(session_id, step, tool_call, result)
-        self._record.appended(messages, tool_call, result)
+        self._transcript.result(session_id, step, tool_call, result)
+        self._transcript.appended(messages, tool_call, result)
         guards.observe(tool_call, result)
         return None
 
@@ -100,7 +96,7 @@ class AgentRuntime:
             return CallTool.unwrap(profile.llm_provider.complete_tool_call(profile.system_prompt, messages, tools))
         except Exception as exc:
             self._log.log("ERROR", f"llm failure: {exc}")
-            text = self._failure.build(exc)
+            text = self._results.model_failure_text(exc)
             return guards.partial_done(profile.profile_id) or ToolCall("done", {"status": "failed", "summary": text, "text": text})
 
     def _finish(self, session_id: str, parameters: dict[str, object]) -> AgentResult:
