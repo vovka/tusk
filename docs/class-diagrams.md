@@ -117,7 +117,6 @@ classDiagram
   }
   class MainAgent {
     process_command(command: str) str
-    run(request: AgentRequest) BackendAgentResult
   }
   class ModeGate {
     should_stop(text: str) bool

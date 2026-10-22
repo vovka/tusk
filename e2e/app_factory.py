@@ -1,6 +1,7 @@
 import main as app_main
 from tusk.kernel import CommandMode, KernelAPI, MainAgent, SlidingWindowHistory, ToolRegistry
 from tusk.kernel.agent import AgentOrchestrator, FileStore
+from tusk.kernel.agent.backends import AgentBackendFactory
 from tusk.kernel.agent.confirmation import ConfirmationGate
 from tusk.kernel.core.agent_profiles import build_agent_profiles
 from tusk.shared.config import Config, StartupOptions
@@ -28,4 +29,5 @@ def _kernel(config: Config, log: ColorLogPrinter, registry: LLMRegistry, token: 
     tools = ToolRegistry()
     confirmation = ConfirmationGate(tools)
     orchestrator = AgentOrchestrator(build_agent_profiles(registry), tools, store, log, token, confirmation=confirmation)
-    return KernelAPI(CommandMode(MainAgent(orchestrator, history), log, confirmation), registry, log, None, token)
+    backend = AgentBackendFactory(MainAgent(orchestrator, history), config, log).create()
+    return KernelAPI(CommandMode(backend, log, confirmation), registry, log, None, token)

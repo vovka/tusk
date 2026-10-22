@@ -267,7 +267,7 @@ tusk/                        (repo root)
 │   ├── kernel/              # Thin orchestration layer
 │   │   ├── core/            # KernelAPI, CommandMode, MainAgent, AdapterManager,
 │   │   │   │                #   agent profiles, SlidingWindowHistory, startup wiring
-│   │   ├── interfaces/      # Agent, Shell, ConversationHistory, EditorDriver, EditApplicationStrategy
+│   │   ├── interfaces/      # Shell, ConversationHistory, EditorDriver, EditApplicationStrategy
 │   │   ├── agent/           # Agentic loop: AgentOrchestrator, AgentRuntime, tool catalog/toolset, dispatcher
 │   │   │   ├── backends/    # AgentBackend ABC; tusk / codex_exec / codex_mcp / fallback backends
 │   │   │   │   └── codex_mcp/ # Persistent codex mcp-server session (Client, CallBuilder, ResponseReader, ResultMapper)
@@ -346,12 +346,11 @@ source files; this table is the index:
 
 | ABC | Defined in | Implementations | Key consumers |
 |---|---|---|---|
-| `Agent` | `tusk/kernel/interfaces/agent.py` | `MainAgent` (structural) | `TuskAgentBackend`, `AgentBackendFactory` |
 | `Shell` | `tusk/kernel/interfaces/shell.py` | `VoiceShell`, `CLIShell`, `EmulatorShell`, `TrayShell` (structural) | `ShellLoader` |
 | `ConversationHistory` | `tusk/kernel/interfaces/conversation_history.py` | `SlidingWindowHistory` | `MainAgent` |
 | `EditorDriver` | `tusk/kernel/interfaces/editor_driver.py` | `InputAutomationEditorDriver` | `CodingRouter`, `StartCodingTool`, strategies |
 | `EditApplicationStrategy` | `tusk/kernel/interfaces/edit_application_strategy.py` | `FullReplaceEditStrategy` | `CodingRouter` |
-| `AgentBackend` | `tusk/kernel/agent/backends/agent_backend.py` | `MainAgent`, `TuskAgentBackend`, `CodexExecAgentBackend`, `CodexMcpAgentBackend`, `FallbackAgentBackend` | `CommandMode` |
+| `AgentBackend` | `tusk/kernel/agent/backends/agent_backend.py` | `TuskAgentBackend`, `CodexExecAgentBackend`, `CodexMcpAgentBackend`, `FallbackAgentBackend` | `CommandMode` |
 | `Store` (sessions) | `tusk/kernel/agent/session/store.py` | `FileStore` | `AgentRuntime`, `AgentOrchestrator`, recorders |
 | `LLMProvider` | `tusk/shared/llm/interfaces/llm_provider.py` | `GroqLLM`, `OpenRouterLLM`, `LLMProxy` (wrapper) | agent profiles, gatekeepers, `ModeGate` |
 | `LLMProviderFactory` | `tusk/shared/llm/interfaces/llm_provider_factory.py` | `ConfigurableLLMFactory` | `LLMRegistry` |
@@ -485,8 +484,7 @@ flowchart TD
     SRV -->|AgentResult<br/>session_id = threadId| CM
 ```
 
-- **`tusk`** (default) — `TuskAgentBackend` wraps `MainAgent` (which itself implements
-  `AgentBackend` and is used directly when no wrapper is needed), running the in-process
+- **`tusk`** (default) — `TuskAgentBackend` wraps `MainAgent`, running the in-process
   conversation → planner → executor loop documented under [Agent Structure](#agent-structure).
 - **`codex_exec`** — `CodexExecAgentBackend` shells out to `codex exec --json`
   (`CodexExecCommandBuilder` builds argv, `CodexPromptBuilder` adds the desktop-assistant

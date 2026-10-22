@@ -67,26 +67,12 @@ def test_fast_command_without_store_does_not_share() -> None:
 
 
 def test_first_command_then_conversation_resumes_seeded_session() -> None:
-    from tusk.kernel.agent.backends import AgentRequest
-
     requests: list[AgentRunRequest] = []
     agent = _agent(requests, [])
-    agent.run(AgentRequest("open gedit", "command", ""))
-    agent.run(AgentRequest("what did you open?", "conversation", ""))
+    agent.process_command("open gedit", "command")
+    agent.process_command("what did you open?")
     conversation = next(request for request in requests if request.profile_id == "conversation")
     assert conversation.session_id == "seeded-session"
-
-
-def test_run_command_preserves_conversation_session_for_sharing() -> None:
-    from tusk.kernel.agent.backends import AgentRequest
-
-    requests: list[AgentRunRequest] = []
-    events: list[tuple[str, str, dict]] = []
-    agent = _agent(requests, events)
-    agent.process_command("hello")
-    agent.run(AgentRequest("open gedit", "command", ""))
-    lines = [(sid, data["role"], data["content"]) for sid, name, data in events]
-    assert ("conv-1", "user", "open gedit") in lines
 
 
 def test_fast_command_does_not_adopt_the_command_session() -> None:

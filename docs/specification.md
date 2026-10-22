@@ -369,7 +369,7 @@ codex exec"; otherwise `status`/`reply` are read from the parsed JSON.
 runs the backend, stores the returned `session_id` for the next turn, and returns
 `KernelResponse(handled, reply)`.
 
-`MainAgent` (the `tusk` backend, also implementing the `Agent` ABC) runs
+`MainAgent` (wrapped by the `tusk` backend) runs
 `AgentOrchestrator.run(AgentRunRequest(command, "conversation", session_id))`, maps
 `status="cancelled"` to the reply `"Stopped."`, and appends the exchange to
 `SlidingWindowHistory`.

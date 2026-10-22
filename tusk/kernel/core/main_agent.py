@@ -3,8 +3,6 @@ import re
 from typing import Any
 
 from tusk.kernel.agent import AgentOrchestrator, AgentRunRequest
-from tusk.kernel.agent.backends import AgentBackend, AgentRequest
-from tusk.kernel.agent.backends import AgentResult as BackendAgentResult
 from tusk.kernel.agent.session.store import Store
 from tusk.kernel.interfaces.conversation_history import ConversationHistory
 from tusk.shared.schemas.chat_message import ChatMessage
@@ -12,20 +10,12 @@ from tusk.shared.schemas.chat_message import ChatMessage
 __all__ = ["MainAgent"]
 
 
-class MainAgent(AgentBackend):
+class MainAgent:
     def __init__(self, orchestrator: AgentOrchestrator, history: ConversationHistory, session_store: Store | None = None) -> None:
         self._orchestrator = orchestrator
         self._history = history
         self._store = session_store
         self._session_id = ""
-
-    def run(self, request: AgentRequest) -> BackendAgentResult:
-        # keep our conversation session unless a non-empty one is supplied; a one-shot
-        # command must not wipe the session its summary is shared into
-        if request.mode != "command" and request.session_id:
-            self._session_id = request.session_id
-        reply = self.process_command(request.user_text, request.mode)
-        return BackendAgentResult(True, reply, self._session_id)
 
     def process_command(self, command: str, kind: str = "conversation") -> str:
         if kind == "command":
