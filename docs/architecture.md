@@ -875,15 +875,16 @@ main()
   → Config.from_env()                          # all env settings
   → ColorLogPrinter(options)
   → StatusReporter(NullStatusSink(), log)   # real sink attached later by the tray
+  → LLMRegistryBuilder(factory, config, log, options, token, tracer).build()   # tusk/shared/llm
   → build_kernel(config, log, llm_registry, reporter, InterruptToken())   # startup.py
       → ToolRegistry()
-      → AdapterManager("adapters", ...).start_all() + start_watcher()
       → SlidingWindowHistory(20)
       → MainAgent(AgentOrchestrator(build_agent_profiles(llm_registry),
                                     tool_registry, FileStore(session_log_dir), log, token),
                   history)
       → KernelAPI(CommandMode(AgentBackendFactory(agent, config, log).create(), log, confirmation),
                   llm_registry, log, reporter, token)     # owns dictation/coding ModeSlots
+      → AdapterManager("adapters", ...).start_all() + start_watcher()   # skipped when with_adapters=False (voice e2e)
       → ToolRuntime(...).register_tools(kernel)  # start_dictation/start_coding/switch_model,
                                                  # routers + editor driver + strategy attached
   → reporter.set_models(registry.model_labels())

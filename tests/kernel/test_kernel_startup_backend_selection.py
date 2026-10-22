@@ -45,3 +45,16 @@ def _assert_factory_received(agent: object, config: object, user_text: str) -> N
     assert FactoryStub.instances[0].agent is agent
     assert FactoryStub.instances[0].config is config
     assert FactoryStub.instances[0].backend.requests[0].user_text == user_text
+
+
+def test_kernel_startup_without_adapters_skips_adapter_manager_and_tool_runtime(monkeypatch: object) -> None:
+    RuntimeStub.registrations.clear()
+    _patch_startup(monkeypatch, types.SimpleNamespace(name="main-agent"))
+    monkeypatch.setattr(startup, "build_adapter_manager", _unexpected_adapter_manager)
+    config = types.SimpleNamespace(agent_backend="codex_exec")
+    startup.build_kernel(config, _log(), _llm_registry(), None, with_adapters=False)
+    assert RuntimeStub.registrations == []
+
+
+def _unexpected_adapter_manager(*args: object) -> object:
+    raise AssertionError("adapters must not start when with_adapters is False")

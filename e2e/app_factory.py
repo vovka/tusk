@@ -1,33 +1,29 @@
-import main as app_main
-from tusk.kernel import CommandMode, KernelAPI, MainAgent, SlidingWindowHistory, ToolRegistry
-from tusk.kernel.agent import AgentOrchestrator, FileStore
-from tusk.kernel.agent.backends import AgentBackendFactory
-from tusk.kernel.agent.confirmation import ConfirmationGate
-from tusk.kernel.core.agent_profiles import build_agent_profiles
+"""Real kernel + real Groq LLM slots for e2e runs.
+
+with_adapters=False skips the MCP adapters so the voice e2e never touches the desktop;
+with_adapters=True wires the gnome adapter and needs launcher/tusk_host_launcher.py running.
+"""
+from tusk.kernel import KernelAPI, ToolRegistry
+from tusk.kernel.core.startup import build_kernel
+from tusk.providers.llm import ConfigurableLLMFactory
 from tusk.shared.config import Config, StartupOptions
 from tusk.shared.interrupt import InterruptToken
-from tusk.shared.llm import LLMRegistry
+from tusk.shared.llm import LLMRegistryBuilder
 from tusk.shared.logging import ColorLogPrinter
+from tusk.shared.status import NullStatusSink, StatusReporter
 from tusk.shared.tracing.null_tracer import NullTracer
 
 __all__ = ["build_app"]
 
 
-def build_app() -> tuple[KernelAPI, InterruptToken, ColorLogPrinter]:
-    """Real kernel + real Groq LLM slots; no MCP adapters so e2e never touches the desktop."""
+def build_app(with_adapters: bool) -> tuple[KernelAPI, ToolRegistry, InterruptToken, ColorLogPrinter]:
     options = StartupOptions.from_sources([])
     config = Config.from_env()
     log = ColorLogPrinter(options.log_groups, options.hidden_groups)
     token = InterruptToken()
-    registry = app_main._build_llm_registry(config, log, options, token, NullTracer())
-    return _kernel(config, log, registry, token), token, log
-
-
-def _kernel(config: Config, log: ColorLogPrinter, registry: LLMRegistry, token: InterruptToken) -> KernelAPI:
-    history = SlidingWindowHistory(20)
-    store = FileStore(config.agent_session_log_dir)
-    tools = ToolRegistry()
-    confirmation = ConfirmationGate(tools)
-    orchestrator = AgentOrchestrator(build_agent_profiles(registry), tools, store, log, token, confirmation=confirmation)
-    backend = AgentBackendFactory(MainAgent(orchestrator, history), config, log).create()
-    return KernelAPI(CommandMode(backend, log, confirmation), registry, log, None, token)
+    factory = ConfigurableLLMFactory(config.groq_api_key, config.openrouter_api_key)
+    llm_registry = LLMRegistryBuilder(factory, config, log, options, token, NullTracer()).build()
+    reporter = StatusReporter(NullStatusSink(), log)
+    tool_registry = ToolRegistry()
+    kernel = build_kernel(config, log, llm_registry, reporter, token, tool_registry=tool_registry, with_adapters=with_adapters)
+    return kernel, tool_registry, token, log

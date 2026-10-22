@@ -7,14 +7,14 @@ import sys
 import time
 from collections.abc import Callable
 
-from e2e.desktop_app_factory import build_desktop_app
+from e2e.app_factory import build_app
 from e2e.desktop_probe import DesktopProbe
 from e2e.desktop_scenarios import SCENARIOS
 from e2e.voice_e2e_harness import VoiceE2EHarness
 
 
 def main() -> int:
-    kernel, tool_registry, token, log = build_desktop_app()
+    kernel, tool_registry, token, log = build_app(with_adapters=True)
     harness = VoiceE2EHarness(kernel, token, log)
     harness.playback.seconds_per_play = 2.0
     harness.start()

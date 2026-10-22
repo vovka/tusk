@@ -13,14 +13,15 @@ from tusk.shared.status import LatencyMeter, StatusReporter
 from tusk.shared.tracing.interfaces.tracer import Tracer
 
 
-def build_kernel(config: Config, log: ColorLogPrinter, llm_registry: LLMRegistry, reporter: StatusReporter, token: InterruptToken | None = None, tracer: Tracer | None = None, latency_meter: LatencyMeter | None = None) -> KernelAPI:
-    tool_registry = ToolRegistry()
-    adapter_manager = build_adapter_manager(config, log, tool_registry)
+def build_kernel(config: Config, log: ColorLogPrinter, llm_registry: LLMRegistry, reporter: StatusReporter, token: InterruptToken | None = None, tracer: Tracer | None = None, latency_meter: LatencyMeter | None = None, tool_registry: ToolRegistry | None = None, with_adapters: bool = True) -> KernelAPI:
+    tool_registry = tool_registry if tool_registry is not None else ToolRegistry()
     history = SlidingWindowHistory(20)
     confirmation = ConfirmationGate(tool_registry, latency_meter=latency_meter)
     agent = build_agent(config, log, llm_registry, tool_registry, history, token, tracer, confirmation=confirmation)
     kernel = build_api(agent, config, log, llm_registry, reporter, token, tracer, confirmation=confirmation)
-    ToolRuntime(tool_registry, llm_registry, adapter_manager, log, reporter).register_tools(kernel)
+    if with_adapters:
+        adapter_manager = build_adapter_manager(config, log, tool_registry)
+        ToolRuntime(tool_registry, llm_registry, adapter_manager, log, reporter).register_tools(kernel)
     return kernel
 
 

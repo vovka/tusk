@@ -8,75 +8,36 @@ from tusk.kernel.core.startup import build_kernel
 from tusk.providers.llm import ConfigurableLLMFactory
 from tusk.shared.config import Config, StartupOptions
 from tusk.shared.interrupt import InterruptToken
-from tusk.shared.llm import LLMProxy, LLMRegistry, RotatingLLMProvider
-from tusk.shared.llm.interfaces.llm_provider import LLMProvider
+from tusk.shared.llm import LLMRegistryBuilder
 from tusk.shared.logging import ColorLogPrinter
 from tusk.shared.status import LatencyMeter, NullStatusSink, StatusReporter
 from tusk.shared.tracing import TracerFactory
 from tusk.shared.tracing.interfaces.tracer import Tracer
 
 
-def _build_log(options: StartupOptions) -> ColorLogPrinter:
-    return ColorLogPrinter(options.log_groups, options.hidden_groups)
-
-
-def _build_tracer() -> Tracer:
-    return TracerFactory().create(os.environ.get("TRACING_OTLP_ENDPOINT", ""))
-
-
-def _build_llm_registry(config: Config, log: ColorLogPrinter, options: StartupOptions, token: InterruptToken, tracer: Tracer) -> LLMRegistry:
-    factory = ConfigurableLLMFactory(config.groq_api_key, config.openrouter_api_key)
-    registry = LLMRegistry(factory)
-    _register_slots(factory, config, log, registry, options, token, tracer)
-    return registry
-
-
-def _build_kernel(config: Config, log: ColorLogPrinter, options: StartupOptions, reporter: StatusReporter, token: InterruptToken, tracer: Tracer, latency_meter: LatencyMeter) -> KernelAPI:
-    registry = _build_llm_registry(config, log, options, token, tracer)
-    return build_kernel(config, log, registry, reporter, token, tracer, latency_meter)
-
-
-def _register_slots(factory: ConfigurableLLMFactory, config: Config, log: ColorLogPrinter, registry: LLMRegistry, options: StartupOptions, token: InterruptToken, tracer: Tracer) -> None:
-    registry.register_slot("gatekeeper", _slot_proxy(factory, config.gatekeeper_llm, log, "gatekeeper", options, tracer))
-    registry.register_slot("stop_gate", _slot_proxy(factory, config.stop_gate_llm, log, "stop_gate", options, tracer))
-    registry.register_slot("conversation_agent", _slot_proxy(factory, config.conversation_agent_llm, log, "conversation_agent", options, tracer, token))
-    registry.register_slot("command_agent", _slot_proxy(factory, config.command_agent_llm, log, "command_agent", options, tracer, token))
-    registry.register_slot("planner_agent", _slot_proxy(factory, config.planner_agent_llm, log, "planner_agent", options, tracer, token))
-    registry.register_slot("executor_agent", _slot_proxy(factory, config.executor_agent_llm, log, "executor_agent", options, tracer, token))
-    registry.register_slot("default_agent", _slot_proxy(factory, config.default_agent_llm, log, "default_agent", options, tracer, token))
-    registry.register_slot("utility", _slot_proxy(factory, config.utility_llm, log, "utility", options, tracer))
-
-
-def _slot_proxy(factory: ConfigurableLLMFactory, slot: object, log: ColorLogPrinter, name: str, options: StartupOptions, tracer: Tracer, token: InterruptToken | None = None) -> LLMProxy:
-    # the gatekeeper/utility slots get no token: they must stay usable while an interrupt is pending
-    provider = _slot_provider(factory, slot, log, name)
-    return LLMProxy(provider, log, name, enabled_log_groups=options.log_groups, preview_chars=options.llm_log_preview_chars, interrupt_token=token, tracer=tracer)
-
-
-def _slot_provider(factory: ConfigurableLLMFactory, slot: object, log: ColorLogPrinter, name: str) -> LLMProvider:
-    if not getattr(slot, "rotation", ()):
-        return factory.create(slot.provider_name, slot.model)
-    providers = [factory.create(*item.split("/", 1)) for item in slot.rotation]
-    return RotatingLLMProvider(providers, lambda exc, label: log.log("LLMREQUEST", f"[{name}] 429, failing over to {label}: {exc}", "llm-request"))
-
-
-def _check_version_flag(options: StartupOptions) -> None:
-    if getattr(options, "version", False):
-        print(__version__)
-        sys.exit(0)
-
-
 def main() -> None:
     options = StartupOptions.from_sources(sys.argv[1:])
     _check_version_flag(options)
     config = Config.from_env()
-    log = _build_log(options)
-    tracer = _build_tracer()
+    log = ColorLogPrinter(options.log_groups, options.hidden_groups)
+    tracer = TracerFactory().create(os.environ.get("TRACING_OTLP_ENDPOINT", ""))
     reporter = StatusReporter(NullStatusSink(), log)
     latency_meter = LatencyMeter(log, reporter)
     kernel = _build_kernel(config, log, options, reporter, InterruptToken(), tracer, latency_meter)
     reporter.set_models(kernel.llm_registry.model_labels())
     ShellLoader(config, kernel, log, reporter, latency_meter.mark_speech_end).start()
+
+
+def _check_version_flag(options: StartupOptions) -> None:
+    if options.version:
+        print(__version__)
+        sys.exit(0)
+
+
+def _build_kernel(config: Config, log: ColorLogPrinter, options: StartupOptions, reporter: StatusReporter, token: InterruptToken, tracer: Tracer, latency_meter: LatencyMeter) -> KernelAPI:
+    factory = ConfigurableLLMFactory(config.groq_api_key, config.openrouter_api_key)
+    llm_registry = LLMRegistryBuilder(factory, config, log, options, token, tracer).build()
+    return build_kernel(config, log, llm_registry, reporter, token, tracer, latency_meter)
 
 
 if __name__ == "__main__":

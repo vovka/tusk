@@ -69,7 +69,7 @@ _SCENARIOS = [
 
 
 def main() -> int:
-    kernel, token, log = build_app()
+    kernel, _, token, log = build_app(with_adapters=False)
     harness = VoiceE2EHarness(kernel, token, log)
     harness.start()
     failures = sum(_run_one(harness, scenario) for scenario in _SCENARIOS)

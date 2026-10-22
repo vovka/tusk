@@ -7,6 +7,7 @@ def test_shared_llm_exports_present() -> None:
     assert "LLMPayloadLogger" in llm.__all__
     assert "LLMProxy" in llm.__all__
     assert "LLMRegistry" in llm.__all__
+    assert "LLMRegistryBuilder" in llm.__all__
 
 
 def test_shared_llm_retry_exports_present() -> None:
