@@ -3,7 +3,7 @@ from dataclasses import replace
 from tusk.shared.schemas.tools.tool_call import ToolCall
 from tusk.shared.schemas.tools.tool_result import ToolResult
 from tusk.kernel.tools.tool_registry import ToolRegistry
-from tusk.kernel.agent.simple_schema_validator import SimpleSchemaValidator
+from tusk.kernel.agent.toolset.simple_schema_validator import SimpleSchemaValidator
 from tusk.kernel.agent.tool_sequence.executor import Executor
 from tusk.kernel.agent.confirmation.confirmation_gate import ConfirmationGate
 from tusk.shared.schemas.tools.tool_sequence_plan import ToolSequencePlan

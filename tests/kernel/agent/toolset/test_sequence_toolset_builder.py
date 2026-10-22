@@ -1,6 +1,6 @@
 from tests.kernel_api_support import make_registry_tool
 from tusk.kernel.agent.agent_run_request import AgentRunRequest
-from tusk.kernel.agent.agent_toolset_builder import AgentToolsetBuilder
+from tusk.kernel.agent.toolset.toolset_builder import ToolsetBuilder
 from tusk.kernel.core.agent_profiles import build_agent_profiles
 from tusk.kernel.tools.tool_registry import ToolRegistry
 from tusk.shared.schemas.tools.tool_sequence_plan import ToolSequencePlan
@@ -9,7 +9,7 @@ from tusk.shared.schemas.tools.tool_sequence_plan import ToolSequencePlan
 def test_sequence_executor_gets_meta_tool_only() -> None:
     registry = ToolRegistry()
     registry.register(make_registry_tool("gnome.type_text", "type", sequence_callable=True))
-    tools = AgentToolsetBuilder(registry).build(_profiles()["executor"], _sequence_request())
+    tools = ToolsetBuilder(registry).build(_profiles()["executor"], _sequence_request())
     names = [tool["function"]["name"] for tool in tools]
     assert names == ["done", "execute_tool_sequence"]
     assert tools[1]["function"]["parameters"] == {"type": "object", "properties": {}, "additionalProperties": False}
@@ -19,7 +19,7 @@ def test_normal_executor_keeps_runtime_tools() -> None:
     registry = ToolRegistry()
     registry.register(make_registry_tool("gnome.type_text", "type", sequence_callable=True))
     request = AgentRunRequest("type", profile_id="executor", runtime_tool_names=("gnome.type_text",))
-    tools = AgentToolsetBuilder(registry).build(_profiles()["executor"], request)
+    tools = ToolsetBuilder(registry).build(_profiles()["executor"], request)
     names = [tool["function"]["name"] for tool in tools]
     assert names == ["done", "gnome.type_text"]
 

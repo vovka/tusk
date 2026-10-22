@@ -270,8 +270,9 @@ tusk/                        (repo root)
 │   │   │   │   ├── codex_exec/ # One-shot `codex exec --json` backend (CommandBuilder, ResultParser)
 │   │   │   │   └── codex_mcp/ # Persistent codex mcp-server session backend (Client, CallBuilder, ResultMapper)
 │   │   │   ├── guards/      # Turn guards (delegation, clipboard, typing, repeated calls)
-│   │   │   ├── planner/     # Planner output validation, sequence promotion, runtime tool resolution
+│   │   │   ├── planner/     # Planner tool catalog, output validation, sequence promotion, runtime tool resolution
 │   │   │   ├── runtime/     # Message history builder, result factory, step recorder, guard composition
+│   │   │   ├── toolset/     # Per-profile synthetic tool definitions, static schemas, argument validator
 │   │   │   └── tool_sequence/ # Compiled sequences: PlanValidator, Executor, Recorder
 │   │   ├── modes/           # Dictation/coding machinery: ModeSlot, AdapterMode, ModeGate, routers,
 │   │   │                    #   states, gate prompts, InputAutomationEditorDriver, FullReplaceEditStrategy
@@ -642,11 +643,11 @@ lookups by name and filtered views (`all_tools`, `planner_tools`,
 `definitions_for(names)`) — see the class for the exact API.
 
 The planner receives the full catalog as text in its request context via
-`AgentToolCatalog` (name, description, parameters, `sequence_callable` flag per tool).
+`ToolCatalog` (name, description, parameters, `sequence_callable` flag per tool).
 
 Kernel-internal tools (registered by `ToolRuntime`): `start_dictation`, `start_coding`,
 `switch_model`. Synthetic tools (`done`, `run_agent`, `execute_tool_sequence`) are built
-per profile by `AgentToolsetBuilder` and never stored in the registry.
+per profile by `ToolsetBuilder` and never stored in the registry.
 
 ---
 

@@ -9,8 +9,8 @@ from tusk.kernel.agent.agent_run_request import AgentRunRequest
 from tusk.kernel.agent.agent_runtime import AgentRuntime
 from tusk.kernel.agent.runtime.transcript import Transcript
 from tusk.kernel.agent.session_store import SessionStore
-from tusk.kernel.agent.agent_tool_catalog import AgentToolCatalog
-from tusk.kernel.agent.agent_toolset_builder import AgentToolsetBuilder
+from tusk.kernel.agent.planner.tool_catalog import ToolCatalog
+from tusk.kernel.agent.toolset.toolset_builder import ToolsetBuilder
 from tusk.kernel.agent.delegation import Delegation
 from tusk.kernel.agent.orchestrator_tool_dispatcher import OrchestratorToolDispatcher
 from tusk.kernel.agent.planner.result_validator import ResultValidator
@@ -44,10 +44,10 @@ class AgentOrchestrator:
                          confirmation: ConfirmationGate) -> None:
         self._runtime = AgentRuntime(store, log, Transcript(store, registry), token)
         self._delegation = Delegation(store)
-        self._catalog = AgentToolCatalog(registry)
+        self._catalog = ToolCatalog(registry)
         self._planner_results = ResultValidator(log)
         self._resolved_tools = RuntimeToolResolver(store)
-        self._tools = AgentToolsetBuilder(registry)
+        self._tools = ToolsetBuilder(registry)
         sequence_executor = Executor(registry, store, token, tracer=tracer, confirmation=confirmation)
         self._dispatcher = OrchestratorToolDispatcher(registry, sequence_executor, tracer=tracer, confirmation=confirmation)
 

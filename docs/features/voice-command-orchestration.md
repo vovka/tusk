@@ -12,7 +12,7 @@ The voice shell uses the gatekeeper to classify utterances, then routes actionab
 - `tusk/kernel/agent/agent_runtime.py`: main agent loop, repeated-call guard, turn guards, finish/fail handling.
 - `tusk/kernel/agent/planner_result_validator.py`: validates `planned_steps`, normalizes tool names, promotes valid plans to sequence mode.
 - `tusk/kernel/agent/planner_runtime_tool_resolver.py`: restores planner payload into executor `runtime_tool_names`, `execution_mode`, and `sequence_plan`.
-- `tusk/kernel/agent/agent_toolset_builder.py`: exposes either runtime tools or `execute_tool_sequence` to the executor.
+- `tusk/kernel/agent/toolset/toolset_builder.py`: exposes either runtime tools or `execute_tool_sequence` to the executor.
 - `tusk/kernel/agent/runtime/call_tool.py`: the one-shot command's tools as a single `call_tool` with a compact catalogue; `AgentRuntime` unwraps it to the real tool call before guards run.
 - `tusk/kernel/agent/orchestrator_tool_dispatcher.py`: routes `run_agent`, `execute_tool_sequence`, and real tools.
 - `tusk/kernel/agent/tool_sequence_plan_validator.py`: rejects non-`sequence_callable` tools in sequence mode.

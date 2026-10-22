@@ -1,4 +1,4 @@
-from tusk.kernel.agent.simple_schema_validator import SimpleSchemaValidator
+from tusk.kernel.agent.toolset.simple_schema_validator import SimpleSchemaValidator
 from tusk.kernel.tools.tool_registry import ToolRegistry
 from tusk.shared.schemas.tools.tool_sequence_plan import ToolSequencePlan
 

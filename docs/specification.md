@@ -438,7 +438,7 @@ Return done with payload containing selected_tool_names, execution_mode, plan_te
 The planner's only tool is `done` (with the `PLANNER_DONE` schema: `payload` requires
 `selected_tool_names`, `execution_mode`, `planned_steps`). The tool catalog is appended
 to the planner's *instruction* by `AgentOrchestrator._enrich_planner` — the text
-`Tool catalog: {"tools": [...]}` from `AgentToolCatalog.prompt_text()`, listing every
+`Tool catalog: {"tools": [...]}` from `ToolCatalog.prompt_text()`, listing every
 planner-visible tool's `name`, `description`, `input_schema`, `source`, and
 `sequence_callable` flag.
 
@@ -467,7 +467,7 @@ After a planner child finishes with `status=done`,
 
 **Sources:** `tusk/kernel/agent_profiles.py` (`executor` profile),
 `tusk/kernel/agent/planner/runtime_tool_resolver.py`,
-`tusk/kernel/agent/agent_toolset_builder.py`
+`tusk/kernel/agent/toolset/toolset_builder.py`
 
 ### 11.1 System Prompt
 

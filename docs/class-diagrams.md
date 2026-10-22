@@ -169,11 +169,11 @@ classDiagram
   class AgentRuntime {
     run(request: AgentRunRequest, profile: AgentProfile, tools: list[dict[str, object]], executor: Callable[[ToolCall, str], ToolResult]) AgentResult
   }
-  class AgentToolCatalog {
+  class ToolCatalog {
     list_tools() ToolResult
     prompt_text() str
   }
-  class AgentToolsetBuilder {
+  class ToolsetBuilder {
     build(profile: AgentProfile, request: AgentRunRequest) list[dict[str, object]]
     runtime_names(profile: AgentProfile, request: AgentRunRequest) set[str]
   }

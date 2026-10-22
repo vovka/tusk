@@ -3,22 +3,22 @@ import types
 from tests.kernel_api_support import make_registry_tool
 from tusk.kernel.agent.agent_profile import AgentProfile
 from tusk.kernel.agent.agent_run_request import AgentRunRequest
-from tusk.kernel.agent.agent_toolset_builder import AgentToolsetBuilder
+from tusk.kernel.agent.toolset.toolset_builder import ToolsetBuilder
 from tusk.kernel.tools.tool_registry import ToolRegistry
 
 
-def _builder() -> AgentToolsetBuilder:
+def _builder() -> ToolsetBuilder:
     registry = ToolRegistry()
     registry.register(make_registry_tool("gnome.press_keys", "pressed"))
     registry.register(make_registry_tool("gnome.type_text", "typed"))
-    return AgentToolsetBuilder(registry)
+    return ToolsetBuilder(registry)
 
 
-def _builder_with_hidden() -> AgentToolsetBuilder:
+def _builder_with_hidden() -> ToolsetBuilder:
     registry = ToolRegistry()
     registry.register(make_registry_tool("gnome.press_keys", "pressed"))
     registry.register(make_registry_tool("dictation.start_dictation", "started", planner_visible=False))
-    return AgentToolsetBuilder(registry)
+    return ToolsetBuilder(registry)
 
 
 def test_command_wildcard_excludes_hidden_adapter_internals() -> None:

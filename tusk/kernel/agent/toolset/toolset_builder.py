@@ -2,17 +2,17 @@ from tusk.kernel.tools.tool_registry import ToolRegistry
 from tusk.kernel.agent.agent_profile import AgentProfile
 from tusk.kernel.agent.agent_run_request import AgentRunRequest
 from tusk.kernel.agent.runtime.call_tool import CallTool
-from tusk.kernel.agent.static_tool_schemas import (
+from tusk.kernel.agent.toolset.static_tool_schemas import (
     DEFAULT_DONE,
     EXECUTE_TOOL_SEQUENCE,
     PLANNER_DONE,
     RUN_AGENT,
 )
 
-__all__ = ["AgentToolsetBuilder"]
+__all__ = ["ToolsetBuilder"]
 
 
-class AgentToolsetBuilder:
+class ToolsetBuilder:
     def __init__(self, tool_registry: ToolRegistry) -> None:
         self._registry = tool_registry
 
