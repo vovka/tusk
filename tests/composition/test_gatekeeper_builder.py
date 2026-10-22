@@ -1,6 +1,6 @@
 import types
 
-from gatekeeper_builder import GatekeeperBuilder
+from composition.gatekeeper_builder import GatekeeperBuilder
 from shells.voice.gate.playback_gate import PlaybackGate
 from tusk.shared.interrupt_token import InterruptToken
 

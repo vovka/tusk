@@ -2,7 +2,7 @@ import threading
 from collections.abc import Callable
 
 from adapters.gnome.app_vocabulary import AppVocabulary
-from gatekeeper_builder import GatekeeperBuilder
+from composition.gatekeeper_builder import GatekeeperBuilder
 from shells.voice.command_worker import CommandWorker
 from shells.voice.gate.confirmation_answer_gate import ConfirmationAnswerGate
 from shells.voice.pipeline import VoicePipeline

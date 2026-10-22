@@ -256,9 +256,10 @@ Two levels of packages — file-level detail lives in
 ```
 tusk/                        (repo root)
 ├── main.py                  # Entry point: config, log, LLM registry, kernel, ShellLoader
-├── shell_loader.py          # ShellLoader — builds shells from TUSK_SHELLS, orders tray last
-├── voice_shell_builder.py   # VoiceShellBuilder — builds the whole voice stack and returns a ready VoiceShell
-├── gatekeeper_builder.py    # GatekeeperBuilder — gatekeeper slot + mode gate wiring (voice modes)
+├── composition/             # Composition root — the only package allowed to import everything
+│   ├── shell_loader.py      # ShellLoader — builds shells from TUSK_SHELLS, orders tray last
+│   ├── voice_shell_builder.py # VoiceShellBuilder — builds the whole voice stack and returns a ready VoiceShell
+│   └── gatekeeper_builder.py # GatekeeperBuilder — gatekeeper slot + mode gate wiring (voice modes)
 ├── launcher/                # Host-side launcher daemon (Unix socket) — runs GUI apps as the host user
 ├── tusk/
 │   ├── kernel/              # Thin orchestration layer
@@ -327,7 +328,7 @@ tusk/                        (repo root)
 | Cross-layer plumbing (config, MCP, observability) | `tusk/shared/<area>/` |
 | An engine implementation behind a shared ABC (LLM/STT/TTS) | `tusk/providers/<kind>/` |
 | Tests | `tests/<mirror of source package>`; cross-tree tests and shared helpers at `tests/` root |
-| Composition/wiring | `main.py` / `shell_loader.py` — the only places allowed to import everything |
+| Composition/wiring | `main.py` / `composition/` — the only places allowed to import everything |
 | Dev-only tooling | `tools/` |
 
 Each source tree imports only itself plus `tusk.shared`; adapters may also import
@@ -866,7 +867,7 @@ heard during playback requests TUSK to stop (used by `PlaybackGate`).
 ## Startup Wiring
 
 `main.py` builds the platform pieces; `tusk/kernel/startup.py` builds the kernel;
-`shell_loader.py` builds the shells.
+`composition/shell_loader.py` builds the shells.
 
 ```
 main()
@@ -918,7 +919,7 @@ LLM slot proxies for agents carry the `InterruptToken`; gatekeeper/utility do no
 3. **Only `tusk.shared` crosses layers.** Kernel, shells, adapters, and providers import
    ABCs and schemas from `tusk.shared.*`; no layer imports a peer layer's concrete
    classes. Concrete implementations meet only in the wiring layer (`main.py`,
-   `startup.py`, `shell_loader.py`).
+   `startup.py`, `composition/`).
 
 4. **Adapters are isolated processes.** The kernel has no import dependency on any
    adapter module; capabilities are discovered at runtime via MCP.

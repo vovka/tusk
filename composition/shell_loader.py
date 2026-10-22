@@ -1,6 +1,7 @@
 import threading
 from collections.abc import Callable
 
+from composition.voice_shell_builder import VoiceShellBuilder
 from shells.cli_shell import CLIShell
 from shells.emulator_shell import EmulatorShell
 from shells.tray.tray_shell import TrayShell
@@ -10,7 +11,6 @@ from tusk.shared.config.config import Config
 from tusk.shared.interfaces.shell import Shell
 from tusk.shared.interfaces.log_printer import LogPrinter
 from tusk.shared.observability.status_reporter import StatusReporter
-from voice_shell_builder import VoiceShellBuilder
 
 __all__ = ["ShellLoader"]
 

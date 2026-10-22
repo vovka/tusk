@@ -2,7 +2,7 @@ import types
 
 import pytest
 
-from shell_loader import _SHELL_CLASSES, ShellLoader
+from composition.shell_loader import _SHELL_CLASSES, ShellLoader
 from shells.voice.voice_shell import VoiceShell
 from tusk.shared.interfaces.shell import Shell
 
@@ -29,7 +29,7 @@ def test_start_logs_ready_and_runs_last_shell_on_main_thread() -> None:
 
 def test_voice_shell_comes_from_builder_and_becomes_tray_control(monkeypatch) -> None:
     shell = types.SimpleNamespace(kind="voice")
-    monkeypatch.setattr("shell_loader.VoiceShellBuilder", lambda *args: types.SimpleNamespace(build=lambda: shell))
+    monkeypatch.setattr("composition.shell_loader.VoiceShellBuilder", lambda *args: types.SimpleNamespace(build=lambda: shell))
     loader = _loader(["voice", "tray"])
     loader._load_class = lambda name: _tray_class()
     shells = [loader._build(name) for name in loader._ordered_names()]
@@ -38,7 +38,7 @@ def test_voice_shell_comes_from_builder_and_becomes_tray_control(monkeypatch) ->
 
 def test_builder_receives_loader_collaborators_and_speech_end_callback(monkeypatch) -> None:
     seen: list[tuple] = []
-    monkeypatch.setattr("shell_loader.VoiceShellBuilder", lambda *args: seen.append(args) or types.SimpleNamespace(build=lambda: None))
+    monkeypatch.setattr("composition.shell_loader.VoiceShellBuilder", lambda *args: seen.append(args) or types.SimpleNamespace(build=lambda: None))
     config, kernel, log, reporter, on_speech_end = object(), object(), object(), object(), lambda seconds_ago: None
     ShellLoader(config, kernel, log, reporter, on_speech_end)._build("voice")
     assert seen == [(config, kernel, log, reporter, on_speech_end)]

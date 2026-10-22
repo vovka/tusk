@@ -123,7 +123,7 @@ text to the kernel instead of the current correction phrase.
 
 ## Assembly
 
-`VoiceShellBuilder` (repo root) builds the pipeline and hands it to `VoiceShell`, which
+`VoiceShellBuilder` (`composition/`) builds the pipeline and hands it to `VoiceShell`, which
 passes `CommandWorker.enqueue` as the callback. `VoicePipeline.run()` drives the loop:
 
 ```python

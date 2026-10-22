@@ -326,6 +326,7 @@ tusk/
 │   ├── gnome/          # GNOME desktop MCP server (windows, input, mouse, clipboard)
 │   ├── dictation/      # Dictation refinement MCP server
 │   └── coding/         # Voice pair-coding MCP server
+├── composition/        # Composition root: ShellLoader, VoiceShellBuilder, GatekeeperBuilder
 ├── e2e/                # Voice e2e harness: real pipeline + kernel, fake mic/STT/TTS
 ├── demos/              # Pair-coding transcripts + editor_emulator mock desktop adapter
 └── main.py             # Startup wiring: build kernel, attach shells, run adapters

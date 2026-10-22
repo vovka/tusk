@@ -1,11 +1,11 @@
 import types
 
-import voice_shell_builder
+from composition import voice_shell_builder
+from composition.voice_shell_builder import VoiceShellBuilder
 from shells.voice.command_worker import CommandWorker
 from shells.voice.voice_shell import VoiceShell
 from tusk.providers.tts import OpenAICompatibleTTS
 from tusk.shared.interrupt_token import InterruptToken
-from voice_shell_builder import VoiceShellBuilder
 
 
 def _config(tts_url: str = "", tts_enabled: bool = False) -> types.SimpleNamespace:
@@ -38,12 +38,12 @@ def _patch_stt(monkeypatch, engine: object, seen: list[str] | None = None) -> No
         if seen is not None:
             seen.append(vocabulary)
         return types.SimpleNamespace(create=lambda name: engine)
-    monkeypatch.setattr("voice_shell_builder.STTEngineFactory", factory)
+    monkeypatch.setattr("composition.voice_shell_builder.STTEngineFactory", factory)
 
 
 def test_builds_groq_tts_when_url_unset(monkeypatch) -> None:
     sentinel = object()
-    monkeypatch.setattr("voice_shell_builder.GroqTTS", lambda key: sentinel)
+    monkeypatch.setattr("composition.voice_shell_builder.GroqTTS", lambda key: sentinel)
     assert _builder(_config("")).tts_engine() is sentinel
 
 
@@ -54,7 +54,7 @@ def test_builds_openai_compatible_tts_when_url_set() -> None:
 
 def test_worker_receives_tts_engine_only_when_enabled(monkeypatch) -> None:
     sentinel = object()
-    monkeypatch.setattr("voice_shell_builder.GroqTTS", lambda key: sentinel)
+    monkeypatch.setattr("composition.voice_shell_builder.GroqTTS", lambda key: sentinel)
     assert _builder(_config(tts_enabled=True)).worker()._speaker._tts is sentinel
     assert _builder(_config(tts_enabled=False)).worker()._speaker._tts is None
 

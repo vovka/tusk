@@ -709,7 +709,7 @@ buffer, or gatekeeper (§16.1, §20).
 
 ## 16. Kernel Routing and Mode Specification
 
-**Sources:** `tusk/kernel/api.py`, `tusk/kernel/modes/`, `shell_loader.py`,
+**Sources:** `tusk/kernel/api.py`, `tusk/kernel/modes/`, `composition/shell_loader.py`,
 `shells/voice/gate/gatekeeper_slot.py`, `shells/voice/gate/stop_gatekeeper.py`
 
 ### 16.1 KernelAPI.submit
@@ -992,7 +992,7 @@ slots, and registers `SwitchModelTool`, `StartDictationTool`, `StartCodingTool`.
 
 ### 20.1 Shell Registry and Threading
 
-**Source:** `shell_loader.py`, interface `tusk/shared/interfaces/shell.py`
+**Source:** `composition/shell_loader.py`, interface `tusk/shared/interfaces/shell.py`
 (`start(submit)`).
 
 Shells are a static registry — no dynamic discovery:
@@ -1006,7 +1006,7 @@ the **end** of the list (GTK main loop must own the main thread). Every shell bu
 last runs in a daemon thread; the last blocks the main thread. Each shell's `start`
 receives `kernel.submit`.
 
-`VoiceShellBuilder` (repo root) builds the voice stack: STT engine via `STTEngineFactory`,
+`VoiceShellBuilder` (`composition/`) builds the voice stack: STT engine via `STTEngineFactory`,
 `CommandWorker` (with `GroqTTS` when `TUSK_TTS` is on, `SpeechPlayback`, the interrupt
 token, and the `TUSK_ACK` flag), the busy/speaking-aware `LLMGatekeeper` inside a
 `GatekeeperSlot` (via `GatekeeperBuilder`), the mode gate wiring of §16.4, the stage pipeline
@@ -1261,7 +1261,7 @@ apps start on the host desktop rather than inside the container.
 
 3. **Dependencies point at `tusk/shared`.** The kernel depends on
    `tusk.shared` interfaces and schemas; concrete providers (`tusk/providers/`) and
-   shells are injected from `main.py` / `shell_loader.py` / `tusk/kernel/startup.py`.
+   shells are injected from `main.py` / `composition/` / `tusk/kernel/startup.py`.
    The kernel never imports a shell; shells reach the kernel only through
    `KernelAPI.submit` and the wiring callbacks.
 
@@ -1374,7 +1374,7 @@ The active runtime no longer contains:
 - `tusk/kernel/tool_call_parser.py` — deleted; tool calls are native
   (`complete_tool_call`) with `ToolUseFailedRecovery` as the salvage path
 - `shell.json` discovery via `importlib` — replaced by the static `_SHELL_CLASSES`
-  registry in `shell_loader.py`
+  registry in `composition/shell_loader.py`
 - Hard-coded stop-phrase matching, and the separate `DictationGate`/`CodingGate` +
   per-mode voice gatekeepers — unified into `ModeGate` + `StopGatekeeper` +
   `GatekeeperSlot` swapping (§16)

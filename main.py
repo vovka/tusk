@@ -1,7 +1,7 @@
 import os
 import sys
 
-from shell_loader import ShellLoader
+from composition import ShellLoader
 from tusk import __version__
 from tusk.kernel import KernelAPI
 from tusk.kernel.core.startup import build_kernel
