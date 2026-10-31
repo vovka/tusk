@@ -30,7 +30,7 @@ class CodexMcpConfigGenerator:
     # default_tools_approval_mode: codex mcp-server has no interactive approval
     # channel; without it every tool call elicits an approval nothing can answer.
     def _toml(self, name: str, script: Path) -> str:
-        env = {"PYTHONPATH": str(script.parent), **self._server_env}
+        env = {**self._server_env, "PYTHONPATH": self._python_path()}
         env_items = ", ".join(f"{key} = {json.dumps(value)}" for key, value in env.items())
         return (
             f'[mcp_servers."{name}"]\n'
@@ -40,10 +40,16 @@ class CodexMcpConfigGenerator:
             f'default_tools_approval_mode = "approve"\n'
         )
 
+    # Adapters import `adapters.<name>...`, so the repo root must be on the path.
+    def _python_path(self) -> str:
+        repo_root = str(self._adapters_dir.parent)
+        inherited = self._server_env.get("PYTHONPATH")
+        return f"{repo_root}{os.pathsep}{inherited}" if inherited else repo_root
+
 
 def main() -> None:
-    display_env = {key: os.environ.get(key, "") for key in ("DISPLAY", "XAUTHORITY")}
-    server_env = {key: value for key, value in display_env.items() if value}
+    inherited_env = {key: os.environ.get(key, "") for key in ("DISPLAY", "XAUTHORITY", "PYTHONPATH")}
+    server_env = {key: value for key, value in inherited_env.items() if value}
     print(CodexMcpConfigGenerator(Path(sys.argv[1]), server_env).generate())
 
 

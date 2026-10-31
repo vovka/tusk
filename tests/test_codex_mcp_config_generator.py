@@ -28,8 +28,17 @@ def test_section_contains_command_script_and_env(tmp_path: Path) -> None:
 
     assert 'command = "python3"' in output
     assert f'args = ["{tmp_path}/gnome/server.py"]' in output
-    assert f'PYTHONPATH = "{tmp_path}/gnome"' in output
+    assert f'PYTHONPATH = "{tmp_path.parent}"' in output
     assert 'DISPLAY = ":1"' in output
+
+
+def test_pythonpath_keeps_inherited_entries_after_repo_root(tmp_path: Path) -> None:
+    """The gnome adapter imports gi from the system dist-packages on PYTHONPATH."""
+    _write_adapter(tmp_path, "gnome")
+
+    output = CodexMcpConfigGenerator(tmp_path, {"PYTHONPATH": "/usr/lib/python3/dist-packages"}).generate()
+
+    assert f'PYTHONPATH = "{tmp_path.parent}:/usr/lib/python3/dist-packages"' in output
 
 
 def test_section_auto_approves_tool_calls(tmp_path: Path) -> None:
